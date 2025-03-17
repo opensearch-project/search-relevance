@@ -1,3 +1,4 @@
+import java.nio.file.Files
 import org.opensearch.gradle.test.RestIntegTestTask
 
 apply plugin: 'java'
@@ -6,6 +7,12 @@ apply plugin: 'eclipse'
 apply plugin: 'opensearch.opensearchplugin'
 apply plugin: 'opensearch.yaml-rest-test'
 apply plugin: 'opensearch.pluginzip'
+// for formatting and license headers
+apply plugin: 'com.diffplug.spotless'
+apply from: 'formatter/formatting.gradle'
+// for coverage and diff
+apply plugin: 'jacoco'
+apply plugin: 'com.form.diff-coverage'
 
 def pluginName = 'search-relevance'
 def pluginDescription = 'Custom plugin'
@@ -66,10 +73,13 @@ buildscript {
         maven { url "https://aws.oss.sonatype.org/content/repositories/snapshots" }
         mavenCentral()
         maven { url "https://plugins.gradle.org/m2/" }
+        maven { url 'https://jitpack.io' }
     }
 
     dependencies {
         classpath "org.opensearch.gradle:build-tools:${opensearch_version}"
+        classpath "com.diffplug.spotless:spotless-plugin-gradle:6.23.2"
+        classpath "com.github.form-com.diff-coverage-gradle:diff-coverage:0.9.4"
     }
 }
 
@@ -83,6 +93,14 @@ repositories {
 test {
     include '**/*Tests.class'
 }
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required = true
+    }
+}
+tasks.named("check").configure { dependsOn(jacocoTestReport) }
 
 task integTest(type: RestIntegTestTask) {
     description = "Run tests against a cluster"
@@ -120,3 +138,34 @@ task updateVersion {
     }
 }
 
+ext.createDiffFile = { ->
+    def file = Files.createTempFile(URLEncoder.encode(project.name, 'UTF-8'), '.diff').toFile()
+    def diffBase = 'refs/remotes/origin/main'
+    // Only run locally
+    if (!System.getenv('CI')) {
+        file.withOutputStream { out ->
+            exec {
+                commandLine 'git', 'diff', '--no-color', '--minimal', diffBase
+                standardOutput = out
+            }
+        }
+    }
+    return file
+}
+
+diffCoverageReport {
+    afterEvaluate {
+        diffSource.file = createDiffFile()
+    }
+
+    // View report at build/reports/jacoco/diffCoverage/html/index.html
+    reports {
+        html = true
+    }
+
+    violationRules {
+        minBranches = 0.00
+        minLines = 0.00
+        failOnViolation = true
+    }
+}

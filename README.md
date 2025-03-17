@@ -1,1 +1,1 @@
-# opensearch-search-relevance
+# OpenSearch Search Relevance
