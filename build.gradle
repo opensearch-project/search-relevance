@@ -19,7 +19,7 @@ def pluginDescription = 'Custom plugin'
 def packagePath = 'org.opensearch'
 def pathToPlugin = 'searchrelevance.plugin'
 def pluginClassName = 'SearchRelevancePlugin'
-group = "SearchRelevanceGroup"
+group = "org.opensearch.searchrelevance"
 
 java {
     targetCompatibility = JavaVersion.VERSION_21
@@ -65,7 +65,21 @@ validateNebulaPom.enabled = false
 
 buildscript {
     ext {
-        opensearch_version = System.getProperty("opensearch.version", "3.0.0-SNAPSHOT")
+        opensearch_version = System.getProperty("opensearch.version", "3.0.0-alpha1-SNAPSHOT")
+        buildVersionQualifier = System.getProperty("build.version_qualifier", "alpha1")
+        isSnapshot = "true" == System.getProperty("build.snapshot", "true")
+        // 2.2.0-SNAPSHOT -> 2.2.0.0-SNAPSHOT
+        version_tokens = opensearch_version.tokenize('-')
+        opensearch_build = version_tokens[0] + '.0'
+        plugin_no_snapshot = opensearch_build
+        if (buildVersionQualifier) {
+            opensearch_build += "-${buildVersionQualifier}"
+            plugin_no_snapshot += "-${buildVersionQualifier}"
+        }
+        if (isSnapshot) {
+            opensearch_build += "-SNAPSHOT"
+        }
+        opensearch_group = "org.opensearch"
     }
 
     repositories {
