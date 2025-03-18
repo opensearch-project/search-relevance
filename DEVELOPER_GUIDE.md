@@ -14,6 +14,7 @@
 # Developer Guide
 
 ## Getting Started
+Please define the OpenSearch version in `build.gradle`. By default, we're developing with `3.0.0-alpha1-SNAPSHOT`
 
 ### Fork OpenSearch search-relevance Repo
 
@@ -26,21 +27,21 @@ git clone https://github.com/[your username]/search-relevance.git
 
 ### Install Prerequisites
 
-#### JDK 11
+#### JDK 21
 
-OpenSearch builds using Java 11 at a minimum. This means you must have a JDK 11 installed with the environment variable
-`JAVA_HOME` referencing the path to Java home for your JDK 11 installation, e.g. `JAVA_HOME=/usr/lib/jvm/jdk-11`.
+OpenSearch builds using Java 21 at a minimum. This means you must have a JDK 21 installed with the environment variable
+`JAVA_HOME` referencing the path to Java home for your JDK 21 installation, e.g. `JAVA_HOME=/usr/lib/jvm/jdk-21`.
 
-One easy way to get Java 11 on *nix is to use [sdkman](https://sdkman.io/).
+One easy way to get Java 21 on *nix is to use [sdkman](https://sdkman.io/).
 
 ```bash
 curl -s "https://get.sdkman.io" | bash
 source ~/.sdkman/bin/sdkman-init.sh
-sdk install java 11.0.2-open
-sdk use java 11.0.2-open
-```
+sdk install java 21.0.2-open
+sdk use java 21.0.2-open
+``````
 
-JDK versions 14 and 17 were tested and are fully supported for local development.
+JDK versions 21 and 23 were tested and are fully supported for local development.
 
 ## Use an Editor
 
@@ -68,10 +69,10 @@ The code can be formatted with:
 
 ## Build
 
-OpenSearch neural-search uses a [Gradle](https://docs.gradle.org/6.6.1/userguide/userguide.html) wrapper for its build.
+OpenSearch search-relevance uses a [Gradle](https://docs.gradle.org/6.6.1/userguide/userguide.html) wrapper for its build.
 Run `gradlew` on Unix systems.
 
-Build OpenSearch neural-search using `gradlew build`
+Build OpenSearch search-relevance using `gradlew build`
 
 ```
 ./gradlew build
@@ -80,7 +81,7 @@ Build OpenSearch neural-search using `gradlew build`
 ## Run OpenSearch search-relevance
 
 ### Run Single-node Cluster Locally
-Run OpenSearch neural-search using `gradlew run`.
+Run OpenSearch search-relevance using `gradlew run`.
 
 ```shell script
 ./gradlew run
