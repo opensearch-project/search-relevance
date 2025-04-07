@@ -36,11 +36,11 @@ public class RestCreateQuerySetActionIT extends OpenSearchRestTestCase {
     }
 
     private String createRequestBody(String name, String description) throws JsonProcessingException {
-        Map<String, String> requestMap = new HashMap<>();
+        Map<String, Object> requestMap = new HashMap<>();
         requestMap.put("name", name);
-        if (description != null) {
-            requestMap.put("description", description);
-        }
+        requestMap.put("description", description);
+        requestMap.put("sampling", "topn");
+        requestMap.put("querySetSize", 10);
         return OBJECT_MAPPER.writeValueAsString(requestMap);
     }
 

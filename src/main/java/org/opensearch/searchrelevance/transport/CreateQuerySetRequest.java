@@ -8,6 +8,7 @@
 package org.opensearch.searchrelevance.transport;
 
 import java.io.IOException;
+import java.util.Objects;
 
 import org.opensearch.action.ActionRequest;
 import org.opensearch.action.ActionRequestValidationException;
@@ -24,8 +25,8 @@ public class CreateQuerySetRequest extends ActionRequest {
     public CreateQuerySetRequest(String name, String description, String sampling, int querySetSize) {
         this.name = name;
         this.description = description;
-        this.sampling = sampling;
-        this.querySetSize = querySetSize;
+        this.sampling = Objects.requireNonNull(sampling, "sampling cannot be null.");
+        this.querySetSize = Objects.requireNonNull(querySetSize, "querySetSize cannot be null.");
     }
 
     public CreateQuerySetRequest(StreamInput in) throws IOException {

@@ -13,13 +13,9 @@ import java.io.IOException;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.opensearch.ResourceNotFoundException;
-import org.opensearch.action.DocWriteRequest;
 import org.opensearch.action.StepListener;
 import org.opensearch.action.delete.DeleteResponse;
-import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
-import org.opensearch.action.support.WriteRequest;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.core.action.ActionListener;
@@ -31,7 +27,6 @@ import org.opensearch.search.sort.SortOrder;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager;
 import org.opensearch.searchrelevance.model.QuerySet;
-import org.opensearch.searchrelevance.shared.StashedThreadContext;
 import org.opensearch.transport.client.Client;
 
 import reactor.util.annotation.NonNull;
@@ -70,18 +65,16 @@ public class QuerySetDao {
             listener.onFailure(new IllegalArgumentException("QuerySet cannot be null"));
             return;
         }
-        StashedThreadContext.run(client, () -> {
-            try {
-                client.prepareIndex(QUERY_SET.getIndexName())
-                    .setId(querySet.id())
-                    .setOpType(DocWriteRequest.OpType.CREATE)
-                    .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
-                    .setSource(querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS))
-                    .execute(listener);
-            } catch (IOException e) {
-                throw new SearchRelevanceException("Failed to store QuerySet", e, RestStatus.INTERNAL_SERVER_ERROR);
-            }
-        });
+        try {
+            searchRelevanceIndicesManager.putDoc(
+                querySet.id(),
+                querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS),
+                QUERY_SET,
+                listener
+            );
+        } catch (IOException e) {
+            throw new SearchRelevanceException("Failed to store query set", e, RestStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 
     /**
@@ -90,27 +83,7 @@ public class QuerySetDao {
      * @param listener - action lister for async operation
      */
     public void deleteQuerySet(final String querySetId, final ActionListener<DeleteResponse> listener) {
-        StashedThreadContext.run(client, () -> {
-            try {
-                client.prepareDelete(QUERY_SET.getIndexName(), querySetId)
-                    .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
-                    .execute(new ActionListener<DeleteResponse>() {
-                        @Override
-                        public void onResponse(DeleteResponse deleteResponse) {
-                            listener.onResponse(deleteResponse);
-                        }
-
-                        @Override
-                        public void onFailure(Exception e) {
-                            listener.onFailure(
-                                new SearchRelevanceException("Failed to delete QuerySet", e, RestStatus.INTERNAL_SERVER_ERROR)
-                            );
-                        }
-                    });
-            } catch (Exception e) {
-                listener.onFailure(new SearchRelevanceException("Failed to delete QuerySet", e, RestStatus.INTERNAL_SERVER_ERROR));
-            }
-        });
+        searchRelevanceIndicesManager.deleteDocByDocId(querySetId, QUERY_SET, listener);
     }
 
     /**
@@ -119,26 +92,7 @@ public class QuerySetDao {
      * @param listener - action lister for async operation
      */
     public void getQuerySet(String querySetId, ActionListener<SearchResponse> listener) {
-        SearchRequest searchRequest = new SearchRequest(QUERY_SET.getIndexName());
-        SearchSourceBuilder sourceBuilder = new SearchSourceBuilder().query(QueryBuilders.termQuery("_id", querySetId)).size(1);
-
-        searchRequest.source(sourceBuilder);
-
-        client.search(searchRequest, new ActionListener<SearchResponse>() {
-            @Override
-            public void onResponse(SearchResponse response) {
-                if (response.getHits().getTotalHits().value() == 0) {
-                    listener.onFailure(new ResourceNotFoundException("Query set not found: " + querySetId));
-                    return;
-                }
-                listener.onResponse(response);
-            }
-
-            @Override
-            public void onFailure(Exception e) {
-                listener.onFailure(new SearchRelevanceException("Failed to get QuerySet", e, RestStatus.INTERNAL_SERVER_ERROR));
-            }
-        });
+        searchRelevanceIndicesManager.getDocByDocId(querySetId, QUERY_SET, listener);
     }
 
     /**
@@ -147,8 +101,6 @@ public class QuerySetDao {
      * @param listener - action lister for async operation
      */
     public void listQuerySet(SearchSourceBuilder sourceBuilder, ActionListener<SearchResponse> listener) {
-        SearchRequest searchRequest = new SearchRequest(QUERY_SET.getIndexName());
-
         // Apply default values if not set
         if (sourceBuilder == null) {
             sourceBuilder = new SearchSourceBuilder();
@@ -171,18 +123,6 @@ public class QuerySetDao {
             sourceBuilder.query(QueryBuilders.matchAllQuery());
         }
 
-        searchRequest.source(sourceBuilder);
-
-        client.search(searchRequest, new ActionListener<SearchResponse>() {
-            @Override
-            public void onResponse(SearchResponse response) {
-                listener.onResponse(response);
-            }
-
-            @Override
-            public void onFailure(Exception e) {
-                listener.onFailure(new SearchRelevanceException("Failed to list QuerySet", e, RestStatus.INTERNAL_SERVER_ERROR));
-            }
-        });
+        searchRelevanceIndicesManager.listDocsBySearchRequest(sourceBuilder, QUERY_SET, listener);
     }
 }

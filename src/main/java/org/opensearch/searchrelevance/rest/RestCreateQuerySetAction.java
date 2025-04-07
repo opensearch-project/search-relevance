@@ -17,6 +17,7 @@ import java.util.Map;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.opensearch.action.index.IndexResponse;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.core.xcontent.XContentBuilder;
@@ -26,7 +27,6 @@ import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.searchrelevance.transport.CreateQuerySetAction;
 import org.opensearch.searchrelevance.transport.CreateQuerySetRequest;
-import org.opensearch.searchrelevance.transport.CreateQuerySetResponse;
 import org.opensearch.transport.client.node.NodeClient;
 
 /**
@@ -54,18 +54,18 @@ public class RestCreateQuerySetAction extends BaseRestHandler {
         String name = (String) source.get("name");
         String description = (String) source.get("description");
         // Default values for sampling and querySetSize if they're not in your current API
-        String sampling = (String) source.getOrDefault("sampling", "random");
+        String sampling = (String) source.getOrDefault("sampling", "pptss");
         int querySetSize = (int) source.getOrDefault("querySetSize", 10);
 
         CreateQuerySetRequest createRequest = new CreateQuerySetRequest(name, description, sampling, querySetSize);
 
-        return channel -> client.execute(CreateQuerySetAction.INSTANCE, createRequest, new ActionListener<CreateQuerySetResponse>() {
+        return channel -> client.execute(CreateQuerySetAction.INSTANCE, createRequest, new ActionListener<IndexResponse>() {
             @Override
-            public void onResponse(CreateQuerySetResponse response) {
+            public void onResponse(IndexResponse response) {
                 try {
                     XContentBuilder builder = channel.newBuilder();
                     builder.startObject();
-                    builder.field("query_set_id", response.getQuerySetId());
+                    builder.field("query_set_id", response.getId());
                     builder.endObject();
                     channel.sendResponse(new BytesRestResponse(RestStatus.OK, builder));
                 } catch (IOException e) {

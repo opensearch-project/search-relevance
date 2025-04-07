@@ -10,11 +10,12 @@ package org.opensearch.searchrelevance.transport;
 import static org.opensearch.searchrelevance.common.PluginConstants.TRANSPORT_ACTION_NAME_PREFIX;
 
 import org.opensearch.action.ActionType;
+import org.opensearch.action.index.IndexResponse;
 
 /**
  * External Action for public facing RestCreateQuerySetAction
  */
-public class CreateQuerySetAction extends ActionType<CreateQuerySetResponse> {
+public class CreateQuerySetAction extends ActionType<IndexResponse> {
     /** The name of this action */
     public static final String NAME = TRANSPORT_ACTION_NAME_PREFIX + "queryset/create";
 
@@ -22,6 +23,6 @@ public class CreateQuerySetAction extends ActionType<CreateQuerySetResponse> {
     public static final CreateQuerySetAction INSTANCE = new CreateQuerySetAction();
 
     private CreateQuerySetAction() {
-        super(NAME, CreateQuerySetResponse::new);
+        super(NAME, IndexResponse::new);
     }
 }

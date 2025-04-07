@@ -14,12 +14,23 @@ import java.io.InputStream;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opensearch.ResourceAlreadyExistsException;
+import org.opensearch.ResourceNotFoundException;
+import org.opensearch.action.DocWriteRequest;
 import org.opensearch.action.StepListener;
 import org.opensearch.action.admin.indices.create.CreateIndexRequest;
 import org.opensearch.action.admin.indices.create.CreateIndexResponse;
+import org.opensearch.action.delete.DeleteResponse;
+import org.opensearch.action.search.SearchRequest;
+import org.opensearch.action.search.SearchResponse;
+import org.opensearch.action.support.WriteRequest;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.io.Streams;
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.core.rest.RestStatus;
+import org.opensearch.core.xcontent.XContentBuilder;
+import org.opensearch.index.query.QueryBuilders;
+import org.opensearch.search.builder.SearchSourceBuilder;
+import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.shared.StashedThreadContext;
 import org.opensearch.transport.client.Client;
 
@@ -64,7 +75,7 @@ public class SearchRelevanceIndicesManager {
             @Override
             public void onFailure(final Exception e) {
                 if (e instanceof ResourceAlreadyExistsException) {
-                    LOGGER.info("index[{}] already exist", indexName);
+                    LOGGER.debug("index[{}] already exist", indexName);
                     stepListener.onResponse(null);
                     return;
                 }
@@ -72,6 +83,131 @@ public class SearchRelevanceIndicesManager {
                 stepListener.onFailure(e);
             }
         }));
+    }
+
+    /**
+     * Put a doc to the system index
+     * @param docId - document id need to be executed
+     * @param xContentBuilder - content need to be executed
+     * @param index - system index
+     * @param listener - action lister for async operation
+     */
+    public void putDoc(
+        final String docId,
+        final XContentBuilder xContentBuilder,
+        final SearchRelevanceIndices index,
+        final ActionListener listener
+    ) {
+        StashedThreadContext.run(client, () -> {
+            try {
+                client.prepareIndex(index.getIndexName())
+                    .setId(docId)
+                    .setOpType(DocWriteRequest.OpType.CREATE)
+                    .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
+                    .setSource(xContentBuilder)
+                    .execute(listener);
+            } catch (Exception e) {
+                throw new SearchRelevanceException("Failed to store doc", e, RestStatus.INTERNAL_SERVER_ERROR);
+            }
+        });
+    }
+
+    /**
+     * Delete a doc by doc id
+     * @param docId - document id need to be executed
+     * @param index - system index
+     * @param listener - action lister for async operation
+     */
+    public void deleteDocByDocId(final String docId, final SearchRelevanceIndices index, final ActionListener<DeleteResponse> listener) {
+        StashedThreadContext.run(client, () -> {
+            try {
+                client.prepareDelete(index.getIndexName(), docId)
+                    .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
+                    .execute(new ActionListener<DeleteResponse>() {
+                        @Override
+                        public void onResponse(DeleteResponse deleteResponse) {
+                            LOGGER.info("Successfully delete doc id [{}]", docId);
+                            listener.onResponse(deleteResponse);
+                        }
+
+                        @Override
+                        public void onFailure(Exception e) {
+                            listener.onFailure(new SearchRelevanceException("Failed to delete doc", e, RestStatus.INTERNAL_SERVER_ERROR));
+                        }
+                    });
+            } catch (Exception e) {
+                listener.onFailure(new SearchRelevanceException("Failed to delete doc", e, RestStatus.INTERNAL_SERVER_ERROR));
+            }
+        });
+    }
+
+    /**
+     * Get a doc by doc id
+     * @param docId - document id need to be executed
+     * @param index - system index
+     * @param listener - action lister for async operation
+     */
+    public void getDocByDocId(final String docId, final SearchRelevanceIndices index, final ActionListener<SearchResponse> listener) {
+        SearchRequest searchRequest = new SearchRequest(index.getIndexName());
+        SearchSourceBuilder sourceBuilder = new SearchSourceBuilder().query(QueryBuilders.termQuery("_id", docId)).size(1);
+
+        searchRequest.source(sourceBuilder);
+
+        StashedThreadContext.run(client, () -> {
+            try {
+                client.search(searchRequest, new ActionListener<SearchResponse>() {
+                    @Override
+                    public void onResponse(SearchResponse response) {
+                        LOGGER.info("Successfully get doc id [{}]", docId);
+                        if (response.getHits().getTotalHits().value() == 0) {
+                            listener.onFailure(new ResourceNotFoundException("Document not found: " + docId));
+                            return;
+                        }
+                        listener.onResponse(response);
+                    }
+
+                    @Override
+                    public void onFailure(Exception e) {
+                        listener.onFailure(new SearchRelevanceException("Failed to get document", e, RestStatus.INTERNAL_SERVER_ERROR));
+                    }
+                });
+            } catch (Exception e) {
+                listener.onFailure(new SearchRelevanceException("Failed to get doc", e, RestStatus.INTERNAL_SERVER_ERROR));
+            }
+        });
+    }
+
+    /**
+     * List docs by search request
+     * @param searchSourceBuilder - search source builder to be executed
+     * @param index - index to be executed
+     * @param listener - action lister for async operation
+     */
+    public void listDocsBySearchRequest(
+        final SearchSourceBuilder searchSourceBuilder,
+        final SearchRelevanceIndices index,
+        final ActionListener<SearchResponse> listener
+    ) {
+        SearchRequest searchRequest = new SearchRequest(index.getIndexName());
+        searchRequest.source(searchSourceBuilder);
+        StashedThreadContext.run(client, () -> {
+            try {
+                client.search(searchRequest, new ActionListener<SearchResponse>() {
+                    @Override
+                    public void onResponse(SearchResponse response) {
+                        LOGGER.info("Successfully list documents with search request [{}]", searchRequest);
+                        listener.onResponse(response);
+                    }
+
+                    @Override
+                    public void onFailure(Exception e) {
+                        listener.onFailure(new SearchRelevanceException("Failed to list documents", e, RestStatus.INTERNAL_SERVER_ERROR));
+                    }
+                });
+            } catch (Exception e) {
+                listener.onFailure(new SearchRelevanceException("Failed to list docs", e, RestStatus.INTERNAL_SERVER_ERROR));
+            }
+        });
     }
 
     /**

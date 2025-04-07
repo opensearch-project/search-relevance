@@ -34,4 +34,10 @@ public class PluginConstants {
     public static final String QUERY_SET_INDEX = ".plugins-search-relevance-queryset";
     public static final String QUERY_SET_INDEX_MAPPING = "mappings/queryset.json";
 
+    /**
+     * UBI
+     */
+    public static final String UBI_QUERIES_INDEX = "ubi_queries";
+    public static final String USER_QUERY_FIELD = "user_query";
+
 }
