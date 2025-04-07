@@ -9,36 +9,78 @@ package org.opensearch.searchrelevance.rest;
 
 import static java.util.Collections.singletonList;
 import static org.opensearch.rest.RestRequest.Method.POST;
-import static org.opensearch.searchrelevance.common.Constants.QUERYSET_ID;
-import static org.opensearch.searchrelevance.common.Constants.QUERYSET_URI;
+import static org.opensearch.searchrelevance.common.PluginConstants.QUERYSETS_URL;
 
+import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.opensearch.core.action.ActionListener;
+import org.opensearch.core.rest.RestStatus;
+import org.opensearch.core.xcontent.XContentBuilder;
+import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.rest.BaseRestHandler;
+import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestRequest;
-import org.opensearch.rest.action.RestToXContentListener;
-import org.opensearch.searchrelevance.transport.QuerySetAction;
-import org.opensearch.searchrelevance.transport.QuerySetRequest;
+import org.opensearch.searchrelevance.transport.CreateQuerySetAction;
+import org.opensearch.searchrelevance.transport.CreateQuerySetRequest;
+import org.opensearch.searchrelevance.transport.CreateQuerySetResponse;
 import org.opensearch.transport.client.node.NodeClient;
 
+/**
+ * Rest Action to facilitate requests to create a query set/
+ */
 public class RestCreateQuerySetAction extends BaseRestHandler {
-
-    public static final String NAME = "queryset_action";
+    private static final Logger LOGGER = LogManager.getLogger(RestCreateQuerySetAction.class);
+    private static final String CREATE_QUERYSET_ACTION = "create_queryset_action";
 
     @Override
     public String getName() {
-        return NAME;
+        return CREATE_QUERYSET_ACTION;
     }
 
     @Override
     public List<Route> routes() {
-        return singletonList(new Route(POST, QUERYSET_URI));
+        return singletonList(new Route(POST, QUERYSETS_URL));
     }
 
     @Override
-    protected RestChannelConsumer prepareRequest(RestRequest request, NodeClient client) {
-        String querySetId = request.param(QUERYSET_ID);
-        QuerySetRequest querySetRequest = new QuerySetRequest(querySetId);
-        return channel -> client.execute(QuerySetAction.INSTANCE, querySetRequest, new RestToXContentListener<>(channel));
+    protected RestChannelConsumer prepareRequest(RestRequest request, NodeClient client) throws IOException {
+        XContentParser parser = request.contentParser();
+        Map<String, Object> source = parser.map();
+
+        String name = (String) source.get("name");
+        String description = (String) source.get("description");
+        // Default values for sampling and querySetSize if they're not in your current API
+        String sampling = (String) source.getOrDefault("sampling", "random");
+        int querySetSize = (int) source.getOrDefault("querySetSize", 10);
+
+        CreateQuerySetRequest createRequest = new CreateQuerySetRequest(name, description, sampling, querySetSize);
+
+        return channel -> client.execute(CreateQuerySetAction.INSTANCE, createRequest, new ActionListener<CreateQuerySetResponse>() {
+            @Override
+            public void onResponse(CreateQuerySetResponse response) {
+                try {
+                    XContentBuilder builder = channel.newBuilder();
+                    builder.startObject();
+                    builder.field("query_set_id", response.getQuerySetId());
+                    builder.endObject();
+                    channel.sendResponse(new BytesRestResponse(RestStatus.OK, builder));
+                } catch (IOException e) {
+                    onFailure(e);
+                }
+            }
+
+            @Override
+            public void onFailure(Exception e) {
+                try {
+                    channel.sendResponse(new BytesRestResponse(channel, RestStatus.INTERNAL_SERVER_ERROR, e));
+                } catch (IOException ex) {
+                    LOGGER.error("Failed to send error response", ex);
+                }
+            }
+        });
     }
 }

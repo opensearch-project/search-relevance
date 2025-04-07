@@ -13,33 +13,44 @@ import org.opensearch.action.ActionRequest;
 import org.opensearch.action.ActionRequestValidationException;
 import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.core.common.io.stream.StreamOutput;
-
-import reactor.util.annotation.Nullable;
+import org.opensearch.search.builder.SearchSourceBuilder;
 
 /**
- * Transport Request to create a queryset.
+ * Transport Request to get or delete a queryset.
  */
 public class QuerySetRequest extends ActionRequest {
-    private String querySetId;
+    private final String querySetId;
+    private final SearchSourceBuilder searchSourceBuilder;
 
-    public QuerySetRequest(@Nullable String querySetId) {
+    public QuerySetRequest(String querySetId) {
         this.querySetId = querySetId;
+        this.searchSourceBuilder = new SearchSourceBuilder();
+    }
+
+    public QuerySetRequest(SearchSourceBuilder searchSourceBuilder) {
+        this.querySetId = null;
+        this.searchSourceBuilder = searchSourceBuilder;
     }
 
     public QuerySetRequest(StreamInput in) throws IOException {
         super(in);
         this.querySetId = in.readOptionalString();
-    }
-
-    @Nullable
-    public String getQuerySetId() {
-        return this.querySetId;
+        this.searchSourceBuilder = new SearchSourceBuilder(in);
     }
 
     @Override
     public void writeTo(StreamOutput out) throws IOException {
         super.writeTo(out);
         out.writeOptionalString(querySetId);
+        searchSourceBuilder.writeTo(out);
+    }
+
+    public String getQuerySetId() {
+        return this.querySetId;
+    }
+
+    public SearchSourceBuilder getSearchSourceBuilder() {
+        return this.searchSourceBuilder;
     }
 
     @Override

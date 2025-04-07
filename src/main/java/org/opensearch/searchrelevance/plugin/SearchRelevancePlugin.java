@@ -7,9 +7,6 @@
  */
 package org.opensearch.searchrelevance.plugin;
 
-import static java.util.Collections.singletonList;
-
-import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
 
@@ -27,8 +24,14 @@ import org.opensearch.plugins.Plugin;
 import org.opensearch.rest.RestController;
 import org.opensearch.rest.RestHandler;
 import org.opensearch.searchrelevance.rest.RestCreateQuerySetAction;
-import org.opensearch.searchrelevance.transport.QuerySetAction;
-import org.opensearch.searchrelevance.transport.QuerySetTransportAction;
+import org.opensearch.searchrelevance.rest.RestDeleteQuerySetAction;
+import org.opensearch.searchrelevance.rest.RestGetQuerySetAction;
+import org.opensearch.searchrelevance.transport.CreateQuerySetAction;
+import org.opensearch.searchrelevance.transport.CreateQuerySetTransportAction;
+import org.opensearch.searchrelevance.transport.DeleteQuerySetAction;
+import org.opensearch.searchrelevance.transport.DeleteQuerySetTransportAction;
+import org.opensearch.searchrelevance.transport.GetQuerySetAction;
+import org.opensearch.searchrelevance.transport.GetQuerySetTransportAction;
 
 public class SearchRelevancePlugin extends Plugin implements IngestPlugin, ActionPlugin {
 
@@ -42,17 +45,15 @@ public class SearchRelevancePlugin extends Plugin implements IngestPlugin, Actio
         IndexNameExpressionResolver indexNameExpressionResolver,
         Supplier<DiscoveryNodes> nodesInCluster
     ) {
-        RestCreateQuerySetAction createQuerySetAction = new RestCreateQuerySetAction();
-        return singletonList(createQuerySetAction);
-    };
+        return List.of(new RestCreateQuerySetAction(), new RestDeleteQuerySetAction(), new RestGetQuerySetAction());
+    }
 
     @Override
     public List<ActionHandler<? extends ActionRequest, ? extends ActionResponse>> getActions() {
-        List<ActionHandler<? extends ActionRequest, ? extends ActionResponse>> querysetHandler = List.of(
-            new ActionHandler<>(QuerySetAction.INSTANCE, QuerySetTransportAction.class)
+        return List.of(
+            new ActionHandler<>(CreateQuerySetAction.INSTANCE, CreateQuerySetTransportAction.class),
+            new ActionHandler<>(DeleteQuerySetAction.INSTANCE, DeleteQuerySetTransportAction.class),
+            new ActionHandler<>(GetQuerySetAction.INSTANCE, GetQuerySetTransportAction.class)
         );
-        List<ActionHandler<? extends ActionRequest, ? extends ActionResponse>> allHandlers = new ArrayList<>();
-        allHandlers.addAll(querysetHandler);
-        return allHandlers;
     }
 }
