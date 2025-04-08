@@ -5,7 +5,7 @@
  * this file be licensed under the Apache-2.0 license or a
  * compatible open source license.
  */
-package org.opensearch.searchrelevance.transport;
+package org.opensearch.searchrelevance.transport.queryset;
 
 import java.util.HashMap;
 import java.util.Map;

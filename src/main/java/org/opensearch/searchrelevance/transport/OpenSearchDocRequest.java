@@ -16,37 +16,37 @@ import org.opensearch.core.common.io.stream.StreamOutput;
 import org.opensearch.search.builder.SearchSourceBuilder;
 
 /**
- * Transport Request to get or delete a queryset.
+ * Transport Request to get or get or delete a document from system indices.
  */
-public class QuerySetRequest extends ActionRequest {
-    private final String querySetId;
+public class OpenSearchDocRequest extends ActionRequest {
+    private final String id;
     private final SearchSourceBuilder searchSourceBuilder;
 
-    public QuerySetRequest(String querySetId) {
-        this.querySetId = querySetId;
+    public OpenSearchDocRequest(String id) {
+        this.id = id;
         this.searchSourceBuilder = new SearchSourceBuilder();
     }
 
-    public QuerySetRequest(SearchSourceBuilder searchSourceBuilder) {
-        this.querySetId = null;
+    public OpenSearchDocRequest(SearchSourceBuilder searchSourceBuilder) {
+        this.id = null;
         this.searchSourceBuilder = searchSourceBuilder;
     }
 
-    public QuerySetRequest(StreamInput in) throws IOException {
+    public OpenSearchDocRequest(StreamInput in) throws IOException {
         super(in);
-        this.querySetId = in.readOptionalString();
+        this.id = in.readOptionalString();
         this.searchSourceBuilder = new SearchSourceBuilder(in);
     }
 
     @Override
     public void writeTo(StreamOutput out) throws IOException {
         super.writeTo(out);
-        out.writeOptionalString(querySetId);
+        out.writeOptionalString(id);
         searchSourceBuilder.writeTo(out);
     }
 
-    public String getQuerySetId() {
-        return this.querySetId;
+    public String getId() {
+        return this.id;
     }
 
     public SearchSourceBuilder getSearchSourceBuilder() {

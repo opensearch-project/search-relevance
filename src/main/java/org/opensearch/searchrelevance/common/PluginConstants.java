@@ -26,13 +26,19 @@ public class PluginConstants {
     /** The URI for this plugin's search configurations rest actions */
     public static final String SEARCH_CONFIGURATIONS_URL = SEARCH_RELEVANCE_BASE_URI + "/search_configurations";
 
-    public static final String QUERYSET_ID = "id";
+    public static final String DOCUMENT_ID = "id";
 
     /**
      * Indices constants
      */
     public static final String QUERY_SET_INDEX = ".plugins-search-relevance-queryset";
     public static final String QUERY_SET_INDEX_MAPPING = "mappings/queryset.json";
+    public static final String SEARCH_CONFIGURATION_INDEX = ".plugins-search-relevance-search-config";
+    public static final String SEARCH_CONFIGURATION_INDEX_MAPPING = "mappings/search_configuration.json";
+    public static final String EXPERIMENT_INDEX = ".plugins-search-relevance-experiment";
+    public static final String EXPERIMENT_INDEX_MAPPING = "mappings/experiment.json";
+    public static final String JUDGMENT_INDEX = ".plugins-search-relevance-judgment";
+    public static final String JUDGMENT_INDEX_MAPPING = "mappings/judgment.json";
 
     /**
      * UBI

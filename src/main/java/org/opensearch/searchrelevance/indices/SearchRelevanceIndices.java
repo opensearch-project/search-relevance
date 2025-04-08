@@ -7,8 +7,14 @@
  */
 package org.opensearch.searchrelevance.indices;
 
+import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX;
+import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX_MAPPING;
+import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_INDEX;
+import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_INDEX_MAPPING;
 import static org.opensearch.searchrelevance.common.PluginConstants.QUERY_SET_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.QUERY_SET_INDEX_MAPPING;
+import static org.opensearch.searchrelevance.common.PluginConstants.SEARCH_CONFIGURATION_INDEX;
+import static org.opensearch.searchrelevance.common.PluginConstants.SEARCH_CONFIGURATION_INDEX_MAPPING;
 import static org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager.getIndexMappings;
 
 import java.io.IOException;
@@ -18,7 +24,22 @@ public enum SearchRelevanceIndices {
     /**
      * Query Set Index
      */
-    QUERY_SET(QUERY_SET_INDEX, QUERY_SET_INDEX_MAPPING);
+    QUERY_SET(QUERY_SET_INDEX, QUERY_SET_INDEX_MAPPING),
+
+    /**
+     * Experiment Index
+     */
+    EXPERIMENT(EXPERIMENT_INDEX, EXPERIMENT_INDEX_MAPPING),
+
+    /**
+     * Search Configuration Index
+     */
+    SEARCH_CONFIGURATION(SEARCH_CONFIGURATION_INDEX, SEARCH_CONFIGURATION_INDEX_MAPPING),
+
+    /**
+     * Judgment Index
+     */
+    JUDGMENT(JUDGMENT_INDEX, JUDGMENT_INDEX_MAPPING);
 
     private final String indexName;
     private final String mapping;

@@ -9,7 +9,7 @@ package org.opensearch.searchrelevance.rest;
 
 import static org.opensearch.rest.RestRequest.Method.GET;
 import static org.opensearch.searchrelevance.common.PluginConstants.DOCUMENT_ID;
-import static org.opensearch.searchrelevance.common.PluginConstants.QUERYSETS_URL;
+import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENTS_URL;
 
 import java.io.IOException;
 import java.util.List;
@@ -28,34 +28,34 @@ import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.searchrelevance.model.SearchParams;
-import org.opensearch.searchrelevance.transport.queryset.GetQuerySetAction;
+import org.opensearch.searchrelevance.transport.judgment.GetJudgmentAction;
 import org.opensearch.searchrelevance.transport.OpenSearchDocRequest;
 import org.opensearch.searchrelevance.utils.ParserUtils;
 import org.opensearch.transport.client.node.NodeClient;
 
 /**
- * Rest Action to facilitate requests to get/list query sets.
+ * Rest Action to facilitate requests to get/list judgments.
  */
-public class RestGetQuerySetAction extends BaseRestHandler {
-    private static final Logger LOGGER = LogManager.getLogger(RestGetQuerySetAction.class);
-    private static final String GET_QUERYSET_ACTION = "get_queryset_action";
+public class RestGetJudgmentAction extends BaseRestHandler {
+    private static final Logger LOGGER = LogManager.getLogger(RestGetJudgmentAction.class);
+    private static final String GET_JUDGMENT_ACTION = "get_judgment_action";
 
     @Override
     public String getName() {
-        return GET_QUERYSET_ACTION;
+        return GET_JUDGMENT_ACTION;
     }
 
     @Override
     public List<Route> routes() {
-        return List.of(new Route(GET, String.format(Locale.ROOT, "%s/{%s}", QUERYSETS_URL, DOCUMENT_ID)), new Route(GET, QUERYSETS_URL));
+        return List.of(new Route(GET, String.format(Locale.ROOT, "%s/{%s}", JUDGMENTS_URL, DOCUMENT_ID)), new Route(GET, JUDGMENTS_URL));
     }
 
     @Override
     protected RestChannelConsumer prepareRequest(RestRequest request, NodeClient client) throws IOException {
-        final String querySetId = request.param(DOCUMENT_ID);
+        final String judgmentId = request.param(DOCUMENT_ID);
         // If id is provided, get specific query set
-        if (querySetId != null && !querySetId.isEmpty()) {
-            OpenSearchDocRequest getRequest = new OpenSearchDocRequest(querySetId);
+        if (judgmentId != null && !judgmentId.isEmpty()) {
+            OpenSearchDocRequest getRequest = new OpenSearchDocRequest(judgmentId);
             return executeGetRequest(client, getRequest);
         }
 
@@ -70,7 +70,7 @@ public class RestGetQuerySetAction extends BaseRestHandler {
     }
 
     private RestChannelConsumer executeGetRequest(NodeClient client, OpenSearchDocRequest request) {
-        return channel -> client.execute(GetQuerySetAction.INSTANCE, request, new ActionListener<SearchResponse>() {
+        return channel -> client.execute(GetJudgmentAction.INSTANCE, request, new ActionListener<SearchResponse>() {
             @Override
             public void onResponse(SearchResponse response) {
                 try {

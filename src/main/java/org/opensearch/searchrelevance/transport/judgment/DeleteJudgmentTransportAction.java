@@ -5,9 +5,9 @@
  * this file be licensed under the Apache-2.0 license or a
  * compatible open source license.
  */
-package org.opensearch.searchrelevance.transport;
+package org.opensearch.searchrelevance.transport.judgment;
 
-import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.QUERY_SET;
+import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.JUDGMENT;
 
 import org.opensearch.ResourceNotFoundException;
 import org.opensearch.action.delete.DeleteResponse;
@@ -16,44 +16,45 @@ import org.opensearch.action.support.HandledTransportAction;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.core.action.ActionListener;
-import org.opensearch.searchrelevance.dao.QuerySetDao;
+import org.opensearch.searchrelevance.dao.JudgmentDao;
+import org.opensearch.searchrelevance.transport.OpenSearchDocRequest;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
 import org.opensearch.transport.client.Client;
 
-public class DeleteQuerySetTransportAction extends HandledTransportAction<QuerySetRequest, DeleteResponse> {
+public class DeleteJudgmentTransportAction extends HandledTransportAction<OpenSearchDocRequest, DeleteResponse> {
     private final ClusterService clusterService;
     private final Client client;
-    private final QuerySetDao querySetDao;
+    private final JudgmentDao judgmentDao;
 
     @Inject
-    public DeleteQuerySetTransportAction(
+    public DeleteJudgmentTransportAction(
         ClusterService clusterService,
         TransportService transportService,
         ActionFilters actionFilters,
         Client client
     ) {
-        super(DeleteQuerySetAction.NAME, transportService, actionFilters, QuerySetRequest::new);
+        super(DeleteJudgmentAction.NAME, transportService, actionFilters, OpenSearchDocRequest::new);
         this.clusterService = clusterService;
         this.client = client;
-        this.querySetDao = new QuerySetDao(client, clusterService);
+        this.judgmentDao = new JudgmentDao(client, clusterService);
     }
 
     @Override
-    protected void doExecute(Task task, QuerySetRequest request, ActionListener<DeleteResponse> listener) {
+    protected void doExecute(Task task, OpenSearchDocRequest request, ActionListener<DeleteResponse> listener) {
         // Validate cluster health first
-        if (!clusterService.state().routingTable().hasIndex(QUERY_SET.getIndexName())) {
-            listener.onFailure(new ResourceNotFoundException("Index [" + QUERY_SET.getIndexName() + "] not found"));
+        if (!clusterService.state().routingTable().hasIndex(JUDGMENT.getIndexName())) {
+            listener.onFailure(new ResourceNotFoundException("Index [" + JUDGMENT.getIndexName() + "] not found"));
             return;
         }
 
         try {
-            String querySetId = request.getQuerySetId();
-            if (querySetId == null || querySetId.trim().isEmpty()) {
-                listener.onFailure(new IllegalArgumentException("Query set ID cannot be null or empty"));
+            String judgmentId = request.getId();
+            if (judgmentId == null || judgmentId.trim().isEmpty()) {
+                listener.onFailure(new IllegalArgumentException("judgmentId cannot be null or empty"));
                 return;
             }
-            querySetDao.deleteQuerySet(querySetId, listener);
+            judgmentDao.deleteJudgment(judgmentId, listener);
         } catch (Exception e) {
             listener.onFailure(e);
         }

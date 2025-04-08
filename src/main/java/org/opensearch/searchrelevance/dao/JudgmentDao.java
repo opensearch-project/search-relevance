@@ -7,7 +7,7 @@
  */
 package org.opensearch.searchrelevance.dao;
 
-import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.QUERY_SET;
+import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.JUDGMENT;
 
 import java.io.IOException;
 
@@ -25,81 +25,77 @@ import org.opensearch.index.query.QueryBuilders;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager;
-import org.opensearch.searchrelevance.model.QuerySet;
+import org.opensearch.searchrelevance.model.Judgment;
 import org.opensearch.transport.client.Client;
 
 import reactor.util.annotation.NonNull;
 
-/**
- * Data access object layer for query set system index
- */
-public class QuerySetDao {
-
-    private static final Logger LOGGER = LogManager.getLogger(QuerySetDao.class);
+public class JudgmentDao {
+    private static final Logger LOGGER = LogManager.getLogger(JudgmentDao.class);
     private final Client client;
     private final ClusterService clusterService;
     private final SearchRelevanceIndicesManager searchRelevanceIndicesManager;
 
-    public QuerySetDao(@NonNull Client client, @NonNull ClusterService clusterService) {
+    public JudgmentDao(@NonNull Client client, @NonNull ClusterService clusterService) {
         this.client = client;
         this.clusterService = clusterService;
         this.searchRelevanceIndicesManager = new SearchRelevanceIndicesManager(clusterService, client);
     }
 
     /**
-     * Create query set index if not exists
+     * Create judgment index if not exists
      * @param stepListener - step lister for async operation
      */
     public void createIndexIfAbsent(final StepListener<Void> stepListener) {
-        searchRelevanceIndicesManager.createIndexIfAbsent(QUERY_SET, stepListener);
+        searchRelevanceIndicesManager.createIndexIfAbsent(JUDGMENT, stepListener);
     }
 
     /**
-     * Stores query set to in the system index
-     * @param querySet - QuerySet content to be stored
+     * Stores judgment to in the system index
+     * @param judgment - Judgment content to be stored
      * @param listener - action lister for async operation
      */
-    public void putQuerySet(final QuerySet querySet, final ActionListener listener) {
-        if (querySet == null) {
-            listener.onFailure(new IllegalArgumentException("QuerySet cannot be null"));
+    public void putJudgement(final Judgment judgment, final ActionListener listener) {
+        if (judgment == null) {
+            listener.onFailure(new IllegalArgumentException("Judgment cannot be null"));
             return;
         }
         try {
             searchRelevanceIndicesManager.putDoc(
-                querySet.id(),
-                querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS),
-                QUERY_SET,
+                judgment.id(),
+                judgment.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS),
+                JUDGMENT,
                 listener
             );
         } catch (IOException e) {
-            throw new SearchRelevanceException("Failed to store query set", e, RestStatus.INTERNAL_SERVER_ERROR);
+            throw new SearchRelevanceException("Failed to store judgment", e, RestStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
     /**
-     * Delete query set by querySetID
-     * @param querySetId - id to be deleted
+     * Delete judgment by judgmentID
+     * @param judgmentId - id to be deleted
      * @param listener - action lister for async operation
      */
-    public void deleteQuerySet(final String querySetId, final ActionListener<DeleteResponse> listener) {
-        searchRelevanceIndicesManager.deleteDocByDocId(querySetId, QUERY_SET, listener);
+    public void deleteJudgment(final String judgmentId, final ActionListener<DeleteResponse> listener) {
+        searchRelevanceIndicesManager.deleteDocByDocId(judgmentId, JUDGMENT, listener);
     }
 
     /**
-     * Get query set by querySetID
-     * @param querySetId - id to be deleted
+     * Get judgment by judgmentId
+     * @param judgmentId - id to be deleted
      * @param listener - action lister for async operation
      */
-    public void getQuerySet(String querySetId, ActionListener<SearchResponse> listener) {
-        searchRelevanceIndicesManager.getDocByDocId(querySetId, QUERY_SET, listener);
+    public void getJudgment(String judgmentId, ActionListener<SearchResponse> listener) {
+        searchRelevanceIndicesManager.getDocByDocId(judgmentId, JUDGMENT, listener);
     }
 
     /**
-     * List query set by source builder
+     * List judgment by source builder
      * @param sourceBuilder - source builder to be searched
      * @param listener - action lister for async operation
      */
-    public void listQuerySet(SearchSourceBuilder sourceBuilder, ActionListener<SearchResponse> listener) {
+    public void listJudgment(SearchSourceBuilder sourceBuilder, ActionListener<SearchResponse> listener) {
         // Apply default values if not set
         if (sourceBuilder == null) {
             sourceBuilder = new SearchSourceBuilder();
@@ -110,6 +106,6 @@ public class QuerySetDao {
             sourceBuilder.query(QueryBuilders.matchAllQuery());
         }
 
-        searchRelevanceIndicesManager.listDocsBySearchRequest(sourceBuilder, QUERY_SET, listener);
+        searchRelevanceIndicesManager.listDocsBySearchRequest(sourceBuilder, JUDGMENT, listener);
     }
 }

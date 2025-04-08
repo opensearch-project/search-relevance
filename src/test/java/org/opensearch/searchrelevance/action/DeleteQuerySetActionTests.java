@@ -11,22 +11,22 @@ import java.io.IOException;
 
 import org.opensearch.common.io.stream.BytesStreamOutput;
 import org.opensearch.core.common.io.stream.StreamInput;
-import org.opensearch.searchrelevance.transport.QuerySetRequest;
+import org.opensearch.searchrelevance.transport.OpenSearchDocRequest;
 import org.opensearch.test.OpenSearchTestCase;
 
 public class DeleteQuerySetActionTests extends OpenSearchTestCase {
 
     public void testStreams() throws IOException {
-        QuerySetRequest request = new QuerySetRequest("1234");
+        OpenSearchDocRequest request = new OpenSearchDocRequest("1234");
         BytesStreamOutput output = new BytesStreamOutput();
         request.writeTo(output);
         StreamInput in = StreamInput.wrap(output.bytes().toBytesRef().bytes);
-        QuerySetRequest serialized = new QuerySetRequest(in);
-        assertEquals("1234", serialized.getQuerySetId());
+        OpenSearchDocRequest serialized = new OpenSearchDocRequest(in);
+        assertEquals("1234", serialized.getId());
     }
 
     public void testRequestValidation() {
-        QuerySetRequest request = new QuerySetRequest("1234");
+        OpenSearchDocRequest request = new OpenSearchDocRequest("1234");
         assertNull(request.validate());
     }
 }

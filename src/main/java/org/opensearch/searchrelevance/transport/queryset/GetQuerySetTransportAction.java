@@ -5,7 +5,7 @@
  * this file be licensed under the Apache-2.0 license or a
  * compatible open source license.
  */
-package org.opensearch.searchrelevance.transport;
+package org.opensearch.searchrelevance.transport.queryset;
 
 import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.QUERY_SET;
 
@@ -21,11 +21,12 @@ import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
+import org.opensearch.searchrelevance.transport.OpenSearchDocRequest;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
 import org.opensearch.transport.client.Client;
 
-public class GetQuerySetTransportAction extends HandledTransportAction<QuerySetRequest, SearchResponse> {
+public class GetQuerySetTransportAction extends HandledTransportAction<OpenSearchDocRequest, SearchResponse> {
     private static final Logger LOGGER = LogManager.getLogger(GetQuerySetTransportAction.class);
     private final ClusterService clusterService;
     private final Client client;
@@ -38,14 +39,14 @@ public class GetQuerySetTransportAction extends HandledTransportAction<QuerySetR
         ActionFilters actionFilters,
         Client client
     ) {
-        super(GetQuerySetAction.NAME, transportService, actionFilters, QuerySetRequest::new);
+        super(GetQuerySetAction.NAME, transportService, actionFilters, OpenSearchDocRequest::new);
         this.clusterService = clusterService;
         this.client = client;
         this.querySetDao = new QuerySetDao(client, clusterService);
     }
 
     @Override
-    protected void doExecute(Task task, QuerySetRequest request, ActionListener<SearchResponse> listener) {
+    protected void doExecute(Task task, OpenSearchDocRequest request, ActionListener<SearchResponse> listener) {
         // Validate cluster health first
         if (!clusterService.state().routingTable().hasIndex(QUERY_SET.getIndexName())) {
             listener.onFailure(new ResourceNotFoundException("Index [" + QUERY_SET.getIndexName() + "] not found"));
@@ -53,9 +54,9 @@ public class GetQuerySetTransportAction extends HandledTransportAction<QuerySetR
         }
 
         try {
-            if (request.getQuerySetId() != null) {
+            if (request.getId() != null) {
                 // Handle single query set request
-                querySetDao.getQuerySet(request.getQuerySetId(), listener);
+                querySetDao.getQuerySet(request.getId(), listener);
             } else {
                 // Handle list request
                 querySetDao.listQuerySet(request.getSearchSourceBuilder(), listener);
