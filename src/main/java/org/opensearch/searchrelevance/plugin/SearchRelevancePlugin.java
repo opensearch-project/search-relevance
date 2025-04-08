@@ -33,24 +33,27 @@ import org.opensearch.searchrelevance.rest.RestDeleteSearchConfigurationAction;
 import org.opensearch.searchrelevance.rest.RestGetJudgmentAction;
 import org.opensearch.searchrelevance.rest.RestGetQuerySetAction;
 import org.opensearch.searchrelevance.rest.RestGetSearchConfigurationAction;
+import org.opensearch.searchrelevance.rest.RestPutQuerySetAction;
 import org.opensearch.searchrelevance.transport.experiment.CreateExperimentAction;
 import org.opensearch.searchrelevance.transport.experiment.CreateExperimentTransportAction;
 import org.opensearch.searchrelevance.transport.judgment.CreateJudgmentAction;
 import org.opensearch.searchrelevance.transport.judgment.CreateJudgmentTransportAction;
-import org.opensearch.searchrelevance.transport.queryset.CreateQuerySetAction;
-import org.opensearch.searchrelevance.transport.queryset.CreateQuerySetTransportAction;
-import org.opensearch.searchrelevance.transport.searchConfiguration.CreateSearchConfigurationAction;
-import org.opensearch.searchrelevance.transport.searchConfiguration.CreateSearchConfigurationTransportAction;
 import org.opensearch.searchrelevance.transport.judgment.DeleteJudgmentAction;
 import org.opensearch.searchrelevance.transport.judgment.DeleteJudgmentTransportAction;
-import org.opensearch.searchrelevance.transport.queryset.DeleteQuerySetAction;
-import org.opensearch.searchrelevance.transport.queryset.DeleteQuerySetTransportAction;
-import org.opensearch.searchrelevance.transport.searchConfiguration.DeleteSearchConfigurationAction;
-import org.opensearch.searchrelevance.transport.searchConfiguration.DeleteSearchConfigurationTransportAction;
 import org.opensearch.searchrelevance.transport.judgment.GetJudgmentAction;
 import org.opensearch.searchrelevance.transport.judgment.GetJudgmentTransportAction;
+import org.opensearch.searchrelevance.transport.queryset.CreateQuerySetAction;
+import org.opensearch.searchrelevance.transport.queryset.CreateQuerySetTransportAction;
+import org.opensearch.searchrelevance.transport.queryset.DeleteQuerySetAction;
+import org.opensearch.searchrelevance.transport.queryset.DeleteQuerySetTransportAction;
 import org.opensearch.searchrelevance.transport.queryset.GetQuerySetAction;
 import org.opensearch.searchrelevance.transport.queryset.GetQuerySetTransportAction;
+import org.opensearch.searchrelevance.transport.queryset.PutQuerySetAction;
+import org.opensearch.searchrelevance.transport.queryset.PutQuerySetTransportAction;
+import org.opensearch.searchrelevance.transport.searchConfiguration.CreateSearchConfigurationAction;
+import org.opensearch.searchrelevance.transport.searchConfiguration.CreateSearchConfigurationTransportAction;
+import org.opensearch.searchrelevance.transport.searchConfiguration.DeleteSearchConfigurationAction;
+import org.opensearch.searchrelevance.transport.searchConfiguration.DeleteSearchConfigurationTransportAction;
 import org.opensearch.searchrelevance.transport.searchConfiguration.GetSearchConfigurationAction;
 import org.opensearch.searchrelevance.transport.searchConfiguration.GetSearchConfigurationTransportAction;
 
@@ -68,6 +71,7 @@ public class SearchRelevancePlugin extends Plugin implements IngestPlugin, Actio
     ) {
         return List.of(
             new RestCreateQuerySetAction(),
+            new RestPutQuerySetAction(),
             new RestDeleteQuerySetAction(),
             new RestGetQuerySetAction(),
             new RestCreateJudgmentAction(),
@@ -84,6 +88,7 @@ public class SearchRelevancePlugin extends Plugin implements IngestPlugin, Actio
     public List<ActionHandler<? extends ActionRequest, ? extends ActionResponse>> getActions() {
         return List.of(
             new ActionHandler<>(CreateQuerySetAction.INSTANCE, CreateQuerySetTransportAction.class),
+            new ActionHandler<>(PutQuerySetAction.INSTANCE, PutQuerySetTransportAction.class),
             new ActionHandler<>(DeleteQuerySetAction.INSTANCE, DeleteQuerySetTransportAction.class),
             new ActionHandler<>(GetQuerySetAction.INSTANCE, GetQuerySetTransportAction.class),
             new ActionHandler<>(CreateJudgmentAction.INSTANCE, CreateJudgmentTransportAction.class),

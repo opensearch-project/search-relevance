@@ -20,27 +20,28 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
- * Integration tests for RestCreateQuerySetAction
+ * Integration tests for RestPutQuerySetAction
  */
-public class RestCreateQuerySetActionIT extends OpenSearchRestTestCase {
-    private static final String CREATE_QUERY_SET_ENDPOINT = "/_plugins/search_relevance/query_sets";
+public class RestPutQuerySetActionIT extends OpenSearchRestTestCase {
+    private static final String PUT_QUERY_SET_ENDPOINT = "/_plugins/search_relevance/query_sets";
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-    public void testCreateQuerySetSuccess() throws Exception {
+    public void testPutQuerySetSuccess() throws Exception {
         String name = "test_name";
         String description = "test_description";
-        String requestBody = createRequestBody(name, description);
+        String querySetQueries = "test_string";
+        String requestBody = createRequestBody(name, description, querySetQueries);
 
-        Response response = makeRequest("POST", CREATE_QUERY_SET_ENDPOINT, requestBody);
+        Response response = makeRequest("PUT", PUT_QUERY_SET_ENDPOINT, requestBody);
         assertEquals(RestStatus.OK.getStatus(), response.getStatusLine().getStatusCode());
     }
 
-    private String createRequestBody(String name, String description) throws JsonProcessingException {
+    private String createRequestBody(String name, String description, String querySetQueries) throws JsonProcessingException {
         Map<String, Object> requestMap = new HashMap<>();
         requestMap.put("name", name);
         requestMap.put("description", description);
-        requestMap.put("sampling", "topn");
-        requestMap.put("querySetSize", 10);
+        requestMap.put("sampling", "manual");
+        requestMap.put("querySetQueries", querySetQueries);
         return OBJECT_MAPPER.writeValueAsString(requestMap);
     }
 

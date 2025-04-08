@@ -16,25 +16,25 @@ import org.opensearch.common.Nullable;
 import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.core.common.io.stream.StreamOutput;
 
-public class CreateQuerySetRequest extends ActionRequest {
+public class PutQuerySetRequest extends ActionRequest {
     private String name;
     private String description;
     private String sampling;
-    private int querySetSize;
+    private String querySetQueries;
 
-    public CreateQuerySetRequest(String name, String description, String sampling, int querySetSize) {
+    public PutQuerySetRequest(String name, String description, String sampling, String querySetQueries) {
         this.name = Objects.requireNonNull(name, "name cannot be null.");
         this.description = description;
         this.sampling = Objects.requireNonNull(sampling, "sampling cannot be null.");
-        this.querySetSize = Objects.requireNonNull(querySetSize, "querySetSize cannot be null.");
+        this.querySetQueries = Objects.requireNonNull(querySetQueries, "querySetQueries cannot be null.");
     }
 
-    public CreateQuerySetRequest(StreamInput in) throws IOException {
+    public PutQuerySetRequest(StreamInput in) throws IOException {
         super(in);
         this.name = in.readString();
         this.description = in.readString();
         this.sampling = in.readString();
-        this.querySetSize = in.readInt();
+        this.querySetQueries = in.readString();
     }
 
     @Override
@@ -43,7 +43,7 @@ public class CreateQuerySetRequest extends ActionRequest {
         out.writeString(name);
         out.writeString(description);
         out.writeString(sampling);
-        out.writeInt(querySetSize);
+        out.writeString(querySetQueries);
     }
 
     public String getName() {
@@ -59,8 +59,8 @@ public class CreateQuerySetRequest extends ActionRequest {
         return sampling;
     }
 
-    public int getQuerySetSize() {
-        return querySetSize;
+    public String getQuerySetQueries() {
+        return querySetQueries;
     }
 
     @Override
