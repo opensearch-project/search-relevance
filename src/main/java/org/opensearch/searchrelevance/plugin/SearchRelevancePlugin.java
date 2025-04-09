@@ -23,25 +23,31 @@ import org.opensearch.plugins.IngestPlugin;
 import org.opensearch.plugins.Plugin;
 import org.opensearch.rest.RestController;
 import org.opensearch.rest.RestHandler;
-import org.opensearch.searchrelevance.rest.RestCreateExperimentAction;
-import org.opensearch.searchrelevance.rest.RestCreateJudgmentAction;
+import org.opensearch.searchrelevance.rest.PutCreateSearchConfigurationAction;
 import org.opensearch.searchrelevance.rest.RestCreateQuerySetAction;
-import org.opensearch.searchrelevance.rest.RestCreateSearchConfigurationAction;
+import org.opensearch.searchrelevance.rest.RestDeleteExperimentAction;
 import org.opensearch.searchrelevance.rest.RestDeleteJudgmentAction;
 import org.opensearch.searchrelevance.rest.RestDeleteQuerySetAction;
 import org.opensearch.searchrelevance.rest.RestDeleteSearchConfigurationAction;
+import org.opensearch.searchrelevance.rest.RestGetExperimentAction;
 import org.opensearch.searchrelevance.rest.RestGetJudgmentAction;
 import org.opensearch.searchrelevance.rest.RestGetQuerySetAction;
 import org.opensearch.searchrelevance.rest.RestGetSearchConfigurationAction;
+import org.opensearch.searchrelevance.rest.RestPutExperimentAction;
+import org.opensearch.searchrelevance.rest.RestPutJudgmentAction;
 import org.opensearch.searchrelevance.rest.RestPutQuerySetAction;
-import org.opensearch.searchrelevance.transport.experiment.CreateExperimentAction;
-import org.opensearch.searchrelevance.transport.experiment.CreateExperimentTransportAction;
-import org.opensearch.searchrelevance.transport.judgment.CreateJudgmentAction;
-import org.opensearch.searchrelevance.transport.judgment.CreateJudgmentTransportAction;
+import org.opensearch.searchrelevance.transport.experiment.DeleteExperimentAction;
+import org.opensearch.searchrelevance.transport.experiment.DeleteExperimentTransportAction;
+import org.opensearch.searchrelevance.transport.experiment.GetExperimentAction;
+import org.opensearch.searchrelevance.transport.experiment.GetExperimentTransportAction;
+import org.opensearch.searchrelevance.transport.experiment.PutExperimentAction;
+import org.opensearch.searchrelevance.transport.experiment.PutExperimentTransportAction;
 import org.opensearch.searchrelevance.transport.judgment.DeleteJudgmentAction;
 import org.opensearch.searchrelevance.transport.judgment.DeleteJudgmentTransportAction;
 import org.opensearch.searchrelevance.transport.judgment.GetJudgmentAction;
 import org.opensearch.searchrelevance.transport.judgment.GetJudgmentTransportAction;
+import org.opensearch.searchrelevance.transport.judgment.PutJudgmentAction;
+import org.opensearch.searchrelevance.transport.judgment.PutJudgmentTransportAction;
 import org.opensearch.searchrelevance.transport.queryset.CreateQuerySetAction;
 import org.opensearch.searchrelevance.transport.queryset.CreateQuerySetTransportAction;
 import org.opensearch.searchrelevance.transport.queryset.DeleteQuerySetAction;
@@ -50,12 +56,12 @@ import org.opensearch.searchrelevance.transport.queryset.GetQuerySetAction;
 import org.opensearch.searchrelevance.transport.queryset.GetQuerySetTransportAction;
 import org.opensearch.searchrelevance.transport.queryset.PutQuerySetAction;
 import org.opensearch.searchrelevance.transport.queryset.PutQuerySetTransportAction;
-import org.opensearch.searchrelevance.transport.searchConfiguration.CreateSearchConfigurationAction;
-import org.opensearch.searchrelevance.transport.searchConfiguration.CreateSearchConfigurationTransportAction;
 import org.opensearch.searchrelevance.transport.searchConfiguration.DeleteSearchConfigurationAction;
 import org.opensearch.searchrelevance.transport.searchConfiguration.DeleteSearchConfigurationTransportAction;
 import org.opensearch.searchrelevance.transport.searchConfiguration.GetSearchConfigurationAction;
 import org.opensearch.searchrelevance.transport.searchConfiguration.GetSearchConfigurationTransportAction;
+import org.opensearch.searchrelevance.transport.searchConfiguration.PutSearchConfigurationAction;
+import org.opensearch.searchrelevance.transport.searchConfiguration.PutSearchConfigurationTransportAction;
 
 public class SearchRelevancePlugin extends Plugin implements IngestPlugin, ActionPlugin {
 
@@ -74,13 +80,15 @@ public class SearchRelevancePlugin extends Plugin implements IngestPlugin, Actio
             new RestPutQuerySetAction(),
             new RestDeleteQuerySetAction(),
             new RestGetQuerySetAction(),
-            new RestCreateJudgmentAction(),
+            new RestPutJudgmentAction(),
             new RestDeleteJudgmentAction(),
             new RestGetJudgmentAction(),
-            new RestCreateSearchConfigurationAction(),
+            new PutCreateSearchConfigurationAction(),
             new RestDeleteSearchConfigurationAction(),
             new RestGetSearchConfigurationAction(),
-            new RestCreateExperimentAction()
+            new RestPutExperimentAction(),
+            new RestGetExperimentAction(),
+            new RestDeleteExperimentAction()
         );
     }
 
@@ -91,13 +99,15 @@ public class SearchRelevancePlugin extends Plugin implements IngestPlugin, Actio
             new ActionHandler<>(PutQuerySetAction.INSTANCE, PutQuerySetTransportAction.class),
             new ActionHandler<>(DeleteQuerySetAction.INSTANCE, DeleteQuerySetTransportAction.class),
             new ActionHandler<>(GetQuerySetAction.INSTANCE, GetQuerySetTransportAction.class),
-            new ActionHandler<>(CreateJudgmentAction.INSTANCE, CreateJudgmentTransportAction.class),
+            new ActionHandler<>(PutJudgmentAction.INSTANCE, PutJudgmentTransportAction.class),
             new ActionHandler<>(DeleteJudgmentAction.INSTANCE, DeleteJudgmentTransportAction.class),
             new ActionHandler<>(GetJudgmentAction.INSTANCE, GetJudgmentTransportAction.class),
-            new ActionHandler<>(CreateSearchConfigurationAction.INSTANCE, CreateSearchConfigurationTransportAction.class),
+            new ActionHandler<>(PutSearchConfigurationAction.INSTANCE, PutSearchConfigurationTransportAction.class),
             new ActionHandler<>(DeleteSearchConfigurationAction.INSTANCE, DeleteSearchConfigurationTransportAction.class),
             new ActionHandler<>(GetSearchConfigurationAction.INSTANCE, GetSearchConfigurationTransportAction.class),
-            new ActionHandler<>(CreateExperimentAction.INSTANCE, CreateExperimentTransportAction.class)
+            new ActionHandler<>(PutExperimentAction.INSTANCE, PutExperimentTransportAction.class),
+            new ActionHandler<>(DeleteExperimentAction.INSTANCE, DeleteExperimentTransportAction.class),
+            new ActionHandler<>(GetExperimentAction.INSTANCE, GetExperimentTransportAction.class)
         );
     }
 }

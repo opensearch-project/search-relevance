@@ -28,8 +28,8 @@ import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.searchrelevance.model.SearchParams;
-import org.opensearch.searchrelevance.transport.queryset.GetQuerySetAction;
 import org.opensearch.searchrelevance.transport.OpenSearchDocRequest;
+import org.opensearch.searchrelevance.transport.queryset.GetQuerySetAction;
 import org.opensearch.searchrelevance.utils.ParserUtils;
 import org.opensearch.transport.client.node.NodeClient;
 

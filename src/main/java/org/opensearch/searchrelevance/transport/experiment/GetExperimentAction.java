@@ -10,19 +10,19 @@ package org.opensearch.searchrelevance.transport.experiment;
 import static org.opensearch.searchrelevance.common.PluginConstants.TRANSPORT_ACTION_NAME_PREFIX;
 
 import org.opensearch.action.ActionType;
-import org.opensearch.action.index.IndexResponse;
+import org.opensearch.action.search.SearchResponse;
 
 /**
- * External Action for public facing RestCreateExperimentAction
+ * External Action for public facing RestGetExperimentAction
  */
-public class CreateExperimentAction extends ActionType<IndexResponse> {
+public class GetExperimentAction extends ActionType<SearchResponse> {
     /** The name of this action */
-    public static final String NAME = TRANSPORT_ACTION_NAME_PREFIX + "experiment/create";
+    public static final String NAME = TRANSPORT_ACTION_NAME_PREFIX + "experiment/get";
 
     /** An instance of this action */
-    public static final CreateExperimentAction INSTANCE = new CreateExperimentAction();
+    public static final GetExperimentAction INSTANCE = new GetExperimentAction();
 
-    private CreateExperimentAction() {
-        super(NAME, IndexResponse::new);
+    private GetExperimentAction() {
+        super(NAME, SearchResponse::new);
     }
 }

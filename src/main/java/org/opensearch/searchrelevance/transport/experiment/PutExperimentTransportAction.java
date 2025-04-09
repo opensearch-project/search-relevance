@@ -5,8 +5,9 @@
  * this file be licensed under the Apache-2.0 license or a
  * compatible open source license.
  */
-package org.opensearch.searchrelevance.transport.searchConfiguration;
+package org.opensearch.searchrelevance.transport.experiment;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.opensearch.action.StepListener;
@@ -16,34 +17,34 @@ import org.opensearch.action.support.HandledTransportAction;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.core.action.ActionListener;
-import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
-import org.opensearch.searchrelevance.model.SearchConfiguration;
+import org.opensearch.searchrelevance.dao.ExperimentDao;
+import org.opensearch.searchrelevance.model.Experiment;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
 import org.opensearch.transport.client.Client;
 
-public class CreateSearchConfigurationTransportAction extends HandledTransportAction<CreateSearchConfigurationRequest, IndexResponse> {
+public class PutExperimentTransportAction extends HandledTransportAction<PutExperimentRequest, IndexResponse> {
     private final Client client;
     private final ClusterService clusterService;
 
-    private final SearchConfigurationDao searchConfigurationDao;
+    private final ExperimentDao experimentDao;
 
     @Inject
-    public CreateSearchConfigurationTransportAction(
+    public PutExperimentTransportAction(
         ClusterService clusterService,
         TransportService transportService,
         ActionFilters actionFilters,
         Client client
     ) {
-        super(CreateSearchConfigurationAction.NAME, transportService, actionFilters, CreateSearchConfigurationRequest::new);
+        super(PutExperimentAction.NAME, transportService, actionFilters, PutExperimentRequest::new);
         this.client = client;
         this.clusterService = clusterService;
-        this.searchConfigurationDao = new SearchConfigurationDao(client, clusterService);
+        this.experimentDao = new ExperimentDao(client, clusterService);
     }
 
     @Override
-    protected void doExecute(Task task, CreateSearchConfigurationRequest request, ActionListener<IndexResponse> listener) {
+    protected void doExecute(Task task, PutExperimentRequest request, ActionListener<IndexResponse> listener) {
         if (request == null) {
             listener.onFailure(new IllegalArgumentException("Request cannot be null"));
             return;
@@ -51,11 +52,17 @@ public class CreateSearchConfigurationTransportAction extends HandledTransportAc
         String id = UUID.randomUUID().toString();
         String timestamp = TimeUtils.getTimestamp();
 
+        String name = request.getName();
+        String description = request.getDescription();
+        String index = request.getIndex();
+        List<String> judgmentList = request.getJudgmentList();
+        List<String> querySetList = request.getQuerySetList();
+
         StepListener<Void> createIndexStep = new StepListener<>();
-        searchConfigurationDao.createIndexIfAbsent(createIndexStep);
+        experimentDao.createIndexIfAbsent(createIndexStep);
         createIndexStep.whenComplete(v -> {
-            SearchConfiguration searchConfiguration = new SearchConfiguration(id, timestamp);
-            searchConfigurationDao.putSearchConfiguration(searchConfiguration, listener);
+            Experiment experiment = new Experiment(id, name, description, timestamp, index, judgmentList, querySetList);
+            experimentDao.putExperiment(experiment, listener);
         }, listener::onFailure);
     }
 }

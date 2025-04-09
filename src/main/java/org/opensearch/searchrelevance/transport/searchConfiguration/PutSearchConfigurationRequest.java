@@ -15,35 +15,43 @@ import org.opensearch.common.Nullable;
 import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.core.common.io.stream.StreamOutput;
 
-public class CreateSearchConfigurationRequest extends ActionRequest {
+public class PutSearchConfigurationRequest extends ActionRequest {
     private String name;
-    private String description;
+    private String queryBody;
+    private String searchPipeline;
 
-    public CreateSearchConfigurationRequest(String name, String description) {
+    public PutSearchConfigurationRequest(String name, String queryBody, String searchPipeline) {
         this.name = name;
-        this.description = description;
+        this.queryBody = queryBody;
+        this.searchPipeline = searchPipeline;
     }
 
-    public CreateSearchConfigurationRequest(StreamInput in) throws IOException {
+    public PutSearchConfigurationRequest(StreamInput in) throws IOException {
         super(in);
         this.name = in.readString();
-        this.description = in.readString();
+        this.queryBody = in.readString();
+        this.searchPipeline = in.readString();
     }
 
     @Override
     public void writeTo(StreamOutput out) throws IOException {
         super.writeTo(out);
         out.writeString(name);
-        out.writeString(description);
+        out.writeString(queryBody);
+        out.writeOptionalString(searchPipeline);
     }
 
     public String getName() {
         return name;
     }
 
+    public String getQueryBody() {
+        return queryBody;
+    }
+
     @Nullable
-    public String getDescription() {
-        return description;
+    public String getSearchPipeline() {
+        return searchPipeline;
     }
 
     @Override

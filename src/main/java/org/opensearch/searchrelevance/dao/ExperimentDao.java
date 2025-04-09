@@ -14,11 +14,15 @@ import java.io.IOException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opensearch.action.StepListener;
+import org.opensearch.action.delete.DeleteResponse;
+import org.opensearch.action.search.SearchResponse;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.core.xcontent.ToXContent;
+import org.opensearch.index.query.QueryBuilders;
+import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager;
 import org.opensearch.searchrelevance.model.Experiment;
@@ -66,5 +70,42 @@ public class ExperimentDao {
         } catch (IOException e) {
             throw new SearchRelevanceException("Failed to store experiment", e, RestStatus.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    /**
+     * Delete experiment by experimentId
+     * @param experimentId - id to be deleted
+     * @param listener - action lister for async operation
+     */
+    public void deleteExperiment(final String experimentId, final ActionListener<DeleteResponse> listener) {
+        searchRelevanceIndicesManager.deleteDocByDocId(experimentId, EXPERIMENT, listener);
+    }
+
+    /**
+     * Get experiment by experimentId
+     * @param experimentId - id to be deleted
+     * @param listener - action lister for async operation
+     */
+    public void getExperiment(String experimentId, ActionListener<SearchResponse> listener) {
+        searchRelevanceIndicesManager.getDocByDocId(experimentId, EXPERIMENT, listener);
+    }
+
+    /**
+     * List experiment by source builder
+     * @param sourceBuilder - source builder to be searched
+     * @param listener - action lister for async operation
+     */
+    public void listExperiment(SearchSourceBuilder sourceBuilder, ActionListener<SearchResponse> listener) {
+        // Apply default values if not set
+        if (sourceBuilder == null) {
+            sourceBuilder = new SearchSourceBuilder();
+        }
+
+        // Ensure we have a query
+        if (sourceBuilder.query() == null) {
+            sourceBuilder.query(QueryBuilders.matchAllQuery());
+        }
+
+        searchRelevanceIndicesManager.listDocsBySearchRequest(sourceBuilder, EXPERIMENT, listener);
     }
 }

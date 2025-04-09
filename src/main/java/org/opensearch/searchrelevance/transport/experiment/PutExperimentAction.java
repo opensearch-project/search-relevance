@@ -5,7 +5,7 @@
  * this file be licensed under the Apache-2.0 license or a
  * compatible open source license.
  */
-package org.opensearch.searchrelevance.transport.judgment;
+package org.opensearch.searchrelevance.transport.experiment;
 
 import static org.opensearch.searchrelevance.common.PluginConstants.TRANSPORT_ACTION_NAME_PREFIX;
 
@@ -13,16 +13,16 @@ import org.opensearch.action.ActionType;
 import org.opensearch.action.index.IndexResponse;
 
 /**
- * External Action for public facing RestCreateJudgmentAction
+ * External Action for public facing RestPutExperimentAction
  */
-public class CreateJudgmentAction extends ActionType<IndexResponse> {
+public class PutExperimentAction extends ActionType<IndexResponse> {
     /** The name of this action */
-    public static final String NAME = TRANSPORT_ACTION_NAME_PREFIX + "judgment/create";
+    public static final String NAME = TRANSPORT_ACTION_NAME_PREFIX + "experiment/create";
 
     /** An instance of this action */
-    public static final CreateJudgmentAction INSTANCE = new CreateJudgmentAction();
+    public static final PutExperimentAction INSTANCE = new PutExperimentAction();
 
-    private CreateJudgmentAction() {
+    private PutExperimentAction() {
         super(NAME, IndexResponse::new);
     }
 }

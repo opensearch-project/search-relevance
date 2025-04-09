@@ -8,63 +8,61 @@
 package org.opensearch.searchrelevance.rest;
 
 import static java.util.Collections.singletonList;
-import static org.opensearch.rest.RestRequest.Method.POST;
+import static org.opensearch.rest.RestRequest.Method.DELETE;
+import static org.opensearch.searchrelevance.common.PluginConstants.DOCUMENT_ID;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENTS_URI;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Map;
+import java.util.Locale;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.opensearch.action.index.IndexResponse;
+import org.opensearch.action.DocWriteResponse;
+import org.opensearch.action.delete.DeleteResponse;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.core.xcontent.XContentBuilder;
-import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.rest.BaseRestHandler;
 import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestRequest;
-import org.opensearch.searchrelevance.transport.experiment.CreateExperimentAction;
-import org.opensearch.searchrelevance.transport.experiment.CreateExperimentRequest;
+import org.opensearch.searchrelevance.transport.OpenSearchDocRequest;
+import org.opensearch.searchrelevance.transport.experiment.DeleteExperimentAction;
 import org.opensearch.transport.client.node.NodeClient;
 
-/**
- * Rest Action to facilitate requests to create a experiment.
- */
-public class RestCreateExperimentAction extends BaseRestHandler {
-    private static final Logger LOGGER = LogManager.getLogger(RestCreateExperimentAction.class);
-    private static final String CREATE_EXPERIMENT_ACTION = "create_experiment_action";
+public class RestDeleteExperimentAction extends BaseRestHandler {
+    private static final Logger LOGGER = LogManager.getLogger(RestDeleteExperimentAction.class);
+    private static final String DELETE_EXPERIMENT_ACTION = "delete_experiment_action";
 
     @Override
     public String getName() {
-        return CREATE_EXPERIMENT_ACTION;
+        return DELETE_EXPERIMENT_ACTION;
     }
 
     @Override
     public List<Route> routes() {
-        return singletonList(new Route(POST, EXPERIMENTS_URI));
+        return singletonList(new Route(DELETE, String.format(Locale.ROOT, "%s/{%s}", EXPERIMENTS_URI, DOCUMENT_ID)));
     }
 
     @Override
     protected RestChannelConsumer prepareRequest(RestRequest request, NodeClient client) throws IOException {
-        XContentParser parser = request.contentParser();
-        Map<String, Object> source = parser.map();
-
-        String name = (String) source.get("name");
-        String description = (String) source.get("description");
-
-        CreateExperimentRequest createRequest = new CreateExperimentRequest(name, description);
-
-        return channel -> client.execute(CreateExperimentAction.INSTANCE, createRequest, new ActionListener<IndexResponse>() {
+        final String experimentId = request.param(DOCUMENT_ID);
+        if (experimentId == null) {
+            throw new IllegalArgumentException("id cannot be null");
+        }
+        OpenSearchDocRequest deleteRequest = new OpenSearchDocRequest(experimentId);
+        return channel -> client.execute(DeleteExperimentAction.INSTANCE, deleteRequest, new ActionListener<DeleteResponse>() {
             @Override
-            public void onResponse(IndexResponse response) {
+            public void onResponse(DeleteResponse deleteResponse) {
                 try {
                     XContentBuilder builder = channel.newBuilder();
-                    builder.startObject();
-                    builder.field("experiment_id", response.getId());
-                    builder.endObject();
-                    channel.sendResponse(new BytesRestResponse(RestStatus.OK, builder));
+                    deleteResponse.toXContent(builder, request);
+                    channel.sendResponse(
+                        new BytesRestResponse(
+                            deleteResponse.getResult() == DocWriteResponse.Result.NOT_FOUND ? RestStatus.NOT_FOUND : RestStatus.OK,
+                            builder
+                        )
+                    );
                 } catch (IOException e) {
                     onFailure(e);
                 }

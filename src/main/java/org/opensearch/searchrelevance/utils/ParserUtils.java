@@ -8,6 +8,9 @@
 package org.opensearch.searchrelevance.utils;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.rest.RestRequest;
@@ -71,5 +74,19 @@ public class ParserUtils {
                 }
             }
         }
+    }
+
+    public static List<String> convertObjToList(Map<String, Object> source, String fieldName) {
+        List<String> result = new ArrayList<>();
+        Object rawList = source.get(fieldName);
+
+        if (rawList instanceof List<?>) {
+            ((List<?>) rawList).forEach(item -> {
+                if (item instanceof String) {
+                    result.add((String) item);
+                }
+            });
+        }
+        return result;
     }
 }

@@ -13,7 +13,7 @@ import org.opensearch.action.ActionType;
 import org.opensearch.action.search.SearchResponse;
 
 /**
- * External Action for public facing RestGetWorkflowAction
+ * External Action for public facing RestGetQuerySetAction
  */
 public class GetQuerySetAction extends ActionType<SearchResponse> {
     /** The name of this action */

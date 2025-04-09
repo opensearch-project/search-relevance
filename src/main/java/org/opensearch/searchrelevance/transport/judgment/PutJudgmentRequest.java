@@ -15,16 +15,16 @@ import org.opensearch.common.Nullable;
 import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.core.common.io.stream.StreamOutput;
 
-public class CreateJudgmentRequest extends ActionRequest {
+public class PutJudgmentRequest extends ActionRequest {
     private String name;
     private String description;
 
-    public CreateJudgmentRequest(String name, String description) {
+    public PutJudgmentRequest(String name, String description) {
         this.name = name;
         this.description = description;
     }
 
-    public CreateJudgmentRequest(StreamInput in) throws IOException {
+    public PutJudgmentRequest(StreamInput in) throws IOException {
         super(in);
         this.name = in.readString();
         this.description = in.readString();
