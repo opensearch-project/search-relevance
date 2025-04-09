@@ -42,8 +42,8 @@ public class TopNQuerySampler extends QuerySampler {
     }
 
     @Override
-    public CompletableFuture<Map<String, Long>> sample() {
-        CompletableFuture<Map<String, Long>> future = new CompletableFuture<>();
+    public CompletableFuture<Map<String, Integer>> sample() {
+        CompletableFuture<Map<String, Integer>> future = new CompletableFuture<>();
         try {
             SearchRequest searchRequest = buildSearchRequest();
 
@@ -51,7 +51,7 @@ public class TopNQuerySampler extends QuerySampler {
                 @Override
                 public void onResponse(SearchResponse searchResponse) {
                     try {
-                        Map<String, Long> querySet = processSearchResponse(searchResponse);
+                        Map<String, Integer> querySet = processSearchResponse(searchResponse);
                         if (querySet.isEmpty()) {
                             LOGGER.warn("No queries found in the search response");
                         }
@@ -91,8 +91,8 @@ public class TopNQuerySampler extends QuerySampler {
         return new SearchRequest(UBI_QUERIES_INDEX).source(searchSourceBuilder);
     }
 
-    private Map<String, Long> processSearchResponse(SearchResponse searchResponse) {
-        Map<String, Long> querySet = new HashMap<>();
+    private Map<String, Integer> processSearchResponse(SearchResponse searchResponse) {
+        Map<String, Integer> querySet = new HashMap<>();
 
         Terms byUserQuery = searchResponse.getAggregations().get(AGGREGATION_NAME);
         List<? extends Terms.Bucket> buckets = byUserQuery.getBuckets();
@@ -103,7 +103,7 @@ public class TopNQuerySampler extends QuerySampler {
 
             if (query != null && !query.trim().isEmpty()) {
                 LOGGER.debug("Adding query to set: {} (count: {})", query, count);
-                querySet.put(query, count);
+                querySet.put(query, Math.toIntExact(count));
             }
         }
 

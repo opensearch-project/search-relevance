@@ -20,11 +20,9 @@ import org.opensearch.searchrelevance.dao.QuerySetDao;
 import org.opensearch.searchrelevance.transport.OpenSearchDocRequest;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
-import org.opensearch.transport.client.Client;
 
 public class DeleteQuerySetTransportAction extends HandledTransportAction<OpenSearchDocRequest, DeleteResponse> {
     private final ClusterService clusterService;
-    private final Client client;
     private final QuerySetDao querySetDao;
 
     @Inject
@@ -32,12 +30,11 @@ public class DeleteQuerySetTransportAction extends HandledTransportAction<OpenSe
         ClusterService clusterService,
         TransportService transportService,
         ActionFilters actionFilters,
-        Client client
+        QuerySetDao querySetDao
     ) {
         super(DeleteQuerySetAction.NAME, transportService, actionFilters, OpenSearchDocRequest::new);
         this.clusterService = clusterService;
-        this.client = client;
-        this.querySetDao = new QuerySetDao(client, clusterService);
+        this.querySetDao = querySetDao;
     }
 
     @Override

@@ -7,7 +7,9 @@
  */
 package org.opensearch.searchrelevance.transport.experiment;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.opensearch.action.StepListener;
@@ -18,29 +20,33 @@ import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.searchrelevance.dao.ExperimentDao;
+import org.opensearch.searchrelevance.dao.QuerySetDao;
+import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
 import org.opensearch.searchrelevance.model.Experiment;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
-import org.opensearch.transport.client.Client;
 
 public class PutExperimentTransportAction extends HandledTransportAction<PutExperimentRequest, IndexResponse> {
-    private final Client client;
     private final ClusterService clusterService;
-
     private final ExperimentDao experimentDao;
+    private final QuerySetDao querySetDao;
+    private final SearchConfigurationDao searchConfigurationDao;
 
     @Inject
     public PutExperimentTransportAction(
         ClusterService clusterService,
         TransportService transportService,
         ActionFilters actionFilters,
-        Client client
+        ExperimentDao experimentDao,
+        QuerySetDao querySetDao,
+        SearchConfigurationDao searchConfigurationDao
     ) {
         super(PutExperimentAction.NAME, transportService, actionFilters, PutExperimentRequest::new);
-        this.client = client;
         this.clusterService = clusterService;
-        this.experimentDao = new ExperimentDao(client, clusterService);
+        this.experimentDao = experimentDao;
+        this.querySetDao = querySetDao;
+        this.searchConfigurationDao = searchConfigurationDao;
     }
 
     @Override
@@ -52,16 +58,32 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
         String id = UUID.randomUUID().toString();
         String timestamp = TimeUtils.getTimestamp();
 
-        String name = request.getName();
-        String description = request.getDescription();
         String index = request.getIndex();
-        List<String> judgmentList = request.getJudgmentList();
-        List<String> querySetList = request.getQuerySetList();
+        String querySetId = request.getQuerySetId();
+        List<String> searchConfigurationList = request.getSearchConfigurationList();
+        int k = request.getK();
 
+        Map<String, Object> results = new HashMap<>();
+        // step1: Create Index
         StepListener<Void> createIndexStep = new StepListener<>();
         experimentDao.createIndexIfAbsent(createIndexStep);
-        createIndexStep.whenComplete(v -> {
-            Experiment experiment = new Experiment(id, name, description, timestamp, index, judgmentList, querySetList);
+
+        // step2: Get QuerySet
+        StepListener<Map<String, Object>> getQuerySetStep = new StepListener<>();
+        createIndexStep.whenComplete(
+            v -> { querySetDao.getQuerySetWithStepListener(querySetId, results, getQuerySetStep); },
+            listener::onFailure
+        );
+
+        // step3: Get SearchConfigurations
+        StepListener<Map<String, Object>> getSearchConfigsStep = new StepListener<>();
+        getQuerySetStep.whenComplete(v -> {
+            searchConfigurationDao.getSearchConfigsWithStepListener(searchConfigurationList, results, getSearchConfigsStep);
+        }, listener::onFailure);
+
+        // Step4: Put Experiment
+        getSearchConfigsStep.whenComplete(v -> {
+            Experiment experiment = new Experiment(id, timestamp, index, querySetId, searchConfigurationList, k, results);
             experimentDao.putExperiment(experiment, listener);
         }, listener::onFailure);
     }

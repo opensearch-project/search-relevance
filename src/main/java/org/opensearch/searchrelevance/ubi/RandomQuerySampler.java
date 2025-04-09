@@ -44,8 +44,8 @@ public class RandomQuerySampler extends QuerySampler {
     }
 
     @Override
-    public CompletableFuture<Map<String, Long>> sample() {
-        CompletableFuture<Map<String, Long>> future = new CompletableFuture<>();
+    public CompletableFuture<Map<String, Integer>> sample() {
+        CompletableFuture<Map<String, Integer>> future = new CompletableFuture<>();
         SearchRequest searchRequest = buildSearchRequest();
 
         getClient().search(searchRequest, new ActionListener<SearchResponse>() {
@@ -94,8 +94,8 @@ public class RandomQuerySampler extends QuerySampler {
         return new SearchRequest(UBI_QUERIES_INDEX).source(searchSourceBuilder);
     }
 
-    private CompletableFuture<Map<String, Long>> getQuerySet(SearchResponse searchResponse) {
-        Map<String, Long> querySet = new HashMap<>();
+    private CompletableFuture<Map<String, Integer>> getQuerySet(SearchResponse searchResponse) {
+        Map<String, Integer> querySet = new HashMap<>();
         CompletableFuture<?>[] futures = new CompletableFuture[searchResponse.getHits().getHits().length];
 
         int i = 0;
@@ -103,7 +103,7 @@ public class RandomQuerySampler extends QuerySampler {
             String userQuery = (String) hit.getSourceAsMap().get(USER_QUERY_FIELD);
             futures[i++] = getUserQueryCount(userQuery).thenAccept(count -> {
                 LOGGER.info("Adding user query to query set: {} with frequency {}", userQuery, count);
-                querySet.put(userQuery, count);
+                querySet.put(userQuery, Math.toIntExact(count));
             });
         }
 

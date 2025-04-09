@@ -64,6 +64,7 @@ public class PutCreateSearchConfigurationAction extends BaseRestHandler {
                     XContentBuilder builder = channel.newBuilder();
                     builder.startObject();
                     builder.field("search_configuration_id", response.getId());
+                    builder.field("search_configuration_result", response.getResult());
                     builder.endObject();
                     channel.sendResponse(new BytesRestResponse(RestStatus.OK, builder));
                 } catch (IOException e) {

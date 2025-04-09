@@ -20,11 +20,9 @@ import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.transport.OpenSearchDocRequest;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
-import org.opensearch.transport.client.Client;
 
 public class DeleteJudgmentTransportAction extends HandledTransportAction<OpenSearchDocRequest, DeleteResponse> {
     private final ClusterService clusterService;
-    private final Client client;
     private final JudgmentDao judgmentDao;
 
     @Inject
@@ -32,12 +30,11 @@ public class DeleteJudgmentTransportAction extends HandledTransportAction<OpenSe
         ClusterService clusterService,
         TransportService transportService,
         ActionFilters actionFilters,
-        Client client
+        JudgmentDao judgmentDao
     ) {
         super(DeleteJudgmentAction.NAME, transportService, actionFilters, OpenSearchDocRequest::new);
         this.clusterService = clusterService;
-        this.client = client;
-        this.judgmentDao = new JudgmentDao(client, clusterService);
+        this.judgmentDao = judgmentDao;
     }
 
     @Override

@@ -10,25 +10,26 @@ package org.opensearch.searchrelevance.dao;
 import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.QUERY_SET;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opensearch.action.StepListener;
 import org.opensearch.action.delete.DeleteResponse;
 import org.opensearch.action.search.SearchResponse;
-import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.common.inject.Inject;
 import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.core.xcontent.ToXContent;
 import org.opensearch.index.query.QueryBuilders;
+import org.opensearch.search.SearchHit;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager;
 import org.opensearch.searchrelevance.model.QuerySet;
-import org.opensearch.transport.client.Client;
-
-import reactor.util.annotation.NonNull;
 
 /**
  * Data access object layer for query set system index
@@ -36,14 +37,11 @@ import reactor.util.annotation.NonNull;
 public class QuerySetDao {
 
     private static final Logger LOGGER = LogManager.getLogger(QuerySetDao.class);
-    private final Client client;
-    private final ClusterService clusterService;
     private final SearchRelevanceIndicesManager searchRelevanceIndicesManager;
 
-    public QuerySetDao(@NonNull Client client, @NonNull ClusterService clusterService) {
-        this.client = client;
-        this.clusterService = clusterService;
-        this.searchRelevanceIndicesManager = new SearchRelevanceIndicesManager(clusterService, client);
+    @Inject
+    public QuerySetDao(SearchRelevanceIndicesManager searchRelevanceIndicesManager) {
+        this.searchRelevanceIndicesManager = searchRelevanceIndicesManager;
     }
 
     /**
@@ -66,7 +64,7 @@ public class QuerySetDao {
         }
         try {
             searchRelevanceIndicesManager.putDoc(
-                querySet.id(),
+                querySet.name(),
                 querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS),
                 QUERY_SET,
                 listener
@@ -90,8 +88,12 @@ public class QuerySetDao {
      * @param querySetId - id to be deleted
      * @param listener - action lister for async operation
      */
-    public void getQuerySet(String querySetId, ActionListener<SearchResponse> listener) {
-        searchRelevanceIndicesManager.getDocByDocId(querySetId, QUERY_SET, listener);
+    public SearchResponse getQuerySet(String querySetId, ActionListener<SearchResponse> listener) {
+        if (querySetId == null || querySetId.isEmpty()) {
+            listener.onFailure(new IllegalArgumentException("querySetId must not be null or empty"));
+            return null;
+        }
+        return searchRelevanceIndicesManager.getDocByDocId(querySetId, QUERY_SET, listener);
     }
 
     /**
@@ -99,7 +101,7 @@ public class QuerySetDao {
      * @param sourceBuilder - source builder to be searched
      * @param listener - action lister for async operation
      */
-    public void listQuerySet(SearchSourceBuilder sourceBuilder, ActionListener<SearchResponse> listener) {
+    public SearchResponse listQuerySet(SearchSourceBuilder sourceBuilder, ActionListener<SearchResponse> listener) {
         // Apply default values if not set
         if (sourceBuilder == null) {
             sourceBuilder = new SearchSourceBuilder();
@@ -110,6 +112,54 @@ public class QuerySetDao {
             sourceBuilder.query(QueryBuilders.matchAllQuery());
         }
 
-        searchRelevanceIndicesManager.listDocsBySearchRequest(sourceBuilder, QUERY_SET, listener);
+        return searchRelevanceIndicesManager.listDocsBySearchRequest(sourceBuilder, QUERY_SET, listener);
+    }
+
+    /**
+     * Get a queryset given a step stepListener and put it back to results mapping.
+     * @param querySetId - id to be searched
+     * @param results - the results map
+     * @param stepListener - step lister
+     */
+    public void getQuerySetWithStepListener(
+        String querySetId,
+        Map<String, Object> results,
+        StepListener<Map<String, Object>> stepListener
+    ) {
+        getQuerySet(querySetId, new ActionListener<SearchResponse>() {
+            @Override
+            public void onResponse(SearchResponse response) {
+                try {
+                    LOGGER.info("Successfully get response: [{}]", response);
+                    QuerySet querySet = convertToQuerySet(response);
+                    LOGGER.debug("Converted response into queryset: [{}]", querySet);
+
+                    results.put("querySetTexts", new ArrayList<>(querySet.querySetQueries().keySet()));
+                    stepListener.onResponse(results);
+                } catch (Exception e) {
+                    LOGGER.error("Failed to convert response: [{}] into queryset.", response);
+                    stepListener.onFailure(new SearchRelevanceException("Failed to convert queryset", e, RestStatus.INTERNAL_SERVER_ERROR));
+                }
+            }
+
+            @Override
+            public void onFailure(Exception e) {
+                LOGGER.error("Failed to retrieve query set for querySetId: [{}]", querySetId, e);
+                stepListener.onFailure(new SearchRelevanceException("Failed retrieve queryset", e, RestStatus.INTERNAL_SERVER_ERROR));
+            }
+        });
+    }
+
+    private QuerySet convertToQuerySet(SearchResponse response) {
+        SearchHit hit = response.getHits().getHits()[0];
+        Map<String, Object> sourceMap = hit.getSourceAsMap();
+
+        return QuerySet.Builder.builder()
+            .name((String) sourceMap.get(QuerySet.NAME))
+            .description((String) sourceMap.get(QuerySet.DESCRIPTION))
+            .timestamp((String) sourceMap.get(QuerySet.TIME_STAMP))
+            .sampling((String) sourceMap.get(QuerySet.SAMPLING))
+            .querySetQueries((Map<String, Integer>) sourceMap.getOrDefault(QuerySet.QUERY_SET_QUERIES, new HashMap<>()))
+            .build();
     }
 }

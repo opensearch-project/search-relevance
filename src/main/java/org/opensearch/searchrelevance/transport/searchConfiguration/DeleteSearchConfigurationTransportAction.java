@@ -20,11 +20,9 @@ import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
 import org.opensearch.searchrelevance.transport.OpenSearchDocRequest;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
-import org.opensearch.transport.client.Client;
 
 public class DeleteSearchConfigurationTransportAction extends HandledTransportAction<OpenSearchDocRequest, DeleteResponse> {
     private final ClusterService clusterService;
-    private final Client client;
     private final SearchConfigurationDao searchConfigurationDao;
 
     @Inject
@@ -32,12 +30,11 @@ public class DeleteSearchConfigurationTransportAction extends HandledTransportAc
         ClusterService clusterService,
         TransportService transportService,
         ActionFilters actionFilters,
-        Client client
+        SearchConfigurationDao searchConfigurationDao
     ) {
         super(DeleteSearchConfigurationAction.NAME, transportService, actionFilters, OpenSearchDocRequest::new);
         this.clusterService = clusterService;
-        this.client = client;
-        this.searchConfigurationDao = new SearchConfigurationDao(client, clusterService);
+        this.searchConfigurationDao = searchConfigurationDao;
     }
 
     @Override

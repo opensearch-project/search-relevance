@@ -8,7 +8,6 @@
 package org.opensearch.searchrelevance.transport.queryset;
 
 import java.io.IOException;
-import java.util.Objects;
 
 import org.opensearch.action.ActionRequest;
 import org.opensearch.action.ActionRequestValidationException;
@@ -16,17 +15,22 @@ import org.opensearch.common.Nullable;
 import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.core.common.io.stream.StreamOutput;
 
-public class PutQuerySetRequest extends ActionRequest {
-    private String name;
-    private String description;
-    private String sampling;
-    private String querySetQueries;
+import reactor.util.annotation.NonNull;
 
-    public PutQuerySetRequest(String name, String description, String sampling, String querySetQueries) {
-        this.name = Objects.requireNonNull(name, "name cannot be null.");
+/**
+ * Put Request supports sampling as manual, when querySetQueries is provided.
+ */
+public class PutQuerySetRequest extends ActionRequest {
+    private final String name;
+    private final String description;
+    private final String sampling;
+    private final String querySetQueries;
+
+    public PutQuerySetRequest(@NonNull String name, String description, @NonNull String sampling, @NonNull String querySetQueries) {
+        this.name = name;
         this.description = description;
-        this.sampling = Objects.requireNonNull(sampling, "sampling cannot be null.");
-        this.querySetQueries = Objects.requireNonNull(querySetQueries, "querySetQueries cannot be null.");
+        this.sampling = sampling;
+        this.querySetQueries = querySetQueries;
     }
 
     public PutQuerySetRequest(StreamInput in) throws IOException {

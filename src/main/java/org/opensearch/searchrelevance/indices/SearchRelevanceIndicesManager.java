@@ -37,7 +37,7 @@ import org.opensearch.transport.client.Client;
 import reactor.util.annotation.NonNull;
 
 /**
- * Manager for common search relevance index operations.
+ * Manager for common search relevance system indices operations.
  */
 public class SearchRelevanceIndicesManager {
     private static final Logger LOGGER = LogManager.getLogger(SearchRelevanceIndicesManager.class);
@@ -147,7 +147,11 @@ public class SearchRelevanceIndicesManager {
      * @param index - system index
      * @param listener - action lister for async operation
      */
-    public void getDocByDocId(final String docId, final SearchRelevanceIndices index, final ActionListener<SearchResponse> listener) {
+    public SearchResponse getDocByDocId(
+        final String docId,
+        final SearchRelevanceIndices index,
+        final ActionListener<SearchResponse> listener
+    ) {
         SearchRequest searchRequest = new SearchRequest(index.getIndexName());
         SearchSourceBuilder sourceBuilder = new SearchSourceBuilder().query(QueryBuilders.termQuery("_id", docId)).size(1);
 
@@ -175,6 +179,7 @@ public class SearchRelevanceIndicesManager {
                 listener.onFailure(new SearchRelevanceException("Failed to get doc", e, RestStatus.INTERNAL_SERVER_ERROR));
             }
         });
+        return null;
     }
 
     /**
@@ -183,7 +188,7 @@ public class SearchRelevanceIndicesManager {
      * @param index - index to be executed
      * @param listener - action lister for async operation
      */
-    public void listDocsBySearchRequest(
+    public SearchResponse listDocsBySearchRequest(
         final SearchSourceBuilder searchSourceBuilder,
         final SearchRelevanceIndices index,
         final ActionListener<SearchResponse> listener
@@ -208,6 +213,7 @@ public class SearchRelevanceIndicesManager {
                 listener.onFailure(new SearchRelevanceException("Failed to list docs", e, RestStatus.INTERNAL_SERVER_ERROR));
             }
         });
+        return null;
     }
 
     /**

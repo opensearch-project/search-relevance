@@ -16,7 +16,6 @@ import org.apache.logging.log4j.Logger;
 import org.opensearch.action.StepListener;
 import org.opensearch.action.delete.DeleteResponse;
 import org.opensearch.action.search.SearchResponse;
-import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
@@ -26,20 +25,13 @@ import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager;
 import org.opensearch.searchrelevance.model.Experiment;
-import org.opensearch.transport.client.Client;
-
-import reactor.util.annotation.NonNull;
 
 public class ExperimentDao {
     private static final Logger LOGGER = LogManager.getLogger(ExperimentDao.class);
-    private final Client client;
-    private final ClusterService clusterService;
     private final SearchRelevanceIndicesManager searchRelevanceIndicesManager;
 
-    public ExperimentDao(@NonNull Client client, @NonNull ClusterService clusterService) {
-        this.client = client;
-        this.clusterService = clusterService;
-        this.searchRelevanceIndicesManager = new SearchRelevanceIndicesManager(clusterService, client);
+    public ExperimentDao(SearchRelevanceIndicesManager searchRelevanceIndicesManager) {
+        this.searchRelevanceIndicesManager = searchRelevanceIndicesManager;
     }
 
     /**
@@ -86,8 +78,12 @@ public class ExperimentDao {
      * @param experimentId - id to be deleted
      * @param listener - action lister for async operation
      */
-    public void getExperiment(String experimentId, ActionListener<SearchResponse> listener) {
-        searchRelevanceIndicesManager.getDocByDocId(experimentId, EXPERIMENT, listener);
+    public SearchResponse getExperiment(String experimentId, ActionListener<SearchResponse> listener) {
+        if (experimentId == null || experimentId.isEmpty()) {
+            listener.onFailure(new IllegalArgumentException("experimentId must not be null or empty"));
+            return null;
+        }
+        return searchRelevanceIndicesManager.getDocByDocId(experimentId, EXPERIMENT, listener);
     }
 
     /**
@@ -95,7 +91,7 @@ public class ExperimentDao {
      * @param sourceBuilder - source builder to be searched
      * @param listener - action lister for async operation
      */
-    public void listExperiment(SearchSourceBuilder sourceBuilder, ActionListener<SearchResponse> listener) {
+    public SearchResponse listExperiment(SearchSourceBuilder sourceBuilder, ActionListener<SearchResponse> listener) {
         // Apply default values if not set
         if (sourceBuilder == null) {
             sourceBuilder = new SearchSourceBuilder();
@@ -106,6 +102,6 @@ public class ExperimentDao {
             sourceBuilder.query(QueryBuilders.matchAllQuery());
         }
 
-        searchRelevanceIndicesManager.listDocsBySearchRequest(sourceBuilder, EXPERIMENT, listener);
+        return searchRelevanceIndicesManager.listDocsBySearchRequest(sourceBuilder, EXPERIMENT, listener);
     }
 }

@@ -34,7 +34,7 @@ public abstract class QuerySampler {
         return size;
     }
 
-    public abstract CompletableFuture<Map<String, Long>> sample();
+    public abstract CompletableFuture<Map<String, Integer>> sample();
 
     public static QuerySampler create(String name, int size, Client client) {
         return switch (name) {

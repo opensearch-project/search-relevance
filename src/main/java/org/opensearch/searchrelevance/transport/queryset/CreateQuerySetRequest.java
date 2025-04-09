@@ -16,6 +16,9 @@ import org.opensearch.common.Nullable;
 import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.core.common.io.stream.StreamOutput;
 
+/**
+ * Create Request supports sampling from ubi queries.
+ */
 public class CreateQuerySetRequest extends ActionRequest {
     private String name;
     private String description;

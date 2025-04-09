@@ -14,23 +14,27 @@ import org.opensearch.core.xcontent.ToXContent.Params;
 import org.opensearch.core.xcontent.ToXContentObject;
 import org.opensearch.core.xcontent.XContentBuilder;
 
+/**
+ * QuerySet is a system index object that represents all query set sampling/inserting params.
+ */
 public class QuerySet implements ToXContentObject {
 
-    public static final String ID = "id";
-    public static final String TIME_STAMP = "timestamp";
-    public static final String DESCRIPTION = "description";
     public static final String NAME = "name";
+    public static final String DESCRIPTION = "description";
+    public static final String TIME_STAMP = "timestamp";
     public static final String SAMPLING = "sampling";
     public static final String QUERY_SET_QUERIES = "querySetQueries";
-    private String id;
-    private String description;
-    private String name;
-    private String sampling;
-    private String timestamp;
-    private Map<String, Long> querySetQueries;
 
-    public QuerySet(String id, String name, String description, String sampling, String timestamp, Map<String, Long> querySetQueries) {
-        this.id = id;
+    /**
+     * Identifier of the system index
+     */
+    private final String name;
+    private final String description;
+    private final String sampling;
+    private final String timestamp;
+    private final Map<String, Integer> querySetQueries;
+
+    public QuerySet(String name, String description, String timestamp, String sampling, Map<String, Integer> querySetQueries) {
         this.description = description;
         this.name = name;
         this.sampling = sampling;
@@ -41,14 +45,13 @@ public class QuerySet implements ToXContentObject {
     @Override
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
         XContentBuilder xContentBuilder = builder.startObject();
-        xContentBuilder.field(ID, this.id.trim());
         xContentBuilder.field(NAME, this.name == null ? "" : this.name.trim());
         xContentBuilder.field(DESCRIPTION, this.description == null ? "" : this.description.trim());
         xContentBuilder.field(SAMPLING, this.sampling == null ? "" : this.sampling.trim());
         xContentBuilder.field(TIME_STAMP, this.timestamp.trim());
         // Add the query_set_queries field
         xContentBuilder.startObject(QUERY_SET_QUERIES);
-        for (Map.Entry<String, Long> entry : querySetQueries.entrySet()) {
+        for (Map.Entry<String, Integer> entry : querySetQueries.entrySet()) {
             builder.field(entry.getKey(), entry.getValue());
         }
         xContentBuilder.endObject();
@@ -56,18 +59,16 @@ public class QuerySet implements ToXContentObject {
     }
 
     public static class Builder {
-        private String id;
         private String name = "";
         private String description = "";
         private String sampling = "";
         private String timestamp = "";
-        private Map<String, Long> querySetQueries;
+        private Map<String, Integer> querySetQueries;
 
         private Builder() {}
 
         private Builder(QuerySet t) {
             this.name = t.name;
-            this.id = t.id;
             this.description = t.description;
             this.sampling = t.sampling;
             this.timestamp = t.timestamp;
@@ -76,11 +77,6 @@ public class QuerySet implements ToXContentObject {
 
         public Builder name(String name) {
             this.name = name;
-            return this;
-        }
-
-        public Builder id(String id) {
-            this.id = id;
             return this;
         }
 
@@ -99,13 +95,13 @@ public class QuerySet implements ToXContentObject {
             return this;
         }
 
-        public Builder querySetQueries(Map<String, Long> querySetQueries) {
+        public Builder querySetQueries(Map<String, Integer> querySetQueries) {
             this.querySetQueries = querySetQueries;
             return this;
         }
 
         public QuerySet build() {
-            return new QuerySet(this.id, this.name, this.description, this.sampling, this.timestamp, this.querySetQueries);
+            return new QuerySet(this.name, this.description, this.sampling, this.timestamp, this.querySetQueries);
         }
 
         public static Builder builder() {
@@ -115,10 +111,6 @@ public class QuerySet implements ToXContentObject {
         public static Builder builder(QuerySet t) {
             return new Builder(t);
         }
-    }
-
-    public String id() {
-        return id;
     }
 
     public String name() {
@@ -131,6 +123,10 @@ public class QuerySet implements ToXContentObject {
 
     public String timestamp() {
         return timestamp;
+    }
+
+    public Map<String, Integer> querySetQueries() {
+        return querySetQueries;
     }
 
 }

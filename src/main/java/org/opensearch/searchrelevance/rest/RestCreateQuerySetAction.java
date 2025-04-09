@@ -66,6 +66,7 @@ public class RestCreateQuerySetAction extends BaseRestHandler {
                     XContentBuilder builder = channel.newBuilder();
                     builder.startObject();
                     builder.field("query_set_id", response.getId());
+                    builder.field("query_set_result", response.getResult());
                     builder.endObject();
                     channel.sendResponse(new BytesRestResponse(RestStatus.OK, builder));
                 } catch (IOException e) {

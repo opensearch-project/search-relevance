@@ -7,8 +7,6 @@
  */
 package org.opensearch.searchrelevance.transport.searchConfiguration;
 
-import java.util.UUID;
-
 import org.opensearch.action.StepListener;
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.support.ActionFilters;
@@ -21,10 +19,8 @@ import org.opensearch.searchrelevance.model.SearchConfiguration;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
-import org.opensearch.transport.client.Client;
 
 public class PutSearchConfigurationTransportAction extends HandledTransportAction<PutSearchConfigurationRequest, IndexResponse> {
-    private final Client client;
     private final ClusterService clusterService;
 
     private final SearchConfigurationDao searchConfigurationDao;
@@ -34,12 +30,11 @@ public class PutSearchConfigurationTransportAction extends HandledTransportActio
         ClusterService clusterService,
         TransportService transportService,
         ActionFilters actionFilters,
-        Client client
+        SearchConfigurationDao searchConfigurationDao
     ) {
         super(PutSearchConfigurationAction.NAME, transportService, actionFilters, PutSearchConfigurationRequest::new);
-        this.client = client;
         this.clusterService = clusterService;
-        this.searchConfigurationDao = new SearchConfigurationDao(client, clusterService);
+        this.searchConfigurationDao = searchConfigurationDao;
     }
 
     @Override
@@ -48,9 +43,8 @@ public class PutSearchConfigurationTransportAction extends HandledTransportActio
             listener.onFailure(new IllegalArgumentException("Request cannot be null"));
             return;
         }
-        String id = UUID.randomUUID().toString();
-        String timestamp = TimeUtils.getTimestamp();
         String name = request.getName();
+        String timestamp = TimeUtils.getTimestamp();
         if (name == null || name.trim().isEmpty()) {
             listener.onFailure(new IllegalArgumentException("Name cannot be null or empty. Request: " + request));
             return;
@@ -61,7 +55,7 @@ public class PutSearchConfigurationTransportAction extends HandledTransportActio
         StepListener<Void> createIndexStep = new StepListener<>();
         searchConfigurationDao.createIndexIfAbsent(createIndexStep);
         createIndexStep.whenComplete(v -> {
-            SearchConfiguration searchConfiguration = new SearchConfiguration(id, timestamp, name, queryBody, searchPipeline);
+            SearchConfiguration searchConfiguration = new SearchConfiguration(name, timestamp, queryBody, searchPipeline);
             searchConfigurationDao.putSearchConfiguration(searchConfiguration, listener);
         }, listener::onFailure);
     }

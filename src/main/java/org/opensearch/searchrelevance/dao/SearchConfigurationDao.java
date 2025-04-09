@@ -10,13 +10,17 @@ package org.opensearch.searchrelevance.dao;
 import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.SEARCH_CONFIGURATION;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opensearch.action.StepListener;
 import org.opensearch.action.delete.DeleteResponse;
 import org.opensearch.action.search.SearchResponse;
-import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.action.support.GroupedActionListener;
+import org.opensearch.common.inject.Inject;
 import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
@@ -26,20 +30,15 @@ import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager;
 import org.opensearch.searchrelevance.model.SearchConfiguration;
-import org.opensearch.transport.client.Client;
-
-import reactor.util.annotation.NonNull;
 
 public class SearchConfigurationDao {
     private static final Logger LOGGER = LogManager.getLogger(SearchConfigurationDao.class);
-    private final Client client;
-    private final ClusterService clusterService;
+
     private final SearchRelevanceIndicesManager searchRelevanceIndicesManager;
 
-    public SearchConfigurationDao(@NonNull Client client, @NonNull ClusterService clusterService) {
-        this.client = client;
-        this.clusterService = clusterService;
-        this.searchRelevanceIndicesManager = new SearchRelevanceIndicesManager(clusterService, client);
+    @Inject
+    public SearchConfigurationDao(SearchRelevanceIndicesManager searchRelevanceIndicesManager) {
+        this.searchRelevanceIndicesManager = searchRelevanceIndicesManager;
     }
 
     /**
@@ -62,7 +61,7 @@ public class SearchConfigurationDao {
         }
         try {
             searchRelevanceIndicesManager.putDoc(
-                searchConfiguration.id(),
+                searchConfiguration.name(),
                 searchConfiguration.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS),
                 SEARCH_CONFIGURATION,
                 listener
@@ -86,8 +85,12 @@ public class SearchConfigurationDao {
      * @param searchConfigurationId - id to be deleted
      * @param listener - action lister for async operation
      */
-    public void getSearchConfiguration(String searchConfigurationId, ActionListener<SearchResponse> listener) {
-        searchRelevanceIndicesManager.getDocByDocId(searchConfigurationId, SEARCH_CONFIGURATION, listener);
+    public SearchResponse getSearchConfiguration(String searchConfigurationId, ActionListener<SearchResponse> listener) {
+        if (searchConfigurationId == null || searchConfigurationId.isEmpty()) {
+            listener.onFailure(new IllegalArgumentException("querySetId must not be null or empty"));
+            return null;
+        }
+        return searchRelevanceIndicesManager.getDocByDocId(searchConfigurationId, SEARCH_CONFIGURATION, listener);
     }
 
     /**
@@ -95,7 +98,7 @@ public class SearchConfigurationDao {
      * @param sourceBuilder - source builder to be searched
      * @param listener - action lister for async operation
      */
-    public void listSearchConfiguration(SearchSourceBuilder sourceBuilder, ActionListener<SearchResponse> listener) {
+    public SearchResponse listSearchConfiguration(SearchSourceBuilder sourceBuilder, ActionListener<SearchResponse> listener) {
         // Apply default values if not set
         if (sourceBuilder == null) {
             sourceBuilder = new SearchSourceBuilder();
@@ -106,6 +109,69 @@ public class SearchConfigurationDao {
             sourceBuilder.query(QueryBuilders.matchAllQuery());
         }
 
-        searchRelevanceIndicesManager.listDocsBySearchRequest(sourceBuilder, SEARCH_CONFIGURATION, listener);
+        return searchRelevanceIndicesManager.listDocsBySearchRequest(sourceBuilder, SEARCH_CONFIGURATION, listener);
+    }
+
+    /**
+     * Get list of search configuration given a step stepListener and put it back to results mapping.
+     * @param searchConfigurationList - ids to be searched
+     * @param results - the results map
+     * @param stepListener - step lister
+     */
+    public void getSearchConfigsWithStepListener(
+        List<String> searchConfigurationList,
+        Map<String, Object> results,
+        StepListener<Map<String, Object>> stepListener
+    ) {
+        List<String> queryBodies = new ArrayList<>();
+
+        GroupedActionListener<SearchResponse> groupedListener = new GroupedActionListener<>(ActionListener.wrap(responses -> {
+            results.put("queryBodies", queryBodies);
+            stepListener.onResponse(results);
+        }, stepListener::onFailure), searchConfigurationList.size());
+
+        for (String searchConfigurationId : searchConfigurationList) {
+            getSearchConfiguration(searchConfigurationId, new ActionListener<SearchResponse>() {
+                @Override
+                public void onResponse(SearchResponse response) {
+                    try {
+                        LOGGER.info("Successfully get response for searchConfigurationId [{}]: [{}]", searchConfigurationId, response);
+                        SearchConfiguration searchConfig = convertToSearchConfiguration(response);
+                        LOGGER.debug("Converted response into SearchConfiguration: [{}]", searchConfig);
+
+                        queryBodies.add(searchConfig.queryBody());
+                        groupedListener.onResponse(response);
+                    } catch (Exception e) {
+                        LOGGER.error(
+                            "Failed to convert response: [{}] into SearchConfiguration for id: [{}]",
+                            response,
+                            searchConfigurationId,
+                            e
+                        );
+                        groupedListener.onFailure(
+                            new SearchRelevanceException("Failed to convert SearchConfiguration", e, RestStatus.INTERNAL_SERVER_ERROR)
+                        );
+                    }
+                }
+
+                @Override
+                public void onFailure(Exception e) {
+                    LOGGER.error("Failed to retrieve SearchConfiguration for id: [{}]", searchConfigurationId, e);
+                    groupedListener.onFailure(
+                        new SearchRelevanceException("Failed to retrieve SearchConfiguration", e, RestStatus.INTERNAL_SERVER_ERROR)
+                    );
+                }
+            });
+        }
+    }
+
+    private SearchConfiguration convertToSearchConfiguration(SearchResponse response) {
+        Map<String, Object> source = response.getHits().getHits()[0].getSourceAsMap();
+        return new SearchConfiguration(
+            (String) source.get(SearchConfiguration.NAME),
+            (String) source.get(SearchConfiguration.TIME_STAMP),
+            (String) source.get(SearchConfiguration.QUERY_BODY),
+            (String) source.get(SearchConfiguration.SEARCH_PIPELINE)
+        );
     }
 }

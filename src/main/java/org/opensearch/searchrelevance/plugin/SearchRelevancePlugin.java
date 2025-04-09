@@ -7,22 +7,35 @@
  */
 package org.opensearch.searchrelevance.plugin;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.function.Supplier;
 
 import org.opensearch.action.ActionRequest;
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver;
 import org.opensearch.cluster.node.DiscoveryNodes;
+import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.settings.ClusterSettings;
 import org.opensearch.common.settings.IndexScopedSettings;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.settings.SettingsFilter;
 import org.opensearch.core.action.ActionResponse;
+import org.opensearch.core.common.io.stream.NamedWriteableRegistry;
+import org.opensearch.core.xcontent.NamedXContentRegistry;
+import org.opensearch.env.Environment;
+import org.opensearch.env.NodeEnvironment;
 import org.opensearch.plugins.ActionPlugin;
 import org.opensearch.plugins.IngestPlugin;
 import org.opensearch.plugins.Plugin;
+import org.opensearch.repositories.RepositoriesService;
 import org.opensearch.rest.RestController;
 import org.opensearch.rest.RestHandler;
+import org.opensearch.script.ScriptService;
+import org.opensearch.searchrelevance.dao.ExperimentDao;
+import org.opensearch.searchrelevance.dao.JudgmentDao;
+import org.opensearch.searchrelevance.dao.QuerySetDao;
+import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
+import org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager;
 import org.opensearch.searchrelevance.rest.PutCreateSearchConfigurationAction;
 import org.opensearch.searchrelevance.rest.RestCreateQuerySetAction;
 import org.opensearch.searchrelevance.rest.RestDeleteExperimentAction;
@@ -62,8 +75,43 @@ import org.opensearch.searchrelevance.transport.searchConfiguration.GetSearchCon
 import org.opensearch.searchrelevance.transport.searchConfiguration.GetSearchConfigurationTransportAction;
 import org.opensearch.searchrelevance.transport.searchConfiguration.PutSearchConfigurationAction;
 import org.opensearch.searchrelevance.transport.searchConfiguration.PutSearchConfigurationTransportAction;
+import org.opensearch.threadpool.ThreadPool;
+import org.opensearch.transport.client.Client;
+import org.opensearch.watcher.ResourceWatcherService;
 
 public class SearchRelevancePlugin extends Plugin implements IngestPlugin, ActionPlugin {
+
+    private Client client;
+    private ClusterService clusterService;
+    private SearchRelevanceIndicesManager searchRelevanceIndicesManager;
+    private QuerySetDao querySetDao;
+    private SearchConfigurationDao searchConfigurationDao;
+    private ExperimentDao experimentDao;
+    private JudgmentDao judgmentDao;
+
+    @Override
+    public Collection<Object> createComponents(
+        Client client,
+        ClusterService clusterService,
+        ThreadPool threadPool,
+        ResourceWatcherService resourceWatcherService,
+        ScriptService scriptService,
+        NamedXContentRegistry xContentRegistry,
+        Environment environment,
+        NodeEnvironment nodeEnvironment,
+        NamedWriteableRegistry namedWriteableRegistry,
+        IndexNameExpressionResolver indexNameExpressionResolver,
+        Supplier<RepositoriesService> repositoriesServiceSupplier
+    ) {
+        this.client = client;
+        this.clusterService = clusterService;
+        this.searchRelevanceIndicesManager = new SearchRelevanceIndicesManager(clusterService, client);
+        this.experimentDao = new ExperimentDao(searchRelevanceIndicesManager);
+        this.querySetDao = new QuerySetDao(searchRelevanceIndicesManager);
+        this.searchConfigurationDao = new SearchConfigurationDao(searchRelevanceIndicesManager);
+        this.judgmentDao = new JudgmentDao(searchRelevanceIndicesManager);
+        return List.of(searchRelevanceIndicesManager, querySetDao, searchConfigurationDao, experimentDao, judgmentDao);
+    }
 
     @Override
     public List<RestHandler> getRestHandlers(

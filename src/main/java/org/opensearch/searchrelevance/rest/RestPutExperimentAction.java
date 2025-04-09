@@ -52,13 +52,12 @@ public class RestPutExperimentAction extends BaseRestHandler {
         XContentParser parser = request.contentParser();
         Map<String, Object> source = parser.map();
 
-        String name = (String) source.get("name");
-        String description = (String) source.get("description");
         String index = (String) source.get("index");
-        List<String> judgmentList = ParserUtils.convertObjToList(source, "judgmentList");
-        List<String> querySetList = ParserUtils.convertObjToList(source, "querySetList");
+        String querySetId = (String) source.get("querySetId");
+        List<String> searchConfigurationList = ParserUtils.convertObjToList(source, "searchConfigurationList");
+        int k = (Integer) source.get("k");
 
-        PutExperimentRequest createRequest = new PutExperimentRequest(name, description, index, judgmentList, querySetList);
+        PutExperimentRequest createRequest = new PutExperimentRequest(index, querySetId, searchConfigurationList, k);
 
         return channel -> client.execute(PutExperimentAction.INSTANCE, createRequest, new ActionListener<IndexResponse>() {
             @Override
@@ -67,6 +66,7 @@ public class RestPutExperimentAction extends BaseRestHandler {
                     XContentBuilder builder = channel.newBuilder();
                     builder.startObject();
                     builder.field("experiment_id", response.getId());
+                    builder.field("experiment_result", response.getResult());
                     builder.endObject();
                     channel.sendResponse(new BytesRestResponse(RestStatus.OK, builder));
                 } catch (IOException e) {

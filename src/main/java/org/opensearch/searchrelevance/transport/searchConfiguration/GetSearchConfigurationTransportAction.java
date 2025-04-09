@@ -24,12 +24,10 @@ import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.transport.OpenSearchDocRequest;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
-import org.opensearch.transport.client.Client;
 
 public class GetSearchConfigurationTransportAction extends HandledTransportAction<OpenSearchDocRequest, SearchResponse> {
     private static final Logger LOGGER = LogManager.getLogger(GetSearchConfigurationTransportAction.class);
     private final ClusterService clusterService;
-    private final Client client;
     private final SearchConfigurationDao searchConfigurationDao;
 
     @Inject
@@ -37,12 +35,11 @@ public class GetSearchConfigurationTransportAction extends HandledTransportActio
         ClusterService clusterService,
         TransportService transportService,
         ActionFilters actionFilters,
-        Client client
+        SearchConfigurationDao searchConfigurationDao
     ) {
         super(GetSearchConfigurationAction.NAME, transportService, actionFilters, OpenSearchDocRequest::new);
         this.clusterService = clusterService;
-        this.client = client;
-        this.searchConfigurationDao = new SearchConfigurationDao(client, clusterService);
+        this.searchConfigurationDao = searchConfigurationDao;
     }
 
     @Override

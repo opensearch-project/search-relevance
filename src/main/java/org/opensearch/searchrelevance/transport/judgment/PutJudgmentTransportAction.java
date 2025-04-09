@@ -21,12 +21,9 @@ import org.opensearch.searchrelevance.model.Judgment;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
-import org.opensearch.transport.client.Client;
 
 public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgmentRequest, IndexResponse> {
-    private final Client client;
     private final ClusterService clusterService;
-
     private final JudgmentDao judgmentDao;
 
     @Inject
@@ -34,12 +31,11 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
         ClusterService clusterService,
         TransportService transportService,
         ActionFilters actionFilters,
-        Client client
+        JudgmentDao judgmentDao
     ) {
         super(PutJudgmentAction.NAME, transportService, actionFilters, PutJudgmentRequest::new);
-        this.client = client;
         this.clusterService = clusterService;
-        this.judgmentDao = new JudgmentDao(client, clusterService);
+        this.judgmentDao = judgmentDao;
     }
 
     @Override

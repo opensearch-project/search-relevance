@@ -43,10 +43,10 @@ public class ProbabilityProportionalToSizeQuerySampler extends QuerySampler {
     }
 
     @Override
-    public CompletableFuture<Map<String, Long>> sample() {
+    public CompletableFuture<Map<String, Integer>> sample() {
         // Get queries from the UBI queries index.
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder().query(QueryBuilders.matchAllQuery()).size(10000);
-        CompletableFuture<Map<String, Long>> future = new CompletableFuture<>();
+        CompletableFuture<Map<String, Integer>> future = new CompletableFuture<>();
 
         getUserQueries(searchSourceBuilder, new ActionListener<Collection<String>>() {
             @Override
@@ -57,7 +57,7 @@ public class ProbabilityProportionalToSizeQuerySampler extends QuerySampler {
                         future.complete(new HashMap<>());
                         return;
                     }
-                    Map<String, Long> result = getQuerySet(userQueries);
+                    Map<String, Integer> result = getQuerySet(userQueries);
                     future.complete(result);
                 } catch (Exception e) {
                     LOGGER.error("Error processing user queries", e);
@@ -76,11 +76,11 @@ public class ProbabilityProportionalToSizeQuerySampler extends QuerySampler {
 
     }
 
-    private Map<String, Long> getQuerySet(Collection<String> userQueries) {
+    private Map<String, Integer> getQuerySet(Collection<String> userQueries) {
         final Map<String, Long> weights = new HashMap<>();
         final Map<String, Double> normalizedWeights = new HashMap<>();
         final Map<String, Double> cumulativeWeights = new HashMap<>();
-        final Map<String, Long> querySet = new HashMap<>();
+        final Map<String, Integer> querySet = new HashMap<>();
 
         // Increment the weight for each user query.
         userQueries.forEach(query -> weights.merge(query, 1L, Long::sum));
@@ -121,7 +121,7 @@ public class ProbabilityProportionalToSizeQuerySampler extends QuerySampler {
                 final double cumulativeWeight = cumulativeWeights.get(userQuery);
                 if (cumulativeWeight >= r) {
                     // This ignores duplicate queries.
-                    querySet.put(userQuery, weights.get(userQuery));
+                    querySet.put(userQuery, Math.toIntExact(weights.get(userQuery)));
                     break;
                 }
 

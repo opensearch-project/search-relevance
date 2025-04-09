@@ -16,7 +16,7 @@ import org.apache.logging.log4j.Logger;
 import org.opensearch.action.StepListener;
 import org.opensearch.action.delete.DeleteResponse;
 import org.opensearch.action.search.SearchResponse;
-import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.common.inject.Inject;
 import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
@@ -26,20 +26,14 @@ import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager;
 import org.opensearch.searchrelevance.model.Judgment;
-import org.opensearch.transport.client.Client;
-
-import reactor.util.annotation.NonNull;
 
 public class JudgmentDao {
     private static final Logger LOGGER = LogManager.getLogger(JudgmentDao.class);
-    private final Client client;
-    private final ClusterService clusterService;
     private final SearchRelevanceIndicesManager searchRelevanceIndicesManager;
 
-    public JudgmentDao(@NonNull Client client, @NonNull ClusterService clusterService) {
-        this.client = client;
-        this.clusterService = clusterService;
-        this.searchRelevanceIndicesManager = new SearchRelevanceIndicesManager(clusterService, client);
+    @Inject
+    public JudgmentDao(SearchRelevanceIndicesManager searchRelevanceIndicesManager) {
+        this.searchRelevanceIndicesManager = searchRelevanceIndicesManager;
     }
 
     /**
@@ -86,8 +80,12 @@ public class JudgmentDao {
      * @param judgmentId - id to be deleted
      * @param listener - action lister for async operation
      */
-    public void getJudgment(String judgmentId, ActionListener<SearchResponse> listener) {
-        searchRelevanceIndicesManager.getDocByDocId(judgmentId, JUDGMENT, listener);
+    public SearchResponse getJudgment(String judgmentId, ActionListener<SearchResponse> listener) {
+        if (judgmentId == null || judgmentId.isEmpty()) {
+            listener.onFailure(new IllegalArgumentException("judgmentId must not be null or empty"));
+            return null;
+        }
+        return searchRelevanceIndicesManager.getDocByDocId(judgmentId, JUDGMENT, listener);
     }
 
     /**
@@ -95,7 +93,7 @@ public class JudgmentDao {
      * @param sourceBuilder - source builder to be searched
      * @param listener - action lister for async operation
      */
-    public void listJudgment(SearchSourceBuilder sourceBuilder, ActionListener<SearchResponse> listener) {
+    public SearchResponse listJudgment(SearchSourceBuilder sourceBuilder, ActionListener<SearchResponse> listener) {
         // Apply default values if not set
         if (sourceBuilder == null) {
             sourceBuilder = new SearchSourceBuilder();
@@ -106,6 +104,6 @@ public class JudgmentDao {
             sourceBuilder.query(QueryBuilders.matchAllQuery());
         }
 
-        searchRelevanceIndicesManager.listDocsBySearchRequest(sourceBuilder, JUDGMENT, listener);
+        return searchRelevanceIndicesManager.listDocsBySearchRequest(sourceBuilder, JUDGMENT, listener);
     }
 }
