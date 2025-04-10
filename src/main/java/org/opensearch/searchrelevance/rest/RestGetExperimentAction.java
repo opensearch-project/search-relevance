@@ -10,6 +10,7 @@ package org.opensearch.searchrelevance.rest;
 import static org.opensearch.rest.RestRequest.Method.GET;
 import static org.opensearch.searchrelevance.common.PluginConstants.DOCUMENT_ID;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENTS_URI;
+import static org.opensearch.searchrelevance.common.PluginConstants.QUERY_TEXT;
 
 import java.io.IOException;
 import java.util.List;
@@ -53,6 +54,8 @@ public class RestGetExperimentAction extends BaseRestHandler {
     @Override
     protected RestChannelConsumer prepareRequest(RestRequest request, NodeClient client) throws IOException {
         final String experimentId = request.param(DOCUMENT_ID);
+        // introduce query text as params to support eyeballing visualization
+        final String queryText = request.param(QUERY_TEXT);
         // If id is provided, get specific query set
         if (experimentId != null && !experimentId.isEmpty()) {
             OpenSearchDocRequest getRequest = new OpenSearchDocRequest(experimentId);

@@ -17,6 +17,7 @@ public class PluginConstants {
     public static final String TRANSPORT_ACTION_NAME_PREFIX = "cluster:admin/opensearch/search_relevance/";
     /** The base URI for this plugin's rest actions */
     public static final String SEARCH_RELEVANCE_BASE_URI = "/_plugins/search_relevance";
+
     /** The URI for this plugin's queryset rest actions */
     public static final String QUERYSETS_URL = SEARCH_RELEVANCE_BASE_URI + "/query_sets";
     /** The URI for this plugin's experiments rest actions */
@@ -26,7 +27,9 @@ public class PluginConstants {
     /** The URI for this plugin's search configurations rest actions */
     public static final String SEARCH_CONFIGURATIONS_URL = SEARCH_RELEVANCE_BASE_URI + "/search_configurations";
 
+    /** The URI PARAMS placeholders */
     public static final String DOCUMENT_ID = "id";
+    public static final String QUERY_TEXT = "query_text";
 
     /**
      * Indices constants
