@@ -8,6 +8,7 @@
 package org.opensearch.searchrelevance.dao;
 
 import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.SEARCH_CONFIGURATION;
+import static org.opensearch.searchrelevance.metrics.MetricsHelper.METRICS_QUERY_BODY_FIELD_NAME;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -126,7 +127,7 @@ public class SearchConfigurationDao {
         List<String> queryBodies = new ArrayList<>();
 
         GroupedActionListener<SearchResponse> groupedListener = new GroupedActionListener<>(ActionListener.wrap(responses -> {
-            results.put("queryBodies", queryBodies);
+            results.put(METRICS_QUERY_BODY_FIELD_NAME, queryBodies);
             stepListener.onResponse(results);
         }, stepListener::onFailure), searchConfigurationList.size());
 

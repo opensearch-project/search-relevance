@@ -7,6 +7,11 @@
  */
 package org.opensearch.searchrelevance.plugin;
 
+import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX;
+import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_INDEX;
+import static org.opensearch.searchrelevance.common.PluginConstants.QUERY_SET_INDEX;
+import static org.opensearch.searchrelevance.common.PluginConstants.SEARCH_CONFIGURATION_INDEX;
+
 import java.util.Collection;
 import java.util.List;
 import java.util.function.Supplier;
@@ -24,9 +29,13 @@ import org.opensearch.core.common.io.stream.NamedWriteableRegistry;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.env.Environment;
 import org.opensearch.env.NodeEnvironment;
+import org.opensearch.indices.SystemIndexDescriptor;
 import org.opensearch.plugins.ActionPlugin;
+import org.opensearch.plugins.ClusterPlugin;
 import org.opensearch.plugins.IngestPlugin;
 import org.opensearch.plugins.Plugin;
+import org.opensearch.plugins.SearchPlugin;
+import org.opensearch.plugins.SystemIndexPlugin;
 import org.opensearch.repositories.RepositoriesService;
 import org.opensearch.rest.RestController;
 import org.opensearch.rest.RestHandler;
@@ -36,6 +45,7 @@ import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
 import org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager;
+import org.opensearch.searchrelevance.metrics.MetricsHelper;
 import org.opensearch.searchrelevance.rest.PutCreateSearchConfigurationAction;
 import org.opensearch.searchrelevance.rest.RestCreateQuerySetAction;
 import org.opensearch.searchrelevance.rest.RestDeleteExperimentAction;
@@ -79,7 +89,7 @@ import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.client.Client;
 import org.opensearch.watcher.ResourceWatcherService;
 
-public class SearchRelevancePlugin extends Plugin implements IngestPlugin, ActionPlugin {
+public class SearchRelevancePlugin extends Plugin implements IngestPlugin, ActionPlugin, SystemIndexPlugin, SearchPlugin, ClusterPlugin {
 
     private Client client;
     private ClusterService clusterService;
@@ -88,6 +98,18 @@ public class SearchRelevancePlugin extends Plugin implements IngestPlugin, Actio
     private SearchConfigurationDao searchConfigurationDao;
     private ExperimentDao experimentDao;
     private JudgmentDao judgmentDao;
+
+    private MetricsHelper metricsHelper;
+
+    @Override
+    public Collection<SystemIndexDescriptor> getSystemIndexDescriptors(Settings settings) {
+        return List.of(
+            new SystemIndexDescriptor(QUERY_SET_INDEX, "System index used for query set data"),
+            new SystemIndexDescriptor(SEARCH_CONFIGURATION_INDEX, "System index used for search configuration data"),
+            new SystemIndexDescriptor(EXPERIMENT_INDEX, "System index used for experiment data"),
+            new SystemIndexDescriptor(JUDGMENT_INDEX, "System index used for judgment data")
+        );
+    }
 
     @Override
     public Collection<Object> createComponents(
@@ -110,7 +132,8 @@ public class SearchRelevancePlugin extends Plugin implements IngestPlugin, Actio
         this.querySetDao = new QuerySetDao(searchRelevanceIndicesManager);
         this.searchConfigurationDao = new SearchConfigurationDao(searchRelevanceIndicesManager);
         this.judgmentDao = new JudgmentDao(searchRelevanceIndicesManager);
-        return List.of(searchRelevanceIndicesManager, querySetDao, searchConfigurationDao, experimentDao, judgmentDao);
+        this.metricsHelper = new MetricsHelper(clusterService, client);
+        return List.of(searchRelevanceIndicesManager, querySetDao, searchConfigurationDao, experimentDao, judgmentDao, metricsHelper);
     }
 
     @Override

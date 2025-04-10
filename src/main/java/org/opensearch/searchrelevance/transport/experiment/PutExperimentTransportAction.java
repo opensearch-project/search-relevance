@@ -7,6 +7,9 @@
  */
 package org.opensearch.searchrelevance.transport.experiment;
 
+import static org.opensearch.searchrelevance.metrics.MetricsHelper.METRICS_QUERY_BODY_FIELD_NAME;
+import static org.opensearch.searchrelevance.metrics.MetricsHelper.METRICS_QUERY_TEXT_FIELD_NAME;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +25,7 @@ import org.opensearch.core.action.ActionListener;
 import org.opensearch.searchrelevance.dao.ExperimentDao;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
+import org.opensearch.searchrelevance.metrics.MetricsHelper;
 import org.opensearch.searchrelevance.model.Experiment;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.tasks.Task;
@@ -33,6 +37,8 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
     private final QuerySetDao querySetDao;
     private final SearchConfigurationDao searchConfigurationDao;
 
+    private final MetricsHelper metricsHelper;
+
     @Inject
     public PutExperimentTransportAction(
         ClusterService clusterService,
@@ -40,13 +46,15 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
         ActionFilters actionFilters,
         ExperimentDao experimentDao,
         QuerySetDao querySetDao,
-        SearchConfigurationDao searchConfigurationDao
+        SearchConfigurationDao searchConfigurationDao,
+        MetricsHelper metricsHelper
     ) {
         super(PutExperimentAction.NAME, transportService, actionFilters, PutExperimentRequest::new);
         this.clusterService = clusterService;
         this.experimentDao = experimentDao;
         this.querySetDao = querySetDao;
         this.searchConfigurationDao = searchConfigurationDao;
+        this.metricsHelper = metricsHelper;
     }
 
     @Override
@@ -82,10 +90,15 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
         }, listener::onFailure);
 
         // step4: Search and Calculate Metrics
-
+        StepListener<Map<String, Object>> searchAndMetricsCalcStep = new StepListener<>();
+        getSearchConfigsStep.whenComplete(v -> {
+            List<String> queryBodies = (List<String>) results.get(METRICS_QUERY_BODY_FIELD_NAME);
+            List<String> queryTexts = (List<String>) results.get(METRICS_QUERY_TEXT_FIELD_NAME);
+            metricsHelper.getMetricsAsync(results, index, queryTexts, queryBodies, k, searchAndMetricsCalcStep);
+        }, listener::onFailure);
 
         // Step5: Put Experiment
-        getSearchConfigsStep.whenComplete(v -> {
+        searchAndMetricsCalcStep.whenComplete(v -> {
             Experiment experiment = new Experiment(id, timestamp, index, querySetId, searchConfigurationList, k, results);
             experimentDao.putExperiment(experiment, listener);
         }, listener::onFailure);

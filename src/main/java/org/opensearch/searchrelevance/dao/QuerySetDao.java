@@ -8,6 +8,7 @@
 package org.opensearch.searchrelevance.dao;
 
 import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.QUERY_SET;
+import static org.opensearch.searchrelevance.metrics.MetricsHelper.METRICS_QUERY_TEXT_FIELD_NAME;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -134,7 +135,7 @@ public class QuerySetDao {
                     QuerySet querySet = convertToQuerySet(response);
                     LOGGER.debug("Converted response into queryset: [{}]", querySet);
 
-                    results.put("querySetTexts", new ArrayList<>(querySet.querySetQueries().keySet()));
+                    results.put(METRICS_QUERY_TEXT_FIELD_NAME, new ArrayList<>(querySet.querySetQueries().keySet()));
                     stepListener.onResponse(results);
                 } catch (Exception e) {
                     LOGGER.error("Failed to convert response: [{}] into queryset.", response);
