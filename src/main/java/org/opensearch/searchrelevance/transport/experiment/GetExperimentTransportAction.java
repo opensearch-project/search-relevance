@@ -52,7 +52,7 @@ public class GetExperimentTransportAction extends HandledTransportAction<OpenSea
 
         try {
             if (request.getId() != null) {
-                // Handle single query set request
+                // Handle single experiment request
                 experimentDao.getExperiment(request.getId(), listener);
             } else {
                 // Handle list request

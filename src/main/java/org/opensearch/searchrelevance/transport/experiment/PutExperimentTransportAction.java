@@ -81,7 +81,10 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
             searchConfigurationDao.getSearchConfigsWithStepListener(searchConfigurationList, results, getSearchConfigsStep);
         }, listener::onFailure);
 
-        // Step4: Put Experiment
+        // step4: Search and Calculate Metrics
+
+
+        // Step5: Put Experiment
         getSearchConfigsStep.whenComplete(v -> {
             Experiment experiment = new Experiment(id, timestamp, index, querySetId, searchConfigurationList, k, results);
             experimentDao.putExperiment(experiment, listener);

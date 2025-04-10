@@ -52,7 +52,7 @@ public class GetSearchConfigurationTransportAction extends HandledTransportActio
 
         try {
             if (request.getId() != null) {
-                // Handle single query set request
+                // Handle single search configuration request
                 searchConfigurationDao.getSearchConfiguration(request.getId(), listener);
             } else {
                 // Handle list request

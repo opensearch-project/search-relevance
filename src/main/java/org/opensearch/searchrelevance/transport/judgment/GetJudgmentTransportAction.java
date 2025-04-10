@@ -52,7 +52,7 @@ public class GetJudgmentTransportAction extends HandledTransportAction<OpenSearc
 
         try {
             if (request.getId() != null) {
-                // Handle single query set request
+                // Handle single judgment request
                 judgmentDao.getJudgment(request.getId(), listener);
             } else {
                 // Handle list request
