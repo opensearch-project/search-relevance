@@ -65,7 +65,7 @@ public class QuerySetDao {
         }
         try {
             searchRelevanceIndicesManager.putDoc(
-                querySet.name(),
+                querySet.id(),
                 querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS),
                 QUERY_SET,
                 listener
@@ -156,6 +156,7 @@ public class QuerySetDao {
         Map<String, Object> sourceMap = hit.getSourceAsMap();
 
         return QuerySet.Builder.builder()
+            .name((String) sourceMap.get(QuerySet.ID))
             .name((String) sourceMap.get(QuerySet.NAME))
             .description((String) sourceMap.get(QuerySet.DESCRIPTION))
             .timestamp((String) sourceMap.get(QuerySet.TIME_STAMP))

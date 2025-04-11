@@ -13,7 +13,7 @@ import org.opensearch.action.ActionType;
 import org.opensearch.action.index.IndexResponse;
 
 /**
- * External Action for public facing PutCreateSearchConfigurationAction
+ * External Action for public facing RestPutSearchConfigurationAction
  */
 public class PutSearchConfigurationAction extends ActionType<IndexResponse> {
     /** The name of this action */

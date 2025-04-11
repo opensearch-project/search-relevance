@@ -15,14 +15,14 @@ import org.opensearch.action.index.IndexResponse;
 /**
  * External Action for public facing RestCreateQuerySetAction
  */
-public class CreateQuerySetAction extends ActionType<IndexResponse> {
+public class PostQuerySetAction extends ActionType<IndexResponse> {
     /** The name of this action */
     public static final String NAME = TRANSPORT_ACTION_NAME_PREFIX + "queryset/create";
 
     /** An instance of this action */
-    public static final CreateQuerySetAction INSTANCE = new CreateQuerySetAction();
+    public static final PostQuerySetAction INSTANCE = new PostQuerySetAction();
 
-    private CreateQuerySetAction() {
+    private PostQuerySetAction() {
         super(NAME, IndexResponse::new);
     }
 }

@@ -7,6 +7,8 @@
  */
 package org.opensearch.searchrelevance.transport.searchConfiguration;
 
+import java.util.UUID;
+
 import org.opensearch.action.StepListener;
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.support.ActionFilters;
@@ -43,8 +45,10 @@ public class PutSearchConfigurationTransportAction extends HandledTransportActio
             listener.onFailure(new IllegalArgumentException("Request cannot be null"));
             return;
         }
-        String name = request.getName();
+        String id = UUID.randomUUID().toString();
         String timestamp = TimeUtils.getTimestamp();
+
+        String name = request.getName();
         if (name == null || name.trim().isEmpty()) {
             listener.onFailure(new IllegalArgumentException("Name cannot be null or empty. Request: " + request));
             return;
@@ -55,7 +59,7 @@ public class PutSearchConfigurationTransportAction extends HandledTransportActio
         StepListener<Void> createIndexStep = new StepListener<>();
         searchConfigurationDao.createIndexIfAbsent(createIndexStep);
         createIndexStep.whenComplete(v -> {
-            SearchConfiguration searchConfiguration = new SearchConfiguration(name, timestamp, queryBody, searchPipeline);
+            SearchConfiguration searchConfiguration = new SearchConfiguration(id, name, timestamp, queryBody, searchPipeline);
             searchConfigurationDao.putSearchConfiguration(searchConfiguration, listener);
         }, listener::onFailure);
     }

@@ -46,7 +46,6 @@ import org.opensearch.searchrelevance.dao.QuerySetDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
 import org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager;
 import org.opensearch.searchrelevance.metrics.MetricsHelper;
-import org.opensearch.searchrelevance.rest.PutCreateSearchConfigurationAction;
 import org.opensearch.searchrelevance.rest.RestCreateQuerySetAction;
 import org.opensearch.searchrelevance.rest.RestDeleteExperimentAction;
 import org.opensearch.searchrelevance.rest.RestDeleteJudgmentAction;
@@ -59,6 +58,7 @@ import org.opensearch.searchrelevance.rest.RestGetSearchConfigurationAction;
 import org.opensearch.searchrelevance.rest.RestPutExperimentAction;
 import org.opensearch.searchrelevance.rest.RestPutJudgmentAction;
 import org.opensearch.searchrelevance.rest.RestPutQuerySetAction;
+import org.opensearch.searchrelevance.rest.RestPutSearchConfigurationAction;
 import org.opensearch.searchrelevance.transport.experiment.DeleteExperimentAction;
 import org.opensearch.searchrelevance.transport.experiment.DeleteExperimentTransportAction;
 import org.opensearch.searchrelevance.transport.experiment.GetExperimentAction;
@@ -71,12 +71,12 @@ import org.opensearch.searchrelevance.transport.judgment.GetJudgmentAction;
 import org.opensearch.searchrelevance.transport.judgment.GetJudgmentTransportAction;
 import org.opensearch.searchrelevance.transport.judgment.PutJudgmentAction;
 import org.opensearch.searchrelevance.transport.judgment.PutJudgmentTransportAction;
-import org.opensearch.searchrelevance.transport.queryset.CreateQuerySetAction;
-import org.opensearch.searchrelevance.transport.queryset.CreateQuerySetTransportAction;
 import org.opensearch.searchrelevance.transport.queryset.DeleteQuerySetAction;
 import org.opensearch.searchrelevance.transport.queryset.DeleteQuerySetTransportAction;
 import org.opensearch.searchrelevance.transport.queryset.GetQuerySetAction;
 import org.opensearch.searchrelevance.transport.queryset.GetQuerySetTransportAction;
+import org.opensearch.searchrelevance.transport.queryset.PostQuerySetAction;
+import org.opensearch.searchrelevance.transport.queryset.PostQuerySetTransportAction;
 import org.opensearch.searchrelevance.transport.queryset.PutQuerySetAction;
 import org.opensearch.searchrelevance.transport.queryset.PutQuerySetTransportAction;
 import org.opensearch.searchrelevance.transport.searchConfiguration.DeleteSearchConfigurationAction;
@@ -154,7 +154,7 @@ public class SearchRelevancePlugin extends Plugin implements IngestPlugin, Actio
             new RestPutJudgmentAction(),
             new RestDeleteJudgmentAction(),
             new RestGetJudgmentAction(),
-            new PutCreateSearchConfigurationAction(),
+            new RestPutSearchConfigurationAction(),
             new RestDeleteSearchConfigurationAction(),
             new RestGetSearchConfigurationAction(),
             new RestPutExperimentAction(),
@@ -166,7 +166,7 @@ public class SearchRelevancePlugin extends Plugin implements IngestPlugin, Actio
     @Override
     public List<ActionHandler<? extends ActionRequest, ? extends ActionResponse>> getActions() {
         return List.of(
-            new ActionHandler<>(CreateQuerySetAction.INSTANCE, CreateQuerySetTransportAction.class),
+            new ActionHandler<>(PostQuerySetAction.INSTANCE, PostQuerySetTransportAction.class),
             new ActionHandler<>(PutQuerySetAction.INSTANCE, PutQuerySetTransportAction.class),
             new ActionHandler<>(DeleteQuerySetAction.INSTANCE, DeleteQuerySetTransportAction.class),
             new ActionHandler<>(GetQuerySetAction.INSTANCE, GetQuerySetTransportAction.class),

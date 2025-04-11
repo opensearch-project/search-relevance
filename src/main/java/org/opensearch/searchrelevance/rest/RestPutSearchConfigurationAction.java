@@ -32,8 +32,8 @@ import org.opensearch.transport.client.node.NodeClient;
 /**
  * Rest Action to facilitate requests to create a search configuration.
  */
-public class PutCreateSearchConfigurationAction extends BaseRestHandler {
-    private static final Logger LOGGER = LogManager.getLogger(PutCreateSearchConfigurationAction.class);
+public class RestPutSearchConfigurationAction extends BaseRestHandler {
+    private static final Logger LOGGER = LogManager.getLogger(RestPutSearchConfigurationAction.class);
     private static final String PUT_SEARCH_CONFIGURATION_ACTION = "put_search_configuration_action";
 
     @Override

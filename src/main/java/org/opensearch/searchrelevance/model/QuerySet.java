@@ -19,6 +19,7 @@ import org.opensearch.core.xcontent.XContentBuilder;
  */
 public class QuerySet implements ToXContentObject {
 
+    public static final String ID = "id";
     public static final String NAME = "name";
     public static final String DESCRIPTION = "description";
     public static final String TIME_STAMP = "timestamp";
@@ -28,13 +29,15 @@ public class QuerySet implements ToXContentObject {
     /**
      * Identifier of the system index
      */
+    private final String id;
     private final String name;
     private final String description;
     private final String sampling;
     private final String timestamp;
     private final Map<String, Integer> querySetQueries;
 
-    public QuerySet(String name, String description, String timestamp, String sampling, Map<String, Integer> querySetQueries) {
+    public QuerySet(String id, String name, String description, String timestamp, String sampling, Map<String, Integer> querySetQueries) {
+        this.id = id;
         this.description = description;
         this.name = name;
         this.sampling = sampling;
@@ -45,6 +48,7 @@ public class QuerySet implements ToXContentObject {
     @Override
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
         XContentBuilder xContentBuilder = builder.startObject();
+        xContentBuilder.field(ID, this.id);
         xContentBuilder.field(NAME, this.name == null ? "" : this.name.trim());
         xContentBuilder.field(DESCRIPTION, this.description == null ? "" : this.description.trim());
         xContentBuilder.field(SAMPLING, this.sampling == null ? "" : this.sampling.trim());
@@ -59,6 +63,7 @@ public class QuerySet implements ToXContentObject {
     }
 
     public static class Builder {
+        private String id;
         private String name = "";
         private String description = "";
         private String sampling = "";
@@ -68,11 +73,17 @@ public class QuerySet implements ToXContentObject {
         private Builder() {}
 
         private Builder(QuerySet t) {
+            this.id = t.id;
             this.name = t.name;
             this.description = t.description;
             this.sampling = t.sampling;
             this.timestamp = t.timestamp;
             this.querySetQueries = t.querySetQueries;
+        }
+
+        public Builder id(String id) {
+            this.id = id;
+            return this;
         }
 
         public Builder name(String name) {
@@ -101,7 +112,7 @@ public class QuerySet implements ToXContentObject {
         }
 
         public QuerySet build() {
-            return new QuerySet(this.name, this.description, this.sampling, this.timestamp, this.querySetQueries);
+            return new QuerySet(this.id, this.name, this.description, this.sampling, this.timestamp, this.querySetQueries);
         }
 
         public static Builder builder() {
@@ -111,6 +122,10 @@ public class QuerySet implements ToXContentObject {
         public static Builder builder(QuerySet t) {
             return new Builder(t);
         }
+    }
+
+    public String id() {
+        return id;
     }
 
     public String name() {

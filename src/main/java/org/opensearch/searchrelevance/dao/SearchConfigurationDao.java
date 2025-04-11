@@ -62,7 +62,7 @@ public class SearchConfigurationDao {
         }
         try {
             searchRelevanceIndicesManager.putDoc(
-                searchConfiguration.name(),
+                searchConfiguration.id(),
                 searchConfiguration.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS),
                 SEARCH_CONFIGURATION,
                 listener
@@ -169,6 +169,7 @@ public class SearchConfigurationDao {
     private SearchConfiguration convertToSearchConfiguration(SearchResponse response) {
         Map<String, Object> source = response.getHits().getHits()[0].getSourceAsMap();
         return new SearchConfiguration(
+            (String) source.get(SearchConfiguration.ID),
             (String) source.get(SearchConfiguration.NAME),
             (String) source.get(SearchConfiguration.TIME_STAMP),
             (String) source.get(SearchConfiguration.QUERY_BODY),

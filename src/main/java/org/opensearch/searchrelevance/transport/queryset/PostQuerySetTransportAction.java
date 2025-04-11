@@ -9,6 +9,7 @@ package org.opensearch.searchrelevance.transport.queryset;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
 import org.opensearch.action.StepListener;
@@ -26,34 +27,36 @@ import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
 import org.opensearch.transport.client.Client;
 
-public class CreateQuerySetTransportAction extends HandledTransportAction<CreateQuerySetRequest, IndexResponse> {
+public class PostQuerySetTransportAction extends HandledTransportAction<PostQuerySetRequest, IndexResponse> {
     private final Client client;
     private final ClusterService clusterService;
     private final QuerySetDao querySetDao;
 
     @Inject
-    public CreateQuerySetTransportAction(
+    public PostQuerySetTransportAction(
         ClusterService clusterService,
         TransportService transportService,
         ActionFilters actionFilters,
         Client client,
         QuerySetDao querySetDao
     ) {
-        super(CreateQuerySetAction.NAME, transportService, actionFilters, CreateQuerySetRequest::new);
+        super(PostQuerySetAction.NAME, transportService, actionFilters, PostQuerySetRequest::new);
         this.client = client;
         this.clusterService = clusterService;
         this.querySetDao = querySetDao;
     }
 
     @Override
-    protected void doExecute(Task task, CreateQuerySetRequest request, ActionListener<IndexResponse> listener) {
+    protected void doExecute(Task task, PostQuerySetRequest request, ActionListener<IndexResponse> listener) {
         if (request == null) {
             listener.onFailure(new IllegalArgumentException("Request cannot be null"));
             return;
         }
+        String id = UUID.randomUUID().toString();
+        String timestamp = TimeUtils.getTimestamp();
+
         String name = request.getName();
         String description = request.getDescription();
-        String timestamp = TimeUtils.getTimestamp();
 
         // Given sampling type and querySetSize, build the queryset accordingly
         String sampling = request.getSampling();
@@ -75,7 +78,7 @@ public class CreateQuerySetTransportAction extends HandledTransportAction<Create
         querySetDao.createIndexIfAbsent(createIndexStep);
         Map<String, Integer> finalQuerySetQueries = querySetQueries;
         createIndexStep.whenComplete(v -> {
-            QuerySet querySet = new QuerySet(name, description, timestamp, sampling, finalQuerySetQueries);
+            QuerySet querySet = new QuerySet(id, name, description, timestamp, sampling, finalQuerySetQueries);
             querySetDao.putQuerySet(querySet, listener);
         }, listener::onFailure);
     }

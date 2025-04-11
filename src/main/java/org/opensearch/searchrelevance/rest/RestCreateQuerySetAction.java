@@ -25,8 +25,8 @@ import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.rest.BaseRestHandler;
 import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestRequest;
-import org.opensearch.searchrelevance.transport.queryset.CreateQuerySetAction;
-import org.opensearch.searchrelevance.transport.queryset.CreateQuerySetRequest;
+import org.opensearch.searchrelevance.transport.queryset.PostQuerySetAction;
+import org.opensearch.searchrelevance.transport.queryset.PostQuerySetRequest;
 import org.opensearch.transport.client.node.NodeClient;
 
 /**
@@ -57,9 +57,9 @@ public class RestCreateQuerySetAction extends BaseRestHandler {
         String sampling = (String) source.getOrDefault("sampling", "pptss");
         int querySetSize = (int) source.getOrDefault("querySetSize", 10);
 
-        CreateQuerySetRequest createRequest = new CreateQuerySetRequest(name, description, sampling, querySetSize);
+        PostQuerySetRequest createRequest = new PostQuerySetRequest(name, description, sampling, querySetSize);
 
-        return channel -> client.execute(CreateQuerySetAction.INSTANCE, createRequest, new ActionListener<IndexResponse>() {
+        return channel -> client.execute(PostQuerySetAction.INSTANCE, createRequest, new ActionListener<IndexResponse>() {
             @Override
             public void onResponse(IndexResponse response) {
                 try {

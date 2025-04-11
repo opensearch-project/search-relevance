@@ -10,6 +10,7 @@ package org.opensearch.searchrelevance.transport.queryset;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import org.opensearch.action.StepListener;
 import org.opensearch.action.index.IndexResponse;
@@ -46,9 +47,11 @@ public class PutQuerySetTransportAction extends HandledTransportAction<PutQueryS
             listener.onFailure(new IllegalArgumentException("Request cannot be null"));
             return;
         }
+        String id = UUID.randomUUID().toString();
+        String timestamp = TimeUtils.getTimestamp();
+
         String name = request.getName();
         String description = request.getDescription();
-        String timestamp = TimeUtils.getTimestamp();
 
         // Given sampling type by default "manual" to support manually uploaded querySetQueries.
         String sampling = request.getSampling();
@@ -61,7 +64,7 @@ public class PutQuerySetTransportAction extends HandledTransportAction<PutQueryS
         StepListener<Void> createIndexStep = new StepListener<>();
         querySetDao.createIndexIfAbsent(createIndexStep);
         createIndexStep.whenComplete(v -> {
-            QuerySet querySet = new QuerySet(name, description, timestamp, sampling, querySetQueries);
+            QuerySet querySet = new QuerySet(id, name, description, timestamp, sampling, querySetQueries);
             querySetDao.putQuerySet(querySet, listener);
         }, listener::onFailure);
     }

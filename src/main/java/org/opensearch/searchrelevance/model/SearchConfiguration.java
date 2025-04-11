@@ -16,6 +16,7 @@ import org.opensearch.core.xcontent.XContentBuilder;
  * SearchConfiguration is a system index object that represents all search related params.
  */
 public class SearchConfiguration implements ToXContentObject {
+    public static final String ID = "id";
     public static final String NAME = "name";
     public static final String TIME_STAMP = "timestamp";
     public static final String QUERY_BODY = "queryBody";
@@ -24,12 +25,14 @@ public class SearchConfiguration implements ToXContentObject {
     /**
      * Identifier of the system index
      */
+    private final String id;
     private final String name;
     private final String timestamp;
     private final String queryBody;
     private final String searchPipeline;
 
-    public SearchConfiguration(String name, String timestamp, String queryBody, String searchPipeline) {
+    public SearchConfiguration(String id, String name, String timestamp, String queryBody, String searchPipeline) {
+        this.id = id;
         this.name = name;
         this.timestamp = timestamp;
         this.queryBody = queryBody;
@@ -39,11 +42,16 @@ public class SearchConfiguration implements ToXContentObject {
     @Override
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
         XContentBuilder xContentBuilder = builder.startObject();
+        xContentBuilder.field(ID, this.id);
         xContentBuilder.field(NAME, this.name.trim());
         xContentBuilder.field(TIME_STAMP, this.timestamp.trim());
         xContentBuilder.field(QUERY_BODY, this.queryBody.trim());
         xContentBuilder.field(SEARCH_PIPELINE, this.searchPipeline == null ? "" : this.searchPipeline.trim());
         return xContentBuilder.endObject();
+    }
+
+    public String id() {
+        return id;
     }
 
     public String name() {
