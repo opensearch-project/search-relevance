@@ -51,7 +51,7 @@ public class JudgmentDao {
      */
     public void putJudgement(final Judgment judgment, final ActionListener listener) {
         if (judgment == null) {
-            listener.onFailure(new IllegalArgumentException("Judgment cannot be null"));
+            listener.onFailure(new SearchRelevanceException("Judgment cannot be null", RestStatus.BAD_REQUEST));
             return;
         }
         try {
@@ -82,7 +82,7 @@ public class JudgmentDao {
      */
     public SearchResponse getJudgment(String judgmentId, ActionListener<SearchResponse> listener) {
         if (judgmentId == null || judgmentId.isEmpty()) {
-            listener.onFailure(new IllegalArgumentException("judgmentId must not be null or empty"));
+            listener.onFailure(new SearchRelevanceException("judgmentId must not be null or empty", RestStatus.BAD_REQUEST));
             return null;
         }
         return searchRelevanceIndicesManager.getDocByDocId(judgmentId, JUDGMENT, listener);

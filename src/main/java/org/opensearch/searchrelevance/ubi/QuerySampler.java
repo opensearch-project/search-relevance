@@ -12,6 +12,8 @@ import java.util.concurrent.CompletableFuture;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.opensearch.core.rest.RestStatus;
+import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.transport.client.Client;
 
 import reactor.util.annotation.NonNull;
@@ -41,7 +43,7 @@ public abstract class QuerySampler {
             case ProbabilityProportionalToSizeQuerySampler.NAME -> new ProbabilityProportionalToSizeQuerySampler(size, client);
             case RandomQuerySampler.NAME -> new RandomQuerySampler(size, client);
             case TopNQuerySampler.NAME -> new TopNQuerySampler(size, client);
-            default -> throw new IllegalArgumentException("Unknown sampler type: " + name);
+            default -> throw new SearchRelevanceException("Unknown sampler type: " + name, RestStatus.BAD_REQUEST);
         };
     }
 }

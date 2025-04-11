@@ -60,7 +60,7 @@ public class QuerySetDao {
      */
     public void putQuerySet(final QuerySet querySet, final ActionListener listener) {
         if (querySet == null) {
-            listener.onFailure(new IllegalArgumentException("QuerySet cannot be null"));
+            listener.onFailure(new SearchRelevanceException("QuerySet cannot be null", RestStatus.BAD_REQUEST));
             return;
         }
         try {
@@ -91,7 +91,7 @@ public class QuerySetDao {
      */
     public SearchResponse getQuerySet(String querySetId, ActionListener<SearchResponse> listener) {
         if (querySetId == null || querySetId.isEmpty()) {
-            listener.onFailure(new IllegalArgumentException("querySetId must not be null or empty"));
+            listener.onFailure(new SearchRelevanceException("querySetId must not be null or empty", RestStatus.BAD_REQUEST));
             return null;
         }
         return searchRelevanceIndicesManager.getDocByDocId(querySetId, QUERY_SET, listener);

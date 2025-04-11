@@ -19,7 +19,9 @@ import org.opensearch.action.support.HandledTransportAction;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.core.rest.RestStatus;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
+import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.model.QuerySet;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.tasks.Task;
@@ -44,7 +46,7 @@ public class PutQuerySetTransportAction extends HandledTransportAction<PutQueryS
     @Override
     protected void doExecute(Task task, PutQuerySetRequest request, ActionListener<IndexResponse> listener) {
         if (request == null) {
-            listener.onFailure(new IllegalArgumentException("Request cannot be null"));
+            listener.onFailure(new SearchRelevanceException("Request cannot be null", RestStatus.BAD_REQUEST));
             return;
         }
         String id = UUID.randomUUID().toString();
@@ -56,7 +58,9 @@ public class PutQuerySetTransportAction extends HandledTransportAction<PutQueryS
         // Given sampling type by default "manual" to support manually uploaded querySetQueries.
         String sampling = request.getSampling();
         if (!"manual".equals(sampling)) {
-            listener.onFailure(new IllegalArgumentException("Support sampling as manual only. sampling: " + sampling));
+            listener.onFailure(
+                new SearchRelevanceException("Support sampling as manual only. sampling: " + sampling, RestStatus.BAD_REQUEST)
+            );
         }
         String querySetQueriesStr = request.getQuerySetQueries();
         Map<String, Integer> querySetQueries = convertQuerySetQueriesMap(querySetQueriesStr);

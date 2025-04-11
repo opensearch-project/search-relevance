@@ -16,7 +16,9 @@ import org.opensearch.action.support.HandledTransportAction;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.core.rest.RestStatus;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
+import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.model.SearchConfiguration;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.tasks.Task;
@@ -42,7 +44,7 @@ public class PutSearchConfigurationTransportAction extends HandledTransportActio
     @Override
     protected void doExecute(Task task, PutSearchConfigurationRequest request, ActionListener<IndexResponse> listener) {
         if (request == null) {
-            listener.onFailure(new IllegalArgumentException("Request cannot be null"));
+            listener.onFailure(new SearchRelevanceException("Request cannot be null", RestStatus.BAD_REQUEST));
             return;
         }
         String id = UUID.randomUUID().toString();
@@ -50,7 +52,7 @@ public class PutSearchConfigurationTransportAction extends HandledTransportActio
 
         String name = request.getName();
         if (name == null || name.trim().isEmpty()) {
-            listener.onFailure(new IllegalArgumentException("Name cannot be null or empty. Request: " + request));
+            listener.onFailure(new SearchRelevanceException("Name cannot be null or empty. Request: " + request, RestStatus.BAD_REQUEST));
             return;
         }
         String queryBody = request.getQueryBody();

@@ -235,7 +235,7 @@ public class MetricsHelper {
             double jaccardSimilarity = calculateJaccardSimilarity(docIdListA, docIdListB);
             metrics.put(JACCARD_SIMILARITY_FIELD_NAME, jaccardSimilarity);
         } catch (Exception ex) {
-            throw new IllegalArgumentException("failed to calculate jaccard", ex);
+            throw new SearchRelevanceException("failed to calculate jaccard", ex, RestStatus.INTERNAL_SERVER_ERROR);
         }
 
         try {
@@ -244,14 +244,14 @@ public class MetricsHelper {
             metrics.put(RBO_50_SIMILARITY_FIELD_NAME, rboSimilarity50);
             metrics.put(RBO_90_SIMILARITY_FIELD_NAME, rboSimilarity90);
         } catch (Exception ex) {
-            throw new IllegalArgumentException("failed to calculate rbo", ex);
+            throw new SearchRelevanceException("failed to calculate rbo", ex, RestStatus.INTERNAL_SERVER_ERROR);
         }
 
         try {
             double frequencyWeightedSimilarity = calculateFrequencyWeightedSimilarity(docIdListA, docIdListB);
             metrics.put(FREQUENCY_WEIGHTED_SIMILARITY_FIELD_NAME, frequencyWeightedSimilarity);
         } catch (Exception ex) {
-            throw new IllegalArgumentException("failed to calculate frequencyWeighted", ex);
+            throw new SearchRelevanceException("failed to calculate frequencyWeighted", ex, RestStatus.INTERNAL_SERVER_ERROR);
         }
         return metrics;
     }

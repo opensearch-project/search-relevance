@@ -57,7 +57,7 @@ public class SearchConfigurationDao {
      */
     public void putSearchConfiguration(final SearchConfiguration searchConfiguration, final ActionListener listener) {
         if (searchConfiguration == null) {
-            listener.onFailure(new IllegalArgumentException("SearchConfiguration cannot be null"));
+            listener.onFailure(new SearchRelevanceException("SearchConfiguration cannot be null", RestStatus.BAD_REQUEST));
             return;
         }
         try {
@@ -88,7 +88,7 @@ public class SearchConfigurationDao {
      */
     public SearchResponse getSearchConfiguration(String searchConfigurationId, ActionListener<SearchResponse> listener) {
         if (searchConfigurationId == null || searchConfigurationId.isEmpty()) {
-            listener.onFailure(new IllegalArgumentException("querySetId must not be null or empty"));
+            listener.onFailure(new SearchRelevanceException("querySetId must not be null or empty", RestStatus.BAD_REQUEST));
             return null;
         }
         return searchRelevanceIndicesManager.getDocByDocId(searchConfigurationId, SEARCH_CONFIGURATION, listener);

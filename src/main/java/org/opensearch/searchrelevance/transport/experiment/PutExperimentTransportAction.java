@@ -22,9 +22,11 @@ import org.opensearch.action.support.HandledTransportAction;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.core.rest.RestStatus;
 import org.opensearch.searchrelevance.dao.ExperimentDao;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
+import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.metrics.MetricsHelper;
 import org.opensearch.searchrelevance.model.Experiment;
 import org.opensearch.searchrelevance.utils.TimeUtils;
@@ -60,7 +62,7 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
     @Override
     protected void doExecute(Task task, PutExperimentRequest request, ActionListener<IndexResponse> listener) {
         if (request == null) {
-            listener.onFailure(new IllegalArgumentException("Request cannot be null"));
+            listener.onFailure(new SearchRelevanceException("Request cannot be null", RestStatus.BAD_REQUEST));
             return;
         }
         String id = UUID.randomUUID().toString();

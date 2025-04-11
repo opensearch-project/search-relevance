@@ -7,12 +7,13 @@
  */
 package org.opensearch.searchrelevance.exception;
 
+import org.opensearch.OpenSearchException;
 import org.opensearch.core.rest.RestStatus;
 
 /**
  * Representations of Search Relevance Exceptions
  */
-public class SearchRelevanceException extends RuntimeException {
+public class SearchRelevanceException extends OpenSearchException {
     private final RestStatus restStatus;
 
     /**

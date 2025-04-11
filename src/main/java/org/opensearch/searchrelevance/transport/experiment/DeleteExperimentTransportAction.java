@@ -16,7 +16,9 @@ import org.opensearch.action.support.HandledTransportAction;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.core.rest.RestStatus;
 import org.opensearch.searchrelevance.dao.ExperimentDao;
+import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.transport.OpenSearchDocRequest;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
@@ -48,7 +50,7 @@ public class DeleteExperimentTransportAction extends HandledTransportAction<Open
         try {
             String experimentId = request.getId();
             if (experimentId == null || experimentId.trim().isEmpty()) {
-                listener.onFailure(new IllegalArgumentException("Experiment ID cannot be null or empty"));
+                listener.onFailure(new SearchRelevanceException("Experiment ID cannot be null or empty", RestStatus.BAD_REQUEST));
                 return;
             }
             experimentDao.deleteExperiment(experimentId, listener);

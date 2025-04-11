@@ -13,6 +13,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.opensearch.core.rest.RestStatus;
+import org.opensearch.searchrelevance.exception.SearchRelevanceException;
+
 /**
  * Calculators used for pairwise comparison.
  */
@@ -49,7 +52,7 @@ public class PairComparison {
      */
     public static double calculateRBOSimilarity(List<String> listA, List<String> listB, double p) {
         if (p <= 0 || p >= 1) {
-            throw new IllegalArgumentException("p must be between 0 and 1");
+            throw new SearchRelevanceException("p must be between 0 and 1", RestStatus.INTERNAL_SERVER_ERROR);
         }
 
         int maxDepth = Math.max(listA.size(), listB.size());

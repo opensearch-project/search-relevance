@@ -26,6 +26,7 @@ import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.rest.BaseRestHandler;
 import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestRequest;
+import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.transport.OpenSearchDocRequest;
 import org.opensearch.searchrelevance.transport.judgment.DeleteJudgmentAction;
 import org.opensearch.transport.client.node.NodeClient;
@@ -51,7 +52,7 @@ public class RestDeleteJudgmentAction extends BaseRestHandler {
     protected RestChannelConsumer prepareRequest(RestRequest request, NodeClient client) throws IOException {
         final String judgmentId = request.param(DOCUMENT_ID);
         if (judgmentId == null) {
-            throw new IllegalArgumentException("id cannot be null");
+            throw new SearchRelevanceException("id cannot be null", RestStatus.BAD_REQUEST);
         }
         OpenSearchDocRequest deleteRequest = new OpenSearchDocRequest(judgmentId);
         return channel -> client.execute(DeleteJudgmentAction.INSTANCE, deleteRequest, new ActionListener<DeleteResponse>() {

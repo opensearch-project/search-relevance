@@ -49,7 +49,7 @@ public class ExperimentDao {
      */
     public void putExperiment(final Experiment experiment, final ActionListener listener) {
         if (experiment == null) {
-            listener.onFailure(new IllegalArgumentException("Experiment cannot be null"));
+            listener.onFailure(new SearchRelevanceException("Experiment cannot be null", RestStatus.BAD_REQUEST));
             return;
         }
         try {
@@ -80,7 +80,7 @@ public class ExperimentDao {
      */
     public SearchResponse getExperiment(String experimentId, ActionListener<SearchResponse> listener) {
         if (experimentId == null || experimentId.isEmpty()) {
-            listener.onFailure(new IllegalArgumentException("experimentId must not be null or empty"));
+            listener.onFailure(new SearchRelevanceException("experimentId must not be null or empty", RestStatus.BAD_REQUEST));
             return null;
         }
         return searchRelevanceIndicesManager.getDocByDocId(experimentId, EXPERIMENT, listener);

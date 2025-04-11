@@ -225,7 +225,7 @@ public class SearchRelevanceIndicesManager {
      */
     public static String getIndexMappings(final String mapping) throws IOException {
         if (mapping == null || mapping.trim().isEmpty()) {
-            throw new IllegalArgumentException("Mapping path cannot be null or empty");
+            throw new SearchRelevanceException("Mapping path cannot be null or empty", RestStatus.INTERNAL_SERVER_ERROR);
         }
 
         final String path = mapping.startsWith("/") ? mapping : "/" + mapping;

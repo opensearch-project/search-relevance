@@ -20,6 +20,9 @@ import static org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManag
 import java.io.IOException;
 import java.util.Objects;
 
+import org.opensearch.core.rest.RestStatus;
+import org.opensearch.searchrelevance.exception.SearchRelevanceException;
+
 public enum SearchRelevanceIndices {
     /**
      * Query Set Index
@@ -53,7 +56,7 @@ public enum SearchRelevanceIndices {
         try {
             return getIndexMappings(mappingPath);
         } catch (IOException e) {
-            throw new IllegalArgumentException("Failed to load mapping under path: " + mappingPath, e);
+            throw new SearchRelevanceException("Failed to load mapping under path: " + mappingPath, e, RestStatus.INTERNAL_SERVER_ERROR);
         }
     }
 

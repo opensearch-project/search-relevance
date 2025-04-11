@@ -19,7 +19,9 @@ import org.opensearch.action.support.HandledTransportAction;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.core.rest.RestStatus;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
+import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.model.QuerySet;
 import org.opensearch.searchrelevance.ubi.QuerySampler;
 import org.opensearch.searchrelevance.utils.TimeUtils;
@@ -49,7 +51,7 @@ public class PostQuerySetTransportAction extends HandledTransportAction<PostQuer
     @Override
     protected void doExecute(Task task, PostQuerySetRequest request, ActionListener<IndexResponse> listener) {
         if (request == null) {
-            listener.onFailure(new IllegalArgumentException("Request cannot be null"));
+            listener.onFailure(new SearchRelevanceException("Request cannot be null", RestStatus.BAD_REQUEST));
             return;
         }
         String id = UUID.randomUUID().toString();
@@ -66,11 +68,13 @@ public class PostQuerySetTransportAction extends HandledTransportAction<PostQuer
         try {
             querySetQueries = querySampler.sample().get();
         } catch (InterruptedException | ExecutionException e) {
-            listener.onFailure(new IllegalArgumentException("Failed to build querySetQueries. Request: " + request));
+            listener.onFailure(
+                new SearchRelevanceException("Failed to build querySetQueries. Request: " + request, RestStatus.BAD_REQUEST)
+            );
         }
 
         if (name == null || name.trim().isEmpty()) {
-            listener.onFailure(new IllegalArgumentException("Name cannot be null or empty. Request: " + request));
+            listener.onFailure(new SearchRelevanceException("Name cannot be null or empty. Request: " + request, RestStatus.BAD_REQUEST));
             return;
         }
 
