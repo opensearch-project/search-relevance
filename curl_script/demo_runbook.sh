@@ -86,8 +86,30 @@ echo Create Experiment
 exe curl -s -X PUT "localhost:9200/_plugins/search_relevance/experiments" \
 -H "Content-type: application/json" \
 -d"{
-   	\"index\": \"sample_index\",
+        \"index\": \"ecommerce\",
    	\"querySetId\": \"$QS\",
    	\"searchConfigurationList\": [\"$SC_BASELINE\", \"$SC_CHALLENGER\"],
    	\"k\": 10
    }"
+
+EX=`jq -r '.experiment_id' < RES`
+
+echo
+echo Experiment id: $EX
+
+echo
+echo Show Experiment
+exe curl -s -X GET "localhost:9200/_plugins/search_relevance/experiments/$EX"
+
+echo
+echo List experiments
+exe curl -s -X GET "http://localhost:9200/_plugins/search_relevance/experiments" \
+-H "Content-type: application/json" \
+-d'{
+     "sort": {
+       "timestamp": {
+         "order": "desc"
+       }
+     },
+     "size": 10
+   }'
