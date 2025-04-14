@@ -5,7 +5,7 @@
  * this file be licensed under the Apache-2.0 license or a
  * compatible open source license.
  */
-package org.opensearch.searchrelevance.action;
+package org.opensearch.searchrelevance.action.queryset;
 
 import java.io.IOException;
 
@@ -14,7 +14,7 @@ import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.searchrelevance.transport.OpenSearchDocRequest;
 import org.opensearch.test.OpenSearchTestCase;
 
-public class DeleteQuerySetActionTests extends OpenSearchTestCase {
+public class GetQuerySetActionTests extends OpenSearchTestCase {
 
     public void testStreams() throws IOException {
         OpenSearchDocRequest request = new OpenSearchDocRequest("1234");

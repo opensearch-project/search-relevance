@@ -16,7 +16,7 @@ import org.opensearch.core.common.io.stream.StreamOutput;
 import org.opensearch.search.builder.SearchSourceBuilder;
 
 /**
- * Transport Request to get or get or delete a document from system indices.
+ * Transport Request to get or delete a document from system indices.
  */
 public class OpenSearchDocRequest extends ActionRequest {
     private final String id;
@@ -34,14 +34,14 @@ public class OpenSearchDocRequest extends ActionRequest {
 
     public OpenSearchDocRequest(StreamInput in) throws IOException {
         super(in);
-        this.id = in.readOptionalString();
+        this.id = in.readString();
         this.searchSourceBuilder = new SearchSourceBuilder(in);
     }
 
     @Override
     public void writeTo(StreamOutput out) throws IOException {
         super.writeTo(out);
-        out.writeOptionalString(id);
+        out.writeString(id);
         searchSourceBuilder.writeTo(out);
     }
 

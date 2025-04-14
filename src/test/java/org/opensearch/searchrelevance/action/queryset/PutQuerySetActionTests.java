@@ -5,31 +5,31 @@
  * this file be licensed under the Apache-2.0 license or a
  * compatible open source license.
  */
-package org.opensearch.searchrelevance.action;
+package org.opensearch.searchrelevance.action.queryset;
 
 import java.io.IOException;
 
 import org.opensearch.common.io.stream.BytesStreamOutput;
 import org.opensearch.core.common.io.stream.StreamInput;
-import org.opensearch.searchrelevance.transport.queryset.PostQuerySetRequest;
+import org.opensearch.searchrelevance.transport.queryset.PutQuerySetRequest;
 import org.opensearch.test.OpenSearchTestCase;
 
-public class CreateQuerySetActionTests extends OpenSearchTestCase {
+public class PutQuerySetActionTests extends OpenSearchTestCase {
 
     public void testStreams() throws IOException {
-        PostQuerySetRequest request = new PostQuerySetRequest("test_name", "test_description", "random", 10);
+        PutQuerySetRequest request = new PutQuerySetRequest("test_name", "test_description", "manual", "apple, banana");
         BytesStreamOutput output = new BytesStreamOutput();
         request.writeTo(output);
         StreamInput in = StreamInput.wrap(output.bytes().toBytesRef().bytes);
-        PostQuerySetRequest serialized = new PostQuerySetRequest(in);
+        PutQuerySetRequest serialized = new PutQuerySetRequest(in);
         assertEquals("test_name", serialized.getName());
         assertEquals("test_description", serialized.getDescription());
-        assertEquals("random", serialized.getSampling());
-        assertEquals(10, serialized.getQuerySetSize());
+        assertEquals("manual", serialized.getSampling());
+        assertEquals("apple, banana", serialized.getQuerySetQueries());
     }
 
     public void testRequestValidation() {
-        PostQuerySetRequest request = new PostQuerySetRequest("test_name", "test_description", "random", 10);
+        PutQuerySetRequest request = new PutQuerySetRequest("test_name", "test_description", "manual", "apple, banana");
         assertNull(request.validate());
     }
 }

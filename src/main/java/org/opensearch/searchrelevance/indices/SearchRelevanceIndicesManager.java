@@ -164,7 +164,7 @@ public class SearchRelevanceIndicesManager {
                     public void onResponse(SearchResponse response) {
                         LOGGER.info("Successfully get doc id [{}]", docId);
                         if (response.getHits().getTotalHits().value() == 0) {
-                            listener.onFailure(new ResourceNotFoundException("Document not found: " + docId));
+                            listener.onFailure(new ResourceNotFoundException("Document not found: " + docId, RestStatus.NOT_FOUND));
                             return;
                         }
                         listener.onResponse(response);

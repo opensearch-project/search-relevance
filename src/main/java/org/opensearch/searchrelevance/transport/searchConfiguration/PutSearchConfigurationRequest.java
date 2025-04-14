@@ -11,14 +11,13 @@ import java.io.IOException;
 
 import org.opensearch.action.ActionRequest;
 import org.opensearch.action.ActionRequestValidationException;
-import org.opensearch.common.Nullable;
 import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.core.common.io.stream.StreamOutput;
 
 public class PutSearchConfigurationRequest extends ActionRequest {
-    private String name;
-    private String queryBody;
-    private String searchPipeline;
+    private final String name;
+    private final String queryBody;
+    private final String searchPipeline;
 
     public PutSearchConfigurationRequest(String name, String queryBody, String searchPipeline) {
         this.name = name;
@@ -30,7 +29,7 @@ public class PutSearchConfigurationRequest extends ActionRequest {
         super(in);
         this.name = in.readString();
         this.queryBody = in.readString();
-        this.searchPipeline = in.readString();
+        this.searchPipeline = in.readOptionalString();
     }
 
     @Override
@@ -49,7 +48,6 @@ public class PutSearchConfigurationRequest extends ActionRequest {
         return queryBody;
     }
 
-    @Nullable
     public String getSearchPipeline() {
         return searchPipeline;
     }

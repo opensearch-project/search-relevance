@@ -36,7 +36,7 @@ public class PutQuerySetRequest extends ActionRequest {
     public PutQuerySetRequest(StreamInput in) throws IOException {
         super(in);
         this.name = in.readString();
-        this.description = in.readString();
+        this.description = in.readOptionalString();
         this.sampling = in.readString();
         this.querySetQueries = in.readString();
     }
@@ -45,7 +45,7 @@ public class PutQuerySetRequest extends ActionRequest {
     public void writeTo(StreamOutput out) throws IOException {
         super.writeTo(out);
         out.writeString(name);
-        out.writeString(description);
+        out.writeOptionalString(description);
         out.writeString(sampling);
         out.writeString(querySetQueries);
     }
