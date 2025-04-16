@@ -23,7 +23,6 @@ import org.opensearch.core.xcontent.XContentBuilder;
 public class Experiment implements ToXContentObject {
     public static final String ID = "id";
     public static final String TIME_STAMP = "timestamp";
-    public static final String INDEX = "index";
     public static final String QUERY_SET_ID = "querySetId";
     public static final String SEARCH_CONFIGURATION_LIST = "searchConfigurationList";
     public static final String K = "k";
@@ -35,7 +34,6 @@ public class Experiment implements ToXContentObject {
      */
     private final String id;
     private final String timestamp;
-    private final String index;
     private final String querySetId;
     private final List<String> searchConfigurationList;
     private final int k;
@@ -44,7 +42,6 @@ public class Experiment implements ToXContentObject {
     public Experiment(
         String id,
         String timestamp,
-        String index,
         String querySetId,
         List<String> searchConfigurationList,
         int k,
@@ -52,7 +49,6 @@ public class Experiment implements ToXContentObject {
     ) {
         this.id = id;
         this.timestamp = timestamp;
-        this.index = index;
         this.querySetId = querySetId;
         this.searchConfigurationList = searchConfigurationList;
         this.k = k;
@@ -64,7 +60,6 @@ public class Experiment implements ToXContentObject {
         XContentBuilder xContentBuilder = builder.startObject();
         xContentBuilder.field(ID, this.id.trim());
         xContentBuilder.field(TIME_STAMP, this.timestamp.trim());
-        xContentBuilder.field(INDEX, this.index.trim());
         xContentBuilder.field(QUERY_SET_ID, this.querySetId.trim());
         xContentBuilder.field(
             SEARCH_CONFIGURATION_LIST,
@@ -81,10 +76,6 @@ public class Experiment implements ToXContentObject {
 
     public String timestamp() {
         return timestamp;
-    }
-
-    public String index() {
-        return index;
     }
 
     public String querySetId() {

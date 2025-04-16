@@ -17,18 +17,19 @@ import org.opensearch.test.OpenSearchTestCase;
 public class PutSearchConfigurationActionTests extends OpenSearchTestCase {
 
     public void testStreams() throws IOException {
-        PutSearchConfigurationRequest request = new PutSearchConfigurationRequest("base_line", "{\"match_all\":{}}", "n/a");
+        PutSearchConfigurationRequest request = new PutSearchConfigurationRequest("base_line", "sample_id", "{\"match_all\":{}}", "n/a");
         BytesStreamOutput output = new BytesStreamOutput();
         request.writeTo(output);
         StreamInput in = StreamInput.wrap(output.bytes().toBytesRef().bytes);
         PutSearchConfigurationRequest serialized = new PutSearchConfigurationRequest(in);
         assertEquals("base_line", serialized.getName());
+        assertEquals("sample_id", serialized.getIndex());
         assertEquals("{\"match_all\":{}}", serialized.getQueryBody());
         assertEquals("n/a", serialized.getSearchPipeline());
     }
 
     public void testRequestValidation() {
-        PutSearchConfigurationRequest request = new PutSearchConfigurationRequest("base_line", "{\"match_all\":{}}", "n/a");
+        PutSearchConfigurationRequest request = new PutSearchConfigurationRequest("base_line", "sample_id", "{\"match_all\":{}}", "n/a");
         assertNull(request.validate());
     }
 }

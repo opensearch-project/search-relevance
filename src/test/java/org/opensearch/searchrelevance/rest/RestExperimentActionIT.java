@@ -44,8 +44,9 @@ public class RestExperimentActionIT extends SearchRelevanceRestTestCase {
 
         // create a search configuration and get the search_configuration_id
         String searchConfigName = "test_name";
+        String index = "sample_index";
         String queryBody = "{\"match_all\":{}}";
-        String searchConfigRequestBody = createSearchConfigurationRequestBody(searchConfigName, queryBody);
+        String searchConfigRequestBody = createSearchConfigurationRequestBody(searchConfigName, index, queryBody);
 
         Response putSearchConfigResponse = makeRequest("PUT", SEARCH_CONFIGURATIONS_ENDPOINT, searchConfigRequestBody);
         assertEquals(RestStatus.OK.getStatus(), putSearchConfigResponse.getStatusLine().getStatusCode());
@@ -56,9 +57,8 @@ public class RestExperimentActionIT extends SearchRelevanceRestTestCase {
         assertNotNull("Search configuration ID should not be null", searchConfigurationId);
 
         // 1. put an experiment
-        String index = "sample_index";
         List<String> searchConfigurationList = List.of(searchConfigurationId);
-        String requestBody = createRequestBody(index, querySetId, searchConfigurationList);
+        String requestBody = createRequestBody(querySetId, searchConfigurationList);
 
         Response putResponse = makeRequest("PUT", EXPERIMENTS_ENDPOINT, requestBody);
         assertEquals(RestStatus.OK.getStatus(), putResponse.getStatusLine().getStatusCode());
@@ -98,9 +98,8 @@ public class RestExperimentActionIT extends SearchRelevanceRestTestCase {
         }
     }
 
-    private String createRequestBody(String index, String querySetId, List<String> searchConfigurationList) throws JsonProcessingException {
+    private String createRequestBody(String querySetId, List<String> searchConfigurationList) throws JsonProcessingException {
         Map<String, Object> requestMap = new HashMap<>();
-        requestMap.put("index", index);
         requestMap.put("querySetId", querySetId);
         requestMap.put("searchConfigurationList", searchConfigurationList);
         requestMap.put("k", 10);

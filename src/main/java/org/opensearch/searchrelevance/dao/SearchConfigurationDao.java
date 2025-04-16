@@ -8,10 +8,11 @@
 package org.opensearch.searchrelevance.dao;
 
 import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.SEARCH_CONFIGURATION;
-import static org.opensearch.searchrelevance.metrics.MetricsHelper.METRICS_QUERY_BODY_FIELD_NAME;
+import static org.opensearch.searchrelevance.metrics.MetricsHelper.METRICS_INDEX_AND_QUERY_BODY_FIELD_NAME;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -124,10 +125,10 @@ public class SearchConfigurationDao {
         Map<String, Object> results,
         StepListener<Map<String, Object>> stepListener
     ) {
-        List<String> queryBodies = new ArrayList<>();
+        List<List<String>> indexAndQueryBodies = new ArrayList<>();
 
         GroupedActionListener<SearchResponse> groupedListener = new GroupedActionListener<>(ActionListener.wrap(responses -> {
-            results.put(METRICS_QUERY_BODY_FIELD_NAME, queryBodies);
+            results.put(METRICS_INDEX_AND_QUERY_BODY_FIELD_NAME, indexAndQueryBodies);
             stepListener.onResponse(results);
         }, stepListener::onFailure), searchConfigurationList.size());
 
@@ -140,7 +141,7 @@ public class SearchConfigurationDao {
                         SearchConfiguration searchConfig = convertToSearchConfiguration(response);
                         LOGGER.debug("Converted response into SearchConfiguration: [{}]", searchConfig);
 
-                        queryBodies.add(searchConfig.queryBody());
+                        indexAndQueryBodies.add(Arrays.asList(searchConfig.index(), searchConfig.queryBody()));
                         groupedListener.onResponse(response);
                     } catch (Exception e) {
                         LOGGER.error(
@@ -172,6 +173,7 @@ public class SearchConfigurationDao {
             (String) source.get(SearchConfiguration.ID),
             (String) source.get(SearchConfiguration.NAME),
             (String) source.get(SearchConfiguration.TIME_STAMP),
+            (String) source.get(SearchConfiguration.INDEX),
             (String) source.get(SearchConfiguration.QUERY_BODY),
             (String) source.get(SearchConfiguration.SEARCH_PIPELINE)
         );

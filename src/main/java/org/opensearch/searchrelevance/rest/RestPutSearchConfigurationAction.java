@@ -52,10 +52,11 @@ public class RestPutSearchConfigurationAction extends BaseRestHandler {
         Map<String, Object> source = parser.map();
 
         String name = (String) source.get("name");
+        String index = (String) source.get("index");
         String queryBody = (String) source.get("queryBody");
         String searchPipeline = (String) source.getOrDefault("searchPipeline", "");
 
-        PutSearchConfigurationRequest createRequest = new PutSearchConfigurationRequest(name, queryBody, searchPipeline);
+        PutSearchConfigurationRequest createRequest = new PutSearchConfigurationRequest(name, index, queryBody, searchPipeline);
 
         return channel -> client.execute(PutSearchConfigurationAction.INSTANCE, createRequest, new ActionListener<IndexResponse>() {
             @Override

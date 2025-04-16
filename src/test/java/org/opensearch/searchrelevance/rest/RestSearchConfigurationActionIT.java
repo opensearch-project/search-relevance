@@ -25,8 +25,9 @@ public class RestSearchConfigurationActionIT extends SearchRelevanceRestTestCase
     public void testSearchConfigurationCRUDOperations() throws Exception {
         // 1. put a search configuration
         String name = "test_name";
+        String index = "sample_index";
         String queryBody = "{\"match_all\":{}}";
-        String requestBody = createSearchConfigurationRequestBody(name, queryBody);
+        String requestBody = createSearchConfigurationRequestBody(name, index, queryBody);
 
         Response putResponse = makeRequest("PUT", SEARCH_CONFIGURATIONS_ENDPOINT, requestBody);
         assertEquals(RestStatus.OK.getStatus(), putResponse.getStatusLine().getStatusCode());
@@ -66,9 +67,11 @@ public class RestSearchConfigurationActionIT extends SearchRelevanceRestTestCase
         }
     }
 
-    protected static String createSearchConfigurationRequestBody(String name, String queryBody) throws JsonProcessingException {
+    protected static String createSearchConfigurationRequestBody(String name, String index, String queryBody)
+        throws JsonProcessingException {
         Map<String, Object> requestMap = new HashMap<>();
         requestMap.put("name", name);
+        requestMap.put("index", index);
         requestMap.put("queryBody", queryBody);
         requestMap.put("searchPipeline", "n/a");
         return OBJECT_MAPPER.writeValueAsString(requestMap);

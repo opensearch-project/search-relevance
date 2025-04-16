@@ -7,7 +7,7 @@
  */
 package org.opensearch.searchrelevance.transport.experiment;
 
-import static org.opensearch.searchrelevance.metrics.MetricsHelper.METRICS_QUERY_BODY_FIELD_NAME;
+import static org.opensearch.searchrelevance.metrics.MetricsHelper.METRICS_INDEX_AND_QUERY_BODY_FIELD_NAME;
 import static org.opensearch.searchrelevance.metrics.MetricsHelper.METRICS_QUERY_TEXT_FIELD_NAME;
 
 import java.util.HashMap;
@@ -68,7 +68,6 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
         String id = UUID.randomUUID().toString();
         String timestamp = TimeUtils.getTimestamp();
 
-        String index = request.getIndex();
         String querySetId = request.getQuerySetId();
         List<String> searchConfigurationList = request.getSearchConfigurationList();
         int k = request.getK();
@@ -94,14 +93,14 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
         // step4: Search and Calculate Metrics
         StepListener<Map<String, Object>> searchAndMetricsCalcStep = new StepListener<>();
         getSearchConfigsStep.whenComplete(v -> {
-            List<String> queryBodies = (List<String>) results.get(METRICS_QUERY_BODY_FIELD_NAME);
+            List<List<String>> indexAndQueryBodies = (List<List<String>>) results.get(METRICS_INDEX_AND_QUERY_BODY_FIELD_NAME);
             List<String> queryTexts = (List<String>) results.get(METRICS_QUERY_TEXT_FIELD_NAME);
-            metricsHelper.getMetricsAsync(results, index, queryTexts, queryBodies, k, searchAndMetricsCalcStep);
+            metricsHelper.getMetricsAsync(results, queryTexts, indexAndQueryBodies, k, searchAndMetricsCalcStep);
         }, listener::onFailure);
 
         // Step5: Put Experiment
         searchAndMetricsCalcStep.whenComplete(v -> {
-            Experiment experiment = new Experiment(id, timestamp, index, querySetId, searchConfigurationList, k, results);
+            Experiment experiment = new Experiment(id, timestamp, querySetId, searchConfigurationList, k, results);
             experimentDao.putExperiment(experiment, listener);
         }, listener::onFailure);
     }

@@ -8,7 +8,6 @@
 package org.opensearch.searchrelevance.plugin;
 
 import static org.opensearch.client.WarningsHandler.PERMISSIVE;
-import static org.opensearch.searchrelevance.plugin.SearchRelevancePluginTests.SUPPORTED_SYSTEM_INDEX_PATTERN;
 
 import java.io.IOException;
 

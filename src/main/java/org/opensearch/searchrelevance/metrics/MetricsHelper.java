@@ -53,7 +53,7 @@ public class MetricsHelper {
 
     public static final String METRICS_FIELD_NAME = "metrics";
     public static final String METRICS_QUERY_TEXT_FIELD_NAME = "queryTexts";
-    public static final String METRICS_QUERY_BODY_FIELD_NAME = "queryBodies";
+    public static final String METRICS_INDEX_AND_QUERY_BODY_FIELD_NAME = "indexAndQueryBodies";
     public static final String METRICS_PAIRWISE_COMPARISON_FIELD_NAME = "pairwiseComparison";
     public static final String PAIRWISE_FIELD_NAME_A = "0";
     public static final String PAIRWISE_FIELD_NAME_B = "1";
@@ -69,9 +69,8 @@ public class MetricsHelper {
      */
     public void getMetricsAsync(
         Map<String, Object> results,
-        String index,
         List<String> queryTexts,
-        List<String> queryBodies,
+        List<List<String>> indexAndQueryBodies,
         int k,
         StepListener<Map<String, Object>> stepListener
     ) {
@@ -80,7 +79,7 @@ public class MetricsHelper {
         LOGGER.debug("Processing to getMetricsAsync for {} queryTexts", pendingTexts);
         try {
             for (String queryText : queryTexts) {
-                getMetricsForQueryText(index, queryText, queryBodies, k, new ActionListener<Map<String, Object>>() {
+                getMetricsForQueryText(queryText, indexAndQueryBodies, k, new ActionListener<Map<String, Object>>() {
                     @Override
                     public void onResponse(Map<String, Object> queryMetrics) {
                         synchronized (metrics) {
@@ -114,9 +113,8 @@ public class MetricsHelper {
 
     /**
      * Get metrics for a single queryText.
-     * @param index - index to be searched
      * @param queryText - queryText to be searched
-     * @param queryBodies - list of queryBodies with wildcard queryText
+     * @param indexAndQueryBodies - list of index + queryBody with wildcard queryText
      * @param k - number of documents to be returned
      * @return queryTextMetrics
      *   {
@@ -127,23 +125,23 @@ public class MetricsHelper {
      *   }
      */
     public Map<String, Object> getMetricsForQueryText(
-        final String index,
         final String queryText,
-        final List<String> queryBodies,
+        final List<List<String>> indexAndQueryBodies,
         final int k,
         ActionListener<Map<String, Object>> listener
     ) {
         Map<String, Object> results = new HashMap<>();
-        AtomicInteger pendingQueries = new AtomicInteger(queryBodies.size());
+        AtomicInteger pendingQueries = new AtomicInteger(indexAndQueryBodies.size());
         Map<String, Object> indexToDocIdMap = new ConcurrentHashMap<>();
-        boolean isPairwiseComparison = queryBodies.size() == 2;
+        boolean isPairwiseComparison = indexAndQueryBodies.size() == 2;
 
         try {
-            for (int i = 0; i < queryBodies.size(); i++) {
-                String queryBody = queryBodies.get(i).replace("%queryText%", queryText);
+            for (int i = 0; i < indexAndQueryBodies.size(); i++) {
+                final List<String> currentIndexAndQueryBody = indexAndQueryBodies.get(i);
+                String queryBody = currentIndexAndQueryBody.get(1).replace("%queryText%", queryText);
                 final int queryIndex = i;
 
-                SearchRequest searchRequest = new SearchRequest(index);
+                SearchRequest searchRequest = new SearchRequest(currentIndexAndQueryBody.get(0));
                 SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
 
                 // Set the query and size

@@ -19,6 +19,8 @@ public class SearchConfiguration implements ToXContentObject {
     public static final String ID = "id";
     public static final String NAME = "name";
     public static final String TIME_STAMP = "timestamp";
+    public static final String INDEX = "index";
+
     public static final String QUERY_BODY = "queryBody";
     public static final String SEARCH_PIPELINE = "searchPipeline";
 
@@ -28,13 +30,15 @@ public class SearchConfiguration implements ToXContentObject {
     private final String id;
     private final String name;
     private final String timestamp;
+    private final String index;
     private final String queryBody;
     private final String searchPipeline;
 
-    public SearchConfiguration(String id, String name, String timestamp, String queryBody, String searchPipeline) {
+    public SearchConfiguration(String id, String name, String timestamp, String index, String queryBody, String searchPipeline) {
         this.id = id;
         this.name = name;
         this.timestamp = timestamp;
+        this.index = index;
         this.queryBody = queryBody;
         this.searchPipeline = searchPipeline;
     }
@@ -45,6 +49,7 @@ public class SearchConfiguration implements ToXContentObject {
         xContentBuilder.field(ID, this.id);
         xContentBuilder.field(NAME, this.name.trim());
         xContentBuilder.field(TIME_STAMP, this.timestamp.trim());
+        xContentBuilder.field(INDEX, this.index.trim());
         xContentBuilder.field(QUERY_BODY, this.queryBody.trim());
         xContentBuilder.field(SEARCH_PIPELINE, this.searchPipeline == null ? "" : this.searchPipeline.trim());
         return xContentBuilder.endObject();
@@ -56,6 +61,10 @@ public class SearchConfiguration implements ToXContentObject {
 
     public String name() {
         return name;
+    }
+
+    public String index() {
+        return index;
     }
 
     public String timestamp() {
