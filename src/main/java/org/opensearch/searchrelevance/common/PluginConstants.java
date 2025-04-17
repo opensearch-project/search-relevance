@@ -31,6 +31,9 @@ public class PluginConstants {
     public static final String DOCUMENT_ID = "id";
     public static final String QUERY_TEXT = "query_text";
 
+    /** Use %SearchText% to represent wildcard in queryBody and also refer to the text in the search bar */
+    public static final String WILDCARD_QUERY_TEXT = "%SearchText%";
+
     /**
      * Indices constants
      */

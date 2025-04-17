@@ -18,7 +18,7 @@ exe curl -s -X PUT "http://localhost:9200/_plugins/search_relevance/search_confi
 -H "Content-type: application/json" \
 -d'{
       "name": "baseline",
-      "queryBody": "{\"multi_match\":{\"query\":\"%queryText%\",\"fields\":[\"id\",\"title\",\"category\",\"bullets\",\"description\",\"attrs.Brand\",\"attrs.Color\"]}}",
+      "queryBody": "{\"multi_match\":{\"query\":\"%SearchText%\",\"fields\":[\"id\",\"title\",\"category\",\"bullets\",\"description\",\"attrs.Brand\",\"attrs.Color\"]}}",
       "index": "ecommerce"
 }' 
 
@@ -28,7 +28,7 @@ exe curl -s -X PUT "http://localhost:9200/_plugins/search_relevance/search_confi
 -H "Content-type: application/json" \
 -d'{
       "name": "multi_match",
-      "queryBody": "{\"multi_match\":{\"query\":\"%queryText%\",\"fields\":[\"id\",\"title^25\",\"category\",\"bullets\",\"description\",\"attrs.Brand\",\"attrs.Color\"]}}",
+      "queryBody": "{\"multi_match\":{\"query\":\"%SearchText%\",\"fields\":[\"id\",\"title^25\",\"category\",\"bullets\",\"description\",\"attrs.Brand\",\"attrs.Color\"]}}",
       "index": "ecommerce"
 }'
 

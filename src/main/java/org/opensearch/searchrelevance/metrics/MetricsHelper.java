@@ -14,6 +14,7 @@ import static org.opensearch.searchrelevance.calculator.PairComparison.RBO_90_SI
 import static org.opensearch.searchrelevance.calculator.PairComparison.calculateFrequencyWeightedSimilarity;
 import static org.opensearch.searchrelevance.calculator.PairComparison.calculateJaccardSimilarity;
 import static org.opensearch.searchrelevance.calculator.PairComparison.calculateRBOSimilarity;
+import static org.opensearch.searchrelevance.common.PluginConstants.WILDCARD_QUERY_TEXT;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -39,6 +40,8 @@ import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.shared.StashedThreadContext;
 import org.opensearch.transport.client.Client;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import reactor.util.annotation.NonNull;
 
@@ -138,7 +141,7 @@ public class MetricsHelper {
         try {
             for (int i = 0; i < indexAndQueryBodies.size(); i++) {
                 final List<String> currentIndexAndQueryBody = indexAndQueryBodies.get(i);
-                String queryBody = currentIndexAndQueryBody.get(1).replace("%queryText%", queryText);
+                String queryBody = currentIndexAndQueryBody.get(1).replace(WILDCARD_QUERY_TEXT, queryText);
                 final int queryIndex = i;
 
                 SearchRequest searchRequest = new SearchRequest(currentIndexAndQueryBody.get(0));
