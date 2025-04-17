@@ -12,14 +12,14 @@ echo Deleting queryset, search config and experiment indexes
 
 echo Create search configs
 
-exe() { (set -x ; "$@") | tee RES; echo; }
+exe() { (set -x ; "$@") | jq | tee RES; echo; }
 
 exe curl -s -X PUT "http://localhost:9200/_plugins/search_relevance/search_configurations" \
 -H "Content-type: application/json" \
 -d'{
       "name": "baseline",
-      "queryBody": "{\"match_all\":{}}",
-      "searchPipeline": "n/a"
+      "queryBody": "{\"multi_match\":{\"query\":\"%queryText%\",\"fields\":[\"id\",\"title\",\"category\",\"bullets\",\"description\",\"attrs.Brand\",\"attrs.Color\"]}}",
+      "index": "ecommerce"
 }' 
 
 SC_BASELINE=`jq -r '.search_configuration_id' < RES`
@@ -28,8 +28,8 @@ exe curl -s -X PUT "http://localhost:9200/_plugins/search_relevance/search_confi
 -H "Content-type: application/json" \
 -d'{
       "name": "multi_match",
-      "queryBody": "{\"multi_match\":{\"query\":\"%queryText%\",\"fields\":[\"name\",\"description\"]}}",
-      "searchPipeline": "n/a"
+      "queryBody": "{\"multi_match\":{\"query\":\"%queryText%\",\"fields\":[\"id\",\"title^25\",\"category\",\"bullets\",\"description\",\"attrs.Brand\",\"attrs.Color\"]}}",
+      "index": "ecommerce"
 }'
 
 SC_CHALLENGER=`jq -r '.search_configuration_id' < RES`
@@ -86,7 +86,6 @@ echo Create Experiment
 exe curl -s -X PUT "localhost:9200/_plugins/search_relevance/experiments" \
 -H "Content-type: application/json" \
 -d"{
-        \"index\": \"ecommerce\",
    	\"querySetId\": \"$QS\",
    	\"searchConfigurationList\": [\"$SC_BASELINE\", \"$SC_CHALLENGER\"],
    	\"k\": 10
@@ -101,15 +100,15 @@ echo
 echo Show Experiment
 exe curl -s -X GET "localhost:9200/_plugins/search_relevance/experiments/$EX"
 
-echo
-echo List experiments
-exe curl -s -X GET "http://localhost:9200/_plugins/search_relevance/experiments" \
--H "Content-type: application/json" \
--d'{
-     "sort": {
-       "timestamp": {
-         "order": "desc"
-       }
-     },
-     "size": 10
-   }'
+# echo
+# echo List experiments
+# exe curl -s -X GET "http://localhost:9200/_plugins/search_relevance/experiments" \
+# -H "Content-type: application/json" \
+# -d'{
+#      "sort": {
+#        "timestamp": {
+#          "order": "desc"
+#        }
+#      },
+#      "size": 3
+#    }'
