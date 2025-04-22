@@ -41,8 +41,6 @@ import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.shared.StashedThreadContext;
 import org.opensearch.transport.client.Client;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import reactor.util.annotation.NonNull;
 
 /**
