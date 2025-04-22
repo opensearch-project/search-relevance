@@ -116,3 +116,55 @@ curl localhost:9200
   "tagline" : "The OpenSearch Project: https://opensearch.org/"
 }
 ```
+
+### Run remote clusters with search-relevance
+1. update `docker-compse.yml` with your remote clusters
+2. run command `docker compse up` to spin up the containers
+3. run `docker ps` to make sure all containers are up
+```
+// example
+CONTAINER ID   IMAGE                                          COMMAND                  CREATED       STATUS       PORTS                                                                NAMES
+d988637da9a3   search-relevance-opensearch_search_relevance  "./opensearch-docker…"   2 hours ago   Up 2 hours   0.0.0.0:9200->9200/tcp, 9300/tcp, 0.0.0.0:9600->9600/tcp, 9650/tcp   opensearch_search_relevance
+7c76ddf26b45   search-relevance-opensearch-ccs-node          "./opensearch-docker…"   2 hours ago   Up 2 hours   9300/tcp, 9650/tcp, 0.0.0.0:9260->9200/tcp, 0.0.0.0:9800->9600/tcp   opensearch-ccs-node
+```
+4. get the ip-address for remote container
+```
+docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' 7c76ddf26b45
+
+172.18.0.2
+```
+5. add remote cluster to your coordinate cluster settings
+```
+PUT localhost:9200/_cluster/settings
+{
+  "persistent": {
+    "cluster.remote": {
+      "opensearch-ccs-cluster": {       # remote cluster name
+        "seeds": ["172.18.0.2:9300"]    # remote cluster ip-address
+      }
+    }
+  }
+}
+```
+6. check if the remote cluster is connected
+```
+GET localhost:9200/_remote/info
+
+{
+	"opensearch-ccs-cluster": {
+		"connected": true,              # make sure connected is true
+		"mode": "sniff",
+		"seeds": [
+			"172.18.0.2:9300"
+		],
+		"num_nodes_connected": 1,
+		"max_connections_per_cluster": 3,
+		"initial_connect_timeout": "30s",
+		"skip_unavailable": false
+	}
+}
+```
+7. if you want to run backend with dashboards-search-relevance changes. Go to `OpenSearch-Dashboards/config/opensearch_dashboards.yml`
+```
+#OPENSEARCH_HOSTS: ["http://opensearch_search_relevance:9200"]
+```

@@ -1,0 +1,56 @@
+services:
+
+  opensearch_search_relevance:
+    build: .
+    container_name: opensearch_search_relevance
+    environment:
+      - cluster.name=opensearch_search_relevance
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - DISABLE_INSTALL_DEMO_CONFIG=true
+      - DISABLE_SECURITY_PLUGIN=true      # disable security plugin only for demo
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - 9200:9200
+      - 9600:9600 # required for Performance Analyzer
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    networks:
+      - opensearch-net
+
+# please replace with your remote cluster
+#  opensearch-ccs-node:
+#    build: .
+#    container_name: opensearch-ccs-node
+#    environment:
+#      - cluster.name=opensearch-ccs-cluster
+#      - discovery.type=single-node
+#      - bootstrap.memory_lock=true
+#      - DISABLE_INSTALL_DEMO_CONFIG=true
+#      - DISABLE_SECURITY_PLUGIN=true
+#      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+#
+#    ulimits:
+#      memlock:
+#        soft: -1
+#        hard: -1
+#    volumes:
+#      - opensearch-css-data:/usr/share/opensearch/data
+#    ports:
+#      - 9250:9200
+#      - 9800:9600 # required for Performance Analyzer
+#    networks:
+#      - opensearch-net
+
+volumes:
+  opensearch-data:
+#  opensearch-css-data:
+
+
+networks:
+  opensearch-net:
