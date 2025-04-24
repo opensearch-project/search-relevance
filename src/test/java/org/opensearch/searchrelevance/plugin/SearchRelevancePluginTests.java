@@ -30,8 +30,8 @@ import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.env.Environment;
 import org.opensearch.env.NodeEnvironment;
 import org.opensearch.indices.SystemIndexDescriptor;
+import org.opensearch.ml.client.MachineLearningNodeClient;
 import org.opensearch.plugins.ActionPlugin;
-import org.opensearch.plugins.IngestPlugin;
 import org.opensearch.plugins.SystemIndexPlugin;
 import org.opensearch.repositories.RepositoriesService;
 import org.opensearch.script.ScriptService;
@@ -96,7 +96,8 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
         ExperimentDao.class,
         SearchConfigurationDao.class,
         JudgmentDao.class,
-        MetricsHelper.class
+        MetricsHelper.class,
+        MachineLearningNodeClient.class
     );
 
     @Override
@@ -142,8 +143,8 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
         assertEquals(SUPPORTED_COMPONENTS, registeredComponents);
     }
 
-    public void testIsAnIngestPlugin() {
-        assertTrue(plugin instanceof IngestPlugin);
+    public void testIsAnActionPlugin() {
+        assertTrue(plugin instanceof ActionPlugin);
     }
 
     public void testIsAnSystemIndexPlugin() {

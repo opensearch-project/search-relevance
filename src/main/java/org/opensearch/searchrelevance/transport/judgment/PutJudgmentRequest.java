@@ -16,34 +16,58 @@ import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.core.common.io.stream.StreamOutput;
 
 public class PutJudgmentRequest extends ActionRequest {
-    private String name;
-    private String description;
+    private String type;
+    private String modelId;
+    private String question;
+    private String context;
+    private String reference;
 
-    public PutJudgmentRequest(String name, String description) {
-        this.name = name;
-        this.description = description;
+    public PutJudgmentRequest(String type, String modelId, String question, String context, String reference) {
+        this.type = type;
+        this.modelId = modelId;
+        this.question = question;
+        this.context = context;
+        this.reference = reference;
     }
 
     public PutJudgmentRequest(StreamInput in) throws IOException {
         super(in);
-        this.name = in.readString();
-        this.description = in.readString();
+        this.type = in.readString();
+        this.modelId = in.readString();
+        this.question = in.readString();
+        this.context = in.readString();
+        this.reference = in.readOptionalString();
     }
 
     @Override
     public void writeTo(StreamOutput out) throws IOException {
         super.writeTo(out);
-        out.writeString(name);
-        out.writeString(description);
+        out.writeString(type);
+        out.writeString(modelId);
+        out.writeString(question);
+        out.writeString(context);
+        out.writeOptionalString(reference);
     }
 
-    public String getName() {
-        return name;
+    public String getType() {
+        return type;
+    }
+
+    public String getModelId() {
+        return modelId;
+    }
+
+    public String getQuestion() {
+        return question;
+    }
+
+    public String getContext() {
+        return context;
     }
 
     @Nullable
-    public String getDescription() {
-        return description;
+    public String getReference() {
+        return reference;
     }
 
     @Override
