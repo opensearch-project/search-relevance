@@ -15,18 +15,26 @@ import org.opensearch.common.Nullable;
 import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.core.common.io.stream.StreamOutput;
 
+import reactor.util.annotation.NonNull;
+
 public class PutJudgmentRequest extends ActionRequest {
     private String type;
     private String modelId;
     private String question;
-    private String context;
+    private String content;
     private String reference;
 
-    public PutJudgmentRequest(String type, String modelId, String question, String context, String reference) {
+    public PutJudgmentRequest(
+        @NonNull String type,
+        @NonNull String modelId,
+        @NonNull String question,
+        @NonNull String content,
+        String reference
+    ) {
         this.type = type;
         this.modelId = modelId;
         this.question = question;
-        this.context = context;
+        this.content = content;
         this.reference = reference;
     }
 
@@ -35,7 +43,7 @@ public class PutJudgmentRequest extends ActionRequest {
         this.type = in.readString();
         this.modelId = in.readString();
         this.question = in.readString();
-        this.context = in.readString();
+        this.content = in.readString();
         this.reference = in.readOptionalString();
     }
 
@@ -45,7 +53,7 @@ public class PutJudgmentRequest extends ActionRequest {
         out.writeString(type);
         out.writeString(modelId);
         out.writeString(question);
-        out.writeString(context);
+        out.writeString(content);
         out.writeOptionalString(reference);
     }
 
@@ -61,8 +69,8 @@ public class PutJudgmentRequest extends ActionRequest {
         return question;
     }
 
-    public String getContext() {
-        return context;
+    public String getContent() {
+        return content;
     }
 
     @Nullable

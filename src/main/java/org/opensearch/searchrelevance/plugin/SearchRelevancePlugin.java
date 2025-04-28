@@ -45,6 +45,7 @@ import org.opensearch.searchrelevance.dao.QuerySetDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
 import org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager;
 import org.opensearch.searchrelevance.metrics.MetricsHelper;
+import org.opensearch.searchrelevance.ml.MLAccessor;
 import org.opensearch.searchrelevance.rest.RestCreateQuerySetAction;
 import org.opensearch.searchrelevance.rest.RestDeleteExperimentAction;
 import org.opensearch.searchrelevance.rest.RestDeleteJudgmentAction;
@@ -99,7 +100,7 @@ public class SearchRelevancePlugin extends Plugin implements ActionPlugin, Syste
     private JudgmentDao judgmentDao;
 
     private MetricsHelper metricsHelper;
-    private MachineLearningNodeClient mlClient;
+    private MLAccessor mlAccessor;
 
     @Override
     public Collection<SystemIndexDescriptor> getSystemIndexDescriptors(Settings settings) {
@@ -133,7 +134,8 @@ public class SearchRelevancePlugin extends Plugin implements ActionPlugin, Syste
         this.searchConfigurationDao = new SearchConfigurationDao(searchRelevanceIndicesManager);
         this.judgmentDao = new JudgmentDao(searchRelevanceIndicesManager);
         this.metricsHelper = new MetricsHelper(clusterService, client);
-        this.mlClient = new MachineLearningNodeClient(client);
+        MachineLearningNodeClient mlClient = new MachineLearningNodeClient(client);
+        this.mlAccessor = new MLAccessor(mlClient);
         return List.of(
             searchRelevanceIndicesManager,
             querySetDao,
@@ -141,7 +143,7 @@ public class SearchRelevancePlugin extends Plugin implements ActionPlugin, Syste
             experimentDao,
             judgmentDao,
             metricsHelper,
-            mlClient
+            mlAccessor
         );
     }
 

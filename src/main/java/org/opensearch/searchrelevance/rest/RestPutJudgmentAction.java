@@ -62,7 +62,7 @@ public class RestPutJudgmentAction extends BaseRestHandler {
         String modelId = (String) source.get("modelId");
         String question = (String) source.get("question");
         String content = (String) source.get("content");
-        String reference = (String) source.get("content");
+        String reference = source.containsKey("reference") ? (String) source.get("reference") : null;
 
         PutJudgmentRequest createRequest = new PutJudgmentRequest(type, modelId, question, content, reference);
 
