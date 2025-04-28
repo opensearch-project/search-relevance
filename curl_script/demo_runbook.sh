@@ -88,7 +88,8 @@ exe curl -s -X PUT "localhost:9200/_plugins/search_relevance/experiments" \
 -d"{
    	\"querySetId\": \"$QS\",
    	\"searchConfigurationList\": [\"$SC_BASELINE\", \"$SC_CHALLENGER\"],
-   	\"k\": 10
+   	\"k\": 10,
+   	\"type\": \"PAIRWISE_COMPARISON\"
    }"
 
 EX=`jq -r '.experiment_id' < RES`

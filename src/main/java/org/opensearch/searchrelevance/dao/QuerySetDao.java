@@ -7,8 +7,8 @@
  */
 package org.opensearch.searchrelevance.dao;
 
+import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_QUERY_TEXT_FIELD_NAME;
 import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.QUERY_SET;
-import static org.opensearch.searchrelevance.metrics.MetricsHelper.METRICS_QUERY_TEXT_FIELD_NAME;
 
 import java.io.IOException;
 import java.util.ArrayList;

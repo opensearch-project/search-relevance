@@ -2,6 +2,7 @@ curl -s -X PUT "http://localhost:9200/_plugins/search_relevance/search_configura
 -H "Content-type: application/json" \
 -d'{
       "name": "baseline",
+      "index": "sample_index";
       "queryBody": "{\"match_all\":{}}",
       "searchPipeline": "n/a"
 }' | jq

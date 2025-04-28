@@ -133,9 +133,9 @@ public class SearchRelevancePlugin extends Plugin implements ActionPlugin, Syste
         this.querySetDao = new QuerySetDao(searchRelevanceIndicesManager);
         this.searchConfigurationDao = new SearchConfigurationDao(searchRelevanceIndicesManager);
         this.judgmentDao = new JudgmentDao(searchRelevanceIndicesManager);
-        this.metricsHelper = new MetricsHelper(clusterService, client);
         MachineLearningNodeClient mlClient = new MachineLearningNodeClient(client);
         this.mlAccessor = new MLAccessor(mlClient);
+        this.metricsHelper = new MetricsHelper(clusterService, client, mlAccessor);
         return List.of(
             searchRelevanceIndicesManager,
             querySetDao,

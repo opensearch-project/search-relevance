@@ -7,20 +7,25 @@
  */
 package org.opensearch.searchrelevance.metrics;
 
-import static org.opensearch.searchrelevance.calculator.PairComparison.FREQUENCY_WEIGHTED_SIMILARITY_FIELD_NAME;
-import static org.opensearch.searchrelevance.calculator.PairComparison.JACCARD_SIMILARITY_FIELD_NAME;
-import static org.opensearch.searchrelevance.calculator.PairComparison.RBO_50_SIMILARITY_FIELD_NAME;
-import static org.opensearch.searchrelevance.calculator.PairComparison.RBO_90_SIMILARITY_FIELD_NAME;
-import static org.opensearch.searchrelevance.calculator.PairComparison.calculateFrequencyWeightedSimilarity;
-import static org.opensearch.searchrelevance.calculator.PairComparison.calculateJaccardSimilarity;
-import static org.opensearch.searchrelevance.calculator.PairComparison.calculateRBOSimilarity;
+import static org.opensearch.searchrelevance.common.MetricsConstants.JUDGMENT_IDS;
+import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_EVALUATION_FIELD_NAME;
+import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_FIELD_NAME;
+import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_JUDGMENTS_FIELD_NAME;
+import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_PAIRWISE_COMPARISON_FIELD_NAME;
+import static org.opensearch.searchrelevance.common.MetricsConstants.MODEL_ID;
 import static org.opensearch.searchrelevance.common.PluginConstants.WILDCARD_QUERY_TEXT;
+import static org.opensearch.searchrelevance.metrics.EvaluationMetrics.calculateEvaluationMetrics;
+import static org.opensearch.searchrelevance.model.ExperimentType.LLM_EVALUATION;
+import static org.opensearch.searchrelevance.model.ExperimentType.PAIRWISE_COMPARISON;
+import static org.opensearch.searchrelevance.model.ExperimentType.UBI_EVALUATION;
 
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
@@ -38,6 +43,8 @@ import org.opensearch.index.query.QueryBuilders;
 import org.opensearch.search.SearchHit;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
+import org.opensearch.searchrelevance.ml.MLAccessor;
+import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.shared.StashedThreadContext;
 import org.opensearch.transport.client.Client;
 
@@ -51,18 +58,13 @@ public class MetricsHelper {
 
     private final ClusterService clusterService;
     private final Client client;
-
-    public static final String METRICS_FIELD_NAME = "metrics";
-    public static final String METRICS_QUERY_TEXT_FIELD_NAME = "queryTexts";
-    public static final String METRICS_INDEX_AND_QUERY_BODY_FIELD_NAME = "indexAndQueryBodies";
-    public static final String METRICS_PAIRWISE_COMPARISON_FIELD_NAME = "pairwiseComparison";
-    public static final String PAIRWISE_FIELD_NAME_A = "0";
-    public static final String PAIRWISE_FIELD_NAME_B = "1";
+    private MLAccessor mlAccessor;
 
     @Inject
-    public MetricsHelper(@NonNull ClusterService clusterService, @NonNull Client client) {
+    public MetricsHelper(@NonNull ClusterService clusterService, @NonNull Client client, @NonNull MLAccessor mlAccessor) {
         this.clusterService = clusterService;
         this.client = client;
+        this.mlAccessor = mlAccessor;
     }
 
     /**
@@ -73,6 +75,8 @@ public class MetricsHelper {
         List<String> queryTexts,
         List<List<String>> indexAndQueryBodies,
         int k,
+        ExperimentType type,
+        Map<String, Object> metadata,
         StepListener<Map<String, Object>> stepListener
     ) {
         Map<String, Object> metrics = new HashMap<>();
@@ -80,7 +84,7 @@ public class MetricsHelper {
         LOGGER.debug("Processing to getMetricsAsync for {} queryTexts", pendingTexts);
         try {
             for (String queryText : queryTexts) {
-                getMetricsForQueryText(queryText, indexAndQueryBodies, k, new ActionListener<Map<String, Object>>() {
+                getMetricsForQueryText(queryText, type, metadata, indexAndQueryBodies, k, new ActionListener<Map<String, Object>>() {
                     @Override
                     public void onResponse(Map<String, Object> queryMetrics) {
                         synchronized (metrics) {
@@ -119,14 +123,23 @@ public class MetricsHelper {
      * @param k - number of documents to be returned
      * @return queryTextMetrics
      *   {
-     *     "ranked": {        // key - query index, value - top k doc ids
-     *       "0": ["docId01", "docId02", ... ],
-     *       "1": ["docId02", "docId01", ...],
+     *     "${queryText}": {
+     *       "0": ["docId01", "docId02", ... ],  // for searchConfig at index 0
+     *       "1": ["docId02", "docId01", ...],   // for searchConfig at index 1
+     *       ...
+     *       "pairwiseComparison"/"evaluation": {
+     *         "precision": 0.9                  // aggregated metrics
+     *       },
+     *       "judgements": {
+     *         "docId01": "${judgment_score}"    // doc level metrics
+     *       }
      *     }
      *   }
      */
     public Map<String, Object> getMetricsForQueryText(
         final String queryText,
+        final ExperimentType type,
+        final Map<String, Object> metadata,
         final List<List<String>> indexAndQueryBodies,
         final int k,
         ActionListener<Map<String, Object>> listener
@@ -134,7 +147,7 @@ public class MetricsHelper {
         Map<String, Object> results = new HashMap<>();
         AtomicInteger pendingQueries = new AtomicInteger(indexAndQueryBodies.size());
         Map<String, Object> indexToDocIdMap = new ConcurrentHashMap<>();
-        boolean isPairwiseComparison = indexAndQueryBodies.size() == 2;
+        Set<SearchHit> unionHits = new HashSet<>();
 
         try {
             for (int i = 0; i < indexAndQueryBodies.size(); i++) {
@@ -164,13 +177,14 @@ public class MetricsHelper {
                                             .map(SearchHit::getId)
                                             .collect(Collectors.toList());
                                         indexToDocIdMap.put(String.valueOf(queryIndex), docIds);
+                                        unionHits.addAll(List.of(response.getHits().getHits()));
                                     }
                                 } catch (Exception e) {
                                     LOGGER.error("Error processing response for query index: " + queryIndex, e);
                                     indexToDocIdMap.put(String.valueOf(queryIndex), Collections.singletonList("Error: " + e.getMessage()));
                                 } finally {
                                     if (pendingQueries.decrementAndGet() == 0) {
-                                        processResults(indexToDocIdMap, isPairwiseComparison, results, listener);
+                                        processQueryTextMetrics(indexToDocIdMap, type, metadata, results, queryText, unionHits, listener);
                                     }
                                 }
                             }
@@ -180,7 +194,7 @@ public class MetricsHelper {
                                 LOGGER.error("Search failed for query index: " + queryIndex, e);
                                 indexToDocIdMap.put(String.valueOf(queryIndex), Collections.singletonList("Error: " + e.getMessage()));
                                 if (pendingQueries.decrementAndGet() == 0) {
-                                    processResults(indexToDocIdMap, isPairwiseComparison, results, listener);
+                                    processQueryTextMetrics(indexToDocIdMap, type, metadata, results, queryText, unionHits, listener);
                                 }
                             }
                         });
@@ -188,7 +202,7 @@ public class MetricsHelper {
                         LOGGER.error("Failed to execute search for query index: " + queryIndex, e);
                         indexToDocIdMap.put(String.valueOf(queryIndex), Collections.singletonList("Error: " + e.getMessage()));
                         if (pendingQueries.decrementAndGet() == 0) {
-                            processResults(indexToDocIdMap, isPairwiseComparison, results, listener);
+                            processQueryTextMetrics(indexToDocIdMap, type, metadata, results, queryText, unionHits, listener);
                         }
                     }
                 });
@@ -201,57 +215,70 @@ public class MetricsHelper {
         return results;
     }
 
-    private void processResults(
+    /**
+     * process query text level metrics
+     */
+    private void processQueryTextMetrics(
         Map<String, Object> indexToDocIdMap,
-        boolean isPairwiseComparison,
+        ExperimentType type,
+        Map<String, Object> metadata,
         Map<String, Object> results,
+        String queryText,
+        Set<SearchHit> unionHits,
         ActionListener<Map<String, Object>> listener
     ) {
+        // add indexToDocIdMap under queryText key
         results.putAll(indexToDocIdMap);
 
-        if (isPairwiseComparison) {
-            try {
-                Map<String, Double> pairwiseMetrics = getPairwiseMetrics(indexToDocIdMap);
-                results.put(METRICS_PAIRWISE_COMPARISON_FIELD_NAME, pairwiseMetrics);
-            } catch (Exception e) {
-                LOGGER.error("Error calculating pairwise metrics", e);
-                results.put("pairwiseComparison", Collections.singletonMap("error", e.getMessage()));
+        // add metrics based on experiment type
+        try {
+            switch (type) {
+                case PAIRWISE_COMPARISON -> {
+                    Map<String, Double> pairwiseMetrics = PairwiseComparisonMetrics.calculatePairwiseMetrics(indexToDocIdMap);
+                    results.put(METRICS_PAIRWISE_COMPARISON_FIELD_NAME, pairwiseMetrics);
+                    break;
+                }
+                case LLM_EVALUATION -> {
+                    // Add LLM-specific metrics processing
+                    String modelId = (String) metadata.get(MODEL_ID);
+                    LOGGER.debug("calculating LLM evaluation with modelId: {}", modelId);
+                    Map<String, Double> docIdToScore = getLlmJudgments(queryText, modelId, unionHits);
+                    results.put(METRICS_JUDGMENTS_FIELD_NAME, docIdToScore);
+                    results.put(METRICS_EVALUATION_FIELD_NAME, calculateEvaluationMetrics(indexToDocIdMap, docIdToScore));
+                    break;
+                }
+                case UBI_EVALUATION -> {
+                    // Add UBI-specific metrics processing
+                    List<String> judgmentIds = (List<String>) metadata.get(JUDGMENT_IDS);
+                    LOGGER.debug("calculating UBI evaluation with judgmentIds: {}", judgmentIds);
+                    Map<String, Double> docIdToScore = getUbiJudgments(judgmentIds);
+                    results.put(METRICS_JUDGMENTS_FIELD_NAME, docIdToScore);
+                    results.put(METRICS_EVALUATION_FIELD_NAME, calculateEvaluationMetrics(indexToDocIdMap, docIdToScore));
+                    break;
+                }
             }
-        }
 
-        listener.onResponse(results);
+            listener.onResponse(results);
+        } catch (Exception ex) {
+            listener.onFailure(ex);
+        }
     }
 
-    /**
-     * get the pairwise calculator metrics from queryTextMetrics
-     * @param queryTextMetrics - queryTextMetrics that has the key "0" and "1" for comparison
-     */
-    private Map<String, Double> getPairwiseMetrics(Map<String, Object> queryTextMetrics) {
-        Map<String, Double> metrics = new HashMap<>();
-        List<String> docIdListA = (List<String>) queryTextMetrics.get(PAIRWISE_FIELD_NAME_A);
-        List<String> docIdListB = (List<String>) queryTextMetrics.get(PAIRWISE_FIELD_NAME_B);
-        try {
-            double jaccardSimilarity = calculateJaccardSimilarity(docIdListA, docIdListB);
-            metrics.put(JACCARD_SIMILARITY_FIELD_NAME, jaccardSimilarity);
-        } catch (Exception ex) {
-            throw new SearchRelevanceException("failed to calculate jaccard", ex, RestStatus.INTERNAL_SERVER_ERROR);
-        }
+    private Map<String, Double> getLlmJudgments(String queryText, String modelId, Set<SearchHit> searchHits) {
+        // please add LLM judgment business logics here.
+        Map<String, Double> example_judgments = new HashMap<>();
+        example_judgments.put("docId01", 0.9);
+        example_judgments.put("docId02", 0.85);
+        example_judgments.put("docId03", 0.8);
+        return example_judgments;
+    }
 
-        try {
-            double rboSimilarity50 = calculateRBOSimilarity(docIdListA, docIdListB, 0.5);
-            double rboSimilarity90 = calculateRBOSimilarity(docIdListA, docIdListB, 0.9);
-            metrics.put(RBO_50_SIMILARITY_FIELD_NAME, rboSimilarity50);
-            metrics.put(RBO_90_SIMILARITY_FIELD_NAME, rboSimilarity90);
-        } catch (Exception ex) {
-            throw new SearchRelevanceException("failed to calculate rbo", ex, RestStatus.INTERNAL_SERVER_ERROR);
-        }
-
-        try {
-            double frequencyWeightedSimilarity = calculateFrequencyWeightedSimilarity(docIdListA, docIdListB);
-            metrics.put(FREQUENCY_WEIGHTED_SIMILARITY_FIELD_NAME, frequencyWeightedSimilarity);
-        } catch (Exception ex) {
-            throw new SearchRelevanceException("failed to calculate frequencyWeighted", ex, RestStatus.INTERNAL_SERVER_ERROR);
-        }
-        return metrics;
+    private Map<String, Double> getUbiJudgments(List<String> judgmentIdList) {
+        // please add UBI judgment business logics here.
+        Map<String, Double> example_judgments = new HashMap<>();
+        example_judgments.put("docId01", 0.9);
+        example_judgments.put("docId02", 0.85);
+        example_judgments.put("docId03", 0.8);
+        return example_judgments;
     }
 }

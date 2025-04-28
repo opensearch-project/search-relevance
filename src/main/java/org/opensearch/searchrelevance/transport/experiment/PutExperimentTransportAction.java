@@ -7,8 +7,13 @@
  */
 package org.opensearch.searchrelevance.transport.experiment;
 
-import static org.opensearch.searchrelevance.metrics.MetricsHelper.METRICS_INDEX_AND_QUERY_BODY_FIELD_NAME;
-import static org.opensearch.searchrelevance.metrics.MetricsHelper.METRICS_QUERY_TEXT_FIELD_NAME;
+import static org.opensearch.searchrelevance.common.MetricsConstants.JUDGMENT_IDS;
+import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_INDEX_AND_QUERY_BODY_FIELD_NAME;
+import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_QUERY_TEXT_FIELD_NAME;
+import static org.opensearch.searchrelevance.common.MetricsConstants.MODEL_ID;
+import static org.opensearch.searchrelevance.model.ExperimentType.LLM_EVALUATION;
+import static org.opensearch.searchrelevance.model.ExperimentType.PAIRWISE_COMPARISON;
+import static org.opensearch.searchrelevance.model.ExperimentType.UBI_EVALUATION;
 
 import java.util.HashMap;
 import java.util.List;
@@ -29,6 +34,7 @@ import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.metrics.MetricsHelper;
 import org.opensearch.searchrelevance.model.Experiment;
+import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
@@ -72,6 +78,8 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
         List<String> searchConfigurationList = request.getSearchConfigurationList();
         int k = request.getK();
 
+        ExperimentType type = request.getType();
+
         Map<String, Object> results = new HashMap<>();
         // step1: Create Index
         StepListener<Void> createIndexStep = new StepListener<>();
@@ -95,7 +103,49 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
         getSearchConfigsStep.whenComplete(v -> {
             List<List<String>> indexAndQueryBodies = (List<List<String>>) results.get(METRICS_INDEX_AND_QUERY_BODY_FIELD_NAME);
             List<String> queryTexts = (List<String>) results.get(METRICS_QUERY_TEXT_FIELD_NAME);
-            metricsHelper.getMetricsAsync(results, queryTexts, indexAndQueryBodies, k, searchAndMetricsCalcStep);
+            Map<String, Object> metadata = new HashMap<>();
+            switch (type) {
+                case PAIRWISE_COMPARISON:
+                    metricsHelper.getMetricsAsync(
+                        results,
+                        queryTexts,
+                        indexAndQueryBodies,
+                        k,
+                        PAIRWISE_COMPARISON,
+                        metadata,
+                        searchAndMetricsCalcStep
+                    );
+                    break;
+                case LLM_EVALUATION:
+                    PutLlmExperimentRequest llmRequest = (PutLlmExperimentRequest) request;
+                    String modelId = llmRequest.getModelId();
+                    metadata.put(MODEL_ID, modelId);
+                    metricsHelper.getMetricsAsync(
+                        results,
+                        queryTexts,
+                        indexAndQueryBodies,
+                        k,
+                        LLM_EVALUATION,
+                        metadata,
+                        searchAndMetricsCalcStep
+                    );
+                    break;
+                case UBI_EVALUATION:
+                    PutUbiExperimentRequest ubiRequest = (PutUbiExperimentRequest) request;
+                    List<String> judgmentIds = ubiRequest.getJudgmentIds();
+                    metadata.put(JUDGMENT_IDS, judgmentIds);
+                    metricsHelper.getMetricsAsync(
+                        results,
+                        queryTexts,
+                        indexAndQueryBodies,
+                        k,
+                        UBI_EVALUATION,
+                        metadata,
+                        searchAndMetricsCalcStep
+                    );
+                    break;
+            }
+
         }, listener::onFailure);
 
         // Step5: Put Experiment

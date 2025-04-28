@@ -12,13 +12,20 @@ import java.util.List;
 
 import org.opensearch.common.io.stream.BytesStreamOutput;
 import org.opensearch.core.common.io.stream.StreamInput;
+import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.transport.experiment.PutExperimentRequest;
 import org.opensearch.test.OpenSearchTestCase;
 
 public class PutExperimentActionTests extends OpenSearchTestCase {
 
     public void testStreams() throws IOException {
-        PutExperimentRequest request = new PutExperimentRequest("sample_index", "1234", List.of("5678", "0000"), 10);
+        PutExperimentRequest request = new PutExperimentRequest(
+            "sample_index",
+            ExperimentType.PAIRWISE_COMPARISON,
+            "1234",
+            List.of("5678", "0000"),
+            10
+        );
         BytesStreamOutput output = new BytesStreamOutput();
         request.writeTo(output);
         StreamInput in = StreamInput.wrap(output.bytes().toBytesRef().bytes);
@@ -30,7 +37,13 @@ public class PutExperimentActionTests extends OpenSearchTestCase {
     }
 
     public void testRequestValidation() {
-        PutExperimentRequest request = new PutExperimentRequest("sample_index", "1234", List.of("5678", "0000"), 10);
+        PutExperimentRequest request = new PutExperimentRequest(
+            "sample_index",
+            ExperimentType.PAIRWISE_COMPARISON,
+            "1234",
+            List.of("5678", "0000"),
+            10
+        );
         assertNull(request.validate());
     }
 

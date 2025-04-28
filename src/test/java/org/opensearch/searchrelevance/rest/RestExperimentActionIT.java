@@ -56,12 +56,26 @@ public class RestExperimentActionIT extends SearchRelevanceRestTestCase {
         String searchConfigurationId = (String) searchConfigPutResponseMap.get("search_configuration_id");
         assertNotNull("Search configuration ID should not be null", searchConfigurationId);
 
-        // 1. put an experiment
-        List<String> searchConfigurationList = List.of(searchConfigurationId);
-        String requestBody = createRequestBody(querySetId, searchConfigurationList);
+        // repeat to build pairwise search configuration
+        String searchConfigName2 = "test_name2";
+        String searchConfigRequestBody2 = createSearchConfigurationRequestBody(searchConfigName2, index, queryBody);
+        Response putSearchConfigResponse2 = makeRequest("PUT", SEARCH_CONFIGURATIONS_ENDPOINT, searchConfigRequestBody2);
+        assertEquals(RestStatus.OK.getStatus(), putSearchConfigResponse2.getStatusLine().getStatusCode());
+        Map<String, Object> searchConfigPutResponseMap2 = entityAsMap(putSearchConfigResponse2);
+        String searchConfigurationId2 = (String) searchConfigPutResponseMap2.get("search_configuration_id");
 
-        Response putResponse = makeRequest("PUT", EXPERIMENTS_ENDPOINT, requestBody);
+        // 1. put an experiment
+        List<String> searchConfigurationList = List.of(searchConfigurationId, searchConfigurationId2);
+        String pairwiseRequestBody = createPairwiseRequestBody(querySetId, searchConfigurationList);
+        String llmRequestBody = createLlmRequestBody(querySetId, searchConfigurationList, "test_modelId");
+        String ubiRequestBody = createUbiRequestBody(querySetId, searchConfigurationList, List.of("test_judgmentId01"));
+
+        Response putResponse = makeRequest("PUT", EXPERIMENTS_ENDPOINT, pairwiseRequestBody);
         assertEquals(RestStatus.OK.getStatus(), putResponse.getStatusLine().getStatusCode());
+        Response llmResponse = makeRequest("PUT", EXPERIMENTS_ENDPOINT, llmRequestBody);
+        assertEquals(RestStatus.OK.getStatus(), llmResponse.getStatusLine().getStatusCode());
+        Response ubiResponse = makeRequest("PUT", EXPERIMENTS_ENDPOINT, ubiRequestBody);
+        assertEquals(RestStatus.OK.getStatus(), ubiResponse.getStatusLine().getStatusCode());
 
         // parse the response to get the experiment_id
         Map<String, Object> putResponseMap = entityAsMap(putResponse);
@@ -98,11 +112,34 @@ public class RestExperimentActionIT extends SearchRelevanceRestTestCase {
         }
     }
 
-    private String createRequestBody(String querySetId, List<String> searchConfigurationList) throws JsonProcessingException {
+    private String createPairwiseRequestBody(String querySetId, List<String> searchConfigurationList) throws JsonProcessingException {
         Map<String, Object> requestMap = new HashMap<>();
         requestMap.put("querySetId", querySetId);
         requestMap.put("searchConfigurationList", searchConfigurationList);
         requestMap.put("k", 10);
+        requestMap.put("type", "PAIRWISE_COMPARISON");
+        return OBJECT_MAPPER.writeValueAsString(requestMap);
+    }
+
+    private String createLlmRequestBody(String querySetId, List<String> searchConfigurationList, String modelId)
+        throws JsonProcessingException {
+        Map<String, Object> requestMap = new HashMap<>();
+        requestMap.put("querySetId", querySetId);
+        requestMap.put("searchConfigurationList", searchConfigurationList);
+        requestMap.put("k", 10);
+        requestMap.put("type", "LLM_EVALUATION");
+        requestMap.put("modelId", modelId);
+        return OBJECT_MAPPER.writeValueAsString(requestMap);
+    }
+
+    private String createUbiRequestBody(String querySetId, List<String> searchConfigurationList, List<String> judgmentIds)
+        throws JsonProcessingException {
+        Map<String, Object> requestMap = new HashMap<>();
+        requestMap.put("querySetId", querySetId);
+        requestMap.put("searchConfigurationList", searchConfigurationList);
+        requestMap.put("k", 10);
+        requestMap.put("type", "UBI_EVALUATION");
+        requestMap.put("judgmentIds", judgmentIds);
         return OBJECT_MAPPER.writeValueAsString(requestMap);
     }
 }
