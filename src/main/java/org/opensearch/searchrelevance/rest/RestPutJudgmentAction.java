@@ -25,7 +25,6 @@ import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.rest.BaseRestHandler;
 import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestRequest;
-import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.transport.judgment.PutJudgmentAction;
 import org.opensearch.searchrelevance.transport.judgment.PutJudgmentRequest;
 import org.opensearch.transport.client.node.NodeClient;
@@ -52,19 +51,10 @@ public class RestPutJudgmentAction extends BaseRestHandler {
         XContentParser parser = request.contentParser();
         Map<String, Object> source = parser.map();
 
-        String type = (String) source.get("type");
-        if (!"llm".equals(type)) {
-            throw new SearchRelevanceException(
-                "please onboard judgment type with search relevance workbench. type: " + type,
-                RestStatus.BAD_REQUEST
-            );
-        }
-        String modelId = (String) source.get("modelId");
-        String question = (String) source.get("question");
-        String content = (String) source.get("content");
-        String reference = source.containsKey("reference") ? (String) source.get("reference") : null;
+        String name = (String) source.get("name");
+        String description = (String) source.get("description");
 
-        PutJudgmentRequest createRequest = new PutJudgmentRequest(type, modelId, question, content, reference);
+        PutJudgmentRequest createRequest = new PutJudgmentRequest(name, description);
 
         return channel -> client.execute(PutJudgmentAction.INSTANCE, createRequest, new ActionListener<IndexResponse>() {
             @Override

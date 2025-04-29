@@ -15,15 +15,12 @@ import org.opensearch.core.xcontent.XContentBuilder;
 public class Judgment implements ToXContentObject {
     public static final String ID = "id";
     public static final String TIME_STAMP = "timestamp";
-    public static final String RESPONSE = "response";
     private String id;
     private String timestamp;
-    private String response;
 
-    public Judgment(String id, String timestamp, String response) {
+    public Judgment(String id, String timestamp) {
         this.id = id;
         this.timestamp = timestamp;
-        this.response = response;
     }
 
     @Override
@@ -31,7 +28,6 @@ public class Judgment implements ToXContentObject {
         XContentBuilder xContentBuilder = builder.startObject();
         xContentBuilder.field(ID, this.id.trim());
         xContentBuilder.field(TIME_STAMP, this.timestamp.trim());
-        xContentBuilder.field(RESPONSE, this.response.trim());
         return xContentBuilder.endObject();
     }
 
@@ -41,10 +37,6 @@ public class Judgment implements ToXContentObject {
 
     public String timestamp() {
         return timestamp;
-    }
-
-    public String response() {
-        return response;
     }
 
 }

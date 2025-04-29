@@ -15,67 +15,35 @@ import org.opensearch.common.Nullable;
 import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.core.common.io.stream.StreamOutput;
 
-import reactor.util.annotation.NonNull;
-
 public class PutJudgmentRequest extends ActionRequest {
-    private String type;
-    private String modelId;
-    private String question;
-    private String content;
-    private String reference;
+    private String name;
+    private String description;
 
-    public PutJudgmentRequest(
-        @NonNull String type,
-        @NonNull String modelId,
-        @NonNull String question,
-        @NonNull String content,
-        String reference
-    ) {
-        this.type = type;
-        this.modelId = modelId;
-        this.question = question;
-        this.content = content;
-        this.reference = reference;
+    public PutJudgmentRequest(String name, String description) {
+        this.name = name;
+        this.description = description;
     }
 
     public PutJudgmentRequest(StreamInput in) throws IOException {
         super(in);
-        this.type = in.readString();
-        this.modelId = in.readString();
-        this.question = in.readString();
-        this.content = in.readString();
-        this.reference = in.readOptionalString();
+        this.name = in.readString();
+        this.description = in.readString();
     }
 
     @Override
     public void writeTo(StreamOutput out) throws IOException {
         super.writeTo(out);
-        out.writeString(type);
-        out.writeString(modelId);
-        out.writeString(question);
-        out.writeString(content);
-        out.writeOptionalString(reference);
+        out.writeString(name);
+        out.writeString(description);
     }
 
-    public String getType() {
-        return type;
-    }
-
-    public String getModelId() {
-        return modelId;
-    }
-
-    public String getQuestion() {
-        return question;
-    }
-
-    public String getContent() {
-        return content;
+    public String getName() {
+        return name;
     }
 
     @Nullable
-    public String getReference() {
-        return reference;
+    public String getDescription() {
+        return description;
     }
 
     @Override

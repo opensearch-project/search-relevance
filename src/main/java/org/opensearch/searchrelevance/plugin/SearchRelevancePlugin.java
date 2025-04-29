@@ -98,9 +98,7 @@ public class SearchRelevancePlugin extends Plugin implements ActionPlugin, Syste
     private SearchConfigurationDao searchConfigurationDao;
     private ExperimentDao experimentDao;
     private JudgmentDao judgmentDao;
-
     private MetricsHelper metricsHelper;
-    private MLAccessor mlAccessor;
 
     @Override
     public Collection<SystemIndexDescriptor> getSystemIndexDescriptors(Settings settings) {
@@ -134,17 +132,9 @@ public class SearchRelevancePlugin extends Plugin implements ActionPlugin, Syste
         this.searchConfigurationDao = new SearchConfigurationDao(searchRelevanceIndicesManager);
         this.judgmentDao = new JudgmentDao(searchRelevanceIndicesManager);
         MachineLearningNodeClient mlClient = new MachineLearningNodeClient(client);
-        this.mlAccessor = new MLAccessor(mlClient);
+        MLAccessor mlAccessor = new MLAccessor(mlClient);
         this.metricsHelper = new MetricsHelper(clusterService, client, mlAccessor);
-        return List.of(
-            searchRelevanceIndicesManager,
-            querySetDao,
-            searchConfigurationDao,
-            experimentDao,
-            judgmentDao,
-            metricsHelper,
-            mlAccessor
-        );
+        return List.of(searchRelevanceIndicesManager, querySetDao, searchConfigurationDao, experimentDao, judgmentDao, metricsHelper);
     }
 
     @Override

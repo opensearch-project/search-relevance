@@ -7,17 +7,13 @@
  */
 package org.opensearch.searchrelevance.metrics;
 
-import static org.opensearch.searchrelevance.common.MetricsConstants.JUDGMENT_IDS;
 import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_EVALUATION_FIELD_NAME;
 import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_FIELD_NAME;
 import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_JUDGMENTS_FIELD_NAME;
 import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_PAIRWISE_COMPARISON_FIELD_NAME;
-import static org.opensearch.searchrelevance.common.MetricsConstants.MODEL_ID;
 import static org.opensearch.searchrelevance.common.PluginConstants.WILDCARD_QUERY_TEXT;
 import static org.opensearch.searchrelevance.metrics.EvaluationMetrics.calculateEvaluationMetrics;
-import static org.opensearch.searchrelevance.model.ExperimentType.LLM_EVALUATION;
 import static org.opensearch.searchrelevance.model.ExperimentType.PAIRWISE_COMPARISON;
-import static org.opensearch.searchrelevance.model.ExperimentType.UBI_EVALUATION;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -43,6 +39,8 @@ import org.opensearch.index.query.QueryBuilders;
 import org.opensearch.search.SearchHit;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
+import org.opensearch.searchrelevance.metrics.judgments.JudgmentsProcessor;
+import org.opensearch.searchrelevance.metrics.judgments.JudgmentsProcessorFactory;
 import org.opensearch.searchrelevance.ml.MLAccessor;
 import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.shared.StashedThreadContext;
@@ -58,13 +56,15 @@ public class MetricsHelper {
 
     private final ClusterService clusterService;
     private final Client client;
-    private MLAccessor mlAccessor;
+    private final MLAccessor mlAccessor;
+    private final JudgmentsProcessorFactory judgmentsProcessorFactory;
 
     @Inject
     public MetricsHelper(@NonNull ClusterService clusterService, @NonNull Client client, @NonNull MLAccessor mlAccessor) {
         this.clusterService = clusterService;
         this.client = client;
         this.mlAccessor = mlAccessor;
+        this.judgmentsProcessorFactory = new JudgmentsProcessorFactory(mlAccessor);
     }
 
     /**
@@ -147,7 +147,7 @@ public class MetricsHelper {
         Map<String, Object> results = new HashMap<>();
         AtomicInteger pendingQueries = new AtomicInteger(indexAndQueryBodies.size());
         Map<String, Object> indexToDocIdMap = new ConcurrentHashMap<>();
-        Set<SearchHit> unionHits = new HashSet<>();
+        Set<Map<String, String>> unionHits = new HashSet<>();
 
         try {
             for (int i = 0; i < indexAndQueryBodies.size(); i++) {
@@ -173,11 +173,18 @@ public class MetricsHelper {
                                         LOGGER.warn("No hits found for query index: {}", queryIndex);
                                         indexToDocIdMap.put(String.valueOf(queryIndex), Collections.emptyList());
                                     } else {
-                                        List<String> docIds = Arrays.stream(response.getHits().getHits())
-                                            .map(SearchHit::getId)
-                                            .collect(Collectors.toList());
+                                        SearchHit[] hits = response.getHits().getHits();
+
+                                        List<String> docIds = Arrays.stream(hits).map(SearchHit::getId).collect(Collectors.toList());
                                         indexToDocIdMap.put(String.valueOf(queryIndex), docIds);
-                                        unionHits.addAll(List.of(response.getHits().getHits()));
+
+                                        Arrays.stream(hits).forEach(hit -> {
+                                            Map<String, String> hitMap = new HashMap<>();
+                                            hitMap.put("_id", hit.getId());
+                                            hitMap.put("_index", hit.getIndex());
+                                            hitMap.put("_source", hit.getSourceAsString());
+                                            unionHits.add(hitMap);
+                                        });
                                     }
                                 } catch (Exception e) {
                                     LOGGER.error("Error processing response for query index: " + queryIndex, e);
@@ -224,61 +231,27 @@ public class MetricsHelper {
         Map<String, Object> metadata,
         Map<String, Object> results,
         String queryText,
-        Set<SearchHit> unionHits,
+        Set<Map<String, String>> unionHits,
         ActionListener<Map<String, Object>> listener
     ) {
         // add indexToDocIdMap under queryText key
         results.putAll(indexToDocIdMap);
+        results.put("unionHits", unionHits);
 
         // add metrics based on experiment type
         try {
-            switch (type) {
-                case PAIRWISE_COMPARISON -> {
-                    Map<String, Double> pairwiseMetrics = PairwiseComparisonMetrics.calculatePairwiseMetrics(indexToDocIdMap);
-                    results.put(METRICS_PAIRWISE_COMPARISON_FIELD_NAME, pairwiseMetrics);
-                    break;
-                }
-                case LLM_EVALUATION -> {
-                    // Add LLM-specific metrics processing
-                    String modelId = (String) metadata.get(MODEL_ID);
-                    LOGGER.debug("calculating LLM evaluation with modelId: {}", modelId);
-                    Map<String, Double> docIdToScore = getLlmJudgments(queryText, modelId, unionHits);
-                    results.put(METRICS_JUDGMENTS_FIELD_NAME, docIdToScore);
-                    results.put(METRICS_EVALUATION_FIELD_NAME, calculateEvaluationMetrics(indexToDocIdMap, docIdToScore));
-                    break;
-                }
-                case UBI_EVALUATION -> {
-                    // Add UBI-specific metrics processing
-                    List<String> judgmentIds = (List<String>) metadata.get(JUDGMENT_IDS);
-                    LOGGER.debug("calculating UBI evaluation with judgmentIds: {}", judgmentIds);
-                    Map<String, Double> docIdToScore = getUbiJudgments(judgmentIds);
-                    results.put(METRICS_JUDGMENTS_FIELD_NAME, docIdToScore);
-                    results.put(METRICS_EVALUATION_FIELD_NAME, calculateEvaluationMetrics(indexToDocIdMap, docIdToScore));
-                    break;
-                }
+            if (type == PAIRWISE_COMPARISON) {
+                Map<String, Double> pairwiseMetrics = PairwiseComparisonMetrics.calculatePairwiseMetrics(indexToDocIdMap);
+                results.put(METRICS_PAIRWISE_COMPARISON_FIELD_NAME, pairwiseMetrics);
+            } else {
+                JudgmentsProcessor judgmentsProcessor = judgmentsProcessorFactory.getProcessor(type);
+                Map<String, Double> docIdToScore = judgmentsProcessor.processJudgments(metadata, unionHits, queryText, listener);
+                results.put(METRICS_JUDGMENTS_FIELD_NAME, docIdToScore);
+                results.put(METRICS_EVALUATION_FIELD_NAME, calculateEvaluationMetrics(indexToDocIdMap, docIdToScore));
             }
-
             listener.onResponse(results);
         } catch (Exception ex) {
             listener.onFailure(ex);
         }
-    }
-
-    private Map<String, Double> getLlmJudgments(String queryText, String modelId, Set<SearchHit> searchHits) {
-        // please add LLM judgment business logics here.
-        Map<String, Double> example_judgments = new HashMap<>();
-        example_judgments.put("docId01", 0.9);
-        example_judgments.put("docId02", 0.85);
-        example_judgments.put("docId03", 0.8);
-        return example_judgments;
-    }
-
-    private Map<String, Double> getUbiJudgments(List<String> judgmentIdList) {
-        // please add UBI judgment business logics here.
-        Map<String, Double> example_judgments = new HashMap<>();
-        example_judgments.put("docId01", 0.9);
-        example_judgments.put("docId02", 0.85);
-        example_judgments.put("docId03", 0.8);
-        return example_judgments;
     }
 }

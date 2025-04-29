@@ -7,13 +7,15 @@
  */
 package org.opensearch.searchrelevance.ml;
 
-import static org.opensearch.searchrelevance.common.MLConstants.INPUT_FORMAT_WITHOUT_REFERENCE;
-import static org.opensearch.searchrelevance.common.MLConstants.INPUT_FORMAT_WITH_REFERENCE;
+import static org.opensearch.searchrelevance.common.MLConstants.INPUT_FORMAT_SEARCH;
+import static org.opensearch.searchrelevance.common.MLConstants.INPUT_FORMAT_SEARCH_WITH_REFERENCE;
 import static org.opensearch.searchrelevance.common.MLConstants.PARAM_MESSAGES_FIELD;
 import static org.opensearch.searchrelevance.common.MLConstants.PROMPT_JSON_MESSAGES_SHELL;
-import static org.opensearch.searchrelevance.common.MLConstants.PROMPT_WITHOUT_REFERENCE;
-import static org.opensearch.searchrelevance.common.MLConstants.PROMPT_WITH_REFERENCE;
-import static org.opensearch.searchrelevance.common.MLConstants.RESPONSE_FIELD;
+import static org.opensearch.searchrelevance.common.MLConstants.PROMPT_SEARCH_RELEVANCE;
+import static org.opensearch.searchrelevance.common.MLConstants.RESPONSE_CHOICES_FIELD;
+import static org.opensearch.searchrelevance.common.MLConstants.RESPONSE_CONTENT_FIELD;
+import static org.opensearch.searchrelevance.common.MLConstants.RESPONSE_MESSAGE_FIELD;
+import static org.opensearch.searchrelevance.common.MLConstants.escapeJson;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -49,8 +51,14 @@ public class MLAccessor {
         this.mlClient = mlClient;
     }
 
-    public void predict(String modelId, String question, String context, String reference, ActionListener<String> listener) {
-        MLInput mlInput = getMLInput(question, context, reference);
+    public void predict(
+        String modelId,
+        String searchText,
+        String reference,
+        List<Map<String, String>> hits,
+        ActionListener<String> listener
+    ) {
+        MLInput mlInput = getMLInput(searchText, reference, hits);
         mlClient.predict(
             modelId,
             mlInput,
@@ -58,25 +66,41 @@ public class MLAccessor {
         );
     }
 
-    private MLInput getMLInput(String question, String context, String reference) {
+    private MLInput getMLInput(String searchText, String reference, List<Map<String, String>> hits) {
         Map<String, String> parameters = new HashMap<>();
+        try {
+            // Use XContentBuilder to create JSON string. JSON serialization/deserialization through Jackson needs to use reflection to
+            // access class members, which is restricted by the security policy
+            String hitsJson;
+            try (XContentBuilder builder = XContentFactory.jsonBuilder()) {
+                builder.startArray();
+                for (Map<String, String> hit : hits) {
+                    builder.startObject();
+                    for (Map.Entry<String, String> entry : hit.entrySet()) {
+                        builder.field(entry.getKey(), entry.getValue());
+                    }
+                    builder.endObject();
+                }
+                builder.endArray();
+                hitsJson = builder.toString();
+            }
+            String userContent;
+            if (Objects.isNull(reference) || reference.isEmpty()) {
+                userContent = String.format(Locale.ROOT, INPUT_FORMAT_SEARCH, searchText, hitsJson);
+            } else {
+                userContent = String.format(Locale.ROOT, INPUT_FORMAT_SEARCH_WITH_REFERENCE, searchText, hitsJson, reference);
+            }
+            String messages = String.format(Locale.ROOT, PROMPT_JSON_MESSAGES_SHELL, PROMPT_SEARCH_RELEVANCE, escapeJson(userContent));
 
-        String messagesJson;
-        if (Objects.isNull(reference) || reference.isEmpty()) {
-            String inputs = String.format(Locale.ROOT, INPUT_FORMAT_WITHOUT_REFERENCE, question, context);
-            LOGGER.debug("building mlInput without reference. inputs: {}", inputs);
-            messagesJson = String.format(Locale.ROOT, PROMPT_JSON_MESSAGES_SHELL, PROMPT_WITHOUT_REFERENCE, inputs);
-        } else {
-            String inputs = String.format(Locale.ROOT, INPUT_FORMAT_WITH_REFERENCE, question, context, reference);
-            LOGGER.debug("building mlInput with reference. inputs: {}", inputs);
-            messagesJson = String.format(Locale.ROOT, PROMPT_JSON_MESSAGES_SHELL, PROMPT_WITH_REFERENCE, inputs);
+            parameters.put(PARAM_MESSAGES_FIELD, messages);
+            return MLInput.builder().algorithm(FunctionName.REMOTE).inputDataset(new RemoteInferenceInputDataSet(parameters)).build();
+        } catch (IOException e) {
+            LOGGER.error("Error converting hits to JSON string", e);
+            throw new IllegalArgumentException("Failed to process hits", e);
         }
-
-        parameters.put(PARAM_MESSAGES_FIELD, messagesJson);
-        return MLInput.builder().algorithm(FunctionName.REMOTE).inputDataset(new RemoteInferenceInputDataSet(parameters)).build();
     }
 
-    private String extractResponseContent(MLOutput mlOutput) throws IOException {
+    private String extractResponseContent(MLOutput mlOutput) {
         if (!(mlOutput instanceof ModelTensorOutput)) {
             throw new IllegalArgumentException("Expected ModelTensorOutput, but got " + mlOutput.getClass().getSimpleName());
         }
@@ -93,10 +117,9 @@ public class MLAccessor {
         ModelTensor tensor = tensorOutputList.get(0).getMlModelTensors().get(0);
         Map<String, ?> dataMap = tensor.getDataAsMap();
 
-        XContentBuilder builder = XContentFactory.jsonBuilder();
-        builder.startObject();
-        builder.field(RESPONSE_FIELD, dataMap);
-        builder.endObject();
-        return builder.toString();
+        Map<String, ?> choices = (Map<String, ?>) ((List<?>) dataMap.get(RESPONSE_CHOICES_FIELD)).get(0);
+        Map<String, ?> message = (Map<String, ?>) choices.get(RESPONSE_MESSAGE_FIELD);
+        String content = (String) message.get(RESPONSE_CONTENT_FIELD);
+        return content;
     }
 }

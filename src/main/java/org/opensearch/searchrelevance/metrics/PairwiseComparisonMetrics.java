@@ -28,12 +28,15 @@ public class PairwiseComparisonMetrics {
 
     /**
      * calculate pairwise metrics with pairwise comparison calculators
-     * @param queryTextMetrics - queryTextMetrics that has the key "0" and "1" for comparison
+     * @param indexToDocIdMap - indexToDocIdMap that has the key "0" and "1" for comparison
      * e.g:
+     * // indexToDocIdMap
      * {
      *     "0": ["3"],
      *     "1": ["1","2","3"],
-     *     "pairwiseComparison": {
+     * }
+     * // pairwiseMetrics
+     * {
      *         "jaccard":0.33,
      *         "rbo90":0.1,
      *         "frequencyWeighted":0.67,
@@ -41,16 +44,16 @@ public class PairwiseComparisonMetrics {
      *     }
      * }
      */
-    public static Map<String, Double> calculatePairwiseMetrics(Map<String, Object> queryTextMetrics) {
-        Map<String, Double> metrics = new HashMap<>();
-        List<String> docIdListA = (List<String>) queryTextMetrics.get(PAIRWISE_FIELD_NAME_A);
-        List<String> docIdListB = (List<String>) queryTextMetrics.get(PAIRWISE_FIELD_NAME_B);
+    public static Map<String, Double> calculatePairwiseMetrics(Map<String, Object> indexToDocIdMap) {
+        Map<String, Double> pairwiseMetrics = new HashMap<>();
+        List<String> docIdListA = (List<String>) indexToDocIdMap.get(PAIRWISE_FIELD_NAME_A);
+        List<String> docIdListB = (List<String>) indexToDocIdMap.get(PAIRWISE_FIELD_NAME_B);
 
-        metrics.put(JACCARD_SIMILARITY_FIELD_NAME, calculateJaccardSimilarity(docIdListA, docIdListB));
-        metrics.put(RBO_50_SIMILARITY_FIELD_NAME, calculateRBOSimilarity(docIdListA, docIdListB, 0.5));
-        metrics.put(RBO_90_SIMILARITY_FIELD_NAME, calculateRBOSimilarity(docIdListA, docIdListB, 0.9));
-        metrics.put(FREQUENCY_WEIGHTED_SIMILARITY_FIELD_NAME, calculateFrequencyWeightedSimilarity(docIdListA, docIdListB));
+        pairwiseMetrics.put(JACCARD_SIMILARITY_FIELD_NAME, calculateJaccardSimilarity(docIdListA, docIdListB));
+        pairwiseMetrics.put(RBO_50_SIMILARITY_FIELD_NAME, calculateRBOSimilarity(docIdListA, docIdListB, 0.5));
+        pairwiseMetrics.put(RBO_90_SIMILARITY_FIELD_NAME, calculateRBOSimilarity(docIdListA, docIdListB, 0.9));
+        pairwiseMetrics.put(FREQUENCY_WEIGHTED_SIMILARITY_FIELD_NAME, calculateFrequencyWeightedSimilarity(docIdListA, docIdListB));
 
-        return metrics;
+        return pairwiseMetrics;
     }
 }
