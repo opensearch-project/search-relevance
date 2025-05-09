@@ -64,6 +64,23 @@ public class ExperimentDao {
         }
     }
 
+    public void updateExperiment(final Experiment experiment, final ActionListener listener) {
+        if (experiment == null) {
+            listener.onFailure(new SearchRelevanceException("Experiment cannot be null", RestStatus.BAD_REQUEST));
+            return;
+        }
+        try {
+            searchRelevanceIndicesManager.updateDoc(
+                experiment.id(),
+                experiment.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS),
+                EXPERIMENT,
+                listener
+            );
+        } catch (IOException e) {
+            throw new SearchRelevanceException("Failed to store experiment", e, RestStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
     /**
      * Delete experiment by experimentId
      * @param experimentId - id to be deleted

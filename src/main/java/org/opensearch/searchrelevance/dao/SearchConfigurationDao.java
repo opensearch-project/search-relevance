@@ -13,6 +13,7 @@ import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.SEAR
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -123,9 +124,9 @@ public class SearchConfigurationDao {
     public void getSearchConfigsWithStepListener(
         List<String> searchConfigurationList,
         Map<String, Object> results,
-        StepListener<Map<String, Object>> stepListener
+        ActionListener<Map<String, Object>> stepListener
     ) {
-        List<List<String>> indexAndQueryBodies = new ArrayList<>();
+        Map<String, List<String>> indexAndQueryBodies = new HashMap<>();
 
         GroupedActionListener<SearchResponse> groupedListener = new GroupedActionListener<>(ActionListener.wrap(responses -> {
             results.put(METRICS_INDEX_AND_QUERY_BODY_FIELD_NAME, indexAndQueryBodies);
@@ -141,7 +142,7 @@ public class SearchConfigurationDao {
                         SearchConfiguration searchConfig = convertToSearchConfiguration(response);
                         LOGGER.debug("Converted response into SearchConfiguration: [{}]", searchConfig);
 
-                        indexAndQueryBodies.add(Arrays.asList(searchConfig.index(), searchConfig.queryBody()));
+                        indexAndQueryBodies.put(searchConfigurationId, Arrays.asList(searchConfig.index(), searchConfig.queryBody()));
                         groupedListener.onResponse(response);
                     } catch (Exception e) {
                         LOGGER.error(
