@@ -10,7 +10,9 @@ package org.opensearch.searchrelevance.transport.experiment;
 import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_INDEX_AND_QUERY_BODY_FIELD_NAME;
 import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_QUERY_TEXT_FIELD_NAME;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,13 +31,18 @@ import org.opensearch.common.inject.Inject;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.searchrelevance.dao.ExperimentDao;
+import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
+import org.opensearch.searchrelevance.judgments.BaseJudgmentsProcessor;
+import org.opensearch.searchrelevance.judgments.JudgmentsProcessorFactory;
 import org.opensearch.searchrelevance.metrics.MetricsHelper;
 import org.opensearch.searchrelevance.model.Experiment;
 import org.opensearch.searchrelevance.model.ExperimentStatus;
 import org.opensearch.searchrelevance.model.ExperimentType;
+import org.opensearch.searchrelevance.model.Judgment;
+import org.opensearch.searchrelevance.model.JudgmentType;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
@@ -46,7 +53,10 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
     private final ExperimentDao experimentDao;
     private final QuerySetDao querySetDao;
     private final SearchConfigurationDao searchConfigurationDao;
+    private final JudgmentDao judgmentDao;
+
     private final MetricsHelper metricsHelper;
+    private final JudgmentsProcessorFactory judgmentsProcessorFactory;
 
     private static final Logger LOGGER = LogManager.getLogger(PutExperimentTransportAction.class);
 
@@ -58,14 +68,18 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
         ExperimentDao experimentDao,
         QuerySetDao querySetDao,
         SearchConfigurationDao searchConfigurationDao,
-        MetricsHelper metricsHelper
+        JudgmentDao judgmentDao,
+        MetricsHelper metricsHelper,
+        JudgmentsProcessorFactory judgmentsProcessorFactory
     ) {
         super(PutExperimentAction.NAME, transportService, actionFilters, PutExperimentRequest::new);
         this.clusterService = clusterService;
         this.experimentDao = experimentDao;
         this.querySetDao = querySetDao;
         this.searchConfigurationDao = searchConfigurationDao;
+        this.judgmentDao = judgmentDao;
         this.metricsHelper = metricsHelper;
+        this.judgmentsProcessorFactory = judgmentsProcessorFactory;
     }
 
     @Override
@@ -150,6 +164,74 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
         AtomicInteger pendingQueries = new AtomicInteger(queryTexts.size());
         AtomicBoolean hasFailure = new AtomicBoolean(false);
 
+        if (request.getType() == ExperimentType.LLM_EVALUATION && request.getModelId() != null) {
+            Map<String, Object> metadata = new HashMap<>();
+            metadata.put("modelId", request.getModelId());
+            metadata.put("querySetId", request.getQuerySetId());
+            metadata.put("searchConfigurationList", request.getSearchConfigurationList());
+            metadata.put("size", request.getSize());
+
+            // Step 1: Generate Judgment Scores
+            StepListener<Map<String, Map<String, String>>> processJudgmentScoresStep = new StepListener<>();
+            BaseJudgmentsProcessor llmJudgmentsProcessor = judgmentsProcessorFactory.getProcessor(JudgmentType.LLM_JUDGMENT);
+            llmJudgmentsProcessor.generateJudgmentScore(metadata, processJudgmentScoresStep);
+
+            // Step 2: Store Judgment
+            StepListener<String> storeJudgmentStep = new StepListener<>();
+            processJudgmentScoresStep.whenComplete(llmJudgments -> {
+                LOGGER.debug("Generated LLM judgments for experiment: {}, judgments: {}", experimentId, llmJudgments);
+                createAndStoreLlmJudgment(metadata, llmJudgments, storeJudgmentStep);
+            }, error -> {
+                LOGGER.error("Error generating LLM judgments for experiment: {}", experimentId, error);
+                handleFailure(error, hasFailure, experimentId, request);
+            });
+
+            // Step 3: Execute Experiment Evaluation
+            storeJudgmentStep.whenComplete(llmJudgmentId -> {
+                LOGGER.debug("Stored LLM judgment with ID: {} for experiment: {}", llmJudgmentId, experimentId);
+                List<String> updatedJudgmentList = new ArrayList<>(request.getJudgmentList());
+                updatedJudgmentList.add(llmJudgmentId);
+                LOGGER.debug("Updated judgment list for experiment: {}: {}", experimentId, updatedJudgmentList);
+
+                executeExperimentEvaluation(
+                    experimentId,
+                    request,
+                    indexAndQueryBodies,
+                    queryTexts,
+                    finalResults,
+                    pendingQueries,
+                    hasFailure,
+                    updatedJudgmentList
+                );
+            }, error -> {
+                LOGGER.error("Error storing LLM judgment for experiment: {}", experimentId, error);
+                handleFailure(error, hasFailure, experimentId, request);
+            });
+        } else {
+            // If no LLM judgment needed, proceed directly with experiment evaluation
+            executeExperimentEvaluation(
+                experimentId,
+                request,
+                indexAndQueryBodies,
+                queryTexts,
+                finalResults,
+                pendingQueries,
+                hasFailure,
+                request.getJudgmentList()
+            );
+        }
+    }
+
+    private void executeExperimentEvaluation(
+        String experimentId,
+        PutExperimentRequest request,
+        Map<String, List<String>> indexAndQueryBodies,
+        List<String> queryTexts,
+        Map<String, Object> finalResults,
+        AtomicInteger pendingQueries,
+        AtomicBoolean hasFailure,
+        List<String> judgmentList
+    ) {
         for (String queryText : queryTexts) {
             if (request.getType() == ExperimentType.PAIRWISE_COMPARISON) {
                 metricsHelper.processPairwiseMetrics(
@@ -174,7 +256,7 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
                     queryText,
                     indexAndQueryBodies,
                     request.getSize(),
-                    request.getJudgmentList(),
+                    judgmentList,
                     ActionListener.wrap(queryResults -> {
                         Map<String, Object> convertedResults = new HashMap<>(queryResults);
                         handleQueryResults(queryText, convertedResults, finalResults, pendingQueries, experimentId, request, hasFailure);
@@ -257,5 +339,30 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
                 e -> LOGGER.error("Failed to update error status for experiment: " + experimentId, e)
             )
         );
+    }
+
+    private void createAndStoreLlmJudgment(
+        Map<String, Object> metadata,
+        Map<String, Map<String, String>> llmJudgments,
+        ActionListener<String> listener
+    ) {
+        String judgmentId = UUID.randomUUID().toString();
+
+        Judgment llmJudgment = new Judgment(
+            judgmentId,
+            TimeUtils.getTimestamp(),
+            "LLM Generated Judgment" + new Date(),
+            JudgmentType.LLM_JUDGMENT,
+            metadata,
+            llmJudgments
+        );
+
+        judgmentDao.putJudgement(llmJudgment, ActionListener.wrap(response -> {
+            LOGGER.debug("Stored LLM judgment: {}", judgmentId);
+            listener.onResponse(judgmentId);
+        }, error -> {
+            LOGGER.error("Failed to store LLM judgment", error);
+            listener.onFailure(error);
+        }));
     }
 }

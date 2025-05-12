@@ -29,6 +29,19 @@ public class EvaluationMetrics {
      */
     public static Map<String, String> calculateEvaluationMetrics(List<String> docIds, Map<String, String> judgments) {
         Map<String, String> currSearchConfigMetrics = new HashMap<>();
+
+        List<String> docsWithScores = docIds.stream().filter(judgments::containsKey).toList();
+
+        // calculate coverage statistics
+        int totalCount = docIds.size();
+        int totalDocsWithScores = docsWithScores.size();
+
+        double coverage = totalCount > 0 ? Math.round((double) totalDocsWithScores / totalCount * 100.0) / 100.0 : 0.0;
+
+        // TODO: it's not guarantee that each docId will have its score, especially for UBI data.
+        // Need to define a reliable rate. say, coverage > 80%, then the results become reliable
+        currSearchConfigMetrics.put("coverage", String.valueOf(coverage));
+
         currSearchConfigMetrics.put(METRICS_PRECISION_AT_5, String.valueOf(calculatePrecisionAtK(docIds, judgments, 5)));
         currSearchConfigMetrics.put(METRICS_PRECISION_AT_10, String.valueOf(calculatePrecisionAtK(docIds, judgments, 10)));
         currSearchConfigMetrics.put(METRICS_MEAN_AVERAGE_PRECISION, String.valueOf(calculateMAP(docIds, judgments)));

@@ -24,6 +24,7 @@ public class PutExperimentActionTests extends OpenSearchTestCase {
             "1234",
             List.of("5678", "0000"),
             List.of("5678", "0000"),
+            "modelId_123",
             10
         );
         BytesStreamOutput output = new BytesStreamOutput();
@@ -41,6 +42,7 @@ public class PutExperimentActionTests extends OpenSearchTestCase {
             "1234",
             List.of("5678", "0000"),
             List.of("5678", "0000"),
+            "modelId_123",
             10
         );
         assertNull(request.validate());

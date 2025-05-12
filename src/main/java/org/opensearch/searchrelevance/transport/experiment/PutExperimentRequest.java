@@ -23,6 +23,13 @@ public class PutExperimentRequest extends ActionRequest {
     private final String querySetId;
     private final List<String> searchConfigurationList;
     private final List<String> judgmentList;
+    /**
+     * Optional field for llm as a judgment use case
+     * * will generate llm judgmentID with modelId provided
+     * * will add llm judgmentID to judgmentList
+     * * customers don't have to generate judgments ahead of llm experiment
+     */
+    private final String modelId;
     private int size;
 
     public PutExperimentRequest(
@@ -30,12 +37,14 @@ public class PutExperimentRequest extends ActionRequest {
         @NonNull String querySetId,
         @NonNull List<String> searchConfigurationList,
         @NonNull List<String> judgmentList,
+        @NonNull String modelId,
         int size
     ) {
         this.type = type;
         this.querySetId = querySetId;
         this.searchConfigurationList = searchConfigurationList;
         this.judgmentList = judgmentList;
+        this.modelId = modelId;
         this.size = size;
     }
 
@@ -46,6 +55,7 @@ public class PutExperimentRequest extends ActionRequest {
         this.querySetId = in.readString();
         this.searchConfigurationList = in.readStringList();
         this.judgmentList = in.readStringList();
+        this.modelId = in.readOptionalString();
         this.size = in.readInt();
     }
 
@@ -56,6 +66,7 @@ public class PutExperimentRequest extends ActionRequest {
         out.writeString(querySetId);
         out.writeStringArray(searchConfigurationList.toArray(new String[0]));
         out.writeStringArray(judgmentList.toArray(new String[0]));
+        out.writeOptionalString(modelId);
         out.writeInt(size);
     }
 
@@ -77,6 +88,10 @@ public class PutExperimentRequest extends ActionRequest {
 
     public List<String> getJudgmentList() {
         return judgmentList;
+    }
+
+    public String getModelId() {
+        return modelId;
     }
 
     @Override

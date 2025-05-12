@@ -57,6 +57,8 @@ public class RestPutExperimentAction extends BaseRestHandler {
         List<String> searchConfigurationList = ParserUtils.convertObjToList(source, "searchConfigurationList");
         int size = (Integer) source.get("size");
         List<String> judgmentList = ParserUtils.convertObjToList(source, "judgmentList");
+        // modelId is for runtime llm judgment generation
+        String modelId = (String) source.get("modelId");
 
         String typeString = (String) source.get("type");
         ExperimentType type;
@@ -66,8 +68,14 @@ public class RestPutExperimentAction extends BaseRestHandler {
             throw new IllegalArgumentException("Invalid or missing experiment type", e);
         }
 
-        PutExperimentRequest createRequest = new PutExperimentRequest(type, querySetId, searchConfigurationList, judgmentList, size);
-        ;
+        PutExperimentRequest createRequest = new PutExperimentRequest(
+            type,
+            querySetId,
+            searchConfigurationList,
+            judgmentList,
+            modelId,
+            size
+        );
 
         return channel -> client.execute(PutExperimentAction.INSTANCE, createRequest, new ActionListener<IndexResponse>() {
             @Override
