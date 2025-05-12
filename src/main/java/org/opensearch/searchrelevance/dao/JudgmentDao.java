@@ -66,6 +66,23 @@ public class JudgmentDao {
         }
     }
 
+    public void updateJudgment(final Judgment judgment, final ActionListener listener) {
+        if (judgment == null) {
+            listener.onFailure(new SearchRelevanceException("Judgment cannot be null", RestStatus.BAD_REQUEST));
+            return;
+        }
+        try {
+            searchRelevanceIndicesManager.updateDoc(
+                judgment.id(),
+                judgment.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS),
+                JUDGMENT,
+                listener
+            );
+        } catch (IOException e) {
+            throw new SearchRelevanceException("Failed to store judgment", e, RestStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
     /**
      * Delete judgment by judgmentID
      * @param judgmentId - id to be deleted

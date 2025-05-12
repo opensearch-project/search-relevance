@@ -54,4 +54,12 @@ public class MLConstants {
         }
         return str.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t");
     }
+
+    public static String sanitizeLLMResponse(String response) {
+        if (response == null) return "";
+
+        // Remove special characters that might cause parsing issues
+        return response.replace("`", "").replace("\n", " ").trim();
+    }
+
 }
