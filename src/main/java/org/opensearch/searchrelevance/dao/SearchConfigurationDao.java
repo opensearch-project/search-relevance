@@ -11,7 +11,6 @@ import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_IND
 import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.SEARCH_CONFIGURATION;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -142,7 +141,10 @@ public class SearchConfigurationDao {
                         SearchConfiguration searchConfig = convertToSearchConfiguration(response);
                         LOGGER.debug("Converted response into SearchConfiguration: [{}]", searchConfig);
 
-                        indexAndQueryBodies.put(searchConfigurationId, Arrays.asList(searchConfig.index(), searchConfig.queryBody()));
+                        indexAndQueryBodies.put(
+                            searchConfigurationId,
+                            Arrays.asList(searchConfig.index(), searchConfig.queryBody(), searchConfig.searchPipeline())
+                        );
                         groupedListener.onResponse(response);
                     } catch (Exception e) {
                         LOGGER.error(

@@ -259,17 +259,22 @@ public class MetricsHelper {
             final String evaluationId = UUID.randomUUID().toString();
             String index = indexAndQueryBodies.get(searchConfigurationId).get(0);
             String queryPattern = indexAndQueryBodies.get(searchConfigurationId).get(1);
+            String searchPipeline = indexAndQueryBodies.get(searchConfigurationId).get(2);
             LOGGER.debug(
-                "Configuration {}: index: {}, query pattern: {}, evaluationId: {}",
+                "Configuration {}: index: {}, query pattern: {}, searchPipeline: {}, evaluationId: {}",
                 searchConfigurationId,
                 index,
                 queryPattern,
+                searchPipeline,
                 evaluationId
             );
 
             String queryBody = queryPattern.replace(WILDCARD_QUERY_TEXT, queryText);
             SearchRequest searchRequest = new SearchRequest(index);
             SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
+            if (searchPipeline != null && !searchPipeline.isEmpty()) {
+                searchRequest.pipeline(searchPipeline);
+            }
 
             sourceBuilder.query(QueryBuilders.wrapperQuery(queryBody));
             sourceBuilder.size(size);

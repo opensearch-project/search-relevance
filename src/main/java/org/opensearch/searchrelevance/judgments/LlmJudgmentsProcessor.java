@@ -274,12 +274,16 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                 String configId = entry.getKey();
                 String index = entry.getValue().get(0);
                 String queryBody = entry.getValue().get(1).replace(WILDCARD_QUERY_TEXT, queryText);
+                String searchPipeline = entry.getValue().get(2);
 
                 SearchRequest searchRequest = new SearchRequest(index);
                 SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
                 sourceBuilder.query(QueryBuilders.wrapperQuery(queryBody));
                 sourceBuilder.size(size);
                 searchRequest.source(sourceBuilder);
+                if (searchPipeline != null && !searchPipeline.isEmpty()) {
+                    searchRequest.pipeline(searchPipeline);
+                }
 
                 StashedThreadContext.run(client, () -> {
                     try {
