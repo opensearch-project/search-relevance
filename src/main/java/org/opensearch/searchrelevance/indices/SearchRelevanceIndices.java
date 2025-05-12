@@ -7,6 +7,8 @@
  */
 package org.opensearch.searchrelevance.indices;
 
+import static org.opensearch.searchrelevance.common.PluginConstants.EVALUATION_RESULT_INDEX;
+import static org.opensearch.searchrelevance.common.PluginConstants.EVALUATION_RESULT_INDEX_MAPPING;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX_MAPPING;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_INDEX;
@@ -42,7 +44,12 @@ public enum SearchRelevanceIndices {
     /**
      * Judgment Index
      */
-    JUDGMENT(JUDGMENT_INDEX, JUDGMENT_INDEX_MAPPING);
+    JUDGMENT(JUDGMENT_INDEX, JUDGMENT_INDEX_MAPPING),
+
+    /**
+     * Evaluation Result Index
+     */
+    EVALUATION_RESULT(EVALUATION_RESULT_INDEX, EVALUATION_RESULT_INDEX_MAPPING);
 
     private final String indexName;
     private final String mapping;

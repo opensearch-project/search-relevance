@@ -16,6 +16,7 @@ import org.apache.logging.log4j.Logger;
 import org.opensearch.ResourceAlreadyExistsException;
 import org.opensearch.ResourceNotFoundException;
 import org.opensearch.action.DocWriteRequest;
+import org.opensearch.action.DocWriteRequest.OpType;
 import org.opensearch.action.StepListener;
 import org.opensearch.action.admin.indices.create.CreateIndexRequest;
 import org.opensearch.action.admin.indices.create.CreateIndexResponse;
@@ -103,6 +104,33 @@ public class SearchRelevanceIndicesManager {
                 client.prepareIndex(index.getIndexName())
                     .setId(docId)
                     .setOpType(DocWriteRequest.OpType.CREATE)
+                    .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
+                    .setSource(xContentBuilder)
+                    .execute(listener);
+            } catch (Exception e) {
+                throw new SearchRelevanceException("Failed to store doc", e, RestStatus.INTERNAL_SERVER_ERROR);
+            }
+        });
+    }
+
+    /**
+     * Update a doc to the system index
+     * @param docId - document id need to be executed
+     * @param xContentBuilder - content need to be executed
+     * @param index - system index
+     * @param listener - action lister for async operation
+     */
+    public void updateDoc(
+        final String docId,
+        final XContentBuilder xContentBuilder,
+        final SearchRelevanceIndices index,
+        final ActionListener listener
+    ) {
+        StashedThreadContext.run(client, () -> {
+            try {
+                client.prepareIndex(index.getIndexName())
+                    .setId(docId)
+                    .setOpType(OpType.INDEX)
                     .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
                     .setSource(xContentBuilder)
                     .execute(listener);

@@ -7,6 +7,7 @@
  */
 package org.opensearch.searchrelevance.plugin;
 
+import static org.opensearch.searchrelevance.common.PluginConstants.EVALUATION_RESULT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.QUERY_SET_INDEX;
@@ -39,6 +40,7 @@ import org.opensearch.repositories.RepositoriesService;
 import org.opensearch.rest.RestController;
 import org.opensearch.rest.RestHandler;
 import org.opensearch.script.ScriptService;
+import org.opensearch.searchrelevance.dao.EvaluationResultDao;
 import org.opensearch.searchrelevance.dao.ExperimentDao;
 import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
@@ -98,6 +100,8 @@ public class SearchRelevancePlugin extends Plugin implements ActionPlugin, Syste
     private SearchConfigurationDao searchConfigurationDao;
     private ExperimentDao experimentDao;
     private JudgmentDao judgmentDao;
+    private EvaluationResultDao evaluationResultDao;
+    private MLAccessor mlAccessor;
     private MetricsHelper metricsHelper;
 
     @Override
@@ -106,7 +110,8 @@ public class SearchRelevancePlugin extends Plugin implements ActionPlugin, Syste
             new SystemIndexDescriptor(QUERY_SET_INDEX, "System index used for query set data"),
             new SystemIndexDescriptor(SEARCH_CONFIGURATION_INDEX, "System index used for search configuration data"),
             new SystemIndexDescriptor(EXPERIMENT_INDEX, "System index used for experiment data"),
-            new SystemIndexDescriptor(JUDGMENT_INDEX, "System index used for judgment data")
+            new SystemIndexDescriptor(JUDGMENT_INDEX, "System index used for judgment data"),
+            new SystemIndexDescriptor(EVALUATION_RESULT_INDEX, "System index used for evaluation result data")
         );
     }
 
@@ -131,10 +136,20 @@ public class SearchRelevancePlugin extends Plugin implements ActionPlugin, Syste
         this.querySetDao = new QuerySetDao(searchRelevanceIndicesManager);
         this.searchConfigurationDao = new SearchConfigurationDao(searchRelevanceIndicesManager);
         this.judgmentDao = new JudgmentDao(searchRelevanceIndicesManager);
+        this.evaluationResultDao = new EvaluationResultDao(searchRelevanceIndicesManager);
         MachineLearningNodeClient mlClient = new MachineLearningNodeClient(client);
-        MLAccessor mlAccessor = new MLAccessor(mlClient);
-        this.metricsHelper = new MetricsHelper(clusterService, client, mlAccessor);
-        return List.of(searchRelevanceIndicesManager, querySetDao, searchConfigurationDao, experimentDao, judgmentDao, metricsHelper);
+        this.mlAccessor = new MLAccessor(mlClient);
+        this.metricsHelper = new MetricsHelper(clusterService, client, judgmentDao, evaluationResultDao);
+        return List.of(
+            searchRelevanceIndicesManager,
+            querySetDao,
+            searchConfigurationDao,
+            experimentDao,
+            judgmentDao,
+            evaluationResultDao,
+            mlAccessor,
+            metricsHelper
+        );
     }
 
     @Override

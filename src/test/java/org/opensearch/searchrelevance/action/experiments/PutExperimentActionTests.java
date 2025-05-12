@@ -20,9 +20,9 @@ public class PutExperimentActionTests extends OpenSearchTestCase {
 
     public void testStreams() throws IOException {
         PutExperimentRequest request = new PutExperimentRequest(
-            "sample_index",
             ExperimentType.PAIRWISE_COMPARISON,
             "1234",
+            List.of("5678", "0000"),
             List.of("5678", "0000"),
             10
         );
@@ -30,17 +30,16 @@ public class PutExperimentActionTests extends OpenSearchTestCase {
         request.writeTo(output);
         StreamInput in = StreamInput.wrap(output.bytes().toBytesRef().bytes);
         PutExperimentRequest serialized = new PutExperimentRequest(in);
-        assertEquals("sample_index", serialized.getIndex());
         assertEquals("1234", serialized.getQuerySetId());
         assertEquals(2, serialized.getSearchConfigurationList().size());
-        assertEquals(10, serialized.getK());
+        assertEquals(10, serialized.getSize());
     }
 
     public void testRequestValidation() {
         PutExperimentRequest request = new PutExperimentRequest(
-            "sample_index",
             ExperimentType.PAIRWISE_COMPARISON,
             "1234",
+            List.of("5678", "0000"),
             List.of("5678", "0000"),
             10
         );

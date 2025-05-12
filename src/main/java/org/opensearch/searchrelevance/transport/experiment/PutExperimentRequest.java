@@ -19,48 +19,44 @@ import org.opensearch.searchrelevance.model.ExperimentType;
 import reactor.util.annotation.NonNull;
 
 public class PutExperimentRequest extends ActionRequest {
-    private final String index;
     private final ExperimentType type;
     private final String querySetId;
     private final List<String> searchConfigurationList;
-    private int k;
+    private final List<String> judgmentList;
+    private int size;
 
     public PutExperimentRequest(
-        @NonNull String index,
         @NonNull ExperimentType type,
         @NonNull String querySetId,
         @NonNull List<String> searchConfigurationList,
-        int k
+        @NonNull List<String> judgmentList,
+        int size
     ) {
-        this.index = index;
         this.type = type;
         this.querySetId = querySetId;
         this.searchConfigurationList = searchConfigurationList;
-        this.k = k;
+        this.judgmentList = judgmentList;
+        this.size = size;
     }
 
     public PutExperimentRequest(StreamInput in) throws IOException {
         super(in);
-        this.index = in.readString();
         this.type = in.readEnum(ExperimentType.class);
         ;
         this.querySetId = in.readString();
         this.searchConfigurationList = in.readStringList();
-        this.k = in.readInt();
+        this.judgmentList = in.readStringList();
+        this.size = in.readInt();
     }
 
     @Override
     public void writeTo(StreamOutput out) throws IOException {
         super.writeTo(out);
-        out.writeString(index);
         out.writeEnum(type);
         out.writeString(querySetId);
         out.writeStringArray(searchConfigurationList.toArray(new String[0]));
-        out.writeInt(k);
-    }
-
-    public String getIndex() {
-        return index;
+        out.writeStringArray(judgmentList.toArray(new String[0]));
+        out.writeInt(size);
     }
 
     public ExperimentType getType() {
@@ -75,8 +71,12 @@ public class PutExperimentRequest extends ActionRequest {
         return searchConfigurationList;
     }
 
-    public int getK() {
-        return k;
+    public int getSize() {
+        return size;
+    }
+
+    public List<String> getJudgmentList() {
+        return judgmentList;
     }
 
     @Override

@@ -1,11 +1,13 @@
 {
   "properties": {
-    "timestamp": { "type": "date", "format": "strict_date_time" },
     "id": { "type": "keyword" },
-    "name": { "type": "keyword" },
-    "description": { "type": "text" },
-    "index": { "type": "keyword" },
-    "judgment_set_list": { "type": "object" },
-    "query_set_list": { "type": "object" }
+    "timestamp": { "type": "date", "format": "strict_date_time" },
+    "type": { "type": "keyword" },
+    "status": { "type": "keyword" },
+    "querySetId": { "type": "keyword" },
+    "searchConfigurationList": { "type": "keyword" },
+    "judgmentList": { "type": "keyword" },
+    "size": {"type":  "keyword"},
+    "results": { "type": "object" }
   }
 }

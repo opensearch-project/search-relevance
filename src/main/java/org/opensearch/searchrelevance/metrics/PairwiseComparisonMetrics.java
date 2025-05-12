@@ -7,6 +7,8 @@
  */
 package org.opensearch.searchrelevance.metrics;
 
+import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_A;
+import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_B;
 import static org.opensearch.searchrelevance.metrics.calculator.PairComparison.FREQUENCY_WEIGHTED_SIMILARITY_FIELD_NAME;
 import static org.opensearch.searchrelevance.metrics.calculator.PairComparison.JACCARD_SIMILARITY_FIELD_NAME;
 import static org.opensearch.searchrelevance.metrics.calculator.PairComparison.RBO_50_SIMILARITY_FIELD_NAME;
@@ -14,8 +16,6 @@ import static org.opensearch.searchrelevance.metrics.calculator.PairComparison.R
 import static org.opensearch.searchrelevance.metrics.calculator.PairComparison.calculateFrequencyWeightedSimilarity;
 import static org.opensearch.searchrelevance.metrics.calculator.PairComparison.calculateJaccardSimilarity;
 import static org.opensearch.searchrelevance.metrics.calculator.PairComparison.calculateRBOSimilarity;
-import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_A;
-import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_B;
 
 import java.util.HashMap;
 import java.util.List;

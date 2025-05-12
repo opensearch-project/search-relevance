@@ -7,6 +7,7 @@
  */
 package org.opensearch.searchrelevance.plugin;
 
+import static org.opensearch.searchrelevance.common.PluginConstants.EVALUATION_RESULT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.QUERY_SET_INDEX;
@@ -34,12 +35,14 @@ import org.opensearch.plugins.ActionPlugin;
 import org.opensearch.plugins.SystemIndexPlugin;
 import org.opensearch.repositories.RepositoriesService;
 import org.opensearch.script.ScriptService;
+import org.opensearch.searchrelevance.dao.EvaluationResultDao;
 import org.opensearch.searchrelevance.dao.ExperimentDao;
 import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
 import org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager;
 import org.opensearch.searchrelevance.metrics.MetricsHelper;
+import org.opensearch.searchrelevance.ml.MLAccessor;
 import org.opensearch.searchrelevance.transport.experiment.DeleteExperimentAction;
 import org.opensearch.searchrelevance.transport.experiment.GetExperimentAction;
 import org.opensearch.searchrelevance.transport.experiment.PutExperimentAction;
@@ -86,7 +89,8 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
         QUERY_SET_INDEX,
         EXPERIMENT_INDEX,
         SEARCH_CONFIGURATION_INDEX,
-        JUDGMENT_INDEX
+        JUDGMENT_INDEX,
+        EVALUATION_RESULT_INDEX
     );
 
     private final Set<Class> SUPPORTED_COMPONENTS = Set.of(
@@ -95,6 +99,8 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
         ExperimentDao.class,
         SearchConfigurationDao.class,
         JudgmentDao.class,
+        EvaluationResultDao.class,
+        MLAccessor.class,
         MetricsHelper.class
     );
 

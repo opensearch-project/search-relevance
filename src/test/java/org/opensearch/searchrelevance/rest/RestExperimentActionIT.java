@@ -116,7 +116,7 @@ public class RestExperimentActionIT extends SearchRelevanceRestTestCase {
         Map<String, Object> requestMap = new HashMap<>();
         requestMap.put("querySetId", querySetId);
         requestMap.put("searchConfigurationList", searchConfigurationList);
-        requestMap.put("k", 10);
+        requestMap.put("size", 10);
         requestMap.put("type", "PAIRWISE_COMPARISON");
         return OBJECT_MAPPER.writeValueAsString(requestMap);
     }
@@ -126,7 +126,7 @@ public class RestExperimentActionIT extends SearchRelevanceRestTestCase {
         Map<String, Object> requestMap = new HashMap<>();
         requestMap.put("querySetId", querySetId);
         requestMap.put("searchConfigurationList", searchConfigurationList);
-        requestMap.put("k", 10);
+        requestMap.put("size", 10);
         requestMap.put("type", "LLM_EVALUATION");
         requestMap.put("modelId", modelId);
         return OBJECT_MAPPER.writeValueAsString(requestMap);
@@ -137,9 +137,9 @@ public class RestExperimentActionIT extends SearchRelevanceRestTestCase {
         Map<String, Object> requestMap = new HashMap<>();
         requestMap.put("querySetId", querySetId);
         requestMap.put("searchConfigurationList", searchConfigurationList);
-        requestMap.put("k", 10);
+        requestMap.put("size", 10);
         requestMap.put("type", "UBI_EVALUATION");
-        requestMap.put("judgmentIds", judgmentIds);
+        requestMap.put("judgmentList", judgmentIds);
         return OBJECT_MAPPER.writeValueAsString(requestMap);
     }
 }

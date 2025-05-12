@@ -9,23 +9,19 @@ package org.opensearch.searchrelevance.transport.experiment;
 
 import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_INDEX_AND_QUERY_BODY_FIELD_NAME;
 import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_QUERY_TEXT_FIELD_NAME;
-import static org.opensearch.searchrelevance.common.MetricsConstants.MODEL_ID;
-import static org.opensearch.searchrelevance.model.EvaluationResult.JUDGMENT_IDS;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
-
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opensearch.action.StepListener;
 import org.opensearch.action.index.IndexResponse;
-import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.HandledTransportAction;
 import org.opensearch.cluster.service.ClusterService;
@@ -37,7 +33,6 @@ import org.opensearch.searchrelevance.dao.QuerySetDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.metrics.MetricsHelper;
-import org.opensearch.searchrelevance.model.EvaluationResult;
 import org.opensearch.searchrelevance.model.Experiment;
 import org.opensearch.searchrelevance.model.ExperimentStatus;
 import org.opensearch.searchrelevance.model.ExperimentType;
@@ -81,22 +76,16 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
         }
         String id = UUID.randomUUID().toString();
         String timestamp = TimeUtils.getTimestamp();
-
-        String querySetId = request.getQuerySetId();
-        List<String> searchConfigurationList = request.getSearchConfigurationList();
-
-        int size = request.getSize();
-        ExperimentType type = request.getType();
-
         Map<String, Object> results = new HashMap<>();
-        // step 1: Create Index
+
+        // step 1: Create Index if not exists
         StepListener<Void> createIndexStep = new StepListener<>();
         experimentDao.createIndexIfAbsent(createIndexStep);
 
         // step 2: Get QuerySet
         StepListener<Map<String, Object>> getQuerySetStep = new StepListener<>();
         createIndexStep.whenComplete(
-            v -> { querySetDao.getQuerySetWithStepListener(querySetId, results, getQuerySetStep); },
+            v -> { querySetDao.getQuerySetWithStepListener(request.getQuerySetId(), results, getQuerySetStep); },
             listener::onFailure
         );
 
@@ -105,90 +94,122 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
             Experiment initialExperiment = new Experiment(
                 id,
                 timestamp,
-                type,
+                request.getType(),
                 ExperimentStatus.PROCESSING,
-                querySetId,
-                searchConfigurationList,
+                request.getQuerySetId(),
+                request.getSearchConfigurationList(),
                 request.getJudgmentList(),
-                size,
+                request.getSize(),
                 new HashMap<>()
             );
-            experimentDao.putExperiment(initialExperiment, ActionListener.wrap(
-                response -> {
-                    LOGGER.info("Initial experiment {} created successfully. Triggering async processing.", id);
-                    triggerAsyncProcessing(id, request, results);
-                    listener.onResponse((IndexResponse) response);  // Respond to the client that the experiment has been created
-                },
-                e -> {
-                    LOGGER.error("Failed to create initial experiment: {}", id, e);
-                    listener.onFailure(e);
-                }
-            ));
-            // trigger asynchronous steps
-            triggerAsyncProcessing(id, request, results);
+            experimentDao.putExperiment(initialExperiment, ActionListener.wrap(response -> {
+                LOGGER.info("Initial experiment {} created successfully. Triggering async processing.", id);
+                triggerAsyncProcessing(id, request, results);
+                listener.onResponse((IndexResponse) response);
+            }, e -> {
+                LOGGER.error("Failed to create initial experiment: {}", id, e);
+                listener.onFailure(e);
+            }));
         }, listener::onFailure);
     }
 
     private void triggerAsyncProcessing(String experimentId, PutExperimentRequest request, Map<String, Object> results) {
-        // Async Step 1: Get Search Configurations
         searchConfigurationDao.getSearchConfigsWithStepListener(
             request.getSearchConfigurationList(),
             results,
-            ActionListener.wrap(
-                // Async Step 2: Calculate Metrics
-                searchConfigResults -> {
-                    calculateMetricsAsync(experimentId, request, searchConfigResults);
-                },
-                error -> {
-                    handleAsyncFailure(experimentId, request, "Failed at async step 1: Get Search Configurations", error);
-                }
-            )
+            ActionListener.wrap(searchConfigResults -> {
+                calculateMetricsAsync(experimentId, request, searchConfigResults);
+            }, error -> { handleAsyncFailure(experimentId, request, "Failed at async step 1: Get Search Configurations", error); })
         );
     }
 
     private void calculateMetricsAsync(String experimentId, PutExperimentRequest request, Map<String, Object> results) {
-        LOGGER.debug("Starting calculateMetricsAsync for experiment: {}", experimentId);
         Map<String, List<String>> indexAndQueryBodies = (Map<String, List<String>>) results.get(METRICS_INDEX_AND_QUERY_BODY_FIELD_NAME);
         List<String> queryTexts = (List<String>) results.get(METRICS_QUERY_TEXT_FIELD_NAME);
-        Map<String, Object> metadata = createMetadataForRequest(request);
-
-        LOGGER.debug("IndexAndQueryBodies: {}, QueryTexts: {}, Metadata: {}", indexAndQueryBodies, queryTexts, metadata);
 
         if (queryTexts == null || indexAndQueryBodies == null) {
-            LOGGER.error("Missing required data for metrics calculation");
-            handleAsyncFailure(experimentId, request,
+            handleAsyncFailure(
+                experimentId,
+                request,
                 "Failed to calculate metrics: Missing required data",
-                new IllegalStateException("Missing required data for metrics calculation"));
+                new IllegalStateException("Missing required data for metrics calculation")
+            );
             return;
         }
 
-        Map<String, Object> finalResults = new HashMap<>();
+        processQueryTextMetrics(experimentId, request, indexAndQueryBodies, queryTexts);
+    }
+
+    private void processQueryTextMetrics(
+        String experimentId,
+        PutExperimentRequest request,
+        Map<String, List<String>> indexAndQueryBodies,
+        List<String> queryTexts
+    ) {
+        Map<String, Object> finalResults = Collections.synchronizedMap(new HashMap<>());
         AtomicInteger pendingQueries = new AtomicInteger(queryTexts.size());
+        AtomicBoolean hasFailure = new AtomicBoolean(false);
 
         for (String queryText : queryTexts) {
-            LOGGER.debug("Processing query text: {}", queryText);
-            metricsHelper.evaluateQueryTextAsync(
-                queryText,
-                indexAndQueryBodies,
-                request.getSize(),
-                metadata,
-                ActionListener.wrap(
-                    queryResults -> {
-                        synchronized (finalResults) {
-                            LOGGER.debug("Query results for {}: {}", queryText, queryResults);
-                            finalResults.put(queryText, queryResults);
-                            if (pendingQueries.decrementAndGet() == 0) {
-                                LOGGER.debug("All queries processed, updating final experiment");
-                                updateFinalExperiment(experimentId, request, finalResults);
-                            }
-                        }
-                    },
-                    error -> {
-                        LOGGER.error("Failed to evaluate query: " + queryText, error);
-                        handleAsyncFailure(experimentId, request, "Failed to evaluate query: " + queryText, error);
-                    }
-                )
-            );
+            if (request.getType() == ExperimentType.PAIRWISE_COMPARISON) {
+                metricsHelper.processPairwiseMetrics(
+                    queryText,
+                    indexAndQueryBodies,
+                    request.getSize(),
+                    ActionListener.wrap(
+                        queryResults -> handleQueryResults(
+                            queryText,
+                            queryResults,
+                            finalResults,
+                            pendingQueries,
+                            experimentId,
+                            request,
+                            hasFailure
+                        ),
+                        error -> handleFailure(error, hasFailure, experimentId, request)
+                    )
+                );
+            } else {
+                metricsHelper.processEvaluationMetrics(
+                    queryText,
+                    indexAndQueryBodies,
+                    request.getSize(),
+                    request.getJudgmentList(),
+                    ActionListener.wrap(queryResults -> {
+                        Map<String, Object> convertedResults = new HashMap<>(queryResults);
+                        handleQueryResults(queryText, convertedResults, finalResults, pendingQueries, experimentId, request, hasFailure);
+                    }, error -> handleFailure(error, hasFailure, experimentId, request))
+                );
+            }
+        }
+    }
+
+    private void handleQueryResults(
+        String queryText,
+        Map<String, Object> queryResults,
+        Map<String, Object> finalResults,
+        AtomicInteger pendingQueries,
+        String experimentId,
+        PutExperimentRequest request,
+        AtomicBoolean hasFailure
+    ) {
+        if (hasFailure.get()) return;
+
+        try {
+            synchronized (finalResults) {
+                finalResults.put(queryText, queryResults);
+                if (pendingQueries.decrementAndGet() == 0) {
+                    updateFinalExperiment(experimentId, request, finalResults);
+                }
+            }
+        } catch (Exception e) {
+            handleFailure(e, hasFailure, experimentId, request);
+        }
+    }
+
+    private void handleFailure(Exception error, AtomicBoolean hasFailure, String experimentId, PutExperimentRequest request) {
+        if (hasFailure.compareAndSet(false, true)) {
+            handleAsyncFailure(experimentId, request, "Failed to process metrics", error);
         }
     }
 
@@ -208,8 +229,8 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
         experimentDao.updateExperiment(
             finalExperiment,
             ActionListener.wrap(
-                indexResponse -> LOGGER.info("Completed async step 3: Experiment {} completed successfully", experimentId),
-                error -> handleAsyncFailure(experimentId, request, "Failed at async step 3: Update Final Experiment", error)
+                response -> LOGGER.debug("Updated final experiment: {}", experimentId),
+                error -> handleAsyncFailure(experimentId, request, "Failed to update final experiment", error)
             )
         );
     }
@@ -236,17 +257,5 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
                 e -> LOGGER.error("Failed to update error status for experiment: " + experimentId, e)
             )
         );
-    }
-
-    private Map<String, Object> createMetadataForRequest(PutExperimentRequest request) {
-        Map<String, Object> metadata = new HashMap<>();
-
-        if (request instanceof PutLlmExperimentRequest) {
-            metadata.put(MODEL_ID, ((PutLlmExperimentRequest) request).getModelId());
-            metadata.put(JUDGMENT_IDS, request.getJudgmentList());
-        } else if (request instanceof PutUbiExperimentRequest) {
-            metadata.put(JUDGMENT_IDS, request.getJudgmentList());
-        }
-        return metadata;
     }
 }
