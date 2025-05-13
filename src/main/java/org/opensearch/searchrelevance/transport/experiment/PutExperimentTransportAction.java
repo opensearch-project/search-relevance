@@ -246,7 +246,8 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
                             pendingQueries,
                             experimentId,
                             request,
-                            hasFailure
+                            hasFailure,
+                            judgmentList
                         ),
                         error -> handleFailure(error, hasFailure, experimentId, request)
                     )
@@ -259,7 +260,16 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
                     judgmentList,
                     ActionListener.wrap(queryResults -> {
                         Map<String, Object> convertedResults = new HashMap<>(queryResults);
-                        handleQueryResults(queryText, convertedResults, finalResults, pendingQueries, experimentId, request, hasFailure);
+                        handleQueryResults(
+                            queryText,
+                            convertedResults,
+                            finalResults,
+                            pendingQueries,
+                            experimentId,
+                            request,
+                            hasFailure,
+                            judgmentList
+                        );
                     }, error -> handleFailure(error, hasFailure, experimentId, request))
                 );
             }
@@ -273,7 +283,8 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
         AtomicInteger pendingQueries,
         String experimentId,
         PutExperimentRequest request,
-        AtomicBoolean hasFailure
+        AtomicBoolean hasFailure,
+        List<String> judgmentList
     ) {
         if (hasFailure.get()) return;
 
@@ -281,7 +292,7 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
             synchronized (finalResults) {
                 finalResults.put(queryText, queryResults);
                 if (pendingQueries.decrementAndGet() == 0) {
-                    updateFinalExperiment(experimentId, request, finalResults);
+                    updateFinalExperiment(experimentId, request, finalResults, judgmentList);
                 }
             }
         } catch (Exception e) {
@@ -295,7 +306,12 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
         }
     }
 
-    private void updateFinalExperiment(String experimentId, PutExperimentRequest request, Map<String, Object> finalResults) {
+    private void updateFinalExperiment(
+        String experimentId,
+        PutExperimentRequest request,
+        Map<String, Object> finalResults,
+        List<String> judgmentList
+    ) {
         Experiment finalExperiment = new Experiment(
             experimentId,
             TimeUtils.getTimestamp(),
@@ -303,7 +319,7 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
             ExperimentStatus.COMPLETED,
             request.getQuerySetId(),
             request.getSearchConfigurationList(),
-            request.getJudgmentList(),
+            judgmentList,
             request.getSize(),
             finalResults
         );
