@@ -53,5 +53,5 @@ public class PluginConstants {
      */
     public static final String UBI_QUERIES_INDEX = "ubi_queries";
     public static final String USER_QUERY_FIELD = "user_query";
-
+    public static final String UBI_EVENTS_INDEX = "ubi_events";
 }

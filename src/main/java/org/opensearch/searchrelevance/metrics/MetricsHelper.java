@@ -194,18 +194,22 @@ public class MetricsHelper {
                         }
 
                         Map<String, Object> sourceAsMap = judgmentResponse.getHits().getHits()[0].getSourceAsMap();
-                        Map<String, Object> judgmentScores = (Map<String, Object>) sourceAsMap.get("judgmentScores");
-                        if (judgmentScores == null) {
-                            listener.onFailure(new IllegalStateException("No judgment scores found for ID: " + judgmentId));
-                            return;
-                        }
+                        Map<String, String> docIdToScores = new HashMap<>();
+                        Map<String, Object> judgmentScores = (Map<String, Object>) sourceAsMap.getOrDefault(
+                            "judgmentScores",
+                            Collections.emptyMap()
+                        );
+                        List<Map<String, Object>> queryScores = (List<Map<String, Object>>) judgmentScores.getOrDefault(
+                            queryText,
+                            Collections.emptyList()
+                        );
 
-                        Map<String, String> docIdToScores = (Map<String, String>) judgmentScores.get(queryText);
+                        queryScores.forEach(docScore -> docIdToScores.put((String) docScore.get("docId"), (String) docScore.get("score")));
 
-                        if (docIdToScores == null || docIdToScores.isEmpty()) {
+                        if (docIdToScores.isEmpty()) {
                             LOGGER.warn("No scores found for query: {} in judgment: {}", queryText, judgmentId);
-                            docIdToScores = new HashMap<>();
                         }
+
                         processSearchConfigurations(
                             queryText,
                             indexAndQueryBodies,

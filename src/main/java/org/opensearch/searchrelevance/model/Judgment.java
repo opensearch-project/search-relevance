@@ -55,7 +55,17 @@ public class Judgment implements ToXContentObject {
         xContentBuilder.field(NAME, this.name.trim());
         xContentBuilder.field(TYPE, this.type.name().trim());
         xContentBuilder.field(METADATA, this.metadata);
-        xContentBuilder.field(JUDGMENT_SCORES, this.judgmentScores);
+        // Start judgmentScores object
+        xContentBuilder.startObject(JUDGMENT_SCORES);
+        for (Map.Entry<String, Map<String, String>> queryEntry : this.judgmentScores.entrySet()) {
+            xContentBuilder.startArray(queryEntry.getKey());
+            for (Map.Entry<String, String> docEntry : queryEntry.getValue().entrySet()) {
+                xContentBuilder.startObject().field("docId", docEntry.getKey()).field("score", docEntry.getValue()).endObject();
+            }
+            xContentBuilder.endArray();
+        }
+        xContentBuilder.endObject();
+        // End judgmentScores object
         return xContentBuilder.endObject();
     }
 

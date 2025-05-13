@@ -7,16 +7,16 @@
  */
 package org.opensearch.searchrelevance.judgments.clickmodel.coec;
 
+import static org.opensearch.searchrelevance.common.PluginConstants.UBI_EVENTS_INDEX;
+
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -43,7 +43,7 @@ public class CoecClickModel extends ClickModel {
 
     public static final String CLICK_MODEL_NAME = "coec";
     private static final TimeValue SEARCH_TIMEOUT = TimeValue.timeValueMinutes(5);
-    private static final int SCROLL_SIZE = 200;
+    private static final int SCROLL_SIZE = 1000;
     private static final TimeValue SCROLL_TIMEOUT = TimeValue.timeValueMinutes(10);
 
     private final CoecClickModelParameters parameters;
@@ -87,7 +87,7 @@ public class CoecClickModel extends ClickModel {
 
         searchSourceBuilder.aggregation(actionAgg);
 
-        SearchRequest searchRequest = new SearchRequest("ubi_events").source(searchSourceBuilder);
+        SearchRequest searchRequest = new SearchRequest(UBI_EVENTS_INDEX).source(searchSourceBuilder);
 
         client.search(searchRequest, ActionListener.wrap(response -> {
             try {
@@ -168,7 +168,7 @@ public class CoecClickModel extends ClickModel {
                 null
             );
 
-        SearchRequest searchRequest = new SearchRequest("ubi_events").source(searchSourceBuilder).scroll(SCROLL_TIMEOUT);
+        SearchRequest searchRequest = new SearchRequest(UBI_EVENTS_INDEX).source(searchSourceBuilder).scroll(SCROLL_TIMEOUT);
 
         processClickthroughSearch(searchRequest, queriesToClickthroughRates, listener);
     }
@@ -251,7 +251,7 @@ public class CoecClickModel extends ClickModel {
 
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder().query(queryBuilder).size(SCROLL_SIZE).timeout(SEARCH_TIMEOUT);
 
-        SearchRequest searchRequest = new SearchRequest("ubi_events").source(searchSourceBuilder).scroll(SCROLL_TIMEOUT);
+        SearchRequest searchRequest = new SearchRequest(UBI_EVENTS_INDEX).source(searchSourceBuilder).scroll(SCROLL_TIMEOUT);
 
         LOGGER.debug("Starting click events scroll search");
         scrollEvents(searchRequest, null, clickCounts, "click", listener);
@@ -268,7 +268,7 @@ public class CoecClickModel extends ClickModel {
 
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder().query(queryBuilder).size(SCROLL_SIZE).timeout(SEARCH_TIMEOUT);
 
-        SearchRequest searchRequest = new SearchRequest("ubi_events").source(searchSourceBuilder).scroll(SCROLL_TIMEOUT);
+        SearchRequest searchRequest = new SearchRequest(UBI_EVENTS_INDEX).source(searchSourceBuilder).scroll(SCROLL_TIMEOUT);
 
         LOGGER.debug("Starting impression events scroll search");
         scrollEvents(searchRequest, null, impressionCounts, "impression", ActionListener.wrap(impressionCountsResult -> {
@@ -646,7 +646,7 @@ public class CoecClickModel extends ClickModel {
 
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder().query(queryBuilder).trackTotalHits(true).size(0);
 
-        SearchRequest searchRequest = new SearchRequest("ubi_events").source(searchSourceBuilder);
+        SearchRequest searchRequest = new SearchRequest(UBI_EVENTS_INDEX).source(searchSourceBuilder);
 
         client.search(
             searchRequest,
@@ -662,40 +662,11 @@ public class CoecClickModel extends ClickModel {
         LOGGER.info("Starting COEC calculation with rank CTR: {}", rankAggregatedClickThrough);
         Map<String, Map<String, String>> judgmentScores = new HashMap<>();
 
-        // Take only queries that have clicks
-        List<Map.Entry<String, Set<ClickthroughRate>>> significantQueries = clickthroughRates.entrySet()
-            .stream()
-            .filter(entry -> entry.getValue().stream().anyMatch(ctr -> ctr.getClicks() > 0))
-            .sorted((e1, e2) -> {
-                int clicks1 = e1.getValue().stream().mapToInt(ClickthroughRate::getClicks).sum();
-                int clicks2 = e2.getValue().stream().mapToInt(ClickthroughRate::getClicks).sum();
-                return Integer.compare(clicks2, clicks1);
-            })
-            .limit(20) // Limit to top 20 queries with clicks
-            .collect(Collectors.toList());
-
-        LOGGER.info("Processing {} significant queries", significantQueries.size());
-
-        for (Map.Entry<String, Set<ClickthroughRate>> entry : significantQueries) {
+        for (Map.Entry<String, Set<ClickthroughRate>> entry : clickthroughRates.entrySet()) {
             String userQuery = entry.getKey();
             Map<String, String> docScores = new HashMap<>();
 
-            // Take only documents with significant interaction (clicks or high impressions)
-            List<ClickthroughRate> significantDocs = entry.getValue()
-                .stream()
-                .filter(ctr -> ctr.getClicks() > 0 || ctr.getImpressions() >= parameters.getMaxRank())
-                .sorted((d1, d2) -> {
-                    // Sort by clicks first, then by CTR
-                    int clickCompare = Integer.compare(d2.getClicks(), d1.getClicks());
-                    if (clickCompare != 0) return clickCompare;
-                    double ctr1 = d1.getImpressions() > 0 ? (double) d1.getClicks() / d1.getImpressions() : 0;
-                    double ctr2 = d2.getImpressions() > 0 ? (double) d2.getClicks() / d2.getImpressions() : 0;
-                    return Double.compare(ctr2, ctr1);
-                })
-                .limit(5) // Limit to top 5 documents per query
-                .collect(Collectors.toList());
-
-            for (ClickthroughRate ctr : significantDocs) {
+            for (ClickthroughRate ctr : entry.getValue()) {
                 // Calculate denominator (expected clicks)
                 double expectedClicks = 0.0;
                 for (int rank = 0; rank < parameters.getMaxRank(); rank++) {
