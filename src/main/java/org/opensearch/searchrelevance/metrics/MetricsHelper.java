@@ -194,9 +194,7 @@ public class MetricsHelper {
                         }
 
                         Map<String, Object> sourceAsMap = judgmentResponse.getHits().getHits()[0].getSourceAsMap();
-
                         Map<String, Object> judgmentScores = (Map<String, Object>) sourceAsMap.get("judgmentScores");
-
                         if (judgmentScores == null) {
                             listener.onFailure(new IllegalStateException("No judgment scores found for ID: " + judgmentId));
                             return;
@@ -283,9 +281,7 @@ public class MetricsHelper {
             client.search(searchRequest, new ActionListener<SearchResponse>() {
                 @Override
                 public void onResponse(SearchResponse response) {
-                    if (hasFailure.get()) {
-                        return;
-                    }
+                    if (hasFailure.get()) return;
 
                     try {
                         if (response.getHits().getTotalHits().value() == 0) {
@@ -316,12 +312,10 @@ public class MetricsHelper {
                                 listener.onResponse(configToEvalIds);
                             }
                         }, error -> {
-                            LOGGER.error("Failed to save evaluation result for config {}: {}", searchConfigurationId, error);
                             hasFailure.set(true);
                             listener.onFailure(error);
                         }));
                     } catch (Exception e) {
-                        LOGGER.error("Error processing search response for config {}: {}", searchConfigurationId, e);
                         hasFailure.set(true);
                         listener.onFailure(e);
                     }
@@ -329,7 +323,6 @@ public class MetricsHelper {
 
                 @Override
                 public void onFailure(Exception e) {
-                    LOGGER.error("Search failed for configuration {}: {}", searchConfigurationId, e.getMessage());
                     hasFailure.set(true);
                     listener.onFailure(e);
                 }

@@ -47,6 +47,9 @@ import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
 
+/**
+ * Handles transport actions for creating experiments in the system.
+ */
 public class PutExperimentTransportAction extends HandledTransportAction<PutExperimentRequest, IndexResponse> {
 
     private final ClusterService clusterService;
@@ -88,6 +91,7 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
             listener.onFailure(new SearchRelevanceException("Request cannot be null", RestStatus.BAD_REQUEST));
             return;
         }
+
         String id = UUID.randomUUID().toString();
         String timestamp = TimeUtils.getTimestamp();
         Map<String, Object> results = new HashMap<>();
@@ -117,13 +121,9 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
                 new HashMap<>()
             );
             experimentDao.putExperiment(initialExperiment, ActionListener.wrap(response -> {
-                LOGGER.info("Initial experiment {} created successfully. Triggering async processing.", id);
                 triggerAsyncProcessing(id, request, results);
                 listener.onResponse((IndexResponse) response);
-            }, e -> {
-                LOGGER.error("Failed to create initial experiment: {}", id, e);
-                listener.onFailure(e);
-            }));
+            }, e -> { listener.onFailure(e); }));
         }, listener::onFailure);
     }
 
@@ -178,20 +178,17 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
 
             // Step 2: Store Judgment
             StepListener<String> storeJudgmentStep = new StepListener<>();
-            processJudgmentScoresStep.whenComplete(llmJudgments -> {
-                LOGGER.debug("Generated LLM judgments for experiment: {}, judgments: {}", experimentId, llmJudgments);
-                createAndStoreLlmJudgment(metadata, llmJudgments, storeJudgmentStep);
-            }, error -> {
-                LOGGER.error("Error generating LLM judgments for experiment: {}", experimentId, error);
-                handleFailure(error, hasFailure, experimentId, request);
-            });
+            processJudgmentScoresStep.whenComplete(
+                llmJudgments -> { createAndStoreLlmJudgment(metadata, llmJudgments, storeJudgmentStep); },
+                error -> {
+                    handleFailure(error, hasFailure, experimentId, request);
+                }
+            );
 
             // Step 3: Execute Experiment Evaluation
             storeJudgmentStep.whenComplete(llmJudgmentId -> {
-                LOGGER.debug("Stored LLM judgment with ID: {} for experiment: {}", llmJudgmentId, experimentId);
                 List<String> updatedJudgmentList = new ArrayList<>(request.getJudgmentList());
                 updatedJudgmentList.add(llmJudgmentId);
-                LOGGER.debug("Updated judgment list for experiment: {}: {}", experimentId, updatedJudgmentList);
 
                 executeExperimentEvaluation(
                     experimentId,
@@ -203,12 +200,8 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
                     hasFailure,
                     updatedJudgmentList
                 );
-            }, error -> {
-                LOGGER.error("Error storing LLM judgment for experiment: {}", experimentId, error);
-                handleFailure(error, hasFailure, experimentId, request);
-            });
+            }, error -> { handleFailure(error, hasFailure, experimentId, request); });
         } else {
-            // If no LLM judgment needed, proceed directly with experiment evaluation
             executeExperimentEvaluation(
                 experimentId,
                 request,
@@ -373,11 +366,7 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
             llmJudgments
         );
 
-        judgmentDao.putJudgement(llmJudgment, ActionListener.wrap(response -> {
-            LOGGER.debug("Stored LLM judgment: {}", judgmentId);
-            listener.onResponse(judgmentId);
-        }, error -> {
-            LOGGER.error("Failed to store LLM judgment", error);
+        judgmentDao.putJudgement(llmJudgment, ActionListener.wrap(response -> { listener.onResponse(judgmentId); }, error -> {
             listener.onFailure(error);
         }));
     }
