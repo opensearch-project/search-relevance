@@ -294,37 +294,33 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         Set<String> unprocessedDocIds = Collections.synchronizedSet(new HashSet<>(docIds));
 
         for (String docId : docIds) {
-            judgmentCacheDao.getJudgmentCache(
-                queryText,
-                combinedIndexAndDocId(targetIndex, docId),
-                new ActionListener<SearchResponse>() {
-                    @Override
-                    public void onResponse(SearchResponse response) {
-                        if (response.getHits().getTotalHits().value() > 0) {
-                            SearchHit hit = response.getHits().getHits()[0];
-                            Map<String, Object> source = hit.getSourceAsMap();
-                            String score = (String) source.get(SCORE);
-                            synchronized (docIdToScore) {
-                                docIdToScore.put(docId, score);
-                            }
-                            unprocessedDocIds.remove(docId);
+            judgmentCacheDao.getJudgmentCache(queryText, combinedIndexAndDocId(targetIndex, docId), new ActionListener<SearchResponse>() {
+                @Override
+                public void onResponse(SearchResponse response) {
+                    if (response.getHits().getTotalHits().value() > 0) {
+                        SearchHit hit = response.getHits().getHits()[0];
+                        Map<String, Object> source = hit.getSourceAsMap();
+                        String score = (String) source.get(SCORE);
+                        synchronized (docIdToScore) {
+                            docIdToScore.put(docId, score);
                         }
-                        checkCompletion();
+                        unprocessedDocIds.remove(docId);
                     }
+                    checkCompletion();
+                }
 
-                    @Override
-                    public void onFailure(Exception e) {
-                        LOGGER.error("Failed to check judgment cache for queryText: {} and docId: {}", queryText, docId, e);
-                        checkCompletion();
-                    }
+                @Override
+                public void onFailure(Exception e) {
+                    LOGGER.error("Failed to check judgment cache for queryText: {} and docId: {}", queryText, docId, e);
+                    checkCompletion();
+                }
 
-                    private void checkCompletion() {
-                        if (pendingChecks.decrementAndGet() == 0) {
-                            listener.onResponse(new ArrayList<>(unprocessedDocIds));
-                        }
+                private void checkCompletion() {
+                    if (pendingChecks.decrementAndGet() == 0) {
+                        listener.onResponse(new ArrayList<>(unprocessedDocIds));
                     }
                 }
-            );
+            });
         }
     }
 
