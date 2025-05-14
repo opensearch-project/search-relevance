@@ -14,6 +14,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.opensearch.action.StepListener;
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.support.ActionFilters;
@@ -26,6 +28,7 @@ import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.judgments.BaseJudgmentsProcessor;
 import org.opensearch.searchrelevance.judgments.JudgmentsProcessorFactory;
+import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.Judgment;
 import org.opensearch.searchrelevance.model.JudgmentType;
 import org.opensearch.searchrelevance.utils.TimeUtils;
@@ -36,6 +39,8 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
     private final ClusterService clusterService;
     private final JudgmentDao judgmentDao;
     private final JudgmentsProcessorFactory judgmentsProcessorFactory;
+
+    private static final Logger LOGGER = LogManager.getLogger(PutJudgmentTransportAction.class);
 
     @Inject
     public PutJudgmentTransportAction(
@@ -61,11 +66,27 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
         String timestamp = TimeUtils.getTimestamp();
         String name = request.getName();
         JudgmentType type = request.getType();
+        Map<String, Object> metadata = buildMetadata(request);
 
-        BaseJudgmentsProcessor processor = judgmentsProcessorFactory.getProcessor(type);
+        // Step 1: create initial judgment with empty judgmentScores
+
+        // Step 2: create index
+        StepListener<Void> createIndexStep = new StepListener<>();
+        judgmentDao.createIndexIfAbsent(createIndexStep);
+
+        createIndexStep.whenComplete(v -> {
+            Judgment initialJudgment = new Judgment(id, timestamp, name, AsyncStatus.PROCESSING, type, metadata, new HashMap<>());
+            judgmentDao.putJudgement(initialJudgment, ActionListener.wrap(response -> {
+                // Trigger async processing and return initial response
+                triggerAsyncProcessing(id, request, metadata);
+                listener.onResponse((IndexResponse) response);
+            }, listener::onFailure));
+        }, listener::onFailure);
+    }
+
+    private Map<String, Object> buildMetadata(PutJudgmentRequest request) {
         Map<String, Object> metadata = new HashMap<>();
-
-        switch (type) {
+        switch (request.getType()) {
             case LLM_JUDGMENT -> {
                 PutLlmJudgmentRequest llmRequest = (PutLlmJudgmentRequest) request;
                 metadata.put(MODEL_ID, llmRequest.getModelId());
@@ -79,22 +100,65 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
                 metadata.put("maxRank", ubiRequest.getMaxRank());
             }
         }
+        return metadata;
+    }
 
-        // Step 1: process judgment scores
-        StepListener<Map<String, Map<String, String>>> processJudgmentScoresStep = new StepListener<>();
-        processor.generateJudgmentScore(metadata, processJudgmentScoresStep);
+    private void triggerAsyncProcessing(String judgmentId, PutJudgmentRequest request, Map<String, Object> metadata) {
+        BaseJudgmentsProcessor processor = judgmentsProcessorFactory.getProcessor(request.getType());
 
-        // Step 2: create index
-        StepListener<Void> createIndexStep = new StepListener<>();
+        processor.generateJudgmentScore(
+            metadata,
+            ActionListener.wrap(
+                judgmentScores -> updateFinalJudgment(judgmentId, request, metadata, judgmentScores),
+                error -> handleAsyncFailure(judgmentId, request, "Failed to generate judgment scores", error)
+            )
+        );
+    }
 
-        processJudgmentScoresStep.whenComplete(judgmentScores -> {
-            judgmentDao.createIndexIfAbsent(createIndexStep);
+    private void updateFinalJudgment(
+        String judgmentId,
+        PutJudgmentRequest request,
+        Map<String, Object> metadata,
+        Map<String, Map<String, String>> judgmentScores
+    ) {
+        Judgment finalJudgment = new Judgment(
+            judgmentId,
+            TimeUtils.getTimestamp(),
+            request.getName(),
+            AsyncStatus.COMPLETED,
+            request.getType(),
+            metadata,
+            judgmentScores
+        );
 
-            createIndexStep.whenComplete(v -> {
-                // step3: create judgment
-                Judgment judgment = new Judgment(id, timestamp, name, type, metadata, judgmentScores);
-                judgmentDao.putJudgement(judgment, listener);
-            }, listener::onFailure);
-        }, listener::onFailure);
+        judgmentDao.updateJudgment(
+            finalJudgment,
+            ActionListener.wrap(
+                response -> LOGGER.debug("Updated final judgment: {}", judgmentId),
+                error -> handleAsyncFailure(judgmentId, request, "Failed to update final judgment", error)
+            )
+        );
+    }
+
+    private void handleAsyncFailure(String judgmentId, PutJudgmentRequest request, String message, Exception error) {
+        LOGGER.error(message + " for judgment: " + judgmentId, error);
+
+        Judgment errorJudgment = new Judgment(
+            judgmentId,
+            TimeUtils.getTimestamp(),
+            request.getName(),
+            AsyncStatus.ERROR,
+            request.getType(),
+            Map.of("error", error.getMessage()),
+            new HashMap<>()
+        );
+
+        judgmentDao.updateJudgment(
+            errorJudgment,
+            ActionListener.wrap(
+                response -> LOGGER.info("Updated judgment {} status to ERROR", judgmentId),
+                e -> LOGGER.error("Failed to update error status for judgment: " + judgmentId, e)
+            )
+        );
     }
 }

@@ -7,7 +7,7 @@
  */
 package org.opensearch.searchrelevance.model;
 
-public enum ExperimentStatus {
+public enum AsyncStatus {
     PROCESSING,
     COMPLETED,
     ERROR

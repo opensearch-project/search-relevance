@@ -47,6 +47,8 @@ public class PluginConstants {
     public static final String JUDGMENT_INDEX_MAPPING = "mappings/judgment.json";
     public static final String EVALUATION_RESULT_INDEX = ".plugins-search-relevance-evaluation-result";
     public static final String EVALUATION_RESULT_INDEX_MAPPING = "mappings/evaluation_result.json";
+    public static final String JUDGMENT_CACHE_INDEX = ".plugins-search-relevance-judgment-cache";
+    public static final String JUDGMENT_CACHE_INDEX_MAPPING = "mappings/judgment_cache.json";
 
     /**
      * UBI

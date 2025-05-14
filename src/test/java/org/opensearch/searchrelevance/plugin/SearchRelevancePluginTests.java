@@ -9,6 +9,7 @@ package org.opensearch.searchrelevance.plugin;
 
 import static org.opensearch.searchrelevance.common.PluginConstants.EVALUATION_RESULT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX;
+import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_CACHE_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.QUERY_SET_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.SEARCH_CONFIGURATION_INDEX;
@@ -37,6 +38,7 @@ import org.opensearch.repositories.RepositoriesService;
 import org.opensearch.script.ScriptService;
 import org.opensearch.searchrelevance.dao.EvaluationResultDao;
 import org.opensearch.searchrelevance.dao.ExperimentDao;
+import org.opensearch.searchrelevance.dao.JudgmentCacheDao;
 import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
@@ -90,7 +92,8 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
         EXPERIMENT_INDEX,
         SEARCH_CONFIGURATION_INDEX,
         JUDGMENT_INDEX,
-        EVALUATION_RESULT_INDEX
+        EVALUATION_RESULT_INDEX,
+        JUDGMENT_CACHE_INDEX
     );
 
     private final Set<Class> SUPPORTED_COMPONENTS = Set.of(
@@ -100,6 +103,7 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
         SearchConfigurationDao.class,
         JudgmentDao.class,
         EvaluationResultDao.class,
+        JudgmentCacheDao.class,
         MLAccessor.class,
         MetricsHelper.class
     );

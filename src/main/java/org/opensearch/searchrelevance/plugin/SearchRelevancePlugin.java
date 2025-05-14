@@ -9,6 +9,7 @@ package org.opensearch.searchrelevance.plugin;
 
 import static org.opensearch.searchrelevance.common.PluginConstants.EVALUATION_RESULT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX;
+import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_CACHE_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.QUERY_SET_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.SEARCH_CONFIGURATION_INDEX;
@@ -42,6 +43,7 @@ import org.opensearch.rest.RestHandler;
 import org.opensearch.script.ScriptService;
 import org.opensearch.searchrelevance.dao.EvaluationResultDao;
 import org.opensearch.searchrelevance.dao.ExperimentDao;
+import org.opensearch.searchrelevance.dao.JudgmentCacheDao;
 import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
@@ -101,6 +103,7 @@ public class SearchRelevancePlugin extends Plugin implements ActionPlugin, Syste
     private ExperimentDao experimentDao;
     private JudgmentDao judgmentDao;
     private EvaluationResultDao evaluationResultDao;
+    private JudgmentCacheDao judgmentCacheDao;
     private MLAccessor mlAccessor;
     private MetricsHelper metricsHelper;
 
@@ -111,7 +114,8 @@ public class SearchRelevancePlugin extends Plugin implements ActionPlugin, Syste
             new SystemIndexDescriptor(SEARCH_CONFIGURATION_INDEX, "System index used for search configuration data"),
             new SystemIndexDescriptor(EXPERIMENT_INDEX, "System index used for experiment data"),
             new SystemIndexDescriptor(JUDGMENT_INDEX, "System index used for judgment data"),
-            new SystemIndexDescriptor(EVALUATION_RESULT_INDEX, "System index used for evaluation result data")
+            new SystemIndexDescriptor(EVALUATION_RESULT_INDEX, "System index used for evaluation result data"),
+            new SystemIndexDescriptor(JUDGMENT_CACHE_INDEX, "System index used for judgment cache data")
         );
     }
 
@@ -137,6 +141,7 @@ public class SearchRelevancePlugin extends Plugin implements ActionPlugin, Syste
         this.searchConfigurationDao = new SearchConfigurationDao(searchRelevanceIndicesManager);
         this.judgmentDao = new JudgmentDao(searchRelevanceIndicesManager);
         this.evaluationResultDao = new EvaluationResultDao(searchRelevanceIndicesManager);
+        this.judgmentCacheDao = new JudgmentCacheDao(searchRelevanceIndicesManager);
         MachineLearningNodeClient mlClient = new MachineLearningNodeClient(client);
         this.mlAccessor = new MLAccessor(mlClient);
         this.metricsHelper = new MetricsHelper(clusterService, client, judgmentDao, evaluationResultDao);
@@ -147,6 +152,7 @@ public class SearchRelevancePlugin extends Plugin implements ActionPlugin, Syste
             experimentDao,
             judgmentDao,
             evaluationResultDao,
+            judgmentCacheDao,
             mlAccessor,
             metricsHelper
         );

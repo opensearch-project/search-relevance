@@ -38,8 +38,8 @@ import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.judgments.BaseJudgmentsProcessor;
 import org.opensearch.searchrelevance.judgments.JudgmentsProcessorFactory;
 import org.opensearch.searchrelevance.metrics.MetricsHelper;
+import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.Experiment;
-import org.opensearch.searchrelevance.model.ExperimentStatus;
 import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.model.Judgment;
 import org.opensearch.searchrelevance.model.JudgmentType;
@@ -113,7 +113,7 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
                 id,
                 timestamp,
                 request.getType(),
-                ExperimentStatus.PROCESSING,
+                AsyncStatus.PROCESSING,
                 request.getQuerySetId(),
                 request.getSearchConfigurationList(),
                 request.getJudgmentList(),
@@ -309,7 +309,7 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
             experimentId,
             TimeUtils.getTimestamp(),
             request.getType(),
-            ExperimentStatus.COMPLETED,
+            AsyncStatus.COMPLETED,
             request.getQuerySetId(),
             request.getSearchConfigurationList(),
             judgmentList,
@@ -333,7 +333,7 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
             experimentId,
             TimeUtils.getTimestamp(),
             request.getType(),
-            ExperimentStatus.ERROR,
+            AsyncStatus.ERROR,
             request.getQuerySetId(),
             request.getSearchConfigurationList(),
             request.getJudgmentList(),
@@ -361,6 +361,7 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
             judgmentId,
             TimeUtils.getTimestamp(),
             "LLM Generated Judgment" + new Date(),
+            AsyncStatus.COMPLETED,
             JudgmentType.LLM_JUDGMENT,
             metadata,
             llmJudgments

@@ -17,6 +17,7 @@ public class Judgment implements ToXContentObject {
     public static final String ID = "id";
     public static final String TIME_STAMP = "timestamp";
     public static final String NAME = "name";
+    public static final String STATUS = "status";
     public static final String TYPE = "type";
     public static final String METADATA = "metadata";
     public static final String JUDGMENT_SCORES = "judgmentScores";
@@ -27,6 +28,7 @@ public class Judgment implements ToXContentObject {
     private String id;
     private String timestamp;
     private String name;
+    private final AsyncStatus status;
     private JudgmentType type;
     private Map<String, Object> metadata;
     private Map<String, Map<String, String>> judgmentScores;
@@ -35,6 +37,7 @@ public class Judgment implements ToXContentObject {
         String id,
         String timestamp,
         String name,
+        AsyncStatus status,
         JudgmentType type,
         Map<String, Object> metadata,
         Map<String, Map<String, String>> judgmentScores
@@ -42,6 +45,7 @@ public class Judgment implements ToXContentObject {
         this.id = id;
         this.timestamp = timestamp;
         this.name = name;
+        this.status = status;
         this.type = type;
         this.metadata = metadata;
         this.judgmentScores = judgmentScores;
@@ -53,6 +57,7 @@ public class Judgment implements ToXContentObject {
         xContentBuilder.field(ID, this.id.trim());
         xContentBuilder.field(TIME_STAMP, this.timestamp.trim());
         xContentBuilder.field(NAME, this.name.trim());
+        xContentBuilder.field(STATUS, this.status.name().trim());
         xContentBuilder.field(TYPE, this.type.name().trim());
         xContentBuilder.field(METADATA, this.metadata);
         // Start judgmentScores object
@@ -79,6 +84,10 @@ public class Judgment implements ToXContentObject {
 
     public String name() {
         return name;
+    }
+
+    public AsyncStatus status() {
+        return status;
     }
 
     public JudgmentType type() {

@@ -25,15 +25,6 @@ public class MetricsConstants {
     public static final String PAIRWISE_FIELD_NAME_B = "1";
 
     /**
-     * evaluation field names
-     */
-    public static final String METRICS_EVALUATION_FIELD_NAME = "evaluation";
-    public static final String METRICS_JUDGMENTS_FIELD_NAME = "judgments";
-    // Limits the total number of search configurations to 10 in evaluation experiments.
-    // Exceeding this limit will prevent additional configurations from being added.
-    public static final int DEFAULTED_SEARCH_CONFIG_MAX_COUNT = 10;
-
-    /**
      * metadata map fields
      */
     public static final String JUDGMENT_IDS = "judgmentIds";

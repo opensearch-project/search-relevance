@@ -7,6 +7,7 @@
  */
 package org.opensearch.searchrelevance.metrics;
 
+import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_PAIRWISE_COMPARISON_FIELD_NAME;
 import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_A;
 import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_B;
 import static org.opensearch.searchrelevance.common.PluginConstants.WILDCARD_QUERY_TEXT;
@@ -119,7 +120,7 @@ public class MetricsHelper {
             Map<String, Object> results = new HashMap<>();
 
             if (searchConfigToDocIds == null || searchConfigToDocIds.isEmpty()) {
-                results.put("pairwiseComparison", Collections.emptyMap());
+                results.put(METRICS_PAIRWISE_COMPARISON_FIELD_NAME, Collections.emptyMap());
                 listener.onResponse(results);
                 return;
             }
@@ -136,7 +137,7 @@ public class MetricsHelper {
             }
 
             // Calculate and add pairwise metrics
-            results.put("pairwiseComparison", calculatePairwiseMetrics(pairwiseInput));
+            results.put(METRICS_PAIRWISE_COMPARISON_FIELD_NAME, calculatePairwiseMetrics(pairwiseInput));
 
             listener.onResponse(results);
         } catch (Exception e) {
@@ -181,55 +182,75 @@ public class MetricsHelper {
 
         try {
             Map<String, String> configToEvalIds = new HashMap<>();
+            Map<String, String> docIdToScores = new HashMap<>();
+            AtomicInteger completedJudgments = new AtomicInteger(0);
 
-            // TODO: we support single judgmentId for a experiment for now.
-            String judgmentId = judgmentIds.get(0);
-            judgmentDao.getJudgment(judgmentIds.get(0), new ActionListener<SearchResponse>() {
-                @Override
-                public void onResponse(SearchResponse judgmentResponse) {
-                    try {
-                        if (judgmentResponse.getHits().getTotalHits().value() == 0) {
-                            listener.onFailure(new IllegalStateException("No judgment found for ID: " + judgmentId));
-                            return;
+            for (String judgmentId : judgmentIds) {
+                judgmentDao.getJudgment(judgmentId, new ActionListener<SearchResponse>() {
+                    @Override
+                    public void onResponse(SearchResponse judgmentResponse) {
+                        try {
+                            if (judgmentResponse.getHits().getTotalHits().value() == 0) {
+                                LOGGER.warn("No judgment found for ID: {}", judgmentId);
+                            } else {
+                                Map<String, Object> sourceAsMap = judgmentResponse.getHits().getHits()[0].getSourceAsMap();
+                                Map<String, Object> judgmentScores = (Map<String, Object>) sourceAsMap.getOrDefault(
+                                    "judgmentScores",
+                                    Collections.emptyMap()
+                                );
+                                List<Map<String, Object>> queryScores = (List<Map<String, Object>>) judgmentScores.getOrDefault(
+                                    queryText,
+                                    Collections.emptyList()
+                                );
+
+                                queryScores.forEach(
+                                    docScore -> docIdToScores.put((String) docScore.get("docId"), (String) docScore.get("score"))
+                                );
+                            }
+
+                            // Check if all judgments have been processed
+                            if (completedJudgments.incrementAndGet() == judgmentIds.size()) {
+                                if (docIdToScores.isEmpty()) {
+                                    LOGGER.warn("No scores found for query: {} in any judgments", queryText);
+                                }
+
+                                processSearchConfigurations(
+                                    queryText,
+                                    indexAndQueryBodies,
+                                    size,
+                                    judgmentIds,
+                                    docIdToScores,
+                                    configToEvalIds,
+                                    listener
+                                );
+                            }
+                        } catch (Exception e) {
+                            listener.onFailure(e);
                         }
-
-                        Map<String, Object> sourceAsMap = judgmentResponse.getHits().getHits()[0].getSourceAsMap();
-                        Map<String, String> docIdToScores = new HashMap<>();
-                        Map<String, Object> judgmentScores = (Map<String, Object>) sourceAsMap.getOrDefault(
-                            "judgmentScores",
-                            Collections.emptyMap()
-                        );
-                        List<Map<String, Object>> queryScores = (List<Map<String, Object>>) judgmentScores.getOrDefault(
-                            queryText,
-                            Collections.emptyList()
-                        );
-
-                        queryScores.forEach(docScore -> docIdToScores.put((String) docScore.get("docId"), (String) docScore.get("score")));
-
-                        if (docIdToScores.isEmpty()) {
-                            LOGGER.warn("No scores found for query: {} in judgment: {}", queryText, judgmentId);
-                        }
-
-                        processSearchConfigurations(
-                            queryText,
-                            indexAndQueryBodies,
-                            size,
-                            judgmentIds,
-                            docIdToScores,
-                            configToEvalIds,
-                            listener
-                        );
-                    } catch (Exception e) {
-                        listener.onFailure(e);
                     }
-                }
 
-                @Override
-                public void onFailure(Exception e) {
-                    LOGGER.error("Failed to fetch judgment {}: {}", judgmentId, e);
-                    listener.onFailure(e);
-                }
-            });
+                    @Override
+                    public void onFailure(Exception e) {
+                        LOGGER.error("Failed to fetch judgment {}: {}", judgmentId, e);
+                        if (completedJudgments.incrementAndGet() == judgmentIds.size()) {
+                            if (docIdToScores.isEmpty()) {
+                                listener.onFailure(new IllegalStateException("Failed to fetch any valid judgments"));
+                            } else {
+                                // Proceed with the judgments we were able to fetch
+                                processSearchConfigurations(
+                                    queryText,
+                                    indexAndQueryBodies,
+                                    size,
+                                    judgmentIds,
+                                    docIdToScores,
+                                    configToEvalIds,
+                                    listener
+                                );
+                            }
+                        }
+                    }
+                });
+            }
         } catch (Exception e) {
             LOGGER.error("Unexpected error in evaluateQueryTextAsync: {}", e.getMessage());
             listener.onFailure(e);

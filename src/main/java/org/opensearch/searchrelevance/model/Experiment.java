@@ -37,7 +37,7 @@ public class Experiment implements ToXContentObject {
     private final String id;
     private final String timestamp;
     private final ExperimentType type;
-    private final ExperimentStatus status;
+    private final AsyncStatus status;
     private final String querySetId;
     private final List<String> searchConfigurationList;
     private final List<String> judgmentList;
@@ -48,7 +48,7 @@ public class Experiment implements ToXContentObject {
         String id,
         String timestamp,
         ExperimentType type,
-        ExperimentStatus status,
+        AsyncStatus status,
         String querySetId,
         List<String> searchConfigurationList,
         List<String> judgmentList,
@@ -96,7 +96,7 @@ public class Experiment implements ToXContentObject {
         return type;
     }
 
-    public ExperimentStatus status() {
+    public AsyncStatus status() {
         return status;
     }
 
