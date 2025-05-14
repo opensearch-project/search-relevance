@@ -295,8 +295,8 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
 
         for (String docId : docIds) {
             judgmentCacheDao.getJudgmentCache(
-                combinedIndexAndQueryText(targetIndex, queryText),
-                docId,
+                queryText,
+                combinedIndexAndDocId(targetIndex, docId),
                 new ActionListener<SearchResponse>() {
                     @Override
                     public void onResponse(SearchResponse response) {
@@ -335,8 +335,8 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         JudgmentCache judgmentCache = new JudgmentCache(
             UUID.randomUUID().toString(),
             TimeUtils.getTimestamp(),
-            combinedIndexAndQueryText(targetIndex, queryText),
-            docId,
+            queryText,
+            combinedIndexAndDocId(targetIndex, docId),
             ratingScore,
             modelId
         );
@@ -349,11 +349,11 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         );
     }
 
-    private String combinedIndexAndQueryText(String index, String queryText) {
+    private String combinedIndexAndDocId(String index, String docId) {
         if (index == null) {
-            return queryText;
+            return docId;
         }
-        return String.join(":", index, queryText);
+        return String.join(":", index, docId);
     }
 
 }
