@@ -73,7 +73,7 @@ public class RestSearchConfigurationActionIT extends SearchRelevanceRestTestCase
         requestMap.put("name", name);
         requestMap.put("index", index);
         requestMap.put("queryBody", queryBody);
-        requestMap.put("searchPipeline", "n/a");
+        requestMap.put("searchPipeline", "");
         return OBJECT_MAPPER.writeValueAsString(requestMap);
     }
 }

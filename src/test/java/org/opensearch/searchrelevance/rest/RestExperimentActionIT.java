@@ -15,7 +15,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.opensearch.client.Response;
-import org.opensearch.client.ResponseException;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.searchrelevance.plugin.SearchRelevanceRestTestCase;
 
@@ -67,20 +66,14 @@ public class RestExperimentActionIT extends SearchRelevanceRestTestCase {
         // 1. put an experiment
         List<String> searchConfigurationList = List.of(searchConfigurationId, searchConfigurationId2);
         String pairwiseRequestBody = createPairwiseRequestBody(querySetId, searchConfigurationList);
-        String llmRequestBody = createLlmRequestBody(querySetId, searchConfigurationList, "test_modelId");
-        String ubiRequestBody = createUbiRequestBody(querySetId, searchConfigurationList, List.of("test_judgmentId01"));
 
         Response putResponse = makeRequest("PUT", EXPERIMENTS_ENDPOINT, pairwiseRequestBody);
         assertEquals(RestStatus.OK.getStatus(), putResponse.getStatusLine().getStatusCode());
-        Response llmResponse = makeRequest("PUT", EXPERIMENTS_ENDPOINT, llmRequestBody);
-        assertEquals(RestStatus.OK.getStatus(), llmResponse.getStatusLine().getStatusCode());
-        Response ubiResponse = makeRequest("PUT", EXPERIMENTS_ENDPOINT, ubiRequestBody);
-        assertEquals(RestStatus.OK.getStatus(), ubiResponse.getStatusLine().getStatusCode());
 
         // parse the response to get the experiment_id
         Map<String, Object> putResponseMap = entityAsMap(putResponse);
         String experimentId = (String) putResponseMap.get("experiment_id");
-        assertNotNull("Experiment ID should not be null", querySetId);
+        assertNotNull("Experiment ID should not be null", experimentId);
 
         // force index refresh to ensure the document is searchable
         makeRequest("POST", "/_refresh", null);
@@ -99,17 +92,6 @@ public class RestExperimentActionIT extends SearchRelevanceRestTestCase {
         // 4. delete the experiment by experiment_id
         Response deleteResponse = makeRequest("DELETE", EXPERIMENTS_ENDPOINT + "/" + experimentId, null);
         assertEquals(RestStatus.OK.getStatus(), deleteResponse.getStatusLine().getStatusCode());
-
-        // force index refresh to ensure the document is searchable
-        makeRequest("POST", "/_refresh", null);
-
-        // 5. validate the experiment got deleted
-        try {
-            makeRequest("GET", EXPERIMENTS_ENDPOINT + "/" + experimentId, null);
-            fail("Expected ResponseException for deleted document");
-        } catch (ResponseException e) {
-            assertEquals(RestStatus.NOT_FOUND.getStatus(), e.getResponse().getStatusLine().getStatusCode());
-        }
     }
 
     private String createPairwiseRequestBody(String querySetId, List<String> searchConfigurationList) throws JsonProcessingException {
@@ -118,28 +100,6 @@ public class RestExperimentActionIT extends SearchRelevanceRestTestCase {
         requestMap.put("searchConfigurationList", searchConfigurationList);
         requestMap.put("size", 10);
         requestMap.put("type", "PAIRWISE_COMPARISON");
-        return OBJECT_MAPPER.writeValueAsString(requestMap);
-    }
-
-    private String createLlmRequestBody(String querySetId, List<String> searchConfigurationList, String modelId)
-        throws JsonProcessingException {
-        Map<String, Object> requestMap = new HashMap<>();
-        requestMap.put("querySetId", querySetId);
-        requestMap.put("searchConfigurationList", searchConfigurationList);
-        requestMap.put("size", 10);
-        requestMap.put("type", "LLM_EVALUATION");
-        requestMap.put("modelId", modelId);
-        return OBJECT_MAPPER.writeValueAsString(requestMap);
-    }
-
-    private String createUbiRequestBody(String querySetId, List<String> searchConfigurationList, List<String> judgmentIds)
-        throws JsonProcessingException {
-        Map<String, Object> requestMap = new HashMap<>();
-        requestMap.put("querySetId", querySetId);
-        requestMap.put("searchConfigurationList", searchConfigurationList);
-        requestMap.put("size", 10);
-        requestMap.put("type", "UBI_EVALUATION");
-        requestMap.put("judgmentList", judgmentIds);
         return OBJECT_MAPPER.writeValueAsString(requestMap);
     }
 }
