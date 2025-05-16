@@ -88,7 +88,7 @@ public class MLAccessor {
             if (Objects.isNull(reference) || reference.isEmpty()) {
                 userContent = String.format(Locale.ROOT, INPUT_FORMAT_SEARCH, searchText, hitsJson);
             } else {
-                userContent = String.format(Locale.ROOT, INPUT_FORMAT_SEARCH_WITH_REFERENCE, searchText, hitsJson, reference);
+                userContent = String.format(Locale.ROOT, INPUT_FORMAT_SEARCH_WITH_REFERENCE, searchText, reference, hitsJson);
             }
             String messages = String.format(Locale.ROOT, PROMPT_JSON_MESSAGES_SHELL, PROMPT_SEARCH_RELEVANCE, escapeJson(userContent));
 
