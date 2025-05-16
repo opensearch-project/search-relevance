@@ -7,6 +7,8 @@
  */
 package org.opensearch.searchrelevance.transport.queryset;
 
+import static org.opensearch.searchrelevance.model.QueryWithReference.DELIMITER;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,6 +25,7 @@ import org.opensearch.core.rest.RestStatus;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.model.QuerySet;
+import org.opensearch.searchrelevance.model.QueryWithReference;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
@@ -62,8 +65,8 @@ public class PutQuerySetTransportAction extends HandledTransportAction<PutQueryS
                 new SearchRelevanceException("Support sampling as manual only. sampling: " + sampling, RestStatus.BAD_REQUEST)
             );
         }
-        String querySetQueriesStr = request.getQuerySetQueries();
-        Map<String, Integer> querySetQueries = convertQuerySetQueriesMap(querySetQueriesStr);
+        List<QueryWithReference> queryWithReferenceList = request.getQuerySetQueries();
+        Map<String, Integer> querySetQueries = convertQuerySetQueriesMap(queryWithReferenceList);
 
         StepListener<Void> createIndexStep = new StepListener<>();
         querySetDao.createIndexIfAbsent(createIndexStep);
@@ -74,15 +77,26 @@ public class PutQuerySetTransportAction extends HandledTransportAction<PutQueryS
     }
 
     /**
-     * Query set input is a list of query set text split with comma.
-     * e.g: "querySetQueries": "apple, banana, orange"
-     * @param querySetQueriesStr - input
-     * @return - querySetQueries as a map of string and long
+     * Query set input is a list of queryText and referenceAnswer pair.
+     * e.g:
+     * {
+     *     "queryText": "What is OpenSearch?",
+     *     "referenceAnswer": "OpenSearch is a community-driven, open source search and analytics suite"
+     * }
+     * @param queryWithReferenceList - list of queryText and referenceAnswer pair
+     * @return - querySetQueries as a map of {queryText}#{referenceAnswer} and probability to alignn with UBI queryset
      */
-    private Map<String, Integer> convertQuerySetQueriesMap(String querySetQueriesStr) {
-        List<String> querySetInputs = List.of(querySetQueriesStr.split(","));
+    private Map<String, Integer> convertQuerySetQueriesMap(List<QueryWithReference> queryWithReferenceList) {
         Map<String, Integer> result = new HashMap<>();
-        querySetInputs.forEach(e -> { result.put(e.trim(), 0); });
+        queryWithReferenceList.forEach(queryWithReference -> {
+            if (queryWithReference.getReferenceAnswer() != null && !queryWithReference.getReferenceAnswer().isEmpty()) {
+                String combinedStr = String.join(DELIMITER, queryWithReference.getQueryText(), queryWithReference.getReferenceAnswer());
+                result.put(combinedStr, 0);
+            } else {
+                result.put(queryWithReference.getQueryText(), 0);
+            }
+
+        });
         return result;
     }
 }

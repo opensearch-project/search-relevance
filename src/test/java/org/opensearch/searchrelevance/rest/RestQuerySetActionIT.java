@@ -7,12 +7,15 @@
  */
 package org.opensearch.searchrelevance.rest;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.opensearch.client.Response;
 import org.opensearch.client.ResponseException;
 import org.opensearch.core.rest.RestStatus;
+import org.opensearch.searchrelevance.model.QueryWithReference;
 import org.opensearch.searchrelevance.plugin.SearchRelevanceRestTestCase;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -71,7 +74,14 @@ public class RestQuerySetActionIT extends SearchRelevanceRestTestCase {
         requestMap.put("name", name);
         requestMap.put("description", description);
         requestMap.put("sampling", "manual");
-        requestMap.put("querySetQueries", "apple, banana");
+        requestMap.put("querySetQueries", getQuerySetQueries());
         return OBJECT_MAPPER.writeValueAsString(requestMap);
+    }
+
+    private static List<QueryWithReference> getQuerySetQueries() {
+        List<QueryWithReference> querySetQueries = new ArrayList<>();
+        querySetQueries.add(new QueryWithReference("apple", ""));
+        querySetQueries.add(new QueryWithReference("banana", ""));
+        return querySetQueries;
     }
 }

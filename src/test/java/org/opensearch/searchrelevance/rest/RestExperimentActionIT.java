@@ -10,12 +10,14 @@ package org.opensearch.searchrelevance.rest;
 import static org.opensearch.searchrelevance.rest.RestQuerySetActionIT.createQuerySetRequestBody;
 import static org.opensearch.searchrelevance.rest.RestSearchConfigurationActionIT.createSearchConfigurationRequestBody;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.opensearch.client.Response;
 import org.opensearch.core.rest.RestStatus;
+import org.opensearch.searchrelevance.model.QueryWithReference;
 import org.opensearch.searchrelevance.plugin.SearchRelevanceRestTestCase;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -101,5 +103,12 @@ public class RestExperimentActionIT extends SearchRelevanceRestTestCase {
         requestMap.put("size", 10);
         requestMap.put("type", "PAIRWISE_COMPARISON");
         return OBJECT_MAPPER.writeValueAsString(requestMap);
+    }
+
+    private List<QueryWithReference> getQuerySetQueries() {
+        List<QueryWithReference> querySetQueries = new ArrayList<>();
+        querySetQueries.add(new QueryWithReference("apple", ""));
+        querySetQueries.add(new QueryWithReference("banana", ""));
+        return querySetQueries;
     }
 }

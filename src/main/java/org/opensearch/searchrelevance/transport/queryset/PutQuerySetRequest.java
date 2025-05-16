@@ -8,12 +8,14 @@
 package org.opensearch.searchrelevance.transport.queryset;
 
 import java.io.IOException;
+import java.util.List;
 
 import org.opensearch.action.ActionRequest;
 import org.opensearch.action.ActionRequestValidationException;
 import org.opensearch.common.Nullable;
 import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.core.common.io.stream.StreamOutput;
+import org.opensearch.searchrelevance.model.QueryWithReference;
 
 import reactor.util.annotation.NonNull;
 
@@ -24,9 +26,14 @@ public class PutQuerySetRequest extends ActionRequest {
     private final String name;
     private final String description;
     private final String sampling;
-    private final String querySetQueries;
+    private final List<QueryWithReference> querySetQueries;
 
-    public PutQuerySetRequest(@NonNull String name, String description, @NonNull String sampling, @NonNull String querySetQueries) {
+    public PutQuerySetRequest(
+        @NonNull String name,
+        String description,
+        @NonNull String sampling,
+        @NonNull List<QueryWithReference> querySetQueries
+    ) {
         this.name = name;
         this.description = description;
         this.sampling = sampling;
@@ -38,7 +45,7 @@ public class PutQuerySetRequest extends ActionRequest {
         this.name = in.readString();
         this.description = in.readOptionalString();
         this.sampling = in.readString();
-        this.querySetQueries = in.readString();
+        this.querySetQueries = in.readList(QueryWithReference::new);
     }
 
     @Override
@@ -47,7 +54,7 @@ public class PutQuerySetRequest extends ActionRequest {
         out.writeString(name);
         out.writeOptionalString(description);
         out.writeString(sampling);
-        out.writeString(querySetQueries);
+        out.writeList(querySetQueries);
     }
 
     public String getName() {
@@ -63,7 +70,7 @@ public class PutQuerySetRequest extends ActionRequest {
         return sampling;
     }
 
-    public String getQuerySetQueries() {
+    public List<QueryWithReference> getQuerySetQueries() {
         return querySetQueries;
     }
 

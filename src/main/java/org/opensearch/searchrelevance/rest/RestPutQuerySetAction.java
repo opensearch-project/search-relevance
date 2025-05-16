@@ -12,8 +12,10 @@ import static org.opensearch.rest.RestRequest.Method.PUT;
 import static org.opensearch.searchrelevance.common.PluginConstants.QUERYSETS_URL;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -25,6 +27,7 @@ import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.rest.BaseRestHandler;
 import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestRequest;
+import org.opensearch.searchrelevance.model.QueryWithReference;
 import org.opensearch.searchrelevance.transport.queryset.PutQuerySetAction;
 import org.opensearch.searchrelevance.transport.queryset.PutQuerySetRequest;
 import org.opensearch.transport.client.node.NodeClient;
@@ -55,7 +58,17 @@ public class RestPutQuerySetAction extends BaseRestHandler {
         String description = (String) source.get("description");
         // Default values for sampling as manual
         String sampling = (String) source.getOrDefault("sampling", "manual");
-        String querySetQueries = (String) source.get("querySetQueries");
+
+        List<QueryWithReference> querySetQueries;
+        if (sampling.equals("manual")) {
+            List<Object> rawQueries = (List<Object>) source.get("querySetQueries");
+            querySetQueries = rawQueries.stream().map(obj -> {
+                Map<String, String> queryMap = (Map<String, String>) obj;
+                return new QueryWithReference(queryMap.get("queryText"), queryMap.getOrDefault("referenceAnswer", ""));
+            }).collect(Collectors.toList());
+        } else {
+            querySetQueries = Collections.emptyList();
+        }
 
         PutQuerySetRequest putRequest = new PutQuerySetRequest(name, description, sampling, querySetQueries);
 
