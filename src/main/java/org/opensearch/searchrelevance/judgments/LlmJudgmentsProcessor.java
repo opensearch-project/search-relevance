@@ -8,11 +8,11 @@
 package org.opensearch.searchrelevance.judgments;
 
 import static org.opensearch.searchrelevance.common.MLConstants.sanitizeLLMResponse;
-import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_INDEX_AND_QUERY_BODY_FIELD_NAME;
+import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_INDEX_AND_QUERIES_FIELD_NAME;
 import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_QUERY_TEXT_FIELD_NAME;
-import static org.opensearch.searchrelevance.common.PluginConstants.WILDCARD_QUERY_TEXT;
 import static org.opensearch.searchrelevance.model.JudgmentCache.SCORE;
 import static org.opensearch.searchrelevance.model.QueryWithReference.DELIMITER;
+import static org.opensearch.searchrelevance.model.builder.SearchRequestBuilder.buildSearchRequest;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -34,9 +34,7 @@ import org.opensearch.action.search.SearchResponse;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
-import org.opensearch.index.query.QueryBuilders;
 import org.opensearch.search.SearchHit;
-import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.searchrelevance.dao.JudgmentCacheDao;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
@@ -118,14 +116,14 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         Map<String, Object> results,
         ActionListener<Map<String, Map<String, String>>> listener
     ) {
-        Map<String, List<String>> indexAndQueryBodies = (Map<String, List<String>>) results.get(METRICS_INDEX_AND_QUERY_BODY_FIELD_NAME);
+        Map<String, List<String>> indexAndQueries = (Map<String, List<String>>) results.get(METRICS_INDEX_AND_QUERIES_FIELD_NAME);
         List<String> queryTextWithReferences = (List<String>) results.get(METRICS_QUERY_TEXT_FIELD_NAME);
 
         Map<String, Map<String, String>> allJudgments = new HashMap<>();
         AtomicInteger remainingQueries = new AtomicInteger(queryTextWithReferences.size());
 
         for (String queryTextWithReference : queryTextWithReferences) {
-            processQueryText(modelId, size, indexAndQueryBodies, queryTextWithReference, new ActionListener<Map<String, String>>() {
+            processQueryText(modelId, size, indexAndQueries, queryTextWithReference, new ActionListener<Map<String, String>>() {
                 @Override
                 public void onResponse(Map<String, String> docIdToScore) {
                     synchronized (allJudgments) {
@@ -149,29 +147,21 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
     private void processQueryText(
         String modelId,
         int size,
-        Map<String, List<String>> indexAndQueryBodies,
+        Map<String, List<String>> indexAndQueries,
         String queryTextWithReference,
         ActionListener<Map<String, String>> listener
     ) {
         Set<Map<String, String>> unionHits = new HashSet<>();
         Map<String, String> docIdToScore = new HashMap<>();
 
-        AtomicInteger pendingSearches = new AtomicInteger(indexAndQueryBodies.size());
-        for (Map.Entry<String, List<String>> entry : indexAndQueryBodies.entrySet()) {
+        AtomicInteger pendingSearches = new AtomicInteger(indexAndQueries.size());
+        for (Map.Entry<String, List<String>> entry : indexAndQueries.entrySet()) {
             String index = entry.getValue().get(0);
             String queryText = queryTextWithReference.split(DELIMITER, 2)[0];
-            String queryBody = entry.getValue().get(1).replace(WILDCARD_QUERY_TEXT, queryText);
+            String query = entry.getValue().get(1);
             String searchPipeline = entry.getValue().get(2);
 
-            SearchRequest searchRequest = new SearchRequest(index);
-            SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
-            sourceBuilder.query(QueryBuilders.wrapperQuery(queryBody));
-            sourceBuilder.size(size);
-            searchRequest.source(sourceBuilder);
-            if (searchPipeline != null && !searchPipeline.isEmpty()) {
-                searchRequest.pipeline(searchPipeline);
-            }
-
+            SearchRequest searchRequest = buildSearchRequest(index, query, queryText, searchPipeline, size);
             StashedThreadContext.run(client, () -> client.search(searchRequest, ActionListener.wrap(response -> {
                 SearchHit[] hits = response.getHits().getHits();
                 List<String> docIds = Arrays.stream(hits).map(SearchHit::getId).collect(Collectors.toList());

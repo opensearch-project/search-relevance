@@ -3,6 +3,6 @@ curl -s -X PUT "http://localhost:9200/_plugins/search_relevance/search_configura
 -d'{
       "name": "baseline",
       "index": "sample_index";
-      "queryBody": "{\"match_all\":{}}",
+      "query": "{\"query\": {\n\"match_all\": {}}}",
       "searchPipeline": "n/a"
 }' | jq

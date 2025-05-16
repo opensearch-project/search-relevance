@@ -4,5 +4,8 @@ curl -s -X PUT "localhost:9200/_plugins/search_relevance/query_sets" \
    	"name": "test01",
    	"description": "test01",
    	"sampling": "manual",
-   	"querySetQueries": "apple, banana"
+   	"querySetQueries": [
+    	{"queryText": "apple"},
+    	{"queryText": "banana"}
+    ]
 }' | jq

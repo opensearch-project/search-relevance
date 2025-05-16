@@ -15,7 +15,7 @@ public class MetricsConstants {
 
     public static final String METRICS_FIELD_NAME = "metrics";
     public static final String METRICS_QUERY_TEXT_FIELD_NAME = "queryTexts";
-    public static final String METRICS_INDEX_AND_QUERY_BODY_FIELD_NAME = "indexAndQueryBodies";
+    public static final String METRICS_INDEX_AND_QUERIES_FIELD_NAME = "indexAndQueries";
 
     /**
      * pariwise comparison field names

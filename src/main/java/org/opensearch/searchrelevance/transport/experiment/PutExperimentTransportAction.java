@@ -7,7 +7,7 @@
  */
 package org.opensearch.searchrelevance.transport.experiment;
 
-import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_INDEX_AND_QUERY_BODY_FIELD_NAME;
+import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_INDEX_AND_QUERIES_FIELD_NAME;
 import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_QUERY_TEXT_FIELD_NAME;
 
 import java.util.ArrayList;
@@ -138,10 +138,10 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
     }
 
     private void calculateMetricsAsync(String experimentId, PutExperimentRequest request, Map<String, Object> results) {
-        Map<String, List<String>> indexAndQueryBodies = (Map<String, List<String>>) results.get(METRICS_INDEX_AND_QUERY_BODY_FIELD_NAME);
+        Map<String, List<String>> indexAndQueries = (Map<String, List<String>>) results.get(METRICS_INDEX_AND_QUERIES_FIELD_NAME);
         List<String> queryTexts = (List<String>) results.get(METRICS_QUERY_TEXT_FIELD_NAME);
 
-        if (queryTexts == null || indexAndQueryBodies == null) {
+        if (queryTexts == null || indexAndQueries == null) {
             handleAsyncFailure(
                 experimentId,
                 request,
@@ -151,13 +151,13 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
             return;
         }
 
-        processQueryTextMetrics(experimentId, request, indexAndQueryBodies, queryTexts);
+        processQueryTextMetrics(experimentId, request, indexAndQueries, queryTexts);
     }
 
     private void processQueryTextMetrics(
         String experimentId,
         PutExperimentRequest request,
-        Map<String, List<String>> indexAndQueryBodies,
+        Map<String, List<String>> indexAndQueries,
         List<String> queryTexts
     ) {
         Map<String, Object> finalResults = Collections.synchronizedMap(new HashMap<>());
@@ -193,7 +193,7 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
                 executeExperimentEvaluation(
                     experimentId,
                     request,
-                    indexAndQueryBodies,
+                    indexAndQueries,
                     queryTexts,
                     finalResults,
                     pendingQueries,
@@ -205,7 +205,7 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
             executeExperimentEvaluation(
                 experimentId,
                 request,
-                indexAndQueryBodies,
+                indexAndQueries,
                 queryTexts,
                 finalResults,
                 pendingQueries,
@@ -218,7 +218,7 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
     private void executeExperimentEvaluation(
         String experimentId,
         PutExperimentRequest request,
-        Map<String, List<String>> indexAndQueryBodies,
+        Map<String, List<String>> indexAndQueries,
         List<String> queryTexts,
         Map<String, Object> finalResults,
         AtomicInteger pendingQueries,
@@ -229,7 +229,7 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
             if (request.getType() == ExperimentType.PAIRWISE_COMPARISON) {
                 metricsHelper.processPairwiseMetrics(
                     queryText,
-                    indexAndQueryBodies,
+                    indexAndQueries,
                     request.getSize(),
                     ActionListener.wrap(
                         queryResults -> handleQueryResults(
@@ -248,7 +248,7 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
             } else {
                 metricsHelper.processEvaluationMetrics(
                     queryText,
-                    indexAndQueryBodies,
+                    indexAndQueries,
                     request.getSize(),
                     judgmentList,
                     ActionListener.wrap(queryResults -> {

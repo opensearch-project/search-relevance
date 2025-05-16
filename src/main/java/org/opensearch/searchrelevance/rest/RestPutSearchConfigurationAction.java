@@ -53,7 +53,7 @@ public class RestPutSearchConfigurationAction extends BaseRestHandler {
 
         String name = (String) source.get("name");
         String index = (String) source.get("index");
-        String queryBody = (String) source.get("queryBody");
+        String queryBody = (String) source.get("query");
         String searchPipeline = (String) source.getOrDefault("searchPipeline", "");
 
         PutSearchConfigurationRequest createRequest = new PutSearchConfigurationRequest(name, index, queryBody, searchPipeline);

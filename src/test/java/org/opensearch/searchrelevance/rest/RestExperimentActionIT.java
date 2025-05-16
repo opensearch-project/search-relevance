@@ -46,8 +46,8 @@ public class RestExperimentActionIT extends SearchRelevanceRestTestCase {
         // create a search configuration and get the search_configuration_id
         String searchConfigName = "test_name";
         String index = "sample_index";
-        String queryBody = "{\"match_all\":{}}";
-        String searchConfigRequestBody = createSearchConfigurationRequestBody(searchConfigName, index, queryBody);
+        String query = "{\"query\": {\n\"match_all\": {}}}";
+        String searchConfigRequestBody = createSearchConfigurationRequestBody(searchConfigName, index, query);
 
         Response putSearchConfigResponse = makeRequest("PUT", SEARCH_CONFIGURATIONS_ENDPOINT, searchConfigRequestBody);
         assertEquals(RestStatus.OK.getStatus(), putSearchConfigResponse.getStatusLine().getStatusCode());
@@ -59,7 +59,7 @@ public class RestExperimentActionIT extends SearchRelevanceRestTestCase {
 
         // repeat to build pairwise search configuration
         String searchConfigName2 = "test_name2";
-        String searchConfigRequestBody2 = createSearchConfigurationRequestBody(searchConfigName2, index, queryBody);
+        String searchConfigRequestBody2 = createSearchConfigurationRequestBody(searchConfigName2, index, query);
         Response putSearchConfigResponse2 = makeRequest("PUT", SEARCH_CONFIGURATIONS_ENDPOINT, searchConfigRequestBody2);
         assertEquals(RestStatus.OK.getStatus(), putSearchConfigResponse2.getStatusLine().getStatusCode());
         Map<String, Object> searchConfigPutResponseMap2 = entityAsMap(putSearchConfigResponse2);

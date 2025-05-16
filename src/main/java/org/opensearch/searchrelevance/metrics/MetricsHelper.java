@@ -10,9 +10,9 @@ package org.opensearch.searchrelevance.metrics;
 import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_PAIRWISE_COMPARISON_FIELD_NAME;
 import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_A;
 import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_B;
-import static org.opensearch.searchrelevance.common.PluginConstants.WILDCARD_QUERY_TEXT;
 import static org.opensearch.searchrelevance.metrics.EvaluationMetrics.calculateEvaluationMetrics;
 import static org.opensearch.searchrelevance.metrics.PairwiseComparisonMetrics.calculatePairwiseMetrics;
+import static org.opensearch.searchrelevance.model.builder.SearchRequestBuilder.buildSearchRequest;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -32,9 +32,7 @@ import org.opensearch.action.search.SearchResponse;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.core.action.ActionListener;
-import org.opensearch.index.query.QueryBuilders;
 import org.opensearch.search.SearchHit;
-import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.searchrelevance.dao.EvaluationResultDao;
 import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.model.EvaluationResult;
@@ -73,20 +71,20 @@ public class MetricsHelper {
      */
     public void processPairwiseMetrics(
         String queryText,
-        Map<String, List<String>> indexAndQueryBodies,
+        Map<String, List<String>> indexAndQueries,
         int size,
         ActionListener<Map<String, Object>> listener
     ) {
         Map<String, List<String>> searchConfigToDocIds = Collections.synchronizedMap(new HashMap<>());
         AtomicBoolean hasFailure = new AtomicBoolean(false);
-        AtomicInteger pendingSearches = new AtomicInteger(indexAndQueryBodies.size());
+        AtomicInteger pendingSearches = new AtomicInteger(indexAndQueries.size());
 
-        for (Map.Entry<String, List<String>> entry : indexAndQueryBodies.entrySet()) {
+        for (Map.Entry<String, List<String>> entry : indexAndQueries.entrySet()) {
             String searchConfigId = entry.getKey();
             String index = entry.getValue().get(0);
-            String queryPattern = entry.getValue().get(1);
+            String query = entry.getValue().get(1);
 
-            SearchRequest searchRequest = createSearchRequest(index, queryPattern.replace(WILDCARD_QUERY_TEXT, queryText), size);
+            SearchRequest searchRequest = buildSearchRequest(index, query, queryText, null, size);
 
             client.search(searchRequest, new ActionListener<SearchResponse>() {
                 @Override
@@ -96,6 +94,7 @@ public class MetricsHelper {
                     try {
                         List<String> docIds = Arrays.stream(response.getHits().getHits())
                             .map(SearchHit::getId)
+                            .distinct()
                             .collect(Collectors.toList());
 
                         searchConfigToDocIds.put(searchConfigId, docIds);
@@ -145,12 +144,6 @@ public class MetricsHelper {
         }
     }
 
-    private SearchRequest createSearchRequest(String index, String queryBody, int size) {
-        SearchRequest request = new SearchRequest(index);
-        SearchSourceBuilder sourceBuilder = new SearchSourceBuilder().query(QueryBuilders.wrapperQuery(queryBody)).size(size);
-        return request.source(sourceBuilder);
-    }
-
     private void handleFailure(Exception error, AtomicBoolean hasFailure, ActionListener<?> listener) {
         if (hasFailure.compareAndSet(false, true)) {
             listener.onFailure(error);
@@ -160,7 +153,7 @@ public class MetricsHelper {
     /**
      * Create evaluation results for provided queryText
      * @param queryText - queryText to be evaluated against
-     * @param indexAndQueryBodies - "${searchConfigId}" to ["$index", "$queryPattern"] map
+     * @param indexAndQueries - "${searchConfigId}" to ["$index", "$queryPattern"] map
      * And will add evaluationId back to experiment results
      *  "results" {
      *     "${queryText}": {
@@ -170,12 +163,12 @@ public class MetricsHelper {
      */
     public void processEvaluationMetrics(
         String queryText,
-        Map<String, List<String>> indexAndQueryBodies,
+        Map<String, List<String>> indexAndQueries,
         int size,
         List<String> judgmentIds,
         ActionListener<Map<String, String>> listener
     ) {
-        if (indexAndQueryBodies.isEmpty() || judgmentIds.isEmpty()) {
+        if (indexAndQueries.isEmpty() || judgmentIds.isEmpty()) {
             listener.onFailure(new IllegalArgumentException("Missing required parameters"));
             return;
         }
@@ -216,7 +209,7 @@ public class MetricsHelper {
 
                                 processSearchConfigurations(
                                     queryText,
-                                    indexAndQueryBodies,
+                                    indexAndQueries,
                                     size,
                                     judgmentIds,
                                     docIdToScores,
@@ -239,7 +232,7 @@ public class MetricsHelper {
                                 // Proceed with the judgments we were able to fetch
                                 processSearchConfigurations(
                                     queryText,
-                                    indexAndQueryBodies,
+                                    indexAndQueries,
                                     size,
                                     judgmentIds,
                                     docIdToScores,
@@ -259,50 +252,40 @@ public class MetricsHelper {
 
     private void processSearchConfigurations(
         String queryText,
-        Map<String, List<String>> indexAndQueryBodies,
+        Map<String, List<String>> indexAndQueries,
         int size,
         List<String> judgmentIds,
         Map<String, String> docIdToScores,
         Map<String, String> configToEvalIds,
         ActionListener<Map<String, String>> listener
     ) {
-        AtomicInteger pendingConfigurations = new AtomicInteger(indexAndQueryBodies.size());
+        AtomicInteger pendingConfigurations = new AtomicInteger(indexAndQueries.size());
         AtomicBoolean hasFailure = new AtomicBoolean(false);
 
-        if (indexAndQueryBodies.isEmpty()) {
+        if (indexAndQueries.isEmpty()) {
             listener.onResponse(configToEvalIds);
             return;
         }
 
-        for (String searchConfigurationId : indexAndQueryBodies.keySet()) {
+        for (String searchConfigurationId : indexAndQueries.keySet()) {
             if (hasFailure.get()) {
                 return;
             }
 
             final String evaluationId = UUID.randomUUID().toString();
-            String index = indexAndQueryBodies.get(searchConfigurationId).get(0);
-            String queryPattern = indexAndQueryBodies.get(searchConfigurationId).get(1);
-            String searchPipeline = indexAndQueryBodies.get(searchConfigurationId).get(2);
+            String index = indexAndQueries.get(searchConfigurationId).get(0);
+            String query = indexAndQueries.get(searchConfigurationId).get(1);
+            String searchPipeline = indexAndQueries.get(searchConfigurationId).get(2);
             LOGGER.debug(
-                "Configuration {}: index: {}, query pattern: {}, searchPipeline: {}, evaluationId: {}",
+                "Configuration {}: index: {}, query: {}, searchPipeline: {}, evaluationId: {}",
                 searchConfigurationId,
                 index,
-                queryPattern,
+                query,
                 searchPipeline,
                 evaluationId
             );
 
-            String queryBody = queryPattern.replace(WILDCARD_QUERY_TEXT, queryText);
-            SearchRequest searchRequest = new SearchRequest(index);
-            SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
-            if (searchPipeline != null && !searchPipeline.isEmpty()) {
-                searchRequest.pipeline(searchPipeline);
-            }
-
-            sourceBuilder.query(QueryBuilders.wrapperQuery(queryBody));
-            sourceBuilder.size(size);
-            searchRequest.source(sourceBuilder);
-
+            SearchRequest searchRequest = buildSearchRequest(index, query, queryText, searchPipeline, size);
             client.search(searchRequest, new ActionListener<SearchResponse>() {
                 @Override
                 public void onResponse(SearchResponse response) {
