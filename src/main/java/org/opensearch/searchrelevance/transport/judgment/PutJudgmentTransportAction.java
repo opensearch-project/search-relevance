@@ -68,9 +68,6 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
         JudgmentType type = request.getType();
         Map<String, Object> metadata = buildMetadata(request);
 
-        // Step 1: create initial judgment with empty judgmentScores
-
-        // Step 2: create index
         StepListener<Void> createIndexStep = new StepListener<>();
         judgmentDao.createIndexIfAbsent(createIndexStep);
 
