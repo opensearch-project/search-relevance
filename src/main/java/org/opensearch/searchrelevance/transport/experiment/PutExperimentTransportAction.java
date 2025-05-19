@@ -164,43 +164,49 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
         AtomicInteger pendingQueries = new AtomicInteger(queryTexts.size());
         AtomicBoolean hasFailure = new AtomicBoolean(false);
 
-        if (request.getType() == ExperimentType.LLM_EVALUATION && request.getModelId() != null) {
-            Map<String, Object> metadata = new HashMap<>();
-            metadata.put("modelId", request.getModelId());
-            metadata.put("querySetId", request.getQuerySetId());
-            metadata.put("searchConfigurationList", request.getSearchConfigurationList());
-            metadata.put("size", request.getSize());
+        Map<String, Object> metadata = new HashMap<>();
+        if (request.getType() == ExperimentType.LLM_EVALUATION) {
+            PutLlmExperimentRequest llmRequest = (PutLlmExperimentRequest) request;
+            // generate llm judgment only if modelId is provided
+            if (llmRequest.getModelId() != null) {
+                metadata.put("querySetId", request.getQuerySetId());
+                metadata.put("searchConfigurationList", request.getSearchConfigurationList());
+                metadata.put("size", request.getSize());
+                metadata.put("modelId", llmRequest.getModelId());
+                metadata.put("tokenLimit", llmRequest.getTokenLimit());
+                metadata.put("contextFields", llmRequest.getContextFields());
 
-            // Step 1: Generate Judgment Scores
-            StepListener<Map<String, Map<String, String>>> processJudgmentScoresStep = new StepListener<>();
-            BaseJudgmentsProcessor llmJudgmentsProcessor = judgmentsProcessorFactory.getProcessor(JudgmentType.LLM_JUDGMENT);
-            llmJudgmentsProcessor.generateJudgmentScore(metadata, processJudgmentScoresStep);
+                // Step 1: Generate Judgment Scores
+                StepListener<Map<String, Map<String, String>>> processJudgmentScoresStep = new StepListener<>();
+                BaseJudgmentsProcessor llmJudgmentsProcessor = judgmentsProcessorFactory.getProcessor(JudgmentType.LLM_JUDGMENT);
+                llmJudgmentsProcessor.generateJudgmentScore(metadata, processJudgmentScoresStep);
 
-            // Step 2: Store Judgment
-            StepListener<String> storeJudgmentStep = new StepListener<>();
-            processJudgmentScoresStep.whenComplete(
-                llmJudgments -> { createAndStoreLlmJudgment(metadata, llmJudgments, storeJudgmentStep); },
-                error -> {
-                    handleFailure(error, hasFailure, experimentId, request);
-                }
-            );
-
-            // Step 3: Execute Experiment Evaluation
-            storeJudgmentStep.whenComplete(llmJudgmentId -> {
-                List<String> updatedJudgmentList = new ArrayList<>(request.getJudgmentList());
-                updatedJudgmentList.add(llmJudgmentId);
-
-                executeExperimentEvaluation(
-                    experimentId,
-                    request,
-                    indexAndQueries,
-                    queryTexts,
-                    finalResults,
-                    pendingQueries,
-                    hasFailure,
-                    updatedJudgmentList
+                // Step 2: Store Judgment
+                StepListener<String> storeJudgmentStep = new StepListener<>();
+                processJudgmentScoresStep.whenComplete(
+                    llmJudgments -> { createAndStoreLlmJudgment(metadata, llmJudgments, storeJudgmentStep); },
+                    error -> {
+                        handleFailure(error, hasFailure, experimentId, request);
+                    }
                 );
-            }, error -> { handleFailure(error, hasFailure, experimentId, request); });
+
+                // Step 3: Execute Experiment Evaluation
+                storeJudgmentStep.whenComplete(llmJudgmentId -> {
+                    List<String> updatedJudgmentList = new ArrayList<>(request.getJudgmentList());
+                    updatedJudgmentList.add(llmJudgmentId);
+
+                    executeExperimentEvaluation(
+                        experimentId,
+                        request,
+                        indexAndQueries,
+                        queryTexts,
+                        finalResults,
+                        pendingQueries,
+                        hasFailure,
+                        updatedJudgmentList
+                    );
+                }, error -> { handleFailure(error, hasFailure, experimentId, request); });
+            }
         } else {
             executeExperimentEvaluation(
                 experimentId,

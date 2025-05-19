@@ -90,6 +90,8 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
                 metadata.put("querySetId", llmRequest.getQuerySetId());
                 metadata.put("size", llmRequest.getSize());
                 metadata.put("searchConfigurationList", llmRequest.getSearchConfigurationList());
+                metadata.put("tokenLimit", llmRequest.getTokenLimit());
+                metadata.put("contextFields", llmRequest.getContextFields());
             }
             case UBI_JUDGMENT -> {
                 PutUbiJudgmentRequest ubiRequest = (PutUbiJudgmentRequest) request;

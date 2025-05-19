@@ -9,6 +9,7 @@ package org.opensearch.searchrelevance.utils;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -89,4 +90,22 @@ public class ParserUtils {
         }
         return result;
     }
+
+    public static String convertListToSortedStr(List<String> list) {
+        List<String> sortedList = new ArrayList<>(list);
+        Collections.sort(sortedList);
+        return String.join(",", sortedList);
+    }
+
+    public static String combinedIndexAndDocId(String index, String docId) {
+        if (index == null) {
+            return docId;
+        }
+        return String.join("::", index, docId);
+    }
+
+    public static String getDocIdFromCompositeKey(String compositeKey) {
+        return compositeKey.split("::")[1];
+    }
+
 }

@@ -51,13 +51,7 @@ public class MLAccessor {
         this.mlClient = mlClient;
     }
 
-    public void predict(
-        String modelId,
-        String searchText,
-        String reference,
-        List<Map<String, String>> hits,
-        ActionListener<String> listener
-    ) {
+    public void predict(String modelId, String searchText, String reference, Map<String, String> hits, ActionListener<String> listener) {
         MLInput mlInput = getMLInput(searchText, reference, hits);
         mlClient.predict(
             modelId,
@@ -66,7 +60,7 @@ public class MLAccessor {
         );
     }
 
-    private MLInput getMLInput(String searchText, String reference, List<Map<String, String>> hits) {
+    private MLInput getMLInput(String searchText, String reference, Map<String, String> hits) {
         Map<String, String> parameters = new HashMap<>();
         try {
             // Use XContentBuilder to create JSON string. JSON serialization/deserialization through Jackson needs to use reflection to
@@ -74,11 +68,10 @@ public class MLAccessor {
             String hitsJson;
             try (XContentBuilder builder = XContentFactory.jsonBuilder()) {
                 builder.startArray();
-                for (Map<String, String> hit : hits) {
+                for (Map.Entry hit : hits.entrySet()) {
                     builder.startObject();
-                    for (Map.Entry<String, String> entry : hit.entrySet()) {
-                        builder.field(entry.getKey(), entry.getValue());
-                    }
+                    builder.field("id", hit.getKey());
+                    builder.field("source", hit.getValue());
                     builder.endObject();
                 }
                 builder.endArray();

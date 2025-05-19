@@ -18,10 +18,28 @@ import reactor.util.annotation.NonNull;
 
 public class PutLlmJudgmentRequest extends PutJudgmentRequest {
 
+    /**
+     * LLM defaulted token limits
+     */
+    public static final Integer DEFAULTED_TOKEN_LIMIT = 1000;
+
     private final String modelId;
     private final String querySetId;
     private final List<String> searchConfigurationList;
     private int size;
+
+    /**
+     * The token limit sent to the LLM. This indicates the max token allowed.
+     * A helpful rule of thumb is that one token generally corresponds to ~4 characters of text for common English text.
+     * This translates to roughly ¾ of a word (so 100 tokens ~= 75 words).
+     * Feel free to learn about language model tokenization - https://platform.openai.com/tokenizer
+     */
+    private int tokenLimit;
+
+    /**
+     * A list of fields contained in the document sources that will be used as context for judgment generation.
+     */
+    private List<String> contextFields;
 
     public PutLlmJudgmentRequest(
         @NonNull JudgmentType type,
@@ -30,13 +48,17 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         @NonNull String modelId,
         @NonNull String querySetId,
         @NonNull List<String> searchConfigurationList,
-        int size
+        int size,
+        int tokenLimit,
+        List<String> contextFields
     ) {
         super(type, name, description);
         this.modelId = modelId;
         this.querySetId = querySetId;
         this.searchConfigurationList = searchConfigurationList;
         this.size = size;
+        this.tokenLimit = tokenLimit;
+        this.contextFields = contextFields;
     }
 
     public PutLlmJudgmentRequest(StreamInput in) throws IOException {
@@ -45,6 +67,8 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         this.querySetId = in.readString();
         this.searchConfigurationList = in.readStringList();
         this.size = in.readInt();
+        this.tokenLimit = in.readOptionalInt();
+        this.contextFields = in.readOptionalStringList();
     }
 
     @Override
@@ -54,6 +78,8 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         out.writeString(querySetId);
         out.writeStringArray(searchConfigurationList.toArray(new String[0]));
         out.writeInt(size);
+        out.writeOptionalInt(tokenLimit);
+        out.writeOptionalStringArray(contextFields.toArray(new String[0]));
     }
 
     public String getModelId() {
@@ -70,6 +96,14 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
 
     public int getSize() {
         return size;
+    }
+
+    public int getTokenLimit() {
+        return tokenLimit;
+    }
+
+    public List<String> getContextFields() {
+        return contextFields;
     }
 
 }

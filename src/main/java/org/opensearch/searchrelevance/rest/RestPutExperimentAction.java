@@ -9,7 +9,9 @@ package org.opensearch.searchrelevance.rest;
 
 import static java.util.Collections.singletonList;
 import static org.opensearch.rest.RestRequest.Method.PUT;
+import static org.opensearch.searchrelevance.common.MetricsConstants.MODEL_ID;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENTS_URI;
+import static org.opensearch.searchrelevance.transport.judgment.PutLlmJudgmentRequest.DEFAULTED_TOKEN_LIMIT;
 
 import java.io.IOException;
 import java.util.List;
@@ -25,9 +27,11 @@ import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.rest.BaseRestHandler;
 import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestRequest;
+import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.transport.experiment.PutExperimentAction;
 import org.opensearch.searchrelevance.transport.experiment.PutExperimentRequest;
+import org.opensearch.searchrelevance.transport.experiment.PutLlmExperimentRequest;
 import org.opensearch.searchrelevance.utils.ParserUtils;
 import org.opensearch.transport.client.node.NodeClient;
 
@@ -57,8 +61,6 @@ public class RestPutExperimentAction extends BaseRestHandler {
         List<String> searchConfigurationList = ParserUtils.convertObjToList(source, "searchConfigurationList");
         int size = (Integer) source.get("size");
         List<String> judgmentList = ParserUtils.convertObjToList(source, "judgmentList");
-        // modelId is for runtime llm judgment generation
-        String modelId = (String) source.get("modelId");
 
         String typeString = (String) source.get("type");
         ExperimentType type;
@@ -68,14 +70,30 @@ public class RestPutExperimentAction extends BaseRestHandler {
             throw new IllegalArgumentException("Invalid or missing experiment type", e);
         }
 
-        PutExperimentRequest createRequest = new PutExperimentRequest(
-            type,
-            querySetId,
-            searchConfigurationList,
-            judgmentList,
-            modelId,
-            size
-        );
+        PutExperimentRequest createRequest;
+        if (type == ExperimentType.LLM_EVALUATION) {
+            String modelId = (String) source.get(MODEL_ID);
+            if (modelId == null) {
+                throw new SearchRelevanceException("modelId is required for LLM_JUDGMENT", RestStatus.BAD_REQUEST);
+            }
+
+            Integer tokenLimit = source.containsKey("tokenLimit")
+                ? Integer.parseInt((String) source.get("tokenLimit"))
+                : DEFAULTED_TOKEN_LIMIT;
+            List<String> contextFields = ParserUtils.convertObjToList(source, "contextFields");
+            createRequest = new PutLlmExperimentRequest(
+                type,
+                querySetId,
+                searchConfigurationList,
+                judgmentList,
+                modelId,
+                size,
+                tokenLimit,
+                contextFields
+            );
+        } else {
+            createRequest = new PutExperimentRequest(type, querySetId, searchConfigurationList, judgmentList, size);
+        }
 
         return channel -> client.execute(PutExperimentAction.INSTANCE, createRequest, new ActionListener<IndexResponse>() {
             @Override

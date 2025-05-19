@@ -8,10 +8,13 @@
 package org.opensearch.searchrelevance.dao;
 
 import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.JUDGMENT_CACHE;
+import static org.opensearch.searchrelevance.model.JudgmentCache.CONTEXT_FIELDS_STR;
 import static org.opensearch.searchrelevance.model.JudgmentCache.DOCUMENT_ID;
 import static org.opensearch.searchrelevance.model.JudgmentCache.QUERY_TEXT;
+import static org.opensearch.searchrelevance.utils.ParserUtils.convertListToSortedStr;
 
 import java.io.IOException;
+import java.util.List;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -72,14 +75,21 @@ public class JudgmentCacheDao {
      * Get judgment cache by queryText and documentId
      * @param queryText - queryText to be searched
      * @param documentId - documentId to be searched
+     * @param contextFields - contextFields to be searched
      * @param listener - async operation
      */
-    public SearchResponse getJudgmentCache(String queryText, String documentId, ActionListener<SearchResponse> listener) {
+    public SearchResponse getJudgmentCache(
+        String queryText,
+        String documentId,
+        List<String> contextFields,
+        ActionListener<SearchResponse> listener
+    ) {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
 
         BoolQueryBuilder boolQuery = QueryBuilders.boolQuery();
-        boolQuery.must(QueryBuilders.matchQuery(QUERY_TEXT, queryText));
-        boolQuery.must(QueryBuilders.matchQuery(DOCUMENT_ID, documentId));
+        boolQuery.must(QueryBuilders.termQuery(QUERY_TEXT + ".keyword", queryText));
+        boolQuery.must(QueryBuilders.termQuery(DOCUMENT_ID + ".keyword", documentId));
+        boolQuery.must(QueryBuilders.termQuery(CONTEXT_FIELDS_STR + ".keyword", convertListToSortedStr(contextFields)));
 
         searchSourceBuilder.query(boolQuery);
 

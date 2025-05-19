@@ -4,6 +4,7 @@
     "timestamp": { "type": "date", "format": "strict_date_time" },
     "querySet": { "type": "keyword" },
     "documentId": { "type": "keyword" },
+    "contextFieldsStr": { "type": "keyword" },
     "score": { "type": "keyword" }
   }
 }

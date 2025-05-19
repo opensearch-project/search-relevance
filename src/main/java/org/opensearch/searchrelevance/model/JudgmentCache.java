@@ -7,7 +7,10 @@
  */
 package org.opensearch.searchrelevance.model;
 
+import static org.opensearch.searchrelevance.utils.ParserUtils.convertListToSortedStr;
+
 import java.io.IOException;
+import java.util.List;
 
 import org.opensearch.core.xcontent.ToXContentObject;
 import org.opensearch.core.xcontent.XContentBuilder;
@@ -16,6 +19,7 @@ public class JudgmentCache implements ToXContentObject {
     public static final String ID = "id";
     public static final String QUERY_TEXT = "queryText";
     public static final String DOCUMENT_ID = "documentId";
+    public static final String CONTEXT_FIELDS_STR = "contextFieldsStr";
     public static final String TIME_STAMP = "timestamp";
     public static final String SCORE = "score";
     public static final String MODEL_ID = "modelId";
@@ -27,14 +31,24 @@ public class JudgmentCache implements ToXContentObject {
     private String timestamp;
     private String queryText;
     private String documentId;
+    private String contextFieldsStr;
     private String score;
     private String modelId;
 
-    public JudgmentCache(String id, String timestamp, String queryText, String documentId, String score, String modelId) {
+    public JudgmentCache(
+        String id,
+        String timestamp,
+        String queryText,
+        String documentId,
+        List<String> contextFields,
+        String score,
+        String modelId
+    ) {
         this.id = id;
         this.timestamp = timestamp;
         this.queryText = queryText;
         this.documentId = documentId;
+        this.contextFieldsStr = convertListToSortedStr(contextFields);
         this.score = score;
         this.modelId = modelId;
     }
@@ -46,6 +60,7 @@ public class JudgmentCache implements ToXContentObject {
         xContentBuilder.field(TIME_STAMP, this.timestamp.trim());
         xContentBuilder.field(QUERY_TEXT, this.queryText.trim());
         xContentBuilder.field(DOCUMENT_ID, this.documentId.trim());
+        xContentBuilder.field(CONTEXT_FIELDS_STR, this.contextFieldsStr);
         xContentBuilder.field(SCORE, this.score.trim());
         xContentBuilder.field(MODEL_ID, this.modelId.trim());
         return xContentBuilder.endObject();
@@ -65,6 +80,10 @@ public class JudgmentCache implements ToXContentObject {
 
     public String documentId() {
         return documentId;
+    }
+
+    public String contextFieldsStr() {
+        return contextFieldsStr;
     }
 
     public String score() {
