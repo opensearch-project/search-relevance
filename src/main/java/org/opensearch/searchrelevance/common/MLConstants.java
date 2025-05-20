@@ -27,6 +27,11 @@ public class MLConstants {
     public static final String RESPONSE_CONTENT_FIELD = "content";
 
     /**
+     * LLM defaulted token limits
+     */
+    public static final Integer DEFAULTED_TOKEN_LIMIT = 4000;
+
+    /**
      * Prompt strings that specific for llm-as-a-judge use case.
      * TODO: need benchmark for final prompt definition.
      */

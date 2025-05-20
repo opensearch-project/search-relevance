@@ -23,14 +23,17 @@ import org.opensearch.action.admin.indices.create.CreateIndexResponse;
 import org.opensearch.action.delete.DeleteResponse;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
+import org.opensearch.action.search.ShardSearchFailure;
 import org.opensearch.action.support.WriteRequest;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.io.Streams;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.core.xcontent.XContentBuilder;
+import org.opensearch.index.IndexNotFoundException;
 import org.opensearch.index.query.QueryBuilders;
 import org.opensearch.search.builder.SearchSourceBuilder;
+import org.opensearch.search.internal.InternalSearchResponse;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.shared.StashedThreadContext;
 import org.opensearch.transport.client.Client;
@@ -234,7 +237,26 @@ public class SearchRelevanceIndicesManager {
 
                     @Override
                     public void onFailure(Exception e) {
-                        listener.onFailure(new SearchRelevanceException("Failed to list documents", e, RestStatus.INTERNAL_SERVER_ERROR));
+                        if (e instanceof IndexNotFoundException) {
+                            final InternalSearchResponse internalSearchResponse = InternalSearchResponse.empty();
+                            final SearchResponse emptySearchResponse = new SearchResponse(
+                                internalSearchResponse,
+                                null,
+                                0,
+                                0,
+                                0,
+                                0,
+                                null,
+                                new ShardSearchFailure[] {},
+                                SearchResponse.Clusters.EMPTY,
+                                null
+                            );
+                            listener.onResponse(emptySearchResponse);
+                        } else {
+                            listener.onFailure(
+                                new SearchRelevanceException("Failed to list documents", e, RestStatus.INTERNAL_SERVER_ERROR)
+                            );
+                        }
                     }
                 });
             } catch (Exception e) {

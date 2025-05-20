@@ -5,23 +5,20 @@
  * this file be licensed under the Apache-2.0 license or a
  * compatible open source license.
  */
-package org.opensearch.searchrelevance.transport.judgment;
+package org.opensearch.searchrelevance.transport.experiment;
 
 import java.io.IOException;
 import java.util.List;
 
 import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.core.common.io.stream.StreamOutput;
-import org.opensearch.searchrelevance.model.JudgmentType;
+import org.opensearch.searchrelevance.model.ExperimentType;
 
 import reactor.util.annotation.NonNull;
 
-public class PutLlmJudgmentRequest extends PutJudgmentRequest {
+public class PutLlmExperimentRequest extends PutExperimentRequest {
 
     private final String modelId;
-    private final String querySetId;
-    private final List<String> searchConfigurationList;
-    private int size;
 
     /**
      * The token limit sent to the LLM. This indicates the max token allowed.
@@ -36,32 +33,25 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
      */
     private List<String> contextFields;
 
-    public PutLlmJudgmentRequest(
-        @NonNull JudgmentType type,
-        @NonNull String name,
-        @NonNull String description,
-        @NonNull String modelId,
+    public PutLlmExperimentRequest(
+        @NonNull ExperimentType type,
         @NonNull String querySetId,
         @NonNull List<String> searchConfigurationList,
+        @NonNull List<String> judgmentList,
+        @NonNull String modelId,
         int size,
         int tokenLimit,
         List<String> contextFields
     ) {
-        super(type, name, description);
+        super(type, querySetId, searchConfigurationList, judgmentList, size);
         this.modelId = modelId;
-        this.querySetId = querySetId;
-        this.searchConfigurationList = searchConfigurationList;
-        this.size = size;
         this.tokenLimit = tokenLimit;
         this.contextFields = contextFields;
     }
 
-    public PutLlmJudgmentRequest(StreamInput in) throws IOException {
+    public PutLlmExperimentRequest(StreamInput in) throws IOException {
         super(in);
         this.modelId = in.readString();
-        this.querySetId = in.readString();
-        this.searchConfigurationList = in.readStringList();
-        this.size = in.readInt();
         this.tokenLimit = in.readOptionalInt();
         this.contextFields = in.readOptionalStringList();
     }
@@ -70,27 +60,12 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
     public void writeTo(StreamOutput out) throws IOException {
         super.writeTo(out);
         out.writeString(modelId);
-        out.writeString(querySetId);
-        out.writeStringArray(searchConfigurationList.toArray(new String[0]));
-        out.writeInt(size);
         out.writeOptionalInt(tokenLimit);
         out.writeOptionalStringArray(contextFields.toArray(new String[0]));
     }
 
     public String getModelId() {
         return modelId;
-    }
-
-    public String getQuerySetId() {
-        return querySetId;
-    }
-
-    public List<String> getSearchConfigurationList() {
-        return searchConfigurationList;
-    }
-
-    public int getSize() {
-        return size;
     }
 
     public int getTokenLimit() {
@@ -100,5 +75,4 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
     public List<String> getContextFields() {
         return contextFields;
     }
-
 }

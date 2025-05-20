@@ -119,6 +119,7 @@ dependencies {
     implementation "org.opensearch:common-utils:${common_utils_version}"
     implementation "com.fasterxml.jackson.core:jackson-annotations:${versions.jackson}"
     implementation "com.fasterxml.jackson.core:jackson-databind:${versions.jackson_databind}"
+    implementation 'com.knuddels:jtokkit:0.6.1'
     // ml-common excluded reflection for runtime so we need to add it by ourselves.
     // https://github.com/opensearch-project/ml-commons/commit/464bfe34c66d7a729a00dd457f03587ea4e504d9
     // TODO: Remove following three lines of dependencies if ml-common include them in their jar

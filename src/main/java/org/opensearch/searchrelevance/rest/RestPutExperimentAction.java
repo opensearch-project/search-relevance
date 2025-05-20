@@ -9,9 +9,9 @@ package org.opensearch.searchrelevance.rest;
 
 import static java.util.Collections.singletonList;
 import static org.opensearch.rest.RestRequest.Method.PUT;
+import static org.opensearch.searchrelevance.common.MLConstants.DEFAULTED_TOKEN_LIMIT;
 import static org.opensearch.searchrelevance.common.MetricsConstants.MODEL_ID;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENTS_URI;
-import static org.opensearch.searchrelevance.transport.judgment.PutLlmJudgmentRequest.DEFAULTED_TOKEN_LIMIT;
 
 import java.io.IOException;
 import java.util.List;

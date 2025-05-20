@@ -220,6 +220,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                             generateLLMJudgmentForQueryText(
                                 modelId,
                                 queryTextWithReference,
+                                tokenLimit,
                                 contextFields,
                                 unionHits,
                                 docIdToScore,
@@ -232,6 +233,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                             generateLLMJudgmentForQueryText(
                                 modelId,
                                 queryTextWithReference,
+                                tokenLimit,
                                 contextFields,
                                 unionHits,
                                 docIdToScore,
@@ -243,7 +245,15 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
             }, e -> {
                 LOGGER.error("Search failed for index: {}", index, e);
                 if (pendingSearches.decrementAndGet() == 0) {
-                    generateLLMJudgmentForQueryText(modelId, queryTextWithReference, contextFields, unionHits, docIdToScore, listener);
+                    generateLLMJudgmentForQueryText(
+                        modelId,
+                        queryTextWithReference,
+                        tokenLimit,
+                        contextFields,
+                        unionHits,
+                        docIdToScore,
+                        listener
+                    );
                 }
             })));
         }
@@ -252,6 +262,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
     private void generateLLMJudgmentForQueryText(
         String modelId,
         String queryTextWithReference,
+        int tokenLimit,
         List<String> contextFields,
         Map<String, String> unprocessedUnionHits,
         Map<String, String> docIdToScore,
@@ -259,12 +270,13 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
     ) {
         LOGGER.debug("calculating LLM evaluation with modelId: {} and unprocessed unionHits: {}", modelId, unprocessedUnionHits);
         LOGGER.debug("processed docIdToScore before llm evaluation: {}", docIdToScore);
-        predictWithRetry(queryTextWithReference, modelId, contextFields, unprocessedUnionHits, docIdToScore, listener, 0);
+        predictWithRetry(queryTextWithReference, modelId, tokenLimit, contextFields, unprocessedUnionHits, docIdToScore, listener, 0);
     }
 
     private void predictWithRetry(
         String queryTextWithReference,
         String modelId,
+        int tokenLimit,
         List<String> contextFields,
         Map<String, String> unionHits,
         Map<String, String> docIdToScore,
@@ -274,7 +286,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         String[] queryTextRefArr = queryTextWithReference.split(DELIMITER);
         String queryText = queryTextRefArr[0];
         String referenceAnswer = queryTextRefArr.length > 1 ? queryTextWithReference.split(DELIMITER, 2)[1] : null;
-        mlAccessor.predict(modelId, queryText, referenceAnswer, unionHits, new ActionListener<String>() {
+        mlAccessor.predict(modelId, tokenLimit, queryText, referenceAnswer, unionHits, new ActionListener<String>() {
             @Override
             public void onResponse(String response) {
                 try {
@@ -307,7 +319,16 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                     long delay = (long) Math.pow(2, retryCount) * 1000;
                     try {
                         Thread.sleep(delay);
-                        predictWithRetry(queryTextWithReference, modelId, contextFields, unionHits, docIdToScore, listener, retryCount + 1);
+                        predictWithRetry(
+                            queryTextWithReference,
+                            modelId,
+                            tokenLimit,
+                            contextFields,
+                            unionHits,
+                            docIdToScore,
+                            listener,
+                            retryCount + 1
+                        );
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
                         listener.onFailure(
