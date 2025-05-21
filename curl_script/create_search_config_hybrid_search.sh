@@ -1,8 +1,8 @@
 curl -s -X PUT "http://localhost:9200/_plugins/search_relevance/search_configurations" \
 -H "Content-type: application/json" \
 -d'{
-      "name": "multi_match",
+      "name": "hybrid_search",
       "index": "sample_index";
       "query": "{\n    \"_source\": {\n      \"exclude\": [\n        \"passage_embedding\"\n      ]\n    },\n    \"query\": {\n        \"hybrid\": {\n            \"queries\": [\n                {\n                    \"match\": {\n                        \"name\": \"apple\"\n                    }\n                },\n                {\n                    \"match\": {\n                        \"name\": {\n                            \"query\": \"apple\"\n                        }\n                    }\n                }\n            ]\n        }\n    },\n    \"search_pipeline\" : {\n        \"description\": \"Post processor for hybrid search\",\n        \"phase_results_processors\": [\n            {\n                \"normalization-processor\": {\n                    \"normalization\": {\n                        \"technique\": \"min_max\"\n                    },\n                    \"combination\": {\n                        \"technique\": \"arithmetic_mean\",\n                        \"parameters\": {\n                            \"weights\": [\n                                0.7,\n                                0.3\n                            ]\n                        }\n                    }\n                }\n            }\n        ]\n    }\n}",
-      "searchPipeline": "n/a"
+      "searchPipeline": ""
 }' | jq
