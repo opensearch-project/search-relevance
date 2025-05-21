@@ -9,7 +9,7 @@ package org.opensearch.searchrelevance.rest;
 
 import static java.util.Collections.singletonList;
 import static org.opensearch.rest.RestRequest.Method.PUT;
-import static org.opensearch.searchrelevance.common.MLConstants.DEFAULTED_TOKEN_LIMIT;
+import static org.opensearch.searchrelevance.common.MLConstants.validateTokenLimit;
 import static org.opensearch.searchrelevance.common.MetricsConstants.MODEL_ID;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENTS_URI;
 
@@ -77,9 +77,7 @@ public class RestPutExperimentAction extends BaseRestHandler {
                 throw new SearchRelevanceException("modelId is required for LLM_JUDGMENT", RestStatus.BAD_REQUEST);
             }
 
-            Integer tokenLimit = source.containsKey("tokenLimit")
-                ? Integer.parseInt((String) source.get("tokenLimit"))
-                : DEFAULTED_TOKEN_LIMIT;
+            int tokenLimit = validateTokenLimit(source);
             List<String> contextFields = ParserUtils.convertObjToList(source, "contextFields");
             createRequest = new PutLlmExperimentRequest(
                 type,

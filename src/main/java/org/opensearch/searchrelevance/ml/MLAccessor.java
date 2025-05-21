@@ -19,12 +19,15 @@ import static org.opensearch.searchrelevance.common.MLConstants.escapeJson;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.logging.log4j.LogManager;
@@ -49,6 +52,8 @@ public class MLAccessor {
     private MachineLearningNodeClient mlClient;
 
     private static final Logger LOGGER = LogManager.getLogger(MLAccessor.class);
+    private static final int MAX_RETRY_NUMBER = 3;
+    private static final long RETRY_DELAY_MS = 1000;
 
     public MLAccessor(MachineLearningNodeClient mlClient) {
         this.mlClient = mlClient;
@@ -60,33 +65,72 @@ public class MLAccessor {
         String searchText,
         String reference,
         Map<String, String> hits,
-        ActionListener<String> listener
+        ActionListener<ChunkResult> progressListener  // For individual chunk
     ) {
         List<MLInput> mlInputs = getMLInputs(tokenLimit, searchText, reference, hits);
 
         LOGGER.info("Number of chunks: {}", mlInputs.size());
         AtomicInteger completedChunks = new AtomicInteger(0);
-        List<String> responses = Collections.synchronizedList(new ArrayList<>());
+        ConcurrentMap<Integer, String> responses = new ConcurrentHashMap<>();
 
-        for (MLInput mlInput : mlInputs) {
-            predictSingleChunk(modelId, mlInput, new ActionListener<String>() {
+        for (int i = 0; i < mlInputs.size(); i++) {
+            final int chunkIndex = i;
+            predictSingleChunkWithRetry(modelId, mlInputs.get(chunkIndex), chunkIndex, 0, new ActionListener<String>() {
                 @Override
                 public void onResponse(String response) {
-                    LOGGER.info("single chunk response: {}", response);
-                    responses.add(response.substring(1, response.length() - 1));
-                    if (completedChunks.incrementAndGet() == mlInputs.size()) {
-                        String combinedResponse = "[" + String.join(",", responses) + "]";
-                        LOGGER.info("combined response: {}", combinedResponse);
-                        listener.onResponse(combinedResponse);
-                    }
+                    LOGGER.info("Chunk {} processed successfully", chunkIndex);
+                    String processedResponse = response.substring(1, response.length() - 1); // remove brackets
+                    responses.put(chunkIndex, processedResponse);
+
+                    // Notify about individual chunk completion
+                    progressListener.onResponse(
+                        new ChunkResult(
+                            chunkIndex,
+                            processedResponse,
+                            mlInputs.size(),
+                            completedChunks.incrementAndGet() == mlInputs.size()
+                        )
+                    );
                 }
 
                 @Override
                 public void onFailure(Exception e) {
-                    listener.onFailure(e);
+                    LOGGER.error("Chunk {} failed after all retries", chunkIndex, e);
+                    progressListener.onFailure(new ChunkException(chunkIndex, e, mlInputs.size()));
                 }
             });
         }
+    }
+
+    private void predictSingleChunkWithRetry(
+        String modelId,
+        MLInput mlInput,
+        int chunkIndex,
+        int retryCount,
+        ActionListener<String> chunkListener
+    ) {
+        predictSingleChunk(modelId, mlInput, new ActionListener<String>() {
+            @Override
+            public void onResponse(String response) {
+                chunkListener.onResponse(response);
+            }
+
+            @Override
+            public void onFailure(Exception e) {
+                if (retryCount < MAX_RETRY_NUMBER) {
+                    LOGGER.warn("Chunk {} failed, attempt {}/{}. Retrying...", chunkIndex, retryCount + 1, MAX_RETRY_NUMBER);
+
+                    long delay = RETRY_DELAY_MS * (long) Math.pow(2, retryCount);
+                    scheduleRetry(() -> predictSingleChunkWithRetry(modelId, mlInput, chunkIndex, retryCount + 1, chunkListener), delay);
+                } else {
+                    chunkListener.onFailure(e);
+                }
+            }
+        });
+    }
+
+    private void scheduleRetry(Runnable runnable, long delayMs) {
+        CompletableFuture.delayedExecutor(delayMs, TimeUnit.MILLISECONDS).execute(runnable);
     }
 
     public void predictSingleChunk(String modelId, MLInput mlInput, ActionListener<String> listener) {

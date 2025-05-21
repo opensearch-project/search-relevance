@@ -7,6 +7,9 @@
  */
 package org.opensearch.searchrelevance.common;
 
+import java.util.Locale;
+import java.util.Map;
+
 /**
  * ML related constants.
  */
@@ -30,6 +33,8 @@ public class MLConstants {
      * LLM defaulted token limits
      */
     public static final Integer DEFAULTED_TOKEN_LIMIT = 4000;
+    public static final Integer MAXIMUM_TOKEN_LIMIT = 500000;
+    public static final Integer MINIMUM_TOKEN_LIMIT = 1000;
 
     /**
      * Prompt strings that specific for llm-as-a-judge use case.
@@ -65,6 +70,44 @@ public class MLConstants {
 
         // Remove special characters that might cause parsing issues
         return response.replace("`", "").replace("\n", " ").trim();
+    }
+
+    public static int validateTokenLimit(Map<String, Object> source) {
+        if (!source.containsKey("tokenLimit")) {
+            return DEFAULTED_TOKEN_LIMIT;
+        }
+
+        Object tokenLimitObj = source.get("tokenLimit");
+        int tokenLimit;
+
+        try {
+            if (tokenLimitObj instanceof String) {
+                tokenLimit = Integer.parseInt((String) tokenLimitObj);
+            } else if (tokenLimitObj instanceof Number) {
+                tokenLimit = ((Number) tokenLimitObj).intValue();
+            } else {
+                throw new IllegalArgumentException(
+                    "Invalid tokenLimit type. Expected numeric value or string, got: " + tokenLimitObj.getClass().getSimpleName()
+                );
+            }
+
+            // Validate range
+            if (tokenLimit < MINIMUM_TOKEN_LIMIT || tokenLimit > MAXIMUM_TOKEN_LIMIT) {
+                throw new IllegalArgumentException(
+                    String.format(
+                        Locale.ROOT,
+                        "TokenLimit must be between %d and %d, got: %d",
+                        MINIMUM_TOKEN_LIMIT,
+                        MAXIMUM_TOKEN_LIMIT,
+                        tokenLimit
+                    )
+                );
+            }
+
+            return tokenLimit;
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Invalid tokenLimit value. Expected numeric value, got: " + tokenLimitObj);
+        }
     }
 
 }

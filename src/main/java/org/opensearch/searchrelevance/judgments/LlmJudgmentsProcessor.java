@@ -26,6 +26,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -42,6 +44,8 @@ import org.opensearch.searchrelevance.dao.JudgmentCacheDao;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
+import org.opensearch.searchrelevance.ml.ChunkException;
+import org.opensearch.searchrelevance.ml.ChunkResult;
 import org.opensearch.searchrelevance.ml.MLAccessor;
 import org.opensearch.searchrelevance.model.JudgmentCache;
 import org.opensearch.searchrelevance.model.JudgmentType;
@@ -56,7 +60,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
     private static final Logger LOGGER = LogManager.getLogger(LlmJudgmentsProcessor.class);
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-    private static final int MAX_RETRY_NUMBER = 3;
     private final MLAccessor mlAccessor;
     private final QuerySetDao querySetDao;
     private final SearchConfigurationDao searchConfigurationDao;
@@ -173,7 +176,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         ActionListener<Map<String, String>> listener
     ) {
         Map<String, String> unionHits = new HashMap<>();
-        Map<String, String> docIdToScore = new HashMap<>();
+        ConcurrentMap<String, String> docIdToScore = new ConcurrentHashMap<>();
 
         AtomicInteger pendingSearches = new AtomicInteger(indexAndQueries.size());
         for (Map.Entry<String, List<String>> entry : indexAndQueries.entrySet()) {
@@ -259,6 +262,16 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         }
     }
 
+    /**
+     * Generate LLM judgment for each queryText.
+     * @param modelId - modelId to be used for the judgment generation
+     * @param queryTextWithReference - queryText with its referenceAnswer
+     * @param tokenLimit - llm model token limit
+     * @param contextFields - filters on specific context fields
+     * @param unprocessedUnionHits - hits pending judged
+     * @param docIdToScore - map to store the judgment scores
+     * @param listener - listen each chunk results and update judgment cache at earliest
+     */
     private void generateLLMJudgmentForQueryText(
         String modelId,
         String queryTextWithReference,
@@ -270,80 +283,58 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
     ) {
         LOGGER.debug("calculating LLM evaluation with modelId: {} and unprocessed unionHits: {}", modelId, unprocessedUnionHits);
         LOGGER.debug("processed docIdToScore before llm evaluation: {}", docIdToScore);
-        predictWithRetry(queryTextWithReference, modelId, tokenLimit, contextFields, unprocessedUnionHits, docIdToScore, listener, 0);
-    }
 
-    private void predictWithRetry(
-        String queryTextWithReference,
-        String modelId,
-        int tokenLimit,
-        List<String> contextFields,
-        Map<String, String> unionHits,
-        Map<String, String> docIdToScore,
-        ActionListener<Map<String, String>> listener,
-        int retryCount
-    ) {
+        // If there are no unprocessed hits, return the cached results immediately
+        if (unprocessedUnionHits.isEmpty()) {
+            LOGGER.info("All hits found in cache, returning cached results for query: {}", queryTextWithReference);
+            listener.onResponse(docIdToScore);
+            return;
+        }
+
         String[] queryTextRefArr = queryTextWithReference.split(DELIMITER);
         String queryText = queryTextRefArr[0];
         String referenceAnswer = queryTextRefArr.length > 1 ? queryTextWithReference.split(DELIMITER, 2)[1] : null;
-        mlAccessor.predict(modelId, tokenLimit, queryText, referenceAnswer, unionHits, new ActionListener<String>() {
+
+        ConcurrentMap<String, String> processedScores = new ConcurrentHashMap<>(docIdToScore);
+
+        mlAccessor.predict(modelId, tokenLimit, queryText, referenceAnswer, unprocessedUnionHits, new ActionListener<ChunkResult>() {
             @Override
-            public void onResponse(String response) {
+            public void onResponse(ChunkResult chunkResult) {
                 try {
-                    String sanitizedResponse = sanitizeLLMResponse(response);
+                    String sanitizedResponse = sanitizeLLMResponse("[" + chunkResult.getResponse() + "]");
                     List<Map<String, Object>> scores = OBJECT_MAPPER.readValue(
                         sanitizedResponse,
                         new TypeReference<List<Map<String, Object>>>() {
                         }
                     );
+
+                    // process score and update judgment cache
                     for (Map<String, Object> score : scores) {
                         String compositeKey = (String) score.get("id");
                         Double ratingScore = ((Number) score.get("rating_score")).doubleValue();
-                        docIdToScore.put(getDocIdFromCompositeKey(compositeKey), ratingScore.toString());
-                        // add to llm judgment cache
+                        String docId = getDocIdFromCompositeKey(compositeKey);
+                        processedScores.put(docId, ratingScore.toString());
                         updateJudgmentCache(compositeKey, queryTextWithReference, contextFields, ratingScore.toString(), modelId);
                     }
-                    listener.onResponse(docIdToScore);
+
+                    // If this was the last chunk, send final response
+                    if (chunkResult.isLastChunk()) {
+                        listener.onResponse(processedScores);
+                    }
                 } catch (Exception e) {
-                    handlePredictionError(e);
+                    listener.onFailure(
+                        new SearchRelevanceException("Failed to process chunk response", e, RestStatus.INTERNAL_SERVER_ERROR)
+                    );
                 }
             }
 
             @Override
             public void onFailure(Exception e) {
-                handlePredictionError(e);
-            }
-
-            private void handlePredictionError(Exception e) {
-                if (retryCount < MAX_RETRY_NUMBER) {
-                    long delay = (long) Math.pow(2, retryCount) * 1000;
-                    try {
-                        Thread.sleep(delay);
-                        predictWithRetry(
-                            queryTextWithReference,
-                            modelId,
-                            tokenLimit,
-                            contextFields,
-                            unionHits,
-                            docIdToScore,
-                            listener,
-                            retryCount + 1
-                        );
-                    } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
-                        listener.onFailure(
-                            new SearchRelevanceException("Prediction retry interrupted", ie, RestStatus.INTERNAL_SERVER_ERROR)
-                        );
-                    }
-                } else {
-                    listener.onFailure(
-                        new SearchRelevanceException(
-                            "Failed to get prediction after " + MAX_RETRY_NUMBER + " attempts",
-                            e,
-                            RestStatus.INTERNAL_SERVER_ERROR
-                        )
-                    );
+                if (e instanceof ChunkException) {
+                    ChunkException chunkError = (ChunkException) e;
+                    LOGGER.error("Chunk {}/{} failed: {}", chunkError.getChunkIndex(), chunkError.getTotalChunks(), e.getMessage());
                 }
+                listener.onFailure(new SearchRelevanceException("Failed to process chunk", e, RestStatus.INTERNAL_SERVER_ERROR));
             }
         });
     }
@@ -361,7 +352,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         String queryTextWithReference,
         List<String> docIds,
         List<String> contextFields,
-        Map<String, String> docIdToScore,
+        ConcurrentMap<String, String> docIdToScore,
         ActionListener<List<String>> listener
     ) {
         AtomicInteger pendingChecks = new AtomicInteger(docIds.size());

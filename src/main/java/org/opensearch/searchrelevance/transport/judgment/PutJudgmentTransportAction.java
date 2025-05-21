@@ -103,15 +103,17 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
     }
 
     private void triggerAsyncProcessing(String judgmentId, PutJudgmentRequest request, Map<String, Object> metadata) {
+        LOGGER.info("Starting async processing for judgment: {}, type: {}, metadata: {}", judgmentId, request.getType(), metadata);
         BaseJudgmentsProcessor processor = judgmentsProcessorFactory.getProcessor(request.getType());
 
-        processor.generateJudgmentScore(
-            metadata,
-            ActionListener.wrap(
-                judgmentScores -> updateFinalJudgment(judgmentId, request, metadata, judgmentScores),
-                error -> handleAsyncFailure(judgmentId, request, "Failed to generate judgment scores", error)
-            )
-        );
+        processor.generateJudgmentScore(metadata, ActionListener.wrap(judgmentScores -> {
+            LOGGER.info(
+                "Generated judgment scores for {}, scores size: {}",
+                judgmentId,
+                judgmentScores != null ? judgmentScores.size() : 0
+            );
+            updateFinalJudgment(judgmentId, request, metadata, judgmentScores);
+        }, error -> handleAsyncFailure(judgmentId, request, "Failed to generate judgment scores", error)));
     }
 
     private void updateFinalJudgment(

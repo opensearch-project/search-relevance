@@ -45,10 +45,10 @@ public class TokenizerUtil {
      */
     public static String truncateString(String text, int tokenLimit) {
         List<Integer> tokens = encode(text);
-        while (tokens.size() > tokenLimit) {
-            tokens = tokens.subList(0, tokens.size() - 1);
+        if (tokens.size() <= tokenLimit) { // no truncation needed
+            return text;
         }
-        return decode(tokens);
+        return decode(tokens.subList(0, tokenLimit));
     }
 
     // Method to encode text to tokens

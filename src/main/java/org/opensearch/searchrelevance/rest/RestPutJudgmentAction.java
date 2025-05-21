@@ -9,7 +9,7 @@ package org.opensearch.searchrelevance.rest;
 
 import static java.util.Collections.singletonList;
 import static org.opensearch.rest.RestRequest.Method.PUT;
-import static org.opensearch.searchrelevance.common.MLConstants.DEFAULTED_TOKEN_LIMIT;
+import static org.opensearch.searchrelevance.common.MLConstants.validateTokenLimit;
 import static org.opensearch.searchrelevance.common.MetricsConstants.MODEL_ID;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENTS_URL;
 
@@ -80,9 +80,7 @@ public class RestPutJudgmentAction extends BaseRestHandler {
                 List<String> searchConfigurationList = ParserUtils.convertObjToList(source, "searchConfigurationList");
                 int size = (Integer) source.get("size");
 
-                Integer tokenLimit = source.containsKey("tokenLimit")
-                    ? Integer.parseInt((String) source.get("tokenLimit"))
-                    : DEFAULTED_TOKEN_LIMIT;
+                int tokenLimit = validateTokenLimit(source);
                 List<String> contextFields = ParserUtils.convertObjToList(source, "contextFields");
                 createRequest = new PutLlmJudgmentRequest(
                     type,
