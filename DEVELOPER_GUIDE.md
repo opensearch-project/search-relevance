@@ -2,7 +2,7 @@
     - [Getting Started](#getting-started)
         - [Fork OpenSearch search-relevance Repo](#fork-opensearch-search-relevance-repo)
         - [Install Prerequisites](#install-prerequisites)
-            - [JDK 11](#jdk-11)
+            - [JDK 21](#jdk-21)
             - [Environment](#Environment)
     - [Use an Editor](#use-an-editor)
         - [IntelliJ IDEA](#intellij-idea)
@@ -10,11 +10,12 @@
     - [Run OpenSearch search-relevance](#run-opensearch-search-relevance)
         - [Run Single-node Cluster Locally](#run-single-node-cluster-locally)
         - [Run Multi-node Cluster Locally](#run-multi-node-cluster-locally)
+        - [Run remote cluster](#run-remote-clusters-with-search-relevance)
 
 # Developer Guide
 
 ## Getting Started
-Please define the OpenSearch version in `build.gradle`. By default, we're developing with `3.0.0-alpha1-SNAPSHOT`
+Please define the OpenSearch version in `build.gradle`. By default, we're developing with `3.1.0-SNAPSHOT`
 
 ### Fork OpenSearch search-relevance Repo
 
@@ -69,7 +70,7 @@ The code can be formatted with:
 
 ## Build
 
-OpenSearch search-relevance uses a [Gradle](https://docs.gradle.org/6.6.1/userguide/userguide.html) wrapper for its build.
+OpenSearch search-relevance uses a [Gradle](https://docs.gradle.org/current/userguide/userguide.html) wrapper for its build.
 Run `gradlew` on Unix systems.
 
 Build OpenSearch search-relevance using `gradlew build`
@@ -108,7 +109,7 @@ curl localhost:9200
     "build_hash" : "5bd413c588f48589c6fd6c4de4e87550271aecf8",
     "build_date" : "2023-10-24T18:06:58.612820Z",
     "build_snapshot" : true,
-    "lucene_version" : "9.8.0",
+    "lucene_version" : <lucene-version>,
     "minimum_wire_compatibility_version" : "2.12.0",
     "minimum_index_compatibility_version" : "2.0.0"
   },
