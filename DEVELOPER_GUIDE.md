@@ -11,6 +11,7 @@
         - [Run Single-node Cluster Locally](#run-single-node-cluster-locally)
         - [Run SRW in Demo Mode](#run-srw-in-demo-mode)
         - [Run remote cluster](#run-remote-clusters-with-search-relevance)
+    - [Debugging](#debugging)
 
 # Developer Guide
 
@@ -171,4 +172,33 @@ GET localhost:9200/_remote/info
 7. if you want to run backend with dashboards-search-relevance changes. Go to `OpenSearch-Dashboards/config/opensearch_dashboards.yml`
 ```
 #OPENSEARCH_HOSTS: ["http://opensearch_search_relevance:9200"]
+```
+
+### Debugging
+
+Sometimes it is useful to attach a debugger to either the OpenSearch cluster or the integration test runner to see what's going on. For running unit tests, hit **Debug** from the IDE's gutter to debug the tests. For the OpenSearch cluster, first, make sure that the debugger is listening on port `5005`. Then, to debug the cluster code, run:
+
+```
+./gradlew :integTest -Dcluster.debug=1 # to start a cluster with debugger and run integ tests
+```
+
+OR
+
+```
+./gradlew run --debug-jvm # to just start a cluster that can be debugged
+```
+
+The OpenSearch server JVM will connect to a debugger attached to `localhost:5005` before starting. If there are multiple nodes, the servers will connect to debuggers listening on ports `5005, 5006, ...`
+
+To debug code running in an integration test (which exercises the server from a separate JVM), first, setup a remote debugger listening on port `8000`, and then run:
+
+```
+./gradlew :integTest -Dtest.debug=1
+```
+
+The test runner JVM will connect to a debugger attached to `localhost:8000` before running the tests.
+
+Additionally, it is possible to attach one debugger to the cluster JVM and another debugger to the test runner. First, make sure one debugger is listening on port `5005` and the other is listening on port `8000`. Then, run:
+```
+./gradlew :integTest -Dtest.debug=1 -Dcluster.debug=1
 ```
