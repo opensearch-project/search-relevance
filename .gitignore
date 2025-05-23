@@ -47,6 +47,8 @@ bin/
 **/.local*
 .vagrant/
 /logs/
+src/test/scripts/RES
+src/test/scripts/transformed_esci_1.json
 
 # osx stuff
 .DS_Store
