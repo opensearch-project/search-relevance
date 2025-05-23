@@ -20,13 +20,12 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.cluster.service.ClusterService;
@@ -35,17 +34,22 @@ import org.opensearch.core.action.ActionListener;
 import org.opensearch.search.SearchHit;
 import org.opensearch.searchrelevance.dao.EvaluationResultDao;
 import org.opensearch.searchrelevance.dao.JudgmentDao;
+import org.opensearch.searchrelevance.experiment.EmptyExperimentOptions;
+import org.opensearch.searchrelevance.experiment.ExperimentOptions;
+import org.opensearch.searchrelevance.experiment.ExperimentOptionsFactory;
+import org.opensearch.searchrelevance.experiment.ExperimentOptionsForHybridSearch;
 import org.opensearch.searchrelevance.model.EvaluationResult;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.transport.client.Client;
 
+import lombok.extern.log4j.Log4j2;
 import reactor.util.annotation.NonNull;
 
+@Log4j2
 /**
  * Manager for other local index operations.
  */
 public class MetricsHelper {
-    private static final Logger LOGGER = LogManager.getLogger(MetricsHelper.class);
     private final ClusterService clusterService;
     private final Client client;
     private final JudgmentDao judgmentDao;
@@ -168,6 +172,21 @@ public class MetricsHelper {
         List<String> judgmentIds,
         ActionListener<Map<String, String>> listener
     ) {
+        ExperimentOptions emptyExperimentOptions = ExperimentOptionsFactory.createExperimentOptions(
+            ExperimentOptionsFactory.EMPTY_EXPERIMENT_OPTIONS,
+            Map.of()
+        );
+        processEvaluationMetrics(queryText, indexAndQueries, size, judgmentIds, listener, emptyExperimentOptions);
+    }
+
+    public void processEvaluationMetrics(
+        String queryText,
+        Map<String, List<String>> indexAndQueries,
+        int size,
+        List<String> judgmentIds,
+        ActionListener<Map<String, String>> listener,
+        ExperimentOptions experimentOptions
+    ) {
         if (indexAndQueries.isEmpty() || judgmentIds.isEmpty()) {
             listener.onFailure(new IllegalArgumentException("Missing required parameters"));
             return;
@@ -184,7 +203,7 @@ public class MetricsHelper {
                     public void onResponse(SearchResponse judgmentResponse) {
                         try {
                             if (judgmentResponse.getHits().getTotalHits().value() == 0) {
-                                LOGGER.warn("No judgment found for ID: {}", judgmentId);
+                                log.warn("No judgment found for ID: {}", judgmentId);
                             } else {
                                 Map<String, Object> sourceAsMap = judgmentResponse.getHits().getHits()[0].getSourceAsMap();
                                 Map<String, Object> judgmentScores = (Map<String, Object>) sourceAsMap.getOrDefault(
@@ -204,7 +223,7 @@ public class MetricsHelper {
                             // Check if all judgments have been processed
                             if (completedJudgments.incrementAndGet() == judgmentIds.size()) {
                                 if (docIdToScores.isEmpty()) {
-                                    LOGGER.warn("No scores found for query: {} in any judgments", queryText);
+                                    log.warn("No scores found for query: {} in any judgments", queryText);
                                 }
 
                                 processSearchConfigurations(
@@ -214,7 +233,8 @@ public class MetricsHelper {
                                     judgmentIds,
                                     docIdToScores,
                                     configToEvalIds,
-                                    listener
+                                    listener,
+                                    experimentOptions
                                 );
                             }
                         } catch (Exception e) {
@@ -224,7 +244,7 @@ public class MetricsHelper {
 
                     @Override
                     public void onFailure(Exception e) {
-                        LOGGER.error("Failed to fetch judgment {}: {}", judgmentId, e);
+                        log.error("Failed to fetch judgment {}: {}", judgmentId, e);
                         if (completedJudgments.incrementAndGet() == judgmentIds.size()) {
                             if (docIdToScores.isEmpty()) {
                                 listener.onFailure(new IllegalStateException("Failed to fetch any valid judgments"));
@@ -237,7 +257,8 @@ public class MetricsHelper {
                                     judgmentIds,
                                     docIdToScores,
                                     configToEvalIds,
-                                    listener
+                                    listener,
+                                    experimentOptions
                                 );
                             }
                         }
@@ -245,7 +266,7 @@ public class MetricsHelper {
                 });
             }
         } catch (Exception e) {
-            LOGGER.error("Unexpected error in evaluateQueryTextAsync: {}", e.getMessage());
+            log.error("Unexpected error in evaluateQueryTextAsync: {}", e.getMessage());
             listener.onFailure(e);
         }
     }
@@ -257,7 +278,8 @@ public class MetricsHelper {
         List<String> judgmentIds,
         Map<String, String> docIdToScores,
         Map<String, String> configToEvalIds,
-        ActionListener<Map<String, String>> listener
+        ActionListener<Map<String, String>> listener,
+        ExperimentOptions experimentOptions
     ) {
         AtomicInteger pendingConfigurations = new AtomicInteger(indexAndQueries.size());
         AtomicBoolean hasFailure = new AtomicBoolean(false);
@@ -276,7 +298,7 @@ public class MetricsHelper {
             String index = indexAndQueries.get(searchConfigurationId).get(0);
             String query = indexAndQueries.get(searchConfigurationId).get(1);
             String searchPipeline = indexAndQueries.get(searchConfigurationId).get(2);
-            LOGGER.debug(
+            log.debug(
                 "Configuration {}: index: {}, query: {}, searchPipeline: {}, evaluationId: {}",
                 searchConfigurationId,
                 index,
@@ -285,56 +307,178 @@ public class MetricsHelper {
                 evaluationId
             );
 
-            SearchRequest searchRequest = buildSearchRequest(index, query, queryText, searchPipeline, size);
-            client.search(searchRequest, new ActionListener<SearchResponse>() {
-                @Override
-                public void onResponse(SearchResponse response) {
-                    if (hasFailure.get()) return;
+            if (Objects.isNull(experimentOptions) || experimentOptions instanceof EmptyExperimentOptions) {
+                processSearchConfigurationWithEmptyExperimentOptions(
+                    queryText,
+                    size,
+                    judgmentIds,
+                    docIdToScores,
+                    configToEvalIds,
+                    listener,
+                    searchConfigurationId,
+                    index,
+                    query,
+                    searchPipeline,
+                    hasFailure,
+                    pendingConfigurations,
+                    evaluationId
+                );
+            } else if (experimentOptions instanceof ExperimentOptionsForHybridSearch) {
+                ExperimentOptionsForHybridSearch experimentOptionsForHybridSearch = (ExperimentOptionsForHybridSearch) experimentOptions;
+                processSearchConfigurationWithHybridExperimentOptions(
+                    queryText,
+                    size,
+                    judgmentIds,
+                    docIdToScores,
+                    configToEvalIds,
+                    listener,
+                    searchConfigurationId,
+                    index,
+                    query,
+                    searchPipeline,
+                    hasFailure,
+                    pendingConfigurations,
+                    evaluationId,
+                    experimentOptionsForHybridSearch
+                );
+            } else {
+                listener.onFailure(new IllegalArgumentException("unsupported experiment options"));
+            }
+        }
+    }
 
-                    try {
-                        if (response.getHits().getTotalHits().value() == 0) {
-                            LOGGER.warn("No hits found for search config: {}", searchConfigurationId);
-                            if (pendingConfigurations.decrementAndGet() == 0) {
-                                listener.onResponse(configToEvalIds);
-                            }
-                            return;
+    private void processSearchConfigurationWithEmptyExperimentOptions(
+        String queryText,
+        int size,
+        List<String> judgmentIds,
+        Map<String, String> docIdToScores,
+        Map<String, String> configToEvalIds,
+        ActionListener<Map<String, String>> listener,
+        String searchConfigurationId,
+        String index,
+        String query,
+        String searchPipeline,
+        AtomicBoolean hasFailure,
+        AtomicInteger pendingConfigurations,
+        String evaluationId
+    ) {
+        SearchRequest searchRequest = buildSearchRequest(index, query, queryText, searchPipeline, size);
+        client.search(searchRequest, new ActionListener<>() {
+            @Override
+            public void onResponse(SearchResponse response) {
+                if (hasFailure.get()) return;
+
+                try {
+                    if (response.getHits().getTotalHits().value() == 0) {
+                        log.warn("No hits found for search config: {}", searchConfigurationId);
+                        if (pendingConfigurations.decrementAndGet() == 0) {
+                            listener.onResponse(configToEvalIds);
                         }
-
-                        SearchHit[] hits = response.getHits().getHits();
-                        List<String> docIds = Arrays.stream(hits).map(SearchHit::getId).collect(Collectors.toList());
-
-                        Map<String, String> metrics = calculateEvaluationMetrics(docIds, docIdToScores);
-                        EvaluationResult evaluationResult = new EvaluationResult(
-                            evaluationId,
-                            TimeUtils.getTimestamp(),
-                            searchConfigurationId,
-                            queryText,
-                            judgmentIds,
-                            docIds,
-                            metrics
-                        );
-
-                        evaluationResultDao.putEvaluationResult(evaluationResult, ActionListener.wrap(success -> {
-                            configToEvalIds.put(searchConfigurationId, evaluationId);
-                            if (pendingConfigurations.decrementAndGet() == 0) {
-                                listener.onResponse(configToEvalIds);
-                            }
-                        }, error -> {
-                            hasFailure.set(true);
-                            listener.onFailure(error);
-                        }));
-                    } catch (Exception e) {
-                        hasFailure.set(true);
-                        listener.onFailure(e);
+                        return;
                     }
-                }
 
-                @Override
-                public void onFailure(Exception e) {
+                    SearchHit[] hits = response.getHits().getHits();
+                    List<String> docIds = Arrays.stream(hits).map(SearchHit::getId).collect(Collectors.toList());
+
+                    Map<String, String> metrics = calculateEvaluationMetrics(docIds, docIdToScores);
+                    EvaluationResult evaluationResult = new EvaluationResult(
+                        evaluationId,
+                        TimeUtils.getTimestamp(),
+                        searchConfigurationId,
+                        queryText,
+                        judgmentIds,
+                        docIds,
+                        metrics
+                    );
+
+                    evaluationResultDao.putEvaluationResult(evaluationResult, ActionListener.wrap(success -> {
+                        configToEvalIds.put(searchConfigurationId, evaluationId);
+                        if (pendingConfigurations.decrementAndGet() == 0) {
+                            listener.onResponse(configToEvalIds);
+                        }
+                    }, error -> {
+                        hasFailure.set(true);
+                        listener.onFailure(error);
+                    }));
+                } catch (Exception e) {
                     hasFailure.set(true);
                     listener.onFailure(e);
                 }
-            });
-        }
+            }
+
+            @Override
+            public void onFailure(Exception e) {
+                hasFailure.set(true);
+                listener.onFailure(e);
+            }
+        });
+    }
+
+    private void processSearchConfigurationWithHybridExperimentOptions(
+        String queryText,
+        int size,
+        List<String> judgmentIds,
+        Map<String, String> docIdToScores,
+        Map<String, String> configToEvalIds,
+        ActionListener<Map<String, String>> listener,
+        String searchConfigurationId,
+        String index,
+        String query,
+        String searchPipeline,
+        AtomicBoolean hasFailure,
+        AtomicInteger pendingConfigurations,
+        String evaluationId,
+        ExperimentOptionsForHybridSearch experimentOptionsForHybridSearch
+    ) {
+        SearchRequest searchRequest = buildSearchRequest(index, query, queryText, searchPipeline, size);
+        client.search(searchRequest, new ActionListener<>() {
+            @Override
+            public void onResponse(SearchResponse response) {
+                if (hasFailure.get()) return;
+
+                try {
+                    if (response.getHits().getTotalHits().value() == 0) {
+                        log.warn("No hits found for search config: {}", searchConfigurationId);
+                        if (pendingConfigurations.decrementAndGet() == 0) {
+                            listener.onResponse(configToEvalIds);
+                        }
+                        return;
+                    }
+
+                    SearchHit[] hits = response.getHits().getHits();
+                    List<String> docIds = Arrays.stream(hits).map(SearchHit::getId).collect(Collectors.toList());
+
+                    Map<String, String> metrics = calculateEvaluationMetrics(docIds, docIdToScores);
+                    EvaluationResult evaluationResult = new EvaluationResult(
+                        evaluationId,
+                        TimeUtils.getTimestamp(),
+                        searchConfigurationId,
+                        queryText,
+                        judgmentIds,
+                        docIds,
+                        metrics
+                    );
+
+                    evaluationResultDao.putEvaluationResult(evaluationResult, ActionListener.wrap(success -> {
+                        configToEvalIds.put(searchConfigurationId, evaluationId);
+                        if (pendingConfigurations.decrementAndGet() == 0) {
+                            listener.onResponse(configToEvalIds);
+                        }
+                    }, error -> {
+                        hasFailure.set(true);
+                        listener.onFailure(error);
+                    }));
+                } catch (Exception e) {
+                    hasFailure.set(true);
+                    listener.onFailure(e);
+                }
+            }
+
+            @Override
+            public void onFailure(Exception e) {
+                hasFailure.set(true);
+                listener.onFailure(e);
+            }
+        });
     }
 }
