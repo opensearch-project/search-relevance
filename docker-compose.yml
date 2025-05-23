@@ -4,17 +4,21 @@ services:
     build: .
     container_name: opensearch_search_relevance
     environment:
-      - cluster.name=opensearch_search_relevance
-      - discovery.type=single-node
-      - bootstrap.memory_lock=true
-      - DISABLE_INSTALL_DEMO_CONFIG=true
-      - DISABLE_SECURITY_PLUGIN=true      # disable security plugin only for demo
-      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+      discovery.type: single-node
+      node.name: opensearch
+      cluster.name: opensearch_search_relevance
+      bootstrap.memory_lock: true
+      DISABLE_INSTALL_DEMO_CONFIG: true
+      DISABLE_SECURITY_PLUGIN: true # disable security plugin only for demo
+      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
 
     ulimits:
       memlock:
         soft: -1
         hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
     ports:
       - 9200:9200
       - 9600:9600 # required for Performance Analyzer
