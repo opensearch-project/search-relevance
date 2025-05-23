@@ -9,7 +9,7 @@
     - [Build](#build)
     - [Run OpenSearch search-relevance](#run-opensearch-search-relevance)
         - [Run Single-node Cluster Locally](#run-single-node-cluster-locally)
-        - [Run Multi-node Cluster Locally](#run-multi-node-cluster-locally)
+        - [Run SRW in Demo Mode](#run-srw-in-demo-mode)
         - [Run remote cluster](#run-remote-clusters-with-search-relevance)
 
 # Developer Guide
@@ -116,6 +116,10 @@ curl localhost:9200
   "tagline" : "The OpenSearch Project: https://opensearch.org/"
 }
 ```
+### Run SRW in Demo Mode
+1. run command `docker compose build` to create an image that has the UBI plugin installed.
+2. run command `docker compose up` to spin up the containers.
+3. Run the script `src/test/scripts/demo.sh` to see the full process of creating new UBI indexes loaded with sample data as well as the "sample" ecommerce index.
 
 ### Run remote clusters with search-relevance
 1. update `docker-compse.yml` with your remote clusters
