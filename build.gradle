@@ -24,7 +24,7 @@ def packagePath = 'org.opensearch'
 def pathToPlugin = 'searchrelevance.plugin'
 def pluginClassName = 'SearchRelevancePlugin'
 group = "org.opensearch.searchrelevance"
-version = "3.0.0.0"
+version = "3.1.0.0-SNAPSHOT"
 
 java {
     targetCompatibility = JavaVersion.VERSION_21
