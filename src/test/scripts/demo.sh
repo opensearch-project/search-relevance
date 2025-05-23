@@ -6,7 +6,6 @@
 # You can now exercise all the capabilities of SRW!  It will clear out any existing data.
 
 # TODO
-#  * Implement list experiments
 #  * Switch to the field values used in the runbook, we are using those from the other shell scripts. In particular use ecommerce index and use the query bodies from the runbook
 
 # Once we get remote cluster connection working, we can eliminate this.
@@ -32,21 +31,7 @@ curl -s -X PUT "http://localhost:9200/ecommerce/_settings" \
   "index.mapping.total_fields.limit": 20000
 }'
 
-# Process the file in chunks of 1000 lines to avoid circuit breaker exceptions
-echo "Processing transformed_esci_1.json in chunks"
-total_lines=$(wc -l < transformed_esci_1.json)
-for ((i=1; i<=total_lines; i+=5000)); do
-  end=$((i+4999))
-  if [ $end -gt $total_lines ]; then
-    end=$total_lines
-  fi
-  echo "Processing lines $i to $end"
-  sed -n "${i},${end}p" transformed_esci_1.json | curl -s -X POST "http://localhost:9200/ecommerce/_bulk?pretty" -H 'Content-Type: application/json' --data-binary @-
-  # Small pause to give OpenSearch time to process
-  sleep 1
-done
-
-
+curl -s -X POST "http://localhost:9200/ecommerce/_bulk?pretty" -H 'Content-Type: application/json' --data-binary @transformed_esci_1.json
 
 echo Deleting UBI indexes
 (curl -s -X DELETE "http://localhost:9200/ubi_queries" > /dev/null) || true
@@ -156,15 +141,15 @@ echo
 echo Show Experiment
 exe curl -s -X GET "localhost:9200/_plugins/search_relevance/experiments/$EX"
 
-# echo
-# echo List experiments
-# exe curl -s -X GET "http://localhost:9200/_plugins/search_relevance/experiments" \
-# -H "Content-type: application/json" \
-# -d'{
-#      "sort": {
-#        "timestamp": {
-#          "order": "desc"
-#        }
-#      },
-#      "size": 3
-#    }'
+echo
+echo List experiments
+exe curl -s -X GET "http://localhost:9200/_plugins/search_relevance/experiments" \
+-H "Content-type: application/json" \
+-d'{
+     "sort": {
+       "timestamp": {
+         "order": "desc"
+       }
+     },
+     "size": 3
+   }'
