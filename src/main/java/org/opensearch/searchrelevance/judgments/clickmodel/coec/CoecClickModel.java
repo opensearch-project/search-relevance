@@ -82,7 +82,7 @@ public class CoecClickModel extends ClickModel {
 
         // Add aggregations to see distribution
         TermsAggregationBuilder actionAgg = AggregationBuilders.terms("actions")
-            .field("action_name.keyword")
+            .field("action_name")
             .subAggregation(AggregationBuilders.terms("positions").field("event_attributes.position.ordinal"));
 
         searchSourceBuilder.aggregation(actionAgg);
