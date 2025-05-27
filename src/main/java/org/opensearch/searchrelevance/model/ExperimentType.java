@@ -9,7 +9,6 @@ package org.opensearch.searchrelevance.model;
 
 public enum ExperimentType {
     PAIRWISE_COMPARISON,
-    LLM_EVALUATION,
-    UBI_EVALUATION,
+    POINTWISE_EVALUATION,
     HYBRID_SEARCH
 }
