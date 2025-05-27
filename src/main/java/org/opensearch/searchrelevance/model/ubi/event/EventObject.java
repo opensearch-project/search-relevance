@@ -9,25 +9,20 @@ package org.opensearch.searchrelevance.model.ubi.event;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import lombok.Getter;
+
 public class EventObject {
 
     @JsonProperty("object_id_field")
     private String objectIdField;
 
     @JsonProperty("object_id")
+    @Getter
     private String objectId;
 
     @Override
     public String toString() {
         return "[" + objectIdField + ", " + objectId + "]";
-    }
-
-    /**
-     * Gets the object ID.
-     * @return The object ID.
-     */
-    public String getObjectId() {
-        return objectId;
     }
 
     /**
