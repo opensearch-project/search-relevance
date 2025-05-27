@@ -202,3 +202,70 @@ Additionally, it is possible to attach one debugger to the cluster JVM and anoth
 ```
 ./gradlew :integTest -Dtest.debug=1 -Dcluster.debug=1
 ```
+
+#### Add a plugin to a debugging setup
+
+When debugging certain features that require UBI data, having the UBI plugin available in that instance simplifies
+debugging. To do so the `build.gradle` file can be changed to include a custom plugin which comes in handy when
+developing against an unreleased version of the UBI plugin.
+
+The following code shows the test cluster setup with a custom plugin installation. The plugin has to be available as a
+zip file for this.
+
+```
+// Set up integration test clusters, installs all zipArchive dependencies and Flow Framework
+testClusters.integTest {
+    testDistribution = "ARCHIVE"
+
+    // This block for zipArchive dependencies seems mostly correct,
+    // assuming 'delegate' is the correct way to access the plugin method in your specific setup.
+    configurations.zipArchive.asFileTree.each { pluginFile ->
+        delegate.plugin(provider(new Callable<RegularFile>(){
+            @Override
+            RegularFile call() throws Exception {
+                return new RegularFile() {
+                    @Override
+                    File getAsFile() {
+                        return pluginFile
+                    }
+                }
+            }
+        }))
+    }
+
+    // Installs UBI plugin from a file while there is no staging for this particular one
+    def ubiPluginZipFile = file("${project.rootDir}/plugins_to_install/opensearch-ubi-3.1.0.0-SNAPSHOT.zip")
+
+    // Ensure the plugin zip exists
+    if (!ubiPluginZipFile.exists()) {
+        throw new GradleException("UBI plugin zip not found at: ${ubiPluginZipFile.absolutePath}")
+    }
+
+    delegate.plugin(project.providers.provider(new Callable<RegularFile>() {
+        @Override
+        RegularFile call() throws Exception {
+            return project.objects.fileProperty().fileValue(ubiPluginZipFile).get()
+        }
+    }))
+
+    // Install Flow Framework Plugin on integTest cluster nodes
+    // The 'archiveFile' from bundlePlugin task is usually already a Provider<RegularFile>
+    // but if it's not, you'd need to wrap it too. For safety, let's also use delegate.
+    delegate.plugin(project.tasks.bundlePlugin.archiveFile)
+
+
+    // Cluster shrink exception thrown if we try to set numberOfNodes to 1, so only apply if > 1
+    if (_numNodes > 1) numberOfNodes = _numNodes
+
+    // When running integration tests it doesn't forward the --debug-jvm to the cluster anymore
+    // i.e. we have to use a custom property to flag when we want to debug OpenSearch JVM
+    // since we also support multi node integration tests we increase debugPort per node
+    if (System.getProperty("opensearch.debug") != null) {
+        def debugPort = 5005
+        nodes.forEach { node ->
+            node.jvmArgs("-agentlib:jdwp=transport=dt_socket,server=n,suspend=y,address=*:${debugPort}")
+            debugPort += 1
+        }
+    }
+}
+```
