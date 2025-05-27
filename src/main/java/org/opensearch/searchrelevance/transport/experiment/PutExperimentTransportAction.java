@@ -10,9 +10,7 @@ package org.opensearch.searchrelevance.transport.experiment;
 import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_INDEX_AND_QUERIES_FIELD_NAME;
 import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_QUERY_TEXT_FIELD_NAME;
 
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,7 +29,6 @@ import org.opensearch.common.inject.Inject;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.searchrelevance.dao.ExperimentDao;
-import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
@@ -43,8 +40,6 @@ import org.opensearch.searchrelevance.metrics.MetricsHelper;
 import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.Experiment;
 import org.opensearch.searchrelevance.model.ExperimentType;
-import org.opensearch.searchrelevance.model.Judgment;
-import org.opensearch.searchrelevance.model.JudgmentType;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
@@ -58,10 +53,7 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
     private final ExperimentDao experimentDao;
     private final QuerySetDao querySetDao;
     private final SearchConfigurationDao searchConfigurationDao;
-    private final JudgmentDao judgmentDao;
-
     private final MetricsHelper metricsHelper;
-    private final JudgmentsProcessorFactory judgmentsProcessorFactory;
 
     private static final Logger LOGGER = LogManager.getLogger(PutExperimentTransportAction.class);
 
@@ -73,18 +65,14 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
         ExperimentDao experimentDao,
         QuerySetDao querySetDao,
         SearchConfigurationDao searchConfigurationDao,
-        JudgmentDao judgmentDao,
-        MetricsHelper metricsHelper,
-        JudgmentsProcessorFactory judgmentsProcessorFactory
+        MetricsHelper metricsHelper
     ) {
         super(PutExperimentAction.NAME, transportService, actionFilters, PutExperimentRequest::new);
         this.clusterService = clusterService;
         this.experimentDao = experimentDao;
         this.querySetDao = querySetDao;
         this.searchConfigurationDao = searchConfigurationDao;
-        this.judgmentDao = judgmentDao;
         this.metricsHelper = metricsHelper;
-        this.judgmentsProcessorFactory = judgmentsProcessorFactory;
     }
 
     @Override
@@ -166,72 +154,16 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
         AtomicInteger pendingQueries = new AtomicInteger(queryTexts.size());
         AtomicBoolean hasFailure = new AtomicBoolean(false);
 
-        Map<String, Object> metadata = new HashMap<>();
-        if (request.getType() == ExperimentType.LLM_EVALUATION) {
-            PutLlmExperimentRequest llmRequest = (PutLlmExperimentRequest) request;
-            // generate llm judgment only if modelId is provided
-            if (llmRequest.getModelId() != null) {
-                metadata.put("querySetId", request.getQuerySetId());
-                metadata.put("searchConfigurationList", request.getSearchConfigurationList());
-                metadata.put("size", request.getSize());
-                metadata.put("modelId", llmRequest.getModelId());
-                metadata.put("tokenLimit", llmRequest.getTokenLimit());
-                metadata.put("contextFields", llmRequest.getContextFields());
-
-                // Step 1: Generate Judgment Scores
-                StepListener<Map<String, Map<String, String>>> processJudgmentScoresStep = new StepListener<>();
-                BaseJudgmentsProcessor llmJudgmentsProcessor = judgmentsProcessorFactory.getProcessor(JudgmentType.LLM_JUDGMENT);
-                llmJudgmentsProcessor.generateJudgmentScore(metadata, processJudgmentScoresStep);
-
-                // Step 2: Store Judgment
-                StepListener<String> storeJudgmentStep = new StepListener<>();
-                processJudgmentScoresStep.whenComplete(
-                    llmJudgments -> { createAndStoreLlmJudgment(metadata, llmJudgments, storeJudgmentStep); },
-                    error -> {
-                        handleFailure(error, hasFailure, experimentId, request);
-                    }
-                );
-
-                // Step 3: Execute Experiment Evaluation
-                storeJudgmentStep.whenComplete(llmJudgmentId -> {
-                    List<String> updatedJudgmentList = new ArrayList<>(request.getJudgmentList());
-                    updatedJudgmentList.add(llmJudgmentId);
-
-                    executeExperimentEvaluation(
-                        experimentId,
-                        request,
-                        indexAndQueries,
-                        queryTexts,
-                        finalResults,
-                        pendingQueries,
-                        hasFailure,
-                        updatedJudgmentList
-                    );
-                }, error -> { handleFailure(error, hasFailure, experimentId, request); });
-            }
-        } else if (ExperimentType.HYBRID_SEARCH == request.getType()) {
-            executeExperimentEvaluation(
-                experimentId,
-                request,
-                indexAndQueries,
-                queryTexts,
-                finalResults,
-                pendingQueries,
-                hasFailure,
-                request.getJudgmentList()
-            );
-        } else {
-            executeExperimentEvaluation(
-                experimentId,
-                request,
-                indexAndQueries,
-                queryTexts,
-                finalResults,
-                pendingQueries,
-                hasFailure,
-                request.getJudgmentList()
-            );
-        }
+        executeExperimentEvaluation(
+            experimentId,
+            request,
+            indexAndQueries,
+            queryTexts,
+            finalResults,
+            pendingQueries,
+            hasFailure,
+            request.getJudgmentList()
+        );
     }
 
     private void executeExperimentEvaluation(
@@ -292,7 +224,7 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
                     }, error -> handleFailure(error, hasFailure, experimentId, request)),
                     experimentOptionForHybridSearch
                 );
-            } else {
+            } else if (request.getType() == ExperimentType.POINTWISE_EVALUATION) {
                 metricsHelper.processEvaluationMetrics(
                     queryText,
                     indexAndQueries,
@@ -312,6 +244,8 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
                         );
                     }, error -> handleFailure(error, hasFailure, experimentId, request))
                 );
+            } else {
+                throw new SearchRelevanceException("Unknown experimentType" + request.getType(), RestStatus.BAD_REQUEST);
             }
         }
     }
@@ -395,27 +329,5 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
                 e -> LOGGER.error("Failed to update error status for experiment: " + experimentId, e)
             )
         );
-    }
-
-    private void createAndStoreLlmJudgment(
-        Map<String, Object> metadata,
-        Map<String, Map<String, String>> llmJudgments,
-        ActionListener<String> listener
-    ) {
-        String judgmentId = UUID.randomUUID().toString();
-
-        Judgment llmJudgment = new Judgment(
-            judgmentId,
-            TimeUtils.getTimestamp(),
-            "LLM Generated Judgment" + new Date(),
-            AsyncStatus.COMPLETED,
-            JudgmentType.LLM_JUDGMENT,
-            metadata,
-            llmJudgments
-        );
-
-        judgmentDao.putJudgement(llmJudgment, ActionListener.wrap(response -> { listener.onResponse(judgmentId); }, error -> {
-            listener.onFailure(error);
-        }));
     }
 }
