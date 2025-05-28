@@ -9,6 +9,10 @@ package org.opensearch.searchrelevance.model.builder;
 
 import static org.opensearch.searchrelevance.common.PluginConstants.WILDCARD_QUERY_TEXT;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.test.OpenSearchTestCase;
@@ -57,6 +61,63 @@ public class SearchRequestBuilderTests extends OpenSearchTestCase {
         SearchSourceBuilder sourceBuilder = searchRequest.source();
         assertNotNull("SearchSourceBuilder should not be null", sourceBuilder);
         assertEquals("Size should match", TEST_SIZE, sourceBuilder.size());
+    }
+
+    public void testHybridQuerySearchConfiguration_whenQuerySourceWithGenericHybridQuery_thenSuccess() {
+        String hybridQuery =
+            "{\"_source\":{\"exclude\":[\"passage_embedding\"]},\"query\":{\"hybrid\":{\"queries\":[{\"match\":{\"name\":\""
+                + WILDCARD_QUERY_TEXT
+                + "\"}},{\"match\":{\"name\":{\"query\":\""
+                + WILDCARD_QUERY_TEXT
+                + "\"}}}]}}}";
+
+        Map<String, Object> normalizationProcessorConfig = new HashMap<>(
+            Map.of(
+                "normalization",
+                new HashMap<String, Object>(Map.of("technique", "min_max")),
+                "combination",
+                new HashMap<String, Object>(Map.of("technique", "arithmetic_mean"))
+            )
+        );
+        Map<String, Object> phaseProcessorObject = new HashMap<>(Map.of("normalization-processor", normalizationProcessorConfig));
+        Map<String, Object> temporarySearchPipeline = new HashMap<>();
+        temporarySearchPipeline.put("phase_results_processors", List.of(phaseProcessorObject));
+
+        SearchRequest searchRequest = SearchRequestBuilder.buildRequestForHybridSearch(
+            TEST_INDEX,
+            hybridQuery,
+            temporarySearchPipeline,
+            TEST_QUERY_TEXT,
+            TEST_SIZE
+        );
+        assertNotNull("SearchRequest should not be null", searchRequest);
+        assertEquals("Index should match", TEST_INDEX, searchRequest.indices()[0]);
+
+        SearchSourceBuilder sourceBuilder = searchRequest.source();
+        assertNotNull("SearchSourceBuilder should not be null", sourceBuilder);
+        assertEquals("Size should match", TEST_SIZE, sourceBuilder.size());
+
+        assertNotNull(sourceBuilder.searchPipelineSource());
+        Map<String, Object> searchPipelineSource = sourceBuilder.searchPipelineSource();
+        assertFalse(searchPipelineSource.isEmpty());
+        assertTrue(searchPipelineSource.containsKey("phase_results_processors"));
+        assertEquals(1, ((List<?>) searchPipelineSource.get("phase_results_processors")).size());
+    }
+
+    public void testHybridQuerySearchConfiguration_whenQuerySourceHasTemporaryPipeline_thenFail() {
+        String hybridQuery =
+            "{\"_source\":{\"exclude\":[\"passage_embedding\"]},\"query\":{\"hybrid\":{\"queries\":[{\"match\":{\"name\":\""
+                + WILDCARD_QUERY_TEXT
+                + "\"}},{\"match\":{\"name\":{\"query\":\""
+                + WILDCARD_QUERY_TEXT
+                + "\"}}}]}},\"search_pipeline\":{\"description\":\"Post processor for hybrid search\","
+                + "\"phase_results_processors\":[{\"normalization-processor\":{\"normalization\":{\"technique\":\"min_max\"},\"combination\":"
+                + "{\"technique\":\"arithmetic_mean\",\"parameters\":{\"weights\":[0.7,0.3]}}}}]}}";
+        IllegalArgumentException exception = expectThrows(
+            IllegalArgumentException.class,
+            () -> SearchRequestBuilder.buildRequestForHybridSearch(TEST_INDEX, hybridQuery, Map.of(), TEST_QUERY_TEXT, TEST_SIZE)
+        );
+        assertEquals("search pipeline is not allowed in search request", exception.getMessage());
     }
 
     public void testBuildSearchRequestInvalidJson() {

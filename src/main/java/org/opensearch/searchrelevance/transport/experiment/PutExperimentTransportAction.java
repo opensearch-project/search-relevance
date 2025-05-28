@@ -35,6 +35,8 @@ import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
+import org.opensearch.searchrelevance.experiment.ExperimentOptionsFactory;
+import org.opensearch.searchrelevance.experiment.ExperimentOptionsForHybridSearch;
 import org.opensearch.searchrelevance.judgments.BaseJudgmentsProcessor;
 import org.opensearch.searchrelevance.judgments.JudgmentsProcessorFactory;
 import org.opensearch.searchrelevance.metrics.MetricsHelper;
@@ -207,6 +209,17 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
                     );
                 }, error -> { handleFailure(error, hasFailure, experimentId, request); });
             }
+        } else if (ExperimentType.HYBRID_SEARCH == request.getType()) {
+            executeExperimentEvaluation(
+                experimentId,
+                request,
+                indexAndQueries,
+                queryTexts,
+                finalResults,
+                pendingQueries,
+                hasFailure,
+                request.getJudgmentList()
+            );
         } else {
             executeExperimentEvaluation(
                 experimentId,
@@ -250,6 +263,34 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
                         ),
                         error -> handleFailure(error, hasFailure, experimentId, request)
                     )
+                );
+            } else if (request.getType() == ExperimentType.HYBRID_SEARCH) {
+                Map<String, Object> defaultParametersForHybridSearch = ExperimentOptionsFactory
+                    .createDefaultExperimentParametersForHybridSearch();
+                ExperimentOptionsForHybridSearch experimentOptionForHybridSearch =
+                    (ExperimentOptionsForHybridSearch) ExperimentOptionsFactory.createExperimentOptions(
+                        ExperimentOptionsFactory.HYBRID_SEARCH_EXPERIMENT_OPTIONS,
+                        defaultParametersForHybridSearch
+                    );
+                metricsHelper.processEvaluationMetrics(
+                    queryText,
+                    indexAndQueries,
+                    request.getSize(),
+                    judgmentList,
+                    ActionListener.wrap(queryResults -> {
+                        Map<String, Object> convertedResults = new HashMap<>(queryResults);
+                        handleQueryResults(
+                            queryText,
+                            convertedResults,
+                            finalResults,
+                            pendingQueries,
+                            experimentId,
+                            request,
+                            hasFailure,
+                            judgmentList
+                        );
+                    }, error -> handleFailure(error, hasFailure, experimentId, request)),
+                    experimentOptionForHybridSearch
                 );
             } else {
                 metricsHelper.processEvaluationMetrics(

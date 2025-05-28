@@ -5,11 +5,9 @@
  * this file be licensed under the Apache-2.0 license or a
  * compatible open source license.
  */
-package org.opensearch.searchrelevance.model;
+package org.opensearch.searchrelevance.experiment;
 
-public enum ExperimentType {
-    PAIRWISE_COMPARISON,
-    LLM_EVALUATION,
-    UBI_EVALUATION,
-    HYBRID_SEARCH
-}
+/**
+ * Interface for experiment options
+ */
+public interface ExperimentOptions {}
