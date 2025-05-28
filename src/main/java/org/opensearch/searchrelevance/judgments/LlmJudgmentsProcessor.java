@@ -28,6 +28,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -44,7 +45,6 @@ import org.opensearch.searchrelevance.dao.JudgmentCacheDao;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
-import org.opensearch.searchrelevance.ml.ChunkException;
 import org.opensearch.searchrelevance.ml.ChunkResult;
 import org.opensearch.searchrelevance.ml.MLAccessor;
 import org.opensearch.searchrelevance.model.JudgmentCache;
@@ -95,6 +95,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         String modelId = (String) metadata.get("modelId");
         int tokenLimit = (int) metadata.get("tokenLimit");
         List<String> contextFields = (List<String>) metadata.get("contextFields");
+        boolean ignoreFailure = (boolean) metadata.get("ignoreFailure");
 
         Map<String, Object> results = new HashMap<>();
 
@@ -113,7 +114,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
 
         // Step 3: Generate LLM Judgments
         getSearchConfigsStep.whenComplete(searchConfigResults -> {
-            generateLLMJudgments(modelId, size, tokenLimit, contextFields, results, listener);
+            generateLLMJudgments(modelId, size, tokenLimit, contextFields, results, ignoreFailure, listener);
         }, error -> {
             LOGGER.error("Failed to get search configurations", error);
             listener.onFailure(
@@ -128,6 +129,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         int tokenLimit,
         List<String> contextFields,
         Map<String, Object> results,
+        boolean ignoreFailure,
         ActionListener<Map<String, Map<String, String>>> listener
     ) {
         Map<String, List<String>> indexAndQueries = (Map<String, List<String>>) results.get(METRICS_INDEX_AND_QUERIES_FIELD_NAME);
@@ -144,6 +146,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                 contextFields,
                 indexAndQueries,
                 queryTextWithReference,
+                ignoreFailure,
                 new ActionListener<Map<String, String>>() {
                     @Override
                     public void onResponse(Map<String, String> docIdToScore) {
@@ -173,6 +176,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         List<String> contextFields,
         Map<String, List<String>> indexAndQueries,
         String queryTextWithReference,
+        boolean ignoreFailure,
         ActionListener<Map<String, String>> listener
     ) {
         Map<String, String> unionHits = new HashMap<>();
@@ -227,6 +231,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                                 contextFields,
                                 unionHits,
                                 docIdToScore,
+                                ignoreFailure,
                                 listener
                             );
                         }
@@ -240,6 +245,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                                 contextFields,
                                 unionHits,
                                 docIdToScore,
+                                ignoreFailure,
                                 listener
                             );
                         }
@@ -255,6 +261,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                         contextFields,
                         unionHits,
                         docIdToScore,
+                        ignoreFailure,
                         listener
                     );
                 }
@@ -270,6 +277,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
      * @param contextFields - filters on specific context fields
      * @param unprocessedUnionHits - hits pending judged
      * @param docIdToScore - map to store the judgment scores
+     * @param ignoreFailure - boolean to determine how to error handling
      * @param listener - listen each chunk results and update judgment cache at earliest
      */
     private void generateLLMJudgmentForQueryText(
@@ -279,6 +287,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         List<String> contextFields,
         Map<String, String> unprocessedUnionHits,
         Map<String, String> docIdToScore,
+        boolean ignoreFailure,
         ActionListener<Map<String, String>> listener
     ) {
         LOGGER.debug("calculating LLM evaluation with modelId: {} and unprocessed unionHits: {}", modelId, unprocessedUnionHits);
@@ -296,47 +305,98 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         String referenceAnswer = queryTextRefArr.length > 1 ? queryTextWithReference.split(DELIMITER, 2)[1] : null;
 
         ConcurrentMap<String, String> processedScores = new ConcurrentHashMap<>(docIdToScore);
+        ConcurrentMap<Integer, List<Map<String, Object>>> combinedResponses = new ConcurrentHashMap<>();
+        AtomicBoolean hasFailure = new AtomicBoolean(false); // Add flag to track if any failure has occurred
 
-        mlAccessor.predict(modelId, tokenLimit, queryText, referenceAnswer, unprocessedUnionHits, new ActionListener<ChunkResult>() {
-            @Override
-            public void onResponse(ChunkResult chunkResult) {
-                try {
-                    String sanitizedResponse = sanitizeLLMResponse("[" + chunkResult.getResponse() + "]");
-                    List<Map<String, Object>> scores = OBJECT_MAPPER.readValue(
-                        sanitizedResponse,
-                        new TypeReference<List<Map<String, Object>>>() {
+        mlAccessor.predict(
+            modelId,
+            tokenLimit,
+            queryText,
+            referenceAnswer,
+            unprocessedUnionHits,
+            ignoreFailure,
+            new ActionListener<ChunkResult>() {
+                @Override
+                public void onResponse(ChunkResult chunkResult) {
+                    try {
+                        // If not ignoring failures and there are failed chunks, fail immediately
+                        if (shouldFailImmediately(ignoreFailure, chunkResult)) {
+                            String firstError = chunkResult.getFailedChunks().values().iterator().next();
+                            handleProcessingError(new Exception(firstError), true);
+                            return;
                         }
-                    );
 
-                    // process score and update judgment cache
-                    for (Map<String, Object> score : scores) {
-                        String compositeKey = (String) score.get("id");
-                        Double ratingScore = ((Number) score.get("rating_score")).doubleValue();
-                        String docId = getDocIdFromCompositeKey(compositeKey);
-                        processedScores.put(docId, ratingScore.toString());
-                        updateJudgmentCache(compositeKey, queryTextWithReference, contextFields, ratingScore.toString(), modelId);
-                    }
+                        // Process succeeded chunks
+                        Map<Integer, String> succeededChunks = chunkResult.getSucceededChunks();
+                        for (Map.Entry<Integer, String> entry : succeededChunks.entrySet()) {
+                            Integer chunkIndex = entry.getKey();
+                            if (combinedResponses.containsKey(chunkIndex)) {
+                                continue;
+                            }
 
-                    // If this was the last chunk, send final response
-                    if (chunkResult.isLastChunk()) {
-                        listener.onResponse(processedScores);
+                            String sanitizedResponse = sanitizeLLMResponse("[" + entry.getValue() + "]");
+                            List<Map<String, Object>> scores = OBJECT_MAPPER.readValue(
+                                sanitizedResponse,
+                                new TypeReference<List<Map<String, Object>>>() {
+                                }
+                            );
+                            combinedResponses.put(chunkIndex, scores);
+                        }
+
+                        logFailedChunks(ignoreFailure, chunkResult);
+
+                        // Process final results only if we haven't failed and this is the last chunk
+                        if (chunkResult.isLastChunk() && !hasFailure.get()) {
+                            LOGGER.info(
+                                "Processing final results for query: {}. Successful chunks: {}, Failed chunks: {}",
+                                queryTextWithReference,
+                                chunkResult.getSuccessfulChunksCount(),
+                                chunkResult.getFailedChunksCount()
+                            );
+
+                            // Process combined responses
+                            for (List<Map<String, Object>> scores : combinedResponses.values()) {
+                                for (Map<String, Object> score : scores) {
+                                    String compositeKey = (String) score.get("id");
+                                    Double ratingScore = ((Number) score.get("rating_score")).doubleValue();
+                                    String docId = getDocIdFromCompositeKey(compositeKey);
+                                    processedScores.put(docId, ratingScore.toString());
+                                    updateJudgmentCache(
+                                        compositeKey,
+                                        queryTextWithReference,
+                                        contextFields,
+                                        ratingScore.toString(),
+                                        modelId
+                                    );
+                                }
+                            }
+
+                            listener.onResponse(processedScores);
+                        }
+                    } catch (Exception e) {
+                        handleProcessingError(e, chunkResult.isLastChunk());
                     }
-                } catch (Exception e) {
-                    listener.onFailure(
-                        new SearchRelevanceException("Failed to process chunk response", e, RestStatus.INTERNAL_SERVER_ERROR)
-                    );
+                }
+
+                @Override
+                public void onFailure(Exception e) {
+                    handleProcessingError(e, true);
+                }
+
+                private void handleProcessingError(Exception e, boolean isLastChunk) {
+                    if (!ignoreFailure || isLastChunk) {
+                        if (!hasFailure.getAndSet(true)) {  // Only fail once
+                            LOGGER.error("Failed to process chunk response", e);
+                            listener.onFailure(
+                                new SearchRelevanceException("Failed to process chunk response", e, RestStatus.INTERNAL_SERVER_ERROR)
+                            );
+                        }
+                    } else {
+                        LOGGER.warn("Error processing chunk, continuing due to ignoreFailure=true", e);
+                    }
                 }
             }
-
-            @Override
-            public void onFailure(Exception e) {
-                if (e instanceof ChunkException) {
-                    ChunkException chunkError = (ChunkException) e;
-                    LOGGER.error("Chunk {}/{} failed: {}", chunkError.getChunkIndex(), chunkError.getTotalChunks(), e.getMessage());
-                }
-                listener.onFailure(new SearchRelevanceException("Failed to process chunk", e, RestStatus.INTERNAL_SERVER_ERROR));
-            }
-        });
+        );
     }
 
     /**
@@ -440,6 +500,16 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                 )
             )
         );
+    }
+
+    private boolean shouldFailImmediately(boolean ignoreFailure, ChunkResult chunkResult) {
+        return !ignoreFailure && !chunkResult.getFailedChunks().isEmpty();
+    }
+
+    private void logFailedChunks(boolean ignoreFailure, ChunkResult chunkResult) {
+        if (ignoreFailure) {
+            chunkResult.getFailedChunks().forEach((index, error) -> LOGGER.warn("Chunk {} failed: {}", index, error));
+        }
     }
 
 }

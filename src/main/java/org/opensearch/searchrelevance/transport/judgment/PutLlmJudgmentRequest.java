@@ -36,6 +36,11 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
      */
     private List<String> contextFields;
 
+    /**
+     * Specifies whether the processor continues execution even if it encounters an error.
+     */
+    private boolean ignoreFailure;
+
     public PutLlmJudgmentRequest(
         @NonNull JudgmentType type,
         @NonNull String name,
@@ -45,7 +50,8 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         @NonNull List<String> searchConfigurationList,
         int size,
         int tokenLimit,
-        List<String> contextFields
+        List<String> contextFields,
+        boolean ignoreFailure
     ) {
         super(type, name, description);
         this.modelId = modelId;
@@ -54,6 +60,7 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         this.size = size;
         this.tokenLimit = tokenLimit;
         this.contextFields = contextFields;
+        this.ignoreFailure = ignoreFailure;
     }
 
     public PutLlmJudgmentRequest(StreamInput in) throws IOException {
@@ -64,6 +71,7 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         this.size = in.readInt();
         this.tokenLimit = in.readOptionalInt();
         this.contextFields = in.readOptionalStringList();
+        this.ignoreFailure = Boolean.TRUE.equals(in.readOptionalBoolean()); // by defaulted as false if not provided
     }
 
     @Override
@@ -75,6 +83,7 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         out.writeInt(size);
         out.writeOptionalInt(tokenLimit);
         out.writeOptionalStringArray(contextFields.toArray(new String[0]));
+        out.writeOptionalBoolean(ignoreFailure);
     }
 
     public String getModelId() {
@@ -99,6 +108,10 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
 
     public List<String> getContextFields() {
         return contextFields;
+    }
+
+    public boolean isIgnoreFailure() {
+        return ignoreFailure;
     }
 
 }

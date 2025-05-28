@@ -65,13 +65,15 @@ public class MLAccessor {
         String searchText,
         String reference,
         Map<String, String> hits,
+        boolean ignoreFailure,
         ActionListener<ChunkResult> progressListener  // For individual chunk
     ) {
         List<MLInput> mlInputs = getMLInputs(tokenLimit, searchText, reference, hits);
-
         LOGGER.info("Number of chunks: {}", mlInputs.size());
-        AtomicInteger completedChunks = new AtomicInteger(0);
-        ConcurrentMap<Integer, String> responses = new ConcurrentHashMap<>();
+
+        ConcurrentMap<Integer, String> succeededChunks = new ConcurrentHashMap<>();
+        ConcurrentHashMap<Integer, String> failedChunks = new ConcurrentHashMap<>();
+        AtomicInteger processedChunks = new AtomicInteger(0);
 
         for (int i = 0; i < mlInputs.size(); i++) {
             final int chunkIndex = i;
@@ -80,23 +82,33 @@ public class MLAccessor {
                 public void onResponse(String response) {
                     LOGGER.info("Chunk {} processed successfully", chunkIndex);
                     String processedResponse = response.substring(1, response.length() - 1); // remove brackets
-                    responses.put(chunkIndex, processedResponse);
-
-                    // Notify about individual chunk completion
-                    progressListener.onResponse(
-                        new ChunkResult(
-                            chunkIndex,
-                            processedResponse,
-                            mlInputs.size(),
-                            completedChunks.incrementAndGet() == mlInputs.size()
-                        )
+                    handleChunkCompletion(
+                        chunkIndex,
+                        processedResponse,
+                        null,
+                        mlInputs.size(),
+                        succeededChunks,
+                        failedChunks,
+                        ignoreFailure,
+                        processedChunks,
+                        progressListener
                     );
                 }
 
                 @Override
                 public void onFailure(Exception e) {
                     LOGGER.error("Chunk {} failed after all retries", chunkIndex, e);
-                    progressListener.onFailure(new ChunkException(chunkIndex, e, mlInputs.size()));
+                    handleChunkCompletion(
+                        chunkIndex,
+                        null,
+                        e,
+                        mlInputs.size(),
+                        succeededChunks,
+                        failedChunks,
+                        ignoreFailure,
+                        processedChunks,
+                        progressListener
+                    );
                 }
             });
         }
@@ -242,6 +254,67 @@ public class MLAccessor {
         Map<String, ?> message = (Map<String, ?>) choices.get(RESPONSE_MESSAGE_FIELD);
         String content = (String) message.get(RESPONSE_CONTENT_FIELD);
         return content;
+    }
+
+    private void handleChunkCompletion(
+        int chunkIndex,
+        String response,
+        Exception error,
+        int totalChunks,
+        ConcurrentMap<Integer, String> succeededChunks,
+        ConcurrentMap<Integer, String> failedChunks,
+        boolean ignoreFailure,
+        AtomicInteger processedChunks,
+        ActionListener<ChunkResult> progressListener
+    ) {
+        try {
+            if (error != null) {
+                String errorMessage = error.getMessage();
+                failedChunks.put(chunkIndex, errorMessage);
+                if (!ignoreFailure) {
+                    progressListener.onFailure(error);
+                    return;
+                }
+            } else {
+                succeededChunks.put(chunkIndex, response);
+            }
+
+            int processed = processedChunks.incrementAndGet();
+            boolean isLastChunk = processed == totalChunks;
+
+            ChunkResult result = new ChunkResult(
+                chunkIndex,
+                totalChunks,
+                isLastChunk,
+                new HashMap<>(succeededChunks),
+                new HashMap<>(failedChunks)
+            );
+
+            progressListener.onResponse(result);
+
+            if (isLastChunk) {
+                handleFinalStatus(result, ignoreFailure, progressListener);
+            }
+        } catch (Exception e) {
+            LOGGER.error("Error handling chunk completion for chunk {}", chunkIndex, e);
+            if (!ignoreFailure) {
+                progressListener.onFailure(e);
+            }
+        }
+    }
+
+    private void handleFinalStatus(ChunkResult finalResult, boolean ignoreFailure, ActionListener<ChunkResult> progressListener) {
+        if (finalResult.getFailedChunksCount() > 0 && !ignoreFailure) {
+            String errorMessage = String.format(
+                Locale.ROOT,
+                "Failed to process %d out of %d chunks",
+                finalResult.getFailedChunksCount(),
+                finalResult.getTotalChunks()
+            );
+            progressListener.onFailure(new RuntimeException(errorMessage));
+        } else {
+            progressListener.onResponse(finalResult);
+        }
     }
 
 }
