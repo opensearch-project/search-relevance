@@ -7,62 +7,65 @@
  */
 package org.opensearch.searchrelevance.model.builder;
 
+import static org.opensearch.searchrelevance.common.PluginConstants.WILDCARD_QUERY_TEXT;
+
 import org.opensearch.action.search.SearchRequest;
+import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.test.OpenSearchTestCase;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 public class SearchRequestBuilderTests extends OpenSearchTestCase {
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-    void testQueryParsing() throws Exception {
-        // Given
-        String query =
-            "{\"_source\": {\"exclude\": [\"passage_embedding\"]},\"query\": {\"hybrid\": {\"queries\": [{\"match\": {\"category\": \"sister\"}},{\"match\": {\"title\": {\"query\": \"my friend\"}}}]}},\"search_pipeline\" : {\"description\": \"Post processor for hybrid search\",\"phase_results_processors\": [{\"normalization-processor\": {\"normalization\": {\"technique\": \"min_max\"},\"combination\": {\"technique\": \"arithmetic_mean\",\"parameters\": {\"weights\": [0.7,0.3]}}}}]}}";
+    private static final String TEST_INDEX = "test_index";
+    private static final String TEST_QUERY_TEXT = "test_query";
+    private static final String TEST_PIPELINE = "test_pipeline";
+    private static final int TEST_SIZE = 10;
 
-        // When
-        String pipelineBody = SearchRequestBuilder.fetchPipelineBody(query);
-        String[] excludedFields = SearchRequestBuilder.fetchExcludingFields(query);
-        String queryBody = SearchRequestBuilder.fetchQueryBody(query);
+    public void testBuildSearchRequestSimpleQuery() {
+        String simpleQuery = "{\"query\":{\"match\":{\"title\":\"" + WILDCARD_QUERY_TEXT + "\"}}}";
 
-        // Then
-        // Verify pipeline body
-        assertNotNull(pipelineBody);
-        JsonNode pipelineNode = OBJECT_MAPPER.readTree(pipelineBody);
-        assertEquals("Post processor for hybrid search", pipelineNode.get("description").asText());
-        assertTrue(pipelineNode.has("phase_results_processors"));
+        SearchRequest searchRequest = SearchRequestBuilder.buildSearchRequest(
+            TEST_INDEX,
+            simpleQuery,
+            TEST_QUERY_TEXT,
+            TEST_PIPELINE,
+            TEST_SIZE
+        );
 
-        // Verify excluded fields
-        assertNotNull(excludedFields);
-        assertEquals(1, excludedFields.length);
-        assertEquals("passage_embedding", excludedFields[0]);
+        assertNotNull("SearchRequest should not be null", searchRequest);
+        assertEquals("Index should match", TEST_INDEX, searchRequest.indices()[0]);
+        assertEquals("Pipeline should match", TEST_PIPELINE, searchRequest.pipeline());
 
-        // Verify query body
-        assertNotNull(queryBody);
-        JsonNode queryNode = OBJECT_MAPPER.readTree(queryBody);
-        assertTrue(queryNode.has("hybrid"));
-        JsonNode hybridNode = queryNode.get("hybrid");
-        assertTrue(hybridNode.has("queries"));
-        assertEquals(2, hybridNode.get("queries").size());
+        SearchSourceBuilder sourceBuilder = searchRequest.source();
+        assertNotNull("SearchSourceBuilder should not be null", sourceBuilder);
+        assertEquals("Size should match", TEST_SIZE, sourceBuilder.size());
     }
 
-    void testBuildSearchRequest() {
-        // Given
-        String index = "test_index";
-        String query =
-            "{\"_source\": {\"exclude\": [\"passage_embedding\"]},\"query\": {\"hybrid\": {\"queries\": [{\"match\": {\"category\": \"sister\"}},{\"match\": {\"title\": {\"query\": \"my friend\"}}}]}}}";
-        String queryText = "test query";
-        String searchPipeline = "test_pipeline";
-        int size = 10;
+    public void testBuildSearchRequestHybridQuery() {
+        String hybridQuery =
+            "{\"_source\":{\"exclude\":[\"passage_embedding\"]},\"query\":{\"hybrid\":{\"queries\":[{\"match\":{\"name\":\""
+                + WILDCARD_QUERY_TEXT
+                + "\"}},{\"match\":{\"name\":{\"query\":\""
+                + WILDCARD_QUERY_TEXT
+                + "\"}}}]}},\"search_pipeline\":{\"description\":\"Post processor for hybrid search\","
+                + "\"phase_results_processors\":[{\"normalization-processor\":{\"normalization\":{\"technique\":\"min_max\"},\"combination\":"
+                + "{\"technique\":\"arithmetic_mean\",\"parameters\":{\"weights\":[0.7,0.3]}}}}]}}";
+        SearchRequest searchRequest = SearchRequestBuilder.buildSearchRequest(TEST_INDEX, hybridQuery, TEST_QUERY_TEXT, null, TEST_SIZE);
 
-        // When
-        SearchRequest searchRequest = SearchRequestBuilder.buildSearchRequest(index, query, queryText, searchPipeline, size);
+        assertNotNull("SearchRequest should not be null", searchRequest);
+        assertEquals("Index should match", TEST_INDEX, searchRequest.indices()[0]);
 
-        // Then
-        assertNotNull(searchRequest);
-        assertEquals(index, searchRequest.indices()[0]);
-        assertEquals(searchPipeline, searchRequest.pipeline());
-        assertEquals(size, searchRequest.source().size());
+        SearchSourceBuilder sourceBuilder = searchRequest.source();
+        assertNotNull("SearchSourceBuilder should not be null", sourceBuilder);
+        assertEquals("Size should match", TEST_SIZE, sourceBuilder.size());
     }
+
+    public void testBuildSearchRequestInvalidJson() {
+        String invalidQuery = "{\"query\":invalid}";
+        assertThrows(
+            "Should throw IOException for invalid JSON format",
+            IllegalArgumentException.class,
+            () -> SearchRequestBuilder.buildSearchRequest(TEST_INDEX, invalidQuery, TEST_QUERY_TEXT, null, TEST_SIZE)
+        );
+    }
+
 }

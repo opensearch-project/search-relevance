@@ -9,30 +9,43 @@ package org.opensearch.searchrelevance.model.builder;
 
 import static org.opensearch.searchrelevance.common.PluginConstants.WILDCARD_QUERY_TEXT;
 
-import org.opensearch.action.search.SearchRequest;
-import org.opensearch.index.query.QueryBuilders;
-import org.opensearch.search.builder.SearchSourceBuilder;
+import java.io.IOException;
+import java.util.Collections;
+import java.util.Map;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.opensearch.action.search.SearchRequest;
+import org.opensearch.common.settings.Settings;
+import org.opensearch.common.xcontent.json.JsonXContent;
+import org.opensearch.core.xcontent.DeprecationHandler;
+import org.opensearch.core.xcontent.NamedXContentRegistry;
+import org.opensearch.core.xcontent.XContentBuilder;
+import org.opensearch.core.xcontent.XContentParser;
+import org.opensearch.index.query.QueryBuilders;
+import org.opensearch.search.SearchModule;
+import org.opensearch.search.builder.SearchSourceBuilder;
 
 /**
  * Common Search Request Builder for Search Configuration with placeholder with QueryText filled.
  */
 public class SearchRequestBuilder {
 
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final Logger LOGGER = LogManager.getLogger(SearchRequestBuilder.class);
+    private static final NamedXContentRegistry NAMED_CONTENT_REGISTRY;
+    private static final SearchModule SEARCH_MODULE;
+    private static final String QUERY_FIELD_NAME = "query";
+    private static final String SIZE_FIELD_NAME = "size";
 
-    private static final String SEARCH_PIPELINE_FIELD_NAME = "search_pipeline";
-    private static final String QUERY_BODY_FIELD_NAME = "query";
-    private static final String SOURCE_FIELD_NAME = "_source";
-    private static final String EXCLUDE_FIELD_NAME = "exclude";
+    static {
+        SEARCH_MODULE = new SearchModule(Settings.EMPTY, Collections.emptyList());
+        NAMED_CONTENT_REGISTRY = new NamedXContentRegistry(SEARCH_MODULE.getNamedXContents());
+    }
 
     /**
      * Builds a search request with the given parameters.
      * @param index - target index to be searched against
-     * @param query - DSL query that includes queryBody and optional searchPipelineBody and excluding fields from source
+     * @param query - DSL query that includes queryBody and optional extra fields, like pipeline, aggregation, exclude ...
      * @param queryText - queryText need to be replaced with placeholder
      * @param searchPipeline - searchPipeline if it is provided
      * @param size - number of returned hits from the search
@@ -40,62 +53,70 @@ public class SearchRequestBuilder {
      */
     public static SearchRequest buildSearchRequest(String index, String query, String queryText, String searchPipeline, int size) {
         SearchRequest searchRequest = new SearchRequest(index);
-        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
 
-        String processedQueryBody = fetchQueryBody(query).replace(WILDCARD_QUERY_TEXT, queryText);
-        searchSourceBuilder.query(QueryBuilders.wrapperQuery(processedQueryBody));
-        searchSourceBuilder.size(size);
-
-        String[] excludedFields = fetchExcludingFields(query);
-        if (excludedFields != null && excludedFields.length > 0) {
-            searchSourceBuilder.fetchSource(null, excludedFields);
-        }
-
-        // set search pipeline from query if it's provided
-        String pipelineBody = fetchPipelineBody(query);
-        if (pipelineBody != null) {
-            searchSourceBuilder.pipeline(pipelineBody);
-        }
-
-        // set search pipeline if searchPipeline is provided
-        if (searchPipeline != null && !searchPipeline.isEmpty()) {
-            searchRequest.pipeline(searchPipeline);
-        }
-
-        searchRequest.source(searchSourceBuilder);
-        return searchRequest;
-    }
-
-    public static String fetchPipelineBody(String query) {
         try {
-            JsonNode rootNode = OBJECT_MAPPER.readTree(query);
-            JsonNode pipelineNode = rootNode.get(SEARCH_PIPELINE_FIELD_NAME);
-            return pipelineNode != null ? OBJECT_MAPPER.writeValueAsString(pipelineNode) : null;
-        } catch (JsonProcessingException e) {
-            throw new IllegalArgumentException("Failed to parse pipeline body from query", e);
-        }
-    }
+            // Replace placeholder with actual query text
+            String processedQuery = query.replace(WILDCARD_QUERY_TEXT, queryText);
 
-    public static String[] fetchExcludingFields(String query) {
-        try {
-            JsonNode rootNode = OBJECT_MAPPER.readTree(query);
-            JsonNode sourceNode = rootNode.get(SOURCE_FIELD_NAME);
-            if (sourceNode != null && sourceNode.has(EXCLUDE_FIELD_NAME)) {
-                return OBJECT_MAPPER.convertValue(sourceNode.get(EXCLUDE_FIELD_NAME), String[].class);
+            // Parse the full query into a map
+            XContentParser parser = JsonXContent.jsonXContent.createParser(
+                NamedXContentRegistry.EMPTY,
+                DeprecationHandler.IGNORE_DEPRECATIONS,
+                processedQuery
+            );
+            Map<String, Object> fullQueryMap = parser.map();
+
+            // This implementation handles the 'query' field separately from other fields because:
+            // 1. Custom query types (like hybrid, neural) are not registered in the default QueryBuilders
+            // 2. Using WrapperQuery allows passing through any query structure without parsing
+            // 3. All other fields (aggregations, source filtering, etc.) can be parsed normally by SearchSourceBuilder
+            Object queryObject = fullQueryMap.remove(QUERY_FIELD_NAME);
+
+            // Parse everything except query using SearchSourceBuilder.fromXContent
+            XContentBuilder builder = JsonXContent.contentBuilder();
+            builder.map(fullQueryMap);
+
+            parser = JsonXContent.jsonXContent.createParser(
+                NAMED_CONTENT_REGISTRY,
+                DeprecationHandler.IGNORE_DEPRECATIONS,
+                builder.toString()
+            );
+
+            SearchSourceBuilder sourceBuilder = SearchSourceBuilder.fromXContent(parser);
+
+            // Handle query separately using WrapperQuery
+            if (queryObject != null) {
+                builder = JsonXContent.contentBuilder();
+                builder.value(queryObject);
+                String queryBody = builder.toString();
+                sourceBuilder.query(QueryBuilders.wrapperQuery(queryBody));
             }
-            return null;
-        } catch (JsonProcessingException e) {
-            throw new IllegalArgumentException("Failed to parse excluded fields from query", e);
+
+            // Precheck if query contains a different size value
+            if (fullQueryMap.containsKey(SIZE_FIELD_NAME)) {
+                int querySize = ((Number) fullQueryMap.get(SIZE_FIELD_NAME)).intValue();
+                if (querySize != size) {
+                    LOGGER.debug(
+                        "Size mismatch detected. Query size: {}, Search Configuration Input size: {}. Using Search Configuration Input size.",
+                        querySize,
+                        size
+                    );
+                }
+            }
+            // Set size
+            sourceBuilder.size(size);
+
+            // Set search pipeline if provided
+            if (searchPipeline != null && !searchPipeline.isEmpty()) {
+                searchRequest.pipeline(searchPipeline);
+            }
+
+            searchRequest.source(sourceBuilder);
+            return searchRequest;
+
+        } catch (IOException ex) {
+            throw new IllegalArgumentException("Failed to build search request", ex);
         }
     }
 
-    public static String fetchQueryBody(String query) {
-        try {
-            JsonNode rootNode = OBJECT_MAPPER.readTree(query);
-            JsonNode queryNode = rootNode.get(QUERY_BODY_FIELD_NAME);
-            return queryNode != null ? OBJECT_MAPPER.writeValueAsString(queryNode) : null;
-        } catch (JsonProcessingException e) {
-            throw new IllegalArgumentException("Failed to parse query body from query", e);
-        }
-    }
 }
