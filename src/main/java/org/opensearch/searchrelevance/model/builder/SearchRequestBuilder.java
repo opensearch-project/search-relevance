@@ -11,8 +11,6 @@ import static org.opensearch.searchrelevance.common.PluginConstants.WILDCARD_QUE
 
 import java.io.IOException;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -122,7 +120,13 @@ public class SearchRequestBuilder {
         }
     }
 
-    public static SearchRequest buildSearchRequest(String index, String query, String queryText, int size) {
+    public static SearchRequest buildRequestForHybridSearch(
+        String index,
+        String query,
+        Map<String, Object> temporarySearchPipeline,
+        String queryText,
+        int size
+    ) {
         SearchRequest searchRequest = new SearchRequest(index);
 
         try {
@@ -160,19 +164,12 @@ public class SearchRequestBuilder {
                 log.error("query in search configuration does have temporary search pipeline in its source");
                 throw new IllegalArgumentException("search pipeline is not allowed in search request");
             }
-            Map<String, Object> normalizationTechniqueConfig = Map.of("technique", "min_max");
-            Map<String, Object> combinationTechniqueConfig = Map.of("technique", "arithmetic_mean");
-            Map<String, Object> normalizationProcessorConfig = Map.of(
-                "normalization",
-                normalizationTechniqueConfig,
-                "combination",
-                combinationTechniqueConfig
-            );
-            Map<String, Object> phaseProcessorObject = Map.of("normalization-processor", normalizationProcessorConfig);
-            Map<String, Object> temporarySearchPipeline = new HashMap<>();
-            temporarySearchPipeline.put("phase_results_processors", List.of(phaseProcessorObject));
 
-            sourceBuilder.searchPipelineSource(temporarySearchPipeline);
+            if (temporarySearchPipeline.isEmpty() == false) {
+                sourceBuilder.searchPipelineSource(temporarySearchPipeline);
+            } else {
+                log.debug("no temporary search pipeline");
+            }
 
             // Handle query separately using WrapperQuery
             if (queryObject != null) {

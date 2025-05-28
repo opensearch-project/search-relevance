@@ -9,6 +9,7 @@ package org.opensearch.searchrelevance.model.builder;
 
 import static org.opensearch.searchrelevance.common.PluginConstants.WILDCARD_QUERY_TEXT;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -69,7 +70,26 @@ public class SearchRequestBuilderTests extends OpenSearchTestCase {
                 + "\"}},{\"match\":{\"name\":{\"query\":\""
                 + WILDCARD_QUERY_TEXT
                 + "\"}}}]}}}";
-        SearchRequest searchRequest = SearchRequestBuilder.buildSearchRequest(TEST_INDEX, hybridQuery, TEST_QUERY_TEXT, TEST_SIZE);
+
+        Map<String, Object> normalizationProcessorConfig = new HashMap<>(
+            Map.of(
+                "normalization",
+                new HashMap<String, Object>(Map.of("technique", "min_max")),
+                "combination",
+                new HashMap<String, Object>(Map.of("technique", "arithmetic_mean"))
+            )
+        );
+        Map<String, Object> phaseProcessorObject = new HashMap<>(Map.of("normalization-processor", normalizationProcessorConfig));
+        Map<String, Object> temporarySearchPipeline = new HashMap<>();
+        temporarySearchPipeline.put("phase_results_processors", List.of(phaseProcessorObject));
+
+        SearchRequest searchRequest = SearchRequestBuilder.buildRequestForHybridSearch(
+            TEST_INDEX,
+            hybridQuery,
+            temporarySearchPipeline,
+            TEST_QUERY_TEXT,
+            TEST_SIZE
+        );
         assertNotNull("SearchRequest should not be null", searchRequest);
         assertEquals("Index should match", TEST_INDEX, searchRequest.indices()[0]);
 
@@ -95,7 +115,7 @@ public class SearchRequestBuilderTests extends OpenSearchTestCase {
                 + "{\"technique\":\"arithmetic_mean\",\"parameters\":{\"weights\":[0.7,0.3]}}}}]}}";
         IllegalArgumentException exception = expectThrows(
             IllegalArgumentException.class,
-            () -> SearchRequestBuilder.buildSearchRequest(TEST_INDEX, hybridQuery, TEST_QUERY_TEXT, TEST_SIZE)
+            () -> SearchRequestBuilder.buildRequestForHybridSearch(TEST_INDEX, hybridQuery, Map.of(), TEST_QUERY_TEXT, TEST_SIZE)
         );
         assertEquals("search pipeline is not allowed in search request", exception.getMessage());
     }
