@@ -49,7 +49,6 @@ import org.opensearch.searchrelevance.ml.ChunkResult;
 import org.opensearch.searchrelevance.ml.MLAccessor;
 import org.opensearch.searchrelevance.model.JudgmentCache;
 import org.opensearch.searchrelevance.model.JudgmentType;
-import org.opensearch.searchrelevance.shared.StashedThreadContext;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.transport.client.Client;
 
@@ -190,8 +189,9 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
             String searchPipeline = entry.getValue().get(2);
 
             SearchRequest searchRequest = buildSearchRequest(index, query, queryText, searchPipeline, size);
-            StashedThreadContext.run(client, () -> client.search(searchRequest, ActionListener.wrap(response -> {
+            client.search(searchRequest, ActionListener.wrap(response -> {
                 SearchHit[] hits = response.getHits().getHits();
+                LOGGER.info("Found {} hits with search request: {} ", hits.length, searchRequest);
                 List<String> docIds = Arrays.stream(hits).map(SearchHit::getId).collect(Collectors.toList());
 
                 deduplicateFromProcessedDocs(
@@ -201,27 +201,29 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                     contextFields,
                     docIdToScore,
                     ActionListener.wrap(unprocessedDocIds -> {
-                        Arrays.stream(hits).filter(hit -> unprocessedDocIds.contains(hit.getId())).forEach(hit -> {
-                            String compositeKey = combinedIndexAndDocId(hit.getIndex(), hit.getId());
-                            String contextSource;
-                            if (contextFields != null && !contextFields.isEmpty()) {
-                                Map<String, Object> filteredSource = new HashMap<>();
-                                Map<String, Object> sourceAsMap = hit.getSourceAsMap();
-                                for (String field : contextFields) {
-                                    if (sourceAsMap.containsKey(field)) {
-                                        filteredSource.put(field, sourceAsMap.get(field));
+                        if (!unprocessedDocIds.isEmpty()) {
+                            Arrays.stream(hits).filter(hit -> unprocessedDocIds.contains(hit.getId())).forEach(hit -> {
+                                String compositeKey = combinedIndexAndDocId(hit.getIndex(), hit.getId());
+                                String contextSource;
+                                if (contextFields != null && !contextFields.isEmpty()) {
+                                    Map<String, Object> filteredSource = new HashMap<>();
+                                    Map<String, Object> sourceAsMap = hit.getSourceAsMap();
+                                    for (String field : contextFields) {
+                                        if (sourceAsMap.containsKey(field)) {
+                                            filteredSource.put(field, sourceAsMap.get(field));
+                                        }
                                     }
+                                    try {
+                                        contextSource = new ObjectMapper().writeValueAsString(filteredSource);
+                                    } catch (JsonProcessingException e) {
+                                        throw new RuntimeException(e);
+                                    }
+                                } else {
+                                    contextSource = hit.getSourceAsString();
                                 }
-                                try {
-                                    contextSource = new ObjectMapper().writeValueAsString(filteredSource);
-                                } catch (JsonProcessingException e) {
-                                    throw new RuntimeException(e);
-                                }
-                            } else {
-                                contextSource = hit.getSourceAsString();
-                            }
-                            unionHits.put(compositeKey, contextSource);
-                        });
+                                unionHits.put(compositeKey, contextSource);
+                            });
+                        }
 
                         if (pendingSearches.decrementAndGet() == 0) {
                             generateLLMJudgmentForQueryText(
@@ -265,7 +267,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                         listener
                     );
                 }
-            })));
+            }));
         }
     }
 
