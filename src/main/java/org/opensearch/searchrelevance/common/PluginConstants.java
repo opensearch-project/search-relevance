@@ -37,15 +37,15 @@ public class PluginConstants {
     /**
      * Indices constants
      */
-    public static final String QUERY_SET_INDEX = ".plugins-search-relevance-queryset";
+    public static final String QUERY_SET_INDEX = "search-relevance-queryset";
     public static final String QUERY_SET_INDEX_MAPPING = "mappings/queryset.json";
-    public static final String SEARCH_CONFIGURATION_INDEX = ".plugins-search-relevance-search-config";
+    public static final String SEARCH_CONFIGURATION_INDEX = "search-relevance-search-config";
     public static final String SEARCH_CONFIGURATION_INDEX_MAPPING = "mappings/search_configuration.json";
     public static final String EXPERIMENT_INDEX = ".plugins-search-relevance-experiment";
     public static final String EXPERIMENT_INDEX_MAPPING = "mappings/experiment.json";
-    public static final String JUDGMENT_INDEX = ".plugins-search-relevance-judgment";
+    public static final String JUDGMENT_INDEX = "search-relevance-judgment";
     public static final String JUDGMENT_INDEX_MAPPING = "mappings/judgment.json";
-    public static final String EVALUATION_RESULT_INDEX = ".plugins-search-relevance-evaluation-result";
+    public static final String EVALUATION_RESULT_INDEX = "search-relevance-evaluation-result";
     public static final String EVALUATION_RESULT_INDEX_MAPPING = "mappings/evaluation_result.json";
     public static final String JUDGMENT_CACHE_INDEX = ".plugins-search-relevance-judgment-cache";
     public static final String JUDGMENT_CACHE_INDEX_MAPPING = "mappings/judgment_cache.json";
