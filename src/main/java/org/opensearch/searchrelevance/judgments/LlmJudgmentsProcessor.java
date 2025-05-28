@@ -15,6 +15,7 @@ import static org.opensearch.searchrelevance.model.JudgmentCache.SCORE;
 import static org.opensearch.searchrelevance.model.QueryWithReference.DELIMITER;
 import static org.opensearch.searchrelevance.model.builder.SearchRequestBuilder.buildSearchRequest;
 import static org.opensearch.searchrelevance.utils.ParserUtils.combinedIndexAndDocId;
+import static org.opensearch.searchrelevance.utils.ParserUtils.generateUniqueId;
 import static org.opensearch.searchrelevance.utils.ParserUtils.getDocIdFromCompositeKey;
 
 import java.util.ArrayList;
@@ -25,7 +26,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -476,7 +476,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         String modelId
     ) {
         JudgmentCache judgmentCache = new JudgmentCache(
-            UUID.randomUUID().toString(),
+            generateUniqueId(queryText, compositeKey, contextFields),
             TimeUtils.getTimestamp(),
             queryText,
             compositeKey,
@@ -484,24 +484,37 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
             ratingScore,
             modelId
         );
-        judgmentCacheDao.putJudgementCache(
-            judgmentCache,
-            ActionListener.wrap(
-                response -> LOGGER.debug(
-                    "Successfully updated judgment cache for queryText: {} and compositeKey: {}, contextFields: {}",
-                    queryText,
-                    compositeKey,
-                    contextFields
-                ),
-                e -> LOGGER.error(
-                    "Failed to update judgment cache for queryText: {} and compositeKey: {}, contextFields: {}",
-                    queryText,
-                    compositeKey,
-                    contextFields,
-                    e
+        StepListener<Void> createIndexStep = new StepListener<>();
+        judgmentCacheDao.createIndexIfAbsent(createIndexStep);
+
+        createIndexStep.whenComplete(v -> {
+            judgmentCacheDao.upsertJudgmentCache(
+                judgmentCache,
+                ActionListener.wrap(
+                    response -> LOGGER.debug(
+                        "Successfully processed judgment cache for queryText: {} and compositeKey: {}, contextFields: {}",
+                        queryText,
+                        compositeKey,
+                        contextFields
+                    ),
+                    e -> LOGGER.error(
+                        "Failed to process judgment cache for queryText: {} and compositeKey: {}, contextFields: {}",
+                        queryText,
+                        compositeKey,
+                        contextFields,
+                        e
+                    )
                 )
-            )
-        );
+            );
+        }, e -> {
+            LOGGER.error(
+                "Failed to create judgment cache index for queryText: {} and compositeKey: {}, contextFields: {}",
+                queryText,
+                compositeKey,
+                contextFields,
+                e
+            );
+        });
     }
 
     private boolean shouldFailImmediately(boolean ignoreFailure, ChunkResult chunkResult) {
