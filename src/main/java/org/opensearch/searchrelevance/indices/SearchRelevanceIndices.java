@@ -19,6 +19,8 @@ import static org.opensearch.searchrelevance.common.PluginConstants.QUERY_SET_IN
 import static org.opensearch.searchrelevance.common.PluginConstants.QUERY_SET_INDEX_MAPPING;
 import static org.opensearch.searchrelevance.common.PluginConstants.SEARCH_CONFIGURATION_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.SEARCH_CONFIGURATION_INDEX_MAPPING;
+import static org.opensearch.searchrelevance.common.PluginConstants.SUB_EXPERIMENT_INDEX;
+import static org.opensearch.searchrelevance.common.PluginConstants.SUB_EXPERIMENT_INDEX_MAPPING;
 import static org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager.getIndexMappings;
 
 import java.io.IOException;
@@ -56,7 +58,12 @@ public enum SearchRelevanceIndices {
     /**
      * Judgment Cache Index
      */
-    JUDGMENT_CACHE(JUDGMENT_CACHE_INDEX, JUDGMENT_CACHE_INDEX_MAPPING);
+    JUDGMENT_CACHE(JUDGMENT_CACHE_INDEX, JUDGMENT_CACHE_INDEX_MAPPING),
+
+    /**
+     * Sub experiment Index
+     */
+    SUB_EXPERIMENT(SUB_EXPERIMENT_INDEX, SUB_EXPERIMENT_INDEX_MAPPING);
 
     private final String indexName;
     private final String mapping;

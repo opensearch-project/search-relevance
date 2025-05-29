@@ -27,6 +27,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
+import org.opensearch.action.StepListener;
+import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.cluster.service.ClusterService;
@@ -35,12 +37,10 @@ import org.opensearch.core.action.ActionListener;
 import org.opensearch.search.SearchHit;
 import org.opensearch.searchrelevance.dao.EvaluationResultDao;
 import org.opensearch.searchrelevance.dao.JudgmentDao;
-import org.opensearch.searchrelevance.experiment.EmptyExperimentOptions;
-import org.opensearch.searchrelevance.experiment.ExperimentOptions;
-import org.opensearch.searchrelevance.experiment.ExperimentOptionsFactory;
-import org.opensearch.searchrelevance.experiment.ExperimentOptionsForHybridSearch;
-import org.opensearch.searchrelevance.experiment.SubExperimentHybridSearchDao;
+import org.opensearch.searchrelevance.dao.SubExperimentDao;
+import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.EvaluationResult;
+import org.opensearch.searchrelevance.model.SubExperiment;
 import org.opensearch.searchrelevance.model.builder.SearchRequestBuilder;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.transport.client.Client;
@@ -57,18 +57,21 @@ public class MetricsHelper {
     private final Client client;
     private final JudgmentDao judgmentDao;
     private final EvaluationResultDao evaluationResultDao;
+    private final SubExperimentDao subExperimentDao;
 
     @Inject
     public MetricsHelper(
         @NonNull ClusterService clusterService,
         @NonNull Client client,
         @NonNull JudgmentDao judgmentDao,
-        @NonNull EvaluationResultDao evaluationResultDao
+        @NonNull EvaluationResultDao evaluationResultDao,
+        @NonNull SubExperimentDao subExperimentDao
     ) {
         this.clusterService = clusterService;
         this.client = client;
         this.judgmentDao = judgmentDao;
         this.evaluationResultDao = evaluationResultDao;
+        this.subExperimentDao = subExperimentDao;
     }
 
     /**
@@ -173,13 +176,9 @@ public class MetricsHelper {
         Map<String, List<String>> indexAndQueries,
         int size,
         List<String> judgmentIds,
-        ActionListener<Map<String, String>> listener
+        ActionListener<Map<String, Object>> listener
     ) {
-        ExperimentOptions emptyExperimentOptions = ExperimentOptionsFactory.createExperimentOptions(
-            ExperimentOptionsFactory.EMPTY_EXPERIMENT_OPTIONS,
-            Map.of()
-        );
-        processEvaluationMetrics(queryText, indexAndQueries, size, judgmentIds, listener, emptyExperimentOptions);
+        processEvaluationMetrics(queryText, indexAndQueries, size, judgmentIds, listener, List.of());
     }
 
     public void processEvaluationMetrics(
@@ -187,8 +186,8 @@ public class MetricsHelper {
         Map<String, List<String>> indexAndQueries,
         int size,
         List<String> judgmentIds,
-        ActionListener<Map<String, String>> listener,
-        ExperimentOptions experimentOptions
+        ActionListener<Map<String, Object>> listener,
+        List<SubExperiment> subExperiments
     ) {
         if (indexAndQueries.isEmpty() || judgmentIds.isEmpty()) {
             listener.onFailure(new IllegalArgumentException("Missing required parameters"));
@@ -196,7 +195,7 @@ public class MetricsHelper {
         }
 
         try {
-            Map<String, String> configToEvalIds = new HashMap<>();
+            Map<String, Object> configToEvalIds = Collections.synchronizedMap(new HashMap<>());
             Map<String, String> docIdToScores = new HashMap<>();
             AtomicInteger completedJudgments = new AtomicInteger(0);
 
@@ -237,7 +236,7 @@ public class MetricsHelper {
                                     docIdToScores,
                                     configToEvalIds,
                                     listener,
-                                    experimentOptions
+                                    subExperiments
                                 );
                             }
                         } catch (Exception e) {
@@ -261,7 +260,7 @@ public class MetricsHelper {
                                     docIdToScores,
                                     configToEvalIds,
                                     listener,
-                                    experimentOptions
+                                    subExperiments
                                 );
                             }
                         }
@@ -280,13 +279,12 @@ public class MetricsHelper {
         int size,
         List<String> judgmentIds,
         Map<String, String> docIdToScores,
-        Map<String, String> configToEvalIds,
-        ActionListener<Map<String, String>> listener,
-        ExperimentOptions experimentOptions
+        Map<String, Object> configToEvalIds,
+        ActionListener<Map<String, Object>> listener,
+        List<SubExperiment> subExperiments
     ) {
-        AtomicInteger pendingConfigurations = new AtomicInteger(indexAndQueries.size());
         AtomicBoolean hasFailure = new AtomicBoolean(false);
-
+        AtomicInteger pendingConfigurations = getNumberOfExperimentRuns(indexAndQueries, subExperiments);
         if (indexAndQueries.isEmpty()) {
             listener.onResponse(configToEvalIds);
             return;
@@ -301,7 +299,7 @@ public class MetricsHelper {
             String query = indexAndQueries.get(searchConfigurationId).get(1);
             String searchPipeline = indexAndQueries.get(searchConfigurationId).get(2);
 
-            if (Objects.isNull(experimentOptions) || experimentOptions instanceof EmptyExperimentOptions) {
+            if (Objects.isNull(subExperiments) || subExperiments.isEmpty()) {
                 processSearchConfigurationWithEmptyExperimentOptions(
                     queryText,
                     size,
@@ -316,8 +314,7 @@ public class MetricsHelper {
                     hasFailure,
                     pendingConfigurations
                 );
-            } else if (experimentOptions instanceof ExperimentOptionsForHybridSearch) {
-                ExperimentOptionsForHybridSearch experimentOptionsForHybridSearch = (ExperimentOptionsForHybridSearch) experimentOptions;
+            } else {
                 processSearchConfigurationWithHybridExperimentOptions(
                     queryText,
                     size,
@@ -330,12 +327,25 @@ public class MetricsHelper {
                     query,
                     hasFailure,
                     pendingConfigurations,
-                    experimentOptionsForHybridSearch
+                    subExperiments
                 );
-            } else {
-                listener.onFailure(new IllegalArgumentException("unsupported experiment options"));
             }
         }
+    }
+
+    /**
+     * Get number of experiment runs based on indexAndQueries and subExperiments
+     * @param indexAndQueries
+     * @param subExperiments
+     * @return
+     */
+    private AtomicInteger getNumberOfExperimentRuns(Map<String, List<String>> indexAndQueries, List<SubExperiment> subExperiments) {
+        if (Objects.nonNull(subExperiments)) {
+            // if there are sub experiments we must include them in number of runs
+            return new AtomicInteger(indexAndQueries.size() * subExperiments.size());
+        }
+        return new AtomicInteger(indexAndQueries.size());
+
     }
 
     private void processSearchConfigurationWithEmptyExperimentOptions(
@@ -343,8 +353,8 @@ public class MetricsHelper {
         int size,
         List<String> judgmentIds,
         Map<String, String> docIdToScores,
-        Map<String, String> configToEvalIds,
-        ActionListener<Map<String, String>> listener,
+        Map<String, Object> configToEvalIds,
+        ActionListener<Map<String, Object>> listener,
         String searchConfigurationId,
         String index,
         String query,
@@ -418,23 +428,24 @@ public class MetricsHelper {
         int size,
         List<String> judgmentIds,
         Map<String, String> docIdToScores,
-        Map<String, String> configToEvalIds,
-        ActionListener<Map<String, String>> listener,
+        Map<String, Object> configToSubExperiments,
+        ActionListener<Map<String, Object>> listener,
         String searchConfigurationId,
         String index,
         String query,
         AtomicBoolean hasFailure,
         AtomicInteger pendingConfigurations,
-        ExperimentOptionsForHybridSearch experimentOptionsForHybridSearch
+        List<SubExperiment> subExperiments
     ) {
-        if (Objects.isNull(experimentOptionsForHybridSearch)) {
-            throw new IllegalArgumentException("experiment options for hybrid search cannot be empty");
-        }
-        List<SubExperimentHybridSearchDao> subExperiments = experimentOptionsForHybridSearch.getParameterCombinations(true);
-        if (subExperiments.isEmpty()) {
+        if (Objects.isNull(subExperiments) || subExperiments.isEmpty()) {
             throw new IllegalArgumentException("sub experiment for hybrid search cannot be empty");
         }
-        for (SubExperimentHybridSearchDao subExperiment : subExperiments) {
+        synchronized (configToSubExperiments) {
+            if (configToSubExperiments.containsKey(searchConfigurationId) == false) {
+                configToSubExperiments.put(searchConfigurationId, new HashMap<String, Object>());
+            }
+        }
+        for (SubExperiment subExperiment : subExperiments) {
             Map<String, Object> temporarySearchPipeline = createDefinitionOfTemporarySearchPipeline(subExperiment);
             SearchRequest searchRequest = SearchRequestBuilder.buildRequestForHybridSearch(
                 index,
@@ -445,7 +456,8 @@ public class MetricsHelper {
             );
             final String evaluationId = UUID.randomUUID().toString();
             log.debug(
-                "Processing hybrid search experiment, configuration {}: index: {}, query: {}, evaluationId: {}",
+                "Processing hybrid search sub-experiment: {} configuration: {} index: {}, query: {}, evaluationId: {}",
+                subExperiment.getId(),
                 searchConfigurationId,
                 index,
                 query,
@@ -460,7 +472,7 @@ public class MetricsHelper {
                         if (response.getHits().getTotalHits().value() == 0) {
                             log.warn("No hits found for search config: {}", searchConfigurationId);
                             if (pendingConfigurations.decrementAndGet() == 0) {
-                                listener.onResponse(configToEvalIds);
+                                listener.onResponse(configToSubExperiments);
                             }
                             return;
                         }
@@ -480,10 +492,26 @@ public class MetricsHelper {
                         );
 
                         evaluationResultDao.putEvaluationResult(evaluationResult, ActionListener.wrap(success -> {
-                            configToEvalIds.put(searchConfigurationId, evaluationId);
-                            if (pendingConfigurations.decrementAndGet() == 0) {
-                                listener.onResponse(configToEvalIds);
-                            }
+                            SubExperiment subExperimentResult = new SubExperiment(
+                                subExperiment.getId(),
+                                TimeUtils.getTimestamp(),
+                                subExperiment.getType(),
+                                AsyncStatus.COMPLETED,
+                                subExperiment.getExperimentId(),
+                                subExperiment.getParameters(),
+                                Map.of("evaluationResultId", evaluationId)
+                            );
+                            StepListener<IndexResponse> voidStepListener = new StepListener<>();
+                            subExperimentDao.updateSubExperiment(subExperimentResult, voidStepListener);
+                            voidStepListener.whenComplete(indexResponse -> {
+                                synchronized (configToSubExperiments) {
+                                    Map<String, Object> map = (Map<String, Object>) configToSubExperiments.get(searchConfigurationId);
+                                    map.put(subExperiment.getId(), evaluationId);
+                                }
+                                if (pendingConfigurations.decrementAndGet() == 0) {
+                                    listener.onResponse(configToSubExperiments);
+                                }
+                            }, listener::onFailure);
                         }, error -> {
                             hasFailure.set(true);
                             listener.onFailure(error);
@@ -496,6 +524,20 @@ public class MetricsHelper {
 
                 @Override
                 public void onFailure(Exception e) {
+                    SubExperiment subExperimentResult = new SubExperiment(
+                        subExperiment.getId(),
+                        TimeUtils.getTimestamp(),
+                        subExperiment.getType(),
+                        AsyncStatus.ERROR,
+                        subExperiment.getExperimentId(),
+                        subExperiment.getParameters(),
+                        Map.of("evaluationResultId", evaluationId)
+                    );
+                    subExperimentDao.updateSubExperiment(subExperimentResult, ActionListener.wrap(success -> {}, error -> {
+                        hasFailure.set(true);
+                        listener.onFailure(error);
+                    }));
+
                     hasFailure.set(true);
                     listener.onFailure(e);
                 }
