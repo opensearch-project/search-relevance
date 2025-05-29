@@ -10,6 +10,7 @@ package org.opensearch.searchrelevance.plugin;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_CACHE_INDEX;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_WORKBENCH_ENABLED;
+import static org.opensearch.searchrelevance.common.PluginConstants.SUB_EXPERIMENT_INDEX;
 
 import java.util.Collection;
 import java.util.List;
@@ -46,6 +47,7 @@ import org.opensearch.searchrelevance.dao.JudgmentCacheDao;
 import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
+import org.opensearch.searchrelevance.dao.SubExperimentDao;
 import org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager;
 import org.opensearch.searchrelevance.metrics.MetricsHelper;
 import org.opensearch.searchrelevance.ml.MLAccessor;
@@ -107,6 +109,7 @@ public class SearchRelevancePlugin extends Plugin implements ActionPlugin, Syste
     private QuerySetDao querySetDao;
     private SearchConfigurationDao searchConfigurationDao;
     private ExperimentDao experimentDao;
+    private SubExperimentDao subExperimentDao;
     private JudgmentDao judgmentDao;
     private EvaluationResultDao evaluationResultDao;
     private JudgmentCacheDao judgmentCacheDao;
@@ -118,6 +121,7 @@ public class SearchRelevancePlugin extends Plugin implements ActionPlugin, Syste
     public Collection<SystemIndexDescriptor> getSystemIndexDescriptors(Settings settings) {
         return List.of(
             new SystemIndexDescriptor(EXPERIMENT_INDEX, "System index used for experiment data"),
+            new SystemIndexDescriptor(SUB_EXPERIMENT_INDEX, "System index used for sub experiment data"),
             new SystemIndexDescriptor(JUDGMENT_CACHE_INDEX, "System index used for judgment cache data")
         );
     }
@@ -140,6 +144,7 @@ public class SearchRelevancePlugin extends Plugin implements ActionPlugin, Syste
         this.clusterService = clusterService;
         this.searchRelevanceIndicesManager = new SearchRelevanceIndicesManager(clusterService, client);
         this.experimentDao = new ExperimentDao(searchRelevanceIndicesManager);
+        this.subExperimentDao = new SubExperimentDao(searchRelevanceIndicesManager);
         this.querySetDao = new QuerySetDao(searchRelevanceIndicesManager);
         this.searchConfigurationDao = new SearchConfigurationDao(searchRelevanceIndicesManager);
         this.judgmentDao = new JudgmentDao(searchRelevanceIndicesManager);
@@ -147,13 +152,14 @@ public class SearchRelevancePlugin extends Plugin implements ActionPlugin, Syste
         this.judgmentCacheDao = new JudgmentCacheDao(searchRelevanceIndicesManager);
         MachineLearningNodeClient mlClient = new MachineLearningNodeClient(client);
         this.mlAccessor = new MLAccessor(mlClient);
-        this.metricsHelper = new MetricsHelper(clusterService, client, judgmentDao, evaluationResultDao);
+        this.metricsHelper = new MetricsHelper(clusterService, client, judgmentDao, evaluationResultDao, subExperimentDao);
         this.settingsAccessor = new SearchRelevanceSettingsAccessor(clusterService, environment.settings());
         return List.of(
             searchRelevanceIndicesManager,
             querySetDao,
             searchConfigurationDao,
             experimentDao,
+            subExperimentDao,
             judgmentDao,
             evaluationResultDao,
             judgmentCacheDao,

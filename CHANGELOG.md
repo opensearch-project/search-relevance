@@ -5,8 +5,9 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 ## [Unreleased]
 
 ### Added
-- Added new experiment type for hybrid search ([#10](https://github.com/opensearch-project/search-relevance/pull/26))
+- Added new experiment type for hybrid search ([#26](https://github.com/opensearch-project/search-relevance/pull/26))
 - Added feature flag for search relevance workbench ([#34](https://github.com/opensearch-project/search-relevance/pull/34))
+- [Enhancement] Extend data model to adopt different experiment options/parameters ([#29](https://github.com/opensearch-project/search-relevance/issues/29))
 
 ### Removed
 

@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_CACHE_INDEX;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_WORKBENCH_ENABLED;
+import static org.opensearch.searchrelevance.common.PluginConstants.SUB_EXPERIMENT_INDEX;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -43,6 +44,7 @@ import org.opensearch.searchrelevance.dao.JudgmentCacheDao;
 import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
+import org.opensearch.searchrelevance.dao.SubExperimentDao;
 import org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager;
 import org.opensearch.searchrelevance.metrics.MetricsHelper;
 import org.opensearch.searchrelevance.ml.MLAccessor;
@@ -88,12 +90,13 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
     private NodeEnvironment nodeEnvironment;
     private SearchRelevancePlugin plugin;
 
-    public static final Set<String> SUPPORTED_SYSTEM_INDEX_PATTERN = Set.of(EXPERIMENT_INDEX, JUDGMENT_CACHE_INDEX);
+    public static final Set<String> SUPPORTED_SYSTEM_INDEX_PATTERN = Set.of(EXPERIMENT_INDEX, SUB_EXPERIMENT_INDEX, JUDGMENT_CACHE_INDEX);
 
     private final Set<Class> SUPPORTED_COMPONENTS = Set.of(
         SearchRelevanceIndicesManager.class,
         QuerySetDao.class,
         ExperimentDao.class,
+        SubExperimentDao.class,
         SearchConfigurationDao.class,
         JudgmentDao.class,
         EvaluationResultDao.class,
