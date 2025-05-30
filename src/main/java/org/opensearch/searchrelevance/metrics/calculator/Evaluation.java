@@ -94,13 +94,13 @@ public class Evaluation {
     private static double calculateIDCG(List<String> docIds, Map<String, String> judgmentScores) {
         List<Double> relevanceScores = new ArrayList<>();
         // IDCG is computed on the full set of relevant documents
-        // Note that if we truncate to @k, computing ndcg_cut (see trec_eval)
-        // it is permitted to take the top k relevance judgments
+        // we truncate the list after sorting
         for (String rel : judgmentScores.values()) {
             relevanceScores.add(Double.valueOf(rel));
         }
 
         Collections.sort(relevanceScores, Collections.reverseOrder());
+        relevanceScores = relevanceScores.subList(0, docIds.size());
         double idcg = 0.0;
 
         for (int i = 0; i < relevanceScores.size(); i++) {
