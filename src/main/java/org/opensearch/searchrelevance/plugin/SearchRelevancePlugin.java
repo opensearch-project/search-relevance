@@ -9,6 +9,7 @@ package org.opensearch.searchrelevance.plugin;
 
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_CACHE_INDEX;
+import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_WORKBENCH_ENABLED;
 
 import java.util.Collection;
 import java.util.List;
@@ -20,6 +21,7 @@ import org.opensearch.cluster.node.DiscoveryNodes;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.settings.ClusterSettings;
 import org.opensearch.common.settings.IndexScopedSettings;
+import org.opensearch.common.settings.Setting;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.settings.SettingsFilter;
 import org.opensearch.core.action.ActionResponse;
@@ -31,6 +33,7 @@ import org.opensearch.indices.SystemIndexDescriptor;
 import org.opensearch.ml.client.MachineLearningNodeClient;
 import org.opensearch.plugins.ActionPlugin;
 import org.opensearch.plugins.ClusterPlugin;
+import org.opensearch.plugins.ExtensiblePlugin;
 import org.opensearch.plugins.Plugin;
 import org.opensearch.plugins.SystemIndexPlugin;
 import org.opensearch.repositories.RepositoriesService;
@@ -59,6 +62,7 @@ import org.opensearch.searchrelevance.rest.RestPutExperimentAction;
 import org.opensearch.searchrelevance.rest.RestPutJudgmentAction;
 import org.opensearch.searchrelevance.rest.RestPutQuerySetAction;
 import org.opensearch.searchrelevance.rest.RestPutSearchConfigurationAction;
+import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.searchrelevance.transport.experiment.DeleteExperimentAction;
 import org.opensearch.searchrelevance.transport.experiment.DeleteExperimentTransportAction;
 import org.opensearch.searchrelevance.transport.experiment.GetExperimentAction;
@@ -89,7 +93,13 @@ import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.client.Client;
 import org.opensearch.watcher.ResourceWatcherService;
 
-public class SearchRelevancePlugin extends Plugin implements ActionPlugin, SystemIndexPlugin, ClusterPlugin {
+import lombok.extern.log4j.Log4j2;
+
+/**
+ * Search Relevance plugin class
+ */
+@Log4j2
+public class SearchRelevancePlugin extends Plugin implements ActionPlugin, SystemIndexPlugin, ClusterPlugin, ExtensiblePlugin {
 
     private Client client;
     private ClusterService clusterService;
@@ -102,6 +112,7 @@ public class SearchRelevancePlugin extends Plugin implements ActionPlugin, Syste
     private JudgmentCacheDao judgmentCacheDao;
     private MLAccessor mlAccessor;
     private MetricsHelper metricsHelper;
+    private SearchRelevanceSettingsAccessor settingsAccessor;
 
     @Override
     public Collection<SystemIndexDescriptor> getSystemIndexDescriptors(Settings settings) {
@@ -137,6 +148,7 @@ public class SearchRelevancePlugin extends Plugin implements ActionPlugin, Syste
         MachineLearningNodeClient mlClient = new MachineLearningNodeClient(client);
         this.mlAccessor = new MLAccessor(mlClient);
         this.metricsHelper = new MetricsHelper(clusterService, client, judgmentDao, evaluationResultDao);
+        this.settingsAccessor = new SearchRelevanceSettingsAccessor(clusterService, environment.settings());
         return List.of(
             searchRelevanceIndicesManager,
             querySetDao,
@@ -161,19 +173,19 @@ public class SearchRelevancePlugin extends Plugin implements ActionPlugin, Syste
         Supplier<DiscoveryNodes> nodesInCluster
     ) {
         return List.of(
-            new RestCreateQuerySetAction(),
-            new RestPutQuerySetAction(),
-            new RestDeleteQuerySetAction(),
-            new RestGetQuerySetAction(),
-            new RestPutJudgmentAction(),
-            new RestDeleteJudgmentAction(),
-            new RestGetJudgmentAction(),
-            new RestPutSearchConfigurationAction(),
-            new RestDeleteSearchConfigurationAction(),
-            new RestGetSearchConfigurationAction(),
-            new RestPutExperimentAction(),
-            new RestGetExperimentAction(),
-            new RestDeleteExperimentAction()
+            new RestCreateQuerySetAction(settingsAccessor),
+            new RestPutQuerySetAction(settingsAccessor),
+            new RestDeleteQuerySetAction(settingsAccessor),
+            new RestGetQuerySetAction(settingsAccessor),
+            new RestPutJudgmentAction(settingsAccessor),
+            new RestDeleteJudgmentAction(settingsAccessor),
+            new RestGetJudgmentAction(settingsAccessor),
+            new RestPutSearchConfigurationAction(settingsAccessor),
+            new RestDeleteSearchConfigurationAction(settingsAccessor),
+            new RestGetSearchConfigurationAction(settingsAccessor),
+            new RestPutExperimentAction(settingsAccessor),
+            new RestGetExperimentAction(settingsAccessor),
+            new RestDeleteExperimentAction(settingsAccessor)
         );
     }
 
@@ -194,5 +206,10 @@ public class SearchRelevancePlugin extends Plugin implements ActionPlugin, Syste
             new ActionHandler<>(DeleteExperimentAction.INSTANCE, DeleteExperimentTransportAction.class),
             new ActionHandler<>(GetExperimentAction.INSTANCE, GetExperimentTransportAction.class)
         );
+    }
+
+    @Override
+    public List<Setting<?>> getSettings() {
+        return List.of(SEARCH_RELEVANCE_WORKBENCH_ENABLED);
     }
 }

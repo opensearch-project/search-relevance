@@ -27,16 +27,21 @@ import org.opensearch.rest.BaseRestHandler;
 import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
+import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.searchrelevance.transport.OpenSearchDocRequest;
 import org.opensearch.searchrelevance.transport.queryset.DeleteQuerySetAction;
 import org.opensearch.transport.client.node.NodeClient;
 
+import lombok.AllArgsConstructor;
+
 /**
  * Rest Action to handle requests to delete a query set.
  */
+@AllArgsConstructor
 public class RestDeleteQuerySetAction extends BaseRestHandler {
     private static final Logger LOGGER = LogManager.getLogger(RestDeleteQuerySetAction.class);
     private static final String DELETE_QUERYSET_ACTION = "delete_queryset_action";
+    private SearchRelevanceSettingsAccessor settingsAccessor;
 
     @Override
     public String getName() {
@@ -50,6 +55,9 @@ public class RestDeleteQuerySetAction extends BaseRestHandler {
 
     @Override
     protected RestChannelConsumer prepareRequest(RestRequest request, NodeClient client) throws IOException {
+        if (!settingsAccessor.isWorkbenchEnabled()) {
+            return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.FORBIDDEN, "Search Relevance Workbench is disabled"));
+        }
         final String querySetId = request.param(DOCUMENT_ID);
         if (querySetId == null) {
             throw new SearchRelevanceException("id cannot be null", RestStatus.BAD_REQUEST);

@@ -7,9 +7,12 @@
  */
 package org.opensearch.searchrelevance.plugin;
 
+import static org.mockito.Mockito.when;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_CACHE_INDEX;
+import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_WORKBENCH_ENABLED;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -21,6 +24,8 @@ import org.mockito.MockitoAnnotations;
 import org.opensearch.action.ActionRequest;
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver;
 import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.common.settings.ClusterSettings;
+import org.opensearch.common.settings.Setting;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.core.action.ActionResponse;
 import org.opensearch.core.common.io.stream.NamedWriteableRegistry;
@@ -102,6 +107,15 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
         super.setUp();
         openMocks = MockitoAnnotations.openMocks(this);
         nodeEnvironment = null;
+        Settings settings = Settings.builder().put("path.home", createTempDir()).build();
+
+        // Mock environment
+        when(environment.settings()).thenReturn(settings);
+
+        // Mock ClusterService
+        when(clusterService.getClusterSettings()).thenReturn(
+            new ClusterSettings(settings, new HashSet<>(Arrays.asList(SEARCH_RELEVANCE_WORKBENCH_ENABLED)))
+        );
         plugin = new SearchRelevancePlugin();
     }
 
@@ -173,5 +187,13 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
         assertEquals(1, actions.stream().filter(actionHandler -> actionHandler.getAction() instanceof PutExperimentAction).count());
         assertEquals(1, actions.stream().filter(actionHandler -> actionHandler.getAction() instanceof GetExperimentAction).count());
         assertEquals(1, actions.stream().filter(actionHandler -> actionHandler.getAction() instanceof DeleteExperimentAction).count());
+    }
+
+    public void testGetSettings() {
+        List<Setting<?>> settings = plugin.getSettings();
+        Setting<?> setting = settings.get(0);
+        assertEquals("plugins.search_relevance.workbench_enabled", setting.getKey());
+        assertEquals(1, settings.size());
+        assertEquals(false, setting.get(Settings.EMPTY));
     }
 }

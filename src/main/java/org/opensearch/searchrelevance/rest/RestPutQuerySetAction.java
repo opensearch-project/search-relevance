@@ -28,16 +28,21 @@ import org.opensearch.rest.BaseRestHandler;
 import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.searchrelevance.model.QueryWithReference;
+import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.searchrelevance.transport.queryset.PutQuerySetAction;
 import org.opensearch.searchrelevance.transport.queryset.PutQuerySetRequest;
 import org.opensearch.transport.client.node.NodeClient;
 
+import lombok.AllArgsConstructor;
+
 /**
  * Rest Action to facilitate requests to put a query set from manual input.
  */
+@AllArgsConstructor
 public class RestPutQuerySetAction extends BaseRestHandler {
     private static final Logger LOGGER = LogManager.getLogger(RestPutQuerySetAction.class);
     private static final String PUT_QUERYSET_ACTION = "put_queryset_action";
+    private SearchRelevanceSettingsAccessor settingsAccessor;
 
     @Override
     public String getName() {
@@ -51,6 +56,9 @@ public class RestPutQuerySetAction extends BaseRestHandler {
 
     @Override
     protected RestChannelConsumer prepareRequest(RestRequest request, NodeClient client) throws IOException {
+        if (!settingsAccessor.isWorkbenchEnabled()) {
+            return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.FORBIDDEN, "Search Relevance Workbench is disabled"));
+        }
         XContentParser parser = request.contentParser();
         Map<String, Object> source = parser.map();
 

@@ -27,16 +27,21 @@ import org.opensearch.rest.BaseRestHandler;
 import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
+import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.searchrelevance.transport.OpenSearchDocRequest;
 import org.opensearch.searchrelevance.transport.searchConfiguration.DeleteSearchConfigurationAction;
 import org.opensearch.transport.client.node.NodeClient;
 
+import lombok.AllArgsConstructor;
+
 /**
  * Rest Action to handle requests to delete a search configuration.
  */
+@AllArgsConstructor
 public class RestDeleteSearchConfigurationAction extends BaseRestHandler {
     private static final Logger LOGGER = LogManager.getLogger(RestDeleteSearchConfigurationAction.class);
     private static final String DELETE_SEARCH_CONFIGURATION_ACTION = "delete_search_configuration_action";
+    private SearchRelevanceSettingsAccessor settingsAccessor;
 
     @Override
     public String getName() {
@@ -50,6 +55,9 @@ public class RestDeleteSearchConfigurationAction extends BaseRestHandler {
 
     @Override
     protected RestChannelConsumer prepareRequest(RestRequest request, NodeClient client) throws IOException {
+        if (!settingsAccessor.isWorkbenchEnabled()) {
+            return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.FORBIDDEN, "Search Relevance Workbench is disabled"));
+        }
         final String searchConfigurationId = request.param(DOCUMENT_ID);
         if (searchConfigurationId == null) {
             throw new SearchRelevanceException("id cannot be null", RestStatus.BAD_REQUEST);

@@ -7,60 +7,79 @@
  */
 package org.opensearch.searchrelevance.plugin;
 
-import static org.opensearch.client.WarningsHandler.PERMISSIVE;
+import static org.mockito.Mockito.when;
+import static org.opensearch.searchrelevance.common.PluginConstants.DOCUMENT_ID;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
-import org.junit.After;
 import org.junit.Before;
-import org.opensearch.client.Request;
-import org.opensearch.client.RequestOptions;
-import org.opensearch.client.Response;
-import org.opensearch.common.settings.Settings;
-import org.opensearch.test.rest.OpenSearchRestTestCase;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+import org.opensearch.common.xcontent.XContentType;
+import org.opensearch.common.xcontent.json.JsonXContent;
+import org.opensearch.core.common.bytes.BytesArray;
+import org.opensearch.core.xcontent.NamedXContentRegistry;
+import org.opensearch.core.xcontent.XContentBuilder;
+import org.opensearch.rest.RestChannel;
+import org.opensearch.rest.RestRequest;
+import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
+import org.opensearch.test.OpenSearchTestCase;
+import org.opensearch.test.rest.FakeRestRequest;
+import org.opensearch.transport.client.node.NodeClient;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+public abstract class SearchRelevanceRestTestCase extends OpenSearchTestCase {
 
-public abstract class SearchRelevanceRestTestCase extends OpenSearchRestTestCase {
+    @Mock
+    protected NodeClient client;
 
-    public static final String QUERY_SETS_ENDPOINT = "/_plugins/search_relevance/query_sets";
-    public static final String EXPERIMENTS_ENDPOINT = "/_plugins/search_relevance/experiments";
-    public static final String SEARCH_CONFIGURATIONS_ENDPOINT = "/_plugins/search_relevance/search_configurations";
+    @Mock
+    protected RestChannel channel;
 
-    public static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    @Mock
+    protected SearchRelevanceSettingsAccessor settingsAccessor;
 
     @Before
     public void setUp() throws Exception {
         super.setUp();
+        MockitoAnnotations.openMocks(this);
+
+        // Setup channel mock to handle XContentBuilder
+        XContentBuilder builder = JsonXContent.contentBuilder();
+        when(channel.newBuilder()).thenReturn(builder);
     }
 
-    @After
-    public void tearDown() throws Exception {
-        super.tearDown();
+    public RestRequest createPutRestRequestWithContent(String content, String endpoint) throws IOException {
+        Map<String, String> params = new HashMap<>(); // Create params map
+        return new FakeRestRequest.Builder(NamedXContentRegistry.EMPTY).withContent(new BytesArray(content), XContentType.JSON)
+            .withParams(params)
+            .withMethod(RestRequest.Method.PUT)
+            .withPath("/_plugins/search_relevance/" + endpoint)
+            .build();
     }
 
-    @Override
-    protected Settings restClientSettings() {
-        return super.restClientSettings();
+    protected RestRequest createGetRestRequestWithParams(String endpoint, String documentId, Map<String, String> additionalParams) {
+        Map<String, String> params = new HashMap<>(additionalParams);
+        return new FakeRestRequest.Builder(NamedXContentRegistry.EMPTY).withParams(params)
+            .withMethod(RestRequest.Method.GET)
+            .withPath("/_plugins/search_relevance/" + endpoint + "/" + documentId)
+            .build();
     }
 
-    @Override
-    protected boolean enableWarningsCheck() {
-        return false;  // Disable warnings check
+    protected RestRequest createDeleteRestRequestWithPath(String endpoint, String documentId) {
+        return new FakeRestRequest.Builder(NamedXContentRegistry.EMPTY).withMethod(RestRequest.Method.DELETE)
+            .withPath("/_plugins/search_relevance/" + endpoint + "/" + documentId)
+            .build();
     }
 
-    public Response makeRequest(String method, String endpoint, String body) throws IOException {
-        Request request = new Request(method, endpoint);
-        request.setOptions(suppressWarnings());
-        if (body != null) {
-            request.setJsonEntity(body);
-        }
-        return client().performRequest(request);
+    protected RestRequest createDeleteRestRequestWithParams(String endpoint, String documentId) {
+        Map<String, String> params = new HashMap<>();
+        params.put(DOCUMENT_ID, documentId);
+        return new FakeRestRequest.Builder(NamedXContentRegistry.EMPTY).withMethod(RestRequest.Method.DELETE)
+            .withPath("/_plugins/search_relevance/" + endpoint)
+            .withParams(params)
+            .build();
     }
 
-    public RequestOptions suppressWarnings() {
-        final RequestOptions.Builder options = RequestOptions.DEFAULT.toBuilder();
-        options.setWarningsHandler(PERMISSIVE);
-        return options.build();
-    }
 }

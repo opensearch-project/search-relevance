@@ -34,8 +34,6 @@ import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.experiment.ExperimentOptionsFactory;
 import org.opensearch.searchrelevance.experiment.ExperimentOptionsForHybridSearch;
-import org.opensearch.searchrelevance.judgments.BaseJudgmentsProcessor;
-import org.opensearch.searchrelevance.judgments.JudgmentsProcessorFactory;
 import org.opensearch.searchrelevance.metrics.MetricsHelper;
 import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.Experiment;

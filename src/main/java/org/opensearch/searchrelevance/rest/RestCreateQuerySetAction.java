@@ -25,16 +25,21 @@ import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.rest.BaseRestHandler;
 import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestRequest;
+import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.searchrelevance.transport.queryset.PostQuerySetAction;
 import org.opensearch.searchrelevance.transport.queryset.PostQuerySetRequest;
 import org.opensearch.transport.client.node.NodeClient;
 
+import lombok.AllArgsConstructor;
+
 /**
  * Rest Action to facilitate requests to create a query set from UBI query sampler.
  */
+@AllArgsConstructor
 public class RestCreateQuerySetAction extends BaseRestHandler {
     private static final Logger LOGGER = LogManager.getLogger(RestCreateQuerySetAction.class);
     private static final String CREATE_QUERYSET_ACTION = "create_queryset_action";
+    private SearchRelevanceSettingsAccessor settingsAccessor;
 
     @Override
     public String getName() {
@@ -48,6 +53,9 @@ public class RestCreateQuerySetAction extends BaseRestHandler {
 
     @Override
     protected RestChannelConsumer prepareRequest(RestRequest request, NodeClient client) throws IOException {
+        if (!settingsAccessor.isWorkbenchEnabled()) {
+            return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.FORBIDDEN, "Search Relevance Workbench is disabled"));
+        }
         XContentParser parser = request.contentParser();
         Map<String, Object> source = parser.map();
 
