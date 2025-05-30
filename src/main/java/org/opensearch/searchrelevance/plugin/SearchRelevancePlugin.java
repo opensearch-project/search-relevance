@@ -9,7 +9,6 @@ package org.opensearch.searchrelevance.plugin;
 
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_CACHE_INDEX;
-import static org.opensearch.searchrelevance.common.PluginConstants.SUB_EXPERIMENT_INDEX;
 
 import java.util.Collection;
 import java.util.List;
@@ -110,7 +109,6 @@ public class SearchRelevancePlugin extends Plugin implements ActionPlugin, Syste
     public Collection<SystemIndexDescriptor> getSystemIndexDescriptors(Settings settings) {
         return List.of(
             new SystemIndexDescriptor(EXPERIMENT_INDEX, "System index used for experiment data"),
-            new SystemIndexDescriptor(SUB_EXPERIMENT_INDEX, "System index used for sub experiment data"),
             new SystemIndexDescriptor(JUDGMENT_CACHE_INDEX, "System index used for judgment cache data")
         );
     }
