@@ -38,12 +38,27 @@ public class Evaluation {
     }
 
     /**
+     *
+     * @param judgmentScores the docid->judgment mapping for a query
+     * @return the total number of documents with judgment > 0 in the scores
+     */
+    private static int countRelevant(Map<String, String> judgmentScores) {
+        int numRel = 0;
+        for (String value : judgmentScores.values()) {
+            if (Double.valueOf(value) > 0) {
+                numRel++;
+            }
+        }
+        return numRel;
+    }
+
+    /**
      * Mean Average Precision (MAP)
      */
     public static double calculateMAP(List<String> docIds, Map<String, String> judgmentScores) {
         double sum = 0.0;
         int relevantCount = 0;
-
+        int numRel = countRelevant(judgmentScores);
         for (int i = 0; i < docIds.size(); i++) {
             String docId = docIds.get(i);
             if (judgmentScores.containsKey(docId) && Double.valueOf(judgmentScores.get(docId)) > 0) {
@@ -51,8 +66,9 @@ public class Evaluation {
                 sum += (double) relevantCount / (i + 1);
             }
         }
-
-        double map = relevantCount > 0 ? sum / relevantCount : 0.0;
+        // MAP is computed over the full set of relevant documents, not just the ones retrieved.
+        // see https://en.wikipedia.org/wiki/Evaluation_measures_(information_retrieval)#Average_precision
+        double map = relevantCount > 0 ? sum / numRel : 0.0;
         return Math.round(map * 100.0) / 100.0;
     }
 
@@ -77,13 +93,14 @@ public class Evaluation {
 
     private static double calculateIDCG(List<String> docIds, Map<String, String> judgmentScores) {
         List<Double> relevanceScores = new ArrayList<>();
-        for (String docId : docIds) {
-            if (judgmentScores.containsKey(docId)) {
-                relevanceScores.add(Double.valueOf(judgmentScores.get(docId)));
-            }
+        // IDCG is computed on the full set of relevant documents
+        // we truncate the list after sorting
+        for (String rel : judgmentScores.values()) {
+            relevanceScores.add(Double.valueOf(rel));
         }
 
         Collections.sort(relevanceScores, Collections.reverseOrder());
+        relevanceScores = relevanceScores.subList(0, docIds.size());
         double idcg = 0.0;
 
         for (int i = 0; i < relevanceScores.size(); i++) {
