@@ -43,7 +43,33 @@ curl -s -X POST http://localhost:9200/_plugins/ubi/initialize
 echo Loading sample UBI data
 curl  -X POST 'http://localhost:9200/index-name/_bulk?pretty' --data-binary @../data-esci/ubi_queries_events.ndjson -H "Content-Type: application/x-ndjson"
 
+echo Refreshing indexes to make indexed data available for query sampling
+curl -XPOST "http://localhost:9200/ubi_queries/_refresh"
+echo
+curl -XPOST "http://localhost:9200/ubi_events/_refresh"
 
+read -r -d '' QUERY_BODY << EOF
+{
+  "query": {
+    "match_all": {}
+  },
+  "size": 0
+}
+EOF
+
+NUMBER_OF_QUERIES=$(curl -s -XGET "http://localhost:9200/ubi_queries/_search" \
+  -H "Content-Type: application/json" \
+  -d "${QUERY_BODY}" | jq -r '.hits.total.value')
+
+NUMBER_OF_EVENTS=$(curl -s -XGET "http://localhost:9200/ubi_events/_search" \
+  -H "Content-Type: application/json" \
+  -d "${QUERY_BODY}" | jq -r '.hits.total.value')
+
+
+echo
+echo Indexed UBI data: $NUMBER_OF_QUERIES queries and $NUMBER_OF_EVENTS events
+
+echo
 echo Deleting queryset, search config, judgement and experiment indexes
 (curl -s -X DELETE "http://localhost:9200/.plugins-search-relevance-search-config" > /dev/null) || true
 (curl -s -X DELETE "http://localhost:9200/.plugins-search-relevance-queryset" > /dev/null) || true
@@ -58,17 +84,17 @@ exe curl -s -X PUT "http://localhost:9200/_plugins/search_relevance/search_confi
 -H "Content-type: application/json" \
 -d'{
       "name": "baseline",
-      "query": "{\"query\": {\n\"match_all\": {}}}",
+      "query": "{\"query\":{\"multi_match\":{\"query\":\"%SearchText%\",\"fields\":[\"id\",\"title\",\"category\",\"bullets\",\"description\",\"attrs.Brand\",\"attrs.Color\"]}}}",
       "index": "ecommerce"
-}' 
+}'
 
 SC_BASELINE=`jq -r '.search_configuration_id' < RES`
 
 exe curl -s -X PUT "http://localhost:9200/_plugins/search_relevance/search_configurations" \
 -H "Content-type: application/json" \
 -d'{
-      "name": "multi_match",
-      "query": "{\"query\":{\"multi_match\":{\"query\":\"%SearchText%\",\"fields\":[\"id\",\"title\",\"category\",\"bullets\",\"description\",\"attrs.Brand\",\"attrs.Color\"]}}}",
+      "name": "baseline with title weight",
+      "query": "{\"query\":{\"multi_match\":{\"query\":\"%SearchText%\",\"fields\":[\"id\",\"title^25\",\"category\",\"bullets\",\"description\",\"attrs.Brand\",\"attrs.Color\"]}}}",
       "index": "ecommerce"
 }'
 
@@ -153,3 +179,31 @@ exe curl -s -X GET "http://localhost:9200/_plugins/search_relevance/experiments"
      },
      "size": 3
    }'
+
+echo
+echo Create a Judgment List
+response=$(curl -s -X PUT "http://localhost:9200/_plugins/search_relevance/judgments" \
+-H "Content-type: application/json" \
+-d "{
+      \"name\": \"COEC\",
+      \"type\": \"UBI_JUDGMENT\",
+      \"clickModel\": \"coec\",
+      \"maxRank\": 20
+    }")
+JUDGMENT_LIST_ID=$(echo "$response" | jq -r '.judgment_id')
+
+#wait for judgments to be created in the background
+sleep 5
+echo "Created judgment list with id $JUDGMENT_LIST_ID"
+
+echo
+echo Run an Experiment
+exe curl -s -X PUT "http://localhost:9200/_plugins/search_relevance/experiments" \
+-H "Content-type: application/json" \
+-d"{
+   	\"querySetId\": \"$QS\",
+   	\"searchConfigurationList\": [\"$SC_BASELINE\"],
+   	\"judgmentList\":[\"$JUDGMENT_LIST_ID\"],
+   	\"size\": 10,
+   	\"type\": \"POINTWISE_EVALUATION\"
+   }"
