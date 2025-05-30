@@ -49,7 +49,7 @@ public class PluginConstants {
     public static final String EVALUATION_RESULT_INDEX_MAPPING = "mappings/evaluation_result.json";
     public static final String JUDGMENT_CACHE_INDEX = ".plugins-search-relevance-judgment-cache";
     public static final String JUDGMENT_CACHE_INDEX_MAPPING = "mappings/judgment_cache.json";
-    public static final String SUB_EXPERIMENT_INDEX = ".plugins-search-relevance-sub-experiment";
+    public static final String SUB_EXPERIMENT_INDEX = "search-relevance-sub-experiment";
     public static final String SUB_EXPERIMENT_INDEX_MAPPING = "mappings/sub_experiment.json";
 
     /**
