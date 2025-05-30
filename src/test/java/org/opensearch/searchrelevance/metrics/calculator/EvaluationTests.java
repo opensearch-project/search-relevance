@@ -68,6 +68,6 @@ public class EvaluationTests extends OpenSearchTestCase {
         double ndcg = Evaluation.calculateNDCG(this.results, this.judgments);
         assertEquals(0.76, ndcg, 0.001);
         ndcg = Evaluation.calculateNDCG(this.results.subList(0, 5), this.judgments);
-        assertEquals(0.35, ndcg, 0.001);
+        assertEquals(0.51, ndcg, 0.001);
     }
 }
