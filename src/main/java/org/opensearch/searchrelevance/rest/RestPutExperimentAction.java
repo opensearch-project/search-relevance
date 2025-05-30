@@ -24,19 +24,23 @@ import org.opensearch.rest.BaseRestHandler;
 import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.searchrelevance.model.ExperimentType;
+import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.searchrelevance.transport.experiment.PutExperimentAction;
 import org.opensearch.searchrelevance.transport.experiment.PutExperimentRequest;
 import org.opensearch.searchrelevance.utils.ParserUtils;
 import org.opensearch.transport.client.node.NodeClient;
 
+import lombok.AllArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 
 @Log4j2
 /**
  * Rest Action to facilitate requests to create a experiment.
  */
+@AllArgsConstructor
 public class RestPutExperimentAction extends BaseRestHandler {
     private static final String PUT_EXPERIMENT_ACTION = "put_experiment_action";
+    private SearchRelevanceSettingsAccessor settingsAccessor;
 
     @Override
     public String getName() {
@@ -50,6 +54,9 @@ public class RestPutExperimentAction extends BaseRestHandler {
 
     @Override
     protected RestChannelConsumer prepareRequest(RestRequest request, NodeClient client) throws IOException {
+        if (!settingsAccessor.isWorkbenchEnabled()) {
+            return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.FORBIDDEN, "Search Relevance Workbench is disabled"));
+        }
         XContentParser parser = request.contentParser();
         Map<String, Object> source = parser.map();
 

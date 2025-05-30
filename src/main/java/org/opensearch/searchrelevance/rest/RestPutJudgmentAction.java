@@ -30,6 +30,7 @@ import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.model.JudgmentType;
+import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.searchrelevance.transport.judgment.PutJudgmentAction;
 import org.opensearch.searchrelevance.transport.judgment.PutJudgmentRequest;
 import org.opensearch.searchrelevance.transport.judgment.PutLlmJudgmentRequest;
@@ -37,12 +38,16 @@ import org.opensearch.searchrelevance.transport.judgment.PutUbiJudgmentRequest;
 import org.opensearch.searchrelevance.utils.ParserUtils;
 import org.opensearch.transport.client.node.NodeClient;
 
+import lombok.AllArgsConstructor;
+
 /**
  * Rest Action to facilitate requests to create a judgment.
  */
+@AllArgsConstructor
 public class RestPutJudgmentAction extends BaseRestHandler {
     private static final Logger LOGGER = LogManager.getLogger(RestPutJudgmentAction.class);
     private static final String PUT_JUDGMENT_ACTION = "put_judgment_action";
+    private SearchRelevanceSettingsAccessor settingsAccessor;
 
     @Override
     public String getName() {
@@ -56,6 +61,9 @@ public class RestPutJudgmentAction extends BaseRestHandler {
 
     @Override
     protected RestChannelConsumer prepareRequest(RestRequest request, NodeClient client) throws IOException {
+        if (!settingsAccessor.isWorkbenchEnabled()) {
+            return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.FORBIDDEN, "Search Relevance Workbench is disabled"));
+        }
         XContentParser parser = request.contentParser();
         Map<String, Object> source = parser.map();
 
