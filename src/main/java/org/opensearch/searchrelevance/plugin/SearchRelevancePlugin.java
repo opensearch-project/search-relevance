@@ -39,6 +39,7 @@ import org.opensearch.rest.RestHandler;
 import org.opensearch.script.ScriptService;
 import org.opensearch.searchrelevance.dao.EvaluationResultDao;
 import org.opensearch.searchrelevance.dao.ExperimentDao;
+import org.opensearch.searchrelevance.dao.ExperimentVariantDao;
 import org.opensearch.searchrelevance.dao.JudgmentCacheDao;
 import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
@@ -97,6 +98,7 @@ public class SearchRelevancePlugin extends Plugin implements ActionPlugin, Syste
     private QuerySetDao querySetDao;
     private SearchConfigurationDao searchConfigurationDao;
     private ExperimentDao experimentDao;
+    private ExperimentVariantDao experimentVariantDao;
     private JudgmentDao judgmentDao;
     private EvaluationResultDao evaluationResultDao;
     private JudgmentCacheDao judgmentCacheDao;
@@ -129,6 +131,7 @@ public class SearchRelevancePlugin extends Plugin implements ActionPlugin, Syste
         this.clusterService = clusterService;
         this.searchRelevanceIndicesManager = new SearchRelevanceIndicesManager(clusterService, client);
         this.experimentDao = new ExperimentDao(searchRelevanceIndicesManager);
+        this.experimentVariantDao = new ExperimentVariantDao(searchRelevanceIndicesManager);
         this.querySetDao = new QuerySetDao(searchRelevanceIndicesManager);
         this.searchConfigurationDao = new SearchConfigurationDao(searchRelevanceIndicesManager);
         this.judgmentDao = new JudgmentDao(searchRelevanceIndicesManager);
@@ -136,12 +139,13 @@ public class SearchRelevancePlugin extends Plugin implements ActionPlugin, Syste
         this.judgmentCacheDao = new JudgmentCacheDao(searchRelevanceIndicesManager);
         MachineLearningNodeClient mlClient = new MachineLearningNodeClient(client);
         this.mlAccessor = new MLAccessor(mlClient);
-        this.metricsHelper = new MetricsHelper(clusterService, client, judgmentDao, evaluationResultDao);
+        this.metricsHelper = new MetricsHelper(clusterService, client, judgmentDao, evaluationResultDao, experimentVariantDao);
         return List.of(
             searchRelevanceIndicesManager,
             querySetDao,
             searchConfigurationDao,
             experimentDao,
+            experimentVariantDao,
             judgmentDao,
             evaluationResultDao,
             judgmentCacheDao,

@@ -12,7 +12,7 @@ import lombok.Data;
 
 @Data
 @Builder
-public class SubExperimentHybridSearchDao {
+public class ExperimentVariantHybridSearchDTO {
     private final String normalizationTechnique;
     private final String combinationTechnique;
     private final float[] queryWeightsForCombination;

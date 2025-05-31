@@ -24,6 +24,10 @@ public class ExperimentOptionsForHybridSearch implements ExperimentOptions {
     private Set<String> combinationTechniques;
     private WeightsRange weightsRange;
 
+    public static final String EXPERIMENT_OPTION_NORMALIZATION_TECHNIQUE = "normalization";
+    public static final String EXPERIMENT_OPTION_COMBINATION_TECHNIQUE = "combination";
+    public static final String EXPERIMENT_OPTION_WEIGHTS_FOR_COMBINATION = "weights";
+
     @Data
     @Builder
     static class WeightsRange {
@@ -32,15 +36,15 @@ public class ExperimentOptionsForHybridSearch implements ExperimentOptions {
         private float increment;
     }
 
-    public List<SubExperimentHybridSearchDao> getParameterCombinations(boolean includeWeights) {
-        List<SubExperimentHybridSearchDao> allPossibleParameterCombinations = new ArrayList<>();
+    public List<ExperimentVariantHybridSearchDTO> getParameterCombinations(boolean includeWeights) {
+        List<ExperimentVariantHybridSearchDTO> allPossibleParameterCombinations = new ArrayList<>();
         for (String normalizationTechnique : normalizationTechniques) {
             for (String combinationTechnique : combinationTechniques) {
                 if (includeWeights) {
                     for (float queryWeightForCombination = weightsRange.getRangeMin(); queryWeightForCombination <= weightsRange
                         .getRangeMax(); queryWeightForCombination += weightsRange.getIncrement()) {
                         allPossibleParameterCombinations.add(
-                            SubExperimentHybridSearchDao.builder()
+                            ExperimentVariantHybridSearchDTO.builder()
                                 .normalizationTechnique(normalizationTechnique)
                                 .combinationTechnique(combinationTechnique)
                                 .queryWeightsForCombination(new float[] { queryWeightForCombination, 1.0f - queryWeightForCombination })
@@ -49,7 +53,7 @@ public class ExperimentOptionsForHybridSearch implements ExperimentOptions {
                     }
                 } else {
                     allPossibleParameterCombinations.add(
-                        SubExperimentHybridSearchDao.builder()
+                        ExperimentVariantHybridSearchDTO.builder()
                             .normalizationTechnique(normalizationTechnique)
                             .combinationTechnique(combinationTechnique)
                             .queryWeightsForCombination(new float[] { 0.5f, 0.5f })

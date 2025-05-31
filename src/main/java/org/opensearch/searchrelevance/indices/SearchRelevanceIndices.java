@@ -11,6 +11,8 @@ import static org.opensearch.searchrelevance.common.PluginConstants.EVALUATION_R
 import static org.opensearch.searchrelevance.common.PluginConstants.EVALUATION_RESULT_INDEX_MAPPING;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX_MAPPING;
+import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_VARIANT_INDEX;
+import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_VARIANT_INDEX_MAPPING;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_CACHE_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_CACHE_INDEX_MAPPING;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_INDEX;
@@ -56,7 +58,12 @@ public enum SearchRelevanceIndices {
     /**
      * Judgment Cache Index
      */
-    JUDGMENT_CACHE(JUDGMENT_CACHE_INDEX, JUDGMENT_CACHE_INDEX_MAPPING);
+    JUDGMENT_CACHE(JUDGMENT_CACHE_INDEX, JUDGMENT_CACHE_INDEX_MAPPING),
+
+    /**
+     * Experiment Variant Index
+     */
+    EXPERIMENT_VARIANT(EXPERIMENT_VARIANT_INDEX, EXPERIMENT_VARIANT_INDEX_MAPPING);
 
     private final String indexName;
     private final String mapping;
