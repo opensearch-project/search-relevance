@@ -18,5 +18,6 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - Change aggregation field from `action_name.keyword` to `action_name` to fix implicit judgments calculation ([#15](https://github.com/opensearch-project/search-relevance/issues/10)).
  - Fix COEC calculation: introduce rank in ClickthroughRate class, fix bucket size for positional aggregation, correct COEC claculation ([#23](https://github.com/opensearch-project/search-relevance/issues/23)).
  - LLM Judgment Processor Improvement ([#27](https://github.com/opensearch-project/search-relevance/pull/27))
+ - Extend the `src/test/demo.sh` script to support pointwise experiments.
 
 ### Security
