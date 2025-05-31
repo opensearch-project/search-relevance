@@ -40,6 +40,7 @@ if [ "$SKIP_ECOMMERCE" = false ]; then
     "index.mapping.total_fields.limit": 20000
   }'
 
+  echo Populating ecommerce index
   curl -s -X POST "http://localhost:9200/ecommerce/_bulk?pretty" -H 'Content-Type: application/json' --data-binary @transformed_esci_1.json
 fi
 
@@ -208,7 +209,7 @@ exe curl -s -X PUT "localhost:9200/_plugins/search_relevance/experiments" \
    	\"searchConfigurationList\": [\"$SC_BASELINE\"],
     \"judgmentList\": [\"$JUDGMENT_LIST_ID\"],
    	\"size\": 8,
-   	\"type\": \"UBI_EVALUATION\"
+   	\"type\": \"POINTWISE_EVALUATION\"
    }"
 
 EX_POINTWISE=`jq -r '.experiment_id' < RES`
