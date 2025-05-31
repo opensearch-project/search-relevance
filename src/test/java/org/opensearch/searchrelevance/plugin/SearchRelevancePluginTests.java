@@ -7,12 +7,8 @@
  */
 package org.opensearch.searchrelevance.plugin;
 
-import static org.opensearch.searchrelevance.common.PluginConstants.EVALUATION_RESULT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_CACHE_INDEX;
-import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_INDEX;
-import static org.opensearch.searchrelevance.common.PluginConstants.QUERY_SET_INDEX;
-import static org.opensearch.searchrelevance.common.PluginConstants.SEARCH_CONFIGURATION_INDEX;
 
 import java.util.Collection;
 import java.util.HashSet;
@@ -87,14 +83,7 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
     private NodeEnvironment nodeEnvironment;
     private SearchRelevancePlugin plugin;
 
-    public static final Set<String> SUPPORTED_SYSTEM_INDEX_PATTERN = Set.of(
-        QUERY_SET_INDEX,
-        EXPERIMENT_INDEX,
-        SEARCH_CONFIGURATION_INDEX,
-        JUDGMENT_INDEX,
-        EVALUATION_RESULT_INDEX,
-        JUDGMENT_CACHE_INDEX
-    );
+    public static final Set<String> SUPPORTED_SYSTEM_INDEX_PATTERN = Set.of(EXPERIMENT_INDEX, JUDGMENT_CACHE_INDEX);
 
     private final Set<Class> SUPPORTED_COMPONENTS = Set.of(
         SearchRelevanceIndicesManager.class,

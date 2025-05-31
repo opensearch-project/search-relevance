@@ -12,12 +12,14 @@ import static org.opensearch.searchrelevance.model.JudgmentCache.CONTEXT_FIELDS_
 import static org.opensearch.searchrelevance.model.JudgmentCache.DOCUMENT_ID;
 import static org.opensearch.searchrelevance.model.JudgmentCache.QUERY_TEXT;
 import static org.opensearch.searchrelevance.utils.ParserUtils.convertListToSortedStr;
+import static org.opensearch.searchrelevance.utils.ParserUtils.convertSortedStrToList;
 
 import java.io.IOException;
 import java.util.List;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.opensearch.ResourceAlreadyExistsException;
 import org.opensearch.action.StepListener;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.common.inject.Inject;
@@ -69,6 +71,100 @@ public class JudgmentCacheDao {
         } catch (IOException e) {
             throw new SearchRelevanceException("Failed to store judgment", e, RestStatus.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    /**
+     * Updates or creates judgment cache in the system index
+     * @param judgmentCache - Judgment cache content to be stored
+     * @param listener - action listener for async operation
+     */
+    public void upsertJudgmentCache(final JudgmentCache judgmentCache, final ActionListener listener) {
+        if (judgmentCache == null) {
+            listener.onFailure(new SearchRelevanceException("judgmentCache cannot be null", RestStatus.BAD_REQUEST));
+            return;
+        }
+
+        // First check if the document exists
+        getJudgmentCache(
+            judgmentCache.queryText(),
+            judgmentCache.documentId(),
+            convertSortedStrToList(judgmentCache.contextFieldsStr()),
+            new ActionListener<SearchResponse>() {
+                @Override
+                public void onResponse(SearchResponse searchResponse) {
+                    try {
+                        if (searchResponse.getHits().getTotalHits().value() > 0) {
+                            // Document exists, update it
+                            searchRelevanceIndicesManager.updateDoc(
+                                judgmentCache.id(),
+                                judgmentCache.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS),
+                                JUDGMENT_CACHE,
+                                ActionListener.wrap(response -> {
+                                    LOGGER.debug(
+                                        "Successfully updated judgment cache for queryText: {} and documentId: {}",
+                                        judgmentCache.queryText(),
+                                        judgmentCache.documentId()
+                                    );
+                                    listener.onResponse(response);
+                                }, e -> {
+                                    LOGGER.error(
+                                        "Failed to update judgment cache for queryText: {} and documentId: {}",
+                                        judgmentCache.queryText(),
+                                        judgmentCache.documentId(),
+                                        e
+                                    );
+                                    listener.onFailure(e);
+                                })
+                            );
+                        } else {
+                            // Document doesn't exist, create it
+                            searchRelevanceIndicesManager.putDoc(
+                                judgmentCache.id(),
+                                judgmentCache.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS),
+                                JUDGMENT_CACHE,
+                                ActionListener.wrap(response -> {
+                                    LOGGER.debug(
+                                        "Successfully created judgment cache for queryText: {} and documentId: {}",
+                                        judgmentCache.queryText(),
+                                        judgmentCache.documentId()
+                                    );
+                                    listener.onResponse(response);
+                                }, e -> {
+                                    if (e instanceof ResourceAlreadyExistsException) {
+                                        // Handle race condition where document was created between our check and create
+                                        LOGGER.debug(
+                                            "Judgment cache already exists for queryText: {} and documentId: {}",
+                                            judgmentCache.queryText(),
+                                            judgmentCache.documentId()
+                                        );
+                                        listener.onResponse(null);
+                                    } else {
+                                        LOGGER.error(
+                                            "Failed to create judgment cache for queryText: {} and documentId: {}",
+                                            judgmentCache.queryText(),
+                                            judgmentCache.documentId(),
+                                            e
+                                        );
+                                        listener.onFailure(e);
+                                    }
+                                })
+                            );
+                        }
+                    } catch (IOException e) {
+                        listener.onFailure(
+                            new SearchRelevanceException("Failed to prepare judgment cache document", e, RestStatus.INTERNAL_SERVER_ERROR)
+                        );
+                    }
+                }
+
+                @Override
+                public void onFailure(Exception e) {
+                    listener.onFailure(
+                        new SearchRelevanceException("Failed to check existing judgment cache", e, RestStatus.INTERNAL_SERVER_ERROR)
+                    );
+                }
+            }
+        );
     }
 
     /**

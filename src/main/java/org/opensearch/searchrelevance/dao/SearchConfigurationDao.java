@@ -89,7 +89,7 @@ public class SearchConfigurationDao {
      */
     public SearchResponse getSearchConfiguration(String searchConfigurationId, ActionListener<SearchResponse> listener) {
         if (searchConfigurationId == null || searchConfigurationId.isEmpty()) {
-            listener.onFailure(new SearchRelevanceException("querySetId must not be null or empty", RestStatus.BAD_REQUEST));
+            listener.onFailure(new SearchRelevanceException("searchConfigurationId must not be null or empty", RestStatus.BAD_REQUEST));
             return null;
         }
         return searchRelevanceIndicesManager.getDocByDocId(searchConfigurationId, SEARCH_CONFIGURATION, listener);

@@ -92,6 +92,7 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
                 metadata.put("searchConfigurationList", llmRequest.getSearchConfigurationList());
                 metadata.put("tokenLimit", llmRequest.getTokenLimit());
                 metadata.put("contextFields", llmRequest.getContextFields());
+                metadata.put("ignoreFailure", llmRequest.isIgnoreFailure());
             }
             case UBI_JUDGMENT -> {
                 PutUbiJudgmentRequest ubiRequest = (PutUbiJudgmentRequest) request;

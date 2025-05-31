@@ -17,6 +17,7 @@ public class ClickthroughRate {
     private final String objectId;
     private int clicks;
     private int impressions;
+    private int rank;
 
     /**
      * Creates a new clickthrough rate for an object.
@@ -26,6 +27,7 @@ public class ClickthroughRate {
         this.objectId = objectId;
         this.clicks = 0;
         this.impressions = 0;
+        this.rank = Integer.MAX_VALUE;
     }
 
     /**
@@ -33,11 +35,13 @@ public class ClickthroughRate {
      * @param objectId The object ID.
      * @param clicks The count of clicks.
      * @param impressions The count of events.
+     * @param rank The lowest rank of the event.
      */
-    public ClickthroughRate(final String objectId, final int clicks, final int impressions) {
+    public ClickthroughRate(final String objectId, final int clicks, final int impressions, final int rank) {
         this.objectId = objectId;
         this.clicks = clicks;
         this.impressions = impressions;
+        this.rank = rank;
     }
 
     @Override
@@ -48,6 +52,8 @@ public class ClickthroughRate {
             + clicks
             + ", events: "
             + impressions
+            + ", rank: "
+            + rank
             + ", ctr: "
             + MathUtils.round(getClickthroughRate());
     }
@@ -68,6 +74,15 @@ public class ClickthroughRate {
     }
 
     /**
+     * Log lowest rank per query-doc pair
+     */
+    public void logRank(int rank) {
+        if (rank < this.rank) {
+            this.rank = rank;
+        }
+    }
+
+    /**
      * Calculate the clickthrough rate.
      * @return The clickthrough rate as clicks divided by events.
      */
@@ -81,6 +96,14 @@ public class ClickthroughRate {
      */
     public int getClicks() {
         return clicks;
+    }
+
+    /**
+     * Gets the rank of the event.
+     * @return The rank of the event.
+     */
+    public int getRank() {
+        return rank;
     }
 
     /**

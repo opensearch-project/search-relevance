@@ -8,7 +8,10 @@
 package org.opensearch.searchrelevance.utils;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -95,6 +98,25 @@ public class ParserUtils {
         List<String> sortedList = new ArrayList<>(list);
         Collections.sort(sortedList);
         return String.join(",", sortedList);
+    }
+
+    public static List<String> convertSortedStrToList(String str) {
+        if (str == null || str.trim().isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        List<String> list = new ArrayList<>(Arrays.asList(str.split(",")));
+        Collections.sort(list);
+        return list;
+    }
+
+    /**
+     * unique key for queryText, compositeKey and contextFields for judgment cache
+     */
+    public static String generateUniqueId(String queryText, String compositeKey, List<String> contextFields) {
+        String contextFieldsStr = contextFields != null ? String.join(",", contextFields) : "";
+        return Base64.getUrlEncoder()
+            .encodeToString((queryText + "::" + compositeKey + "::" + contextFieldsStr).getBytes(StandardCharsets.UTF_8));
     }
 
     public static String combinedIndexAndDocId(String index, String docId) {

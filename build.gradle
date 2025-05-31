@@ -17,6 +17,7 @@ apply from: 'formatter/formatting.gradle'
 apply plugin: 'jacoco'
 apply plugin: 'com.form.diff-coverage'
 apply plugin: 'opensearch.java-agent'
+apply plugin: 'io.freefair.lombok'
 
 def pluginName = 'opensearch-search-relevance'
 def pluginDescription = 'opensearch plugin that enables users to fine tuning search based on search relevance judgments'
@@ -102,6 +103,7 @@ buildscript {
         classpath "org.opensearch.gradle:build-tools:${opensearch_version}"
         classpath "com.diffplug.spotless:spotless-plugin-gradle:7.0.3"
         classpath "com.github.form-com.diff-coverage-gradle:diff-coverage:0.9.4"
+        classpath "io.freefair.gradle:lombok-plugin:8.4"
     }
 }
 
@@ -272,4 +274,15 @@ diffCoverageReport {
         minLines = 0.00
         failOnViolation = true
     }
+}
+
+compileJava {
+    dependsOn spotlessApply
+    options.compilerArgs.addAll(["-processor", 'lombok.launch.AnnotationProcessorHider$AnnotationProcessor'])
+}
+compileTestJava {
+    options.compilerArgs.addAll(["-processor", 'lombok.launch.AnnotationProcessorHider$AnnotationProcessor'])
+}
+compileTestFixturesJava {
+    options.compilerArgs.addAll(["-processor", 'lombok.launch.AnnotationProcessorHider$AnnotationProcessor'])
 }

@@ -82,8 +82,10 @@ public class CoecClickModel extends ClickModel {
 
         // Add aggregations to see distribution
         TermsAggregationBuilder actionAgg = AggregationBuilders.terms("actions")
-            .field("action_name.keyword")
-            .subAggregation(AggregationBuilders.terms("positions").field("event_attributes.position.ordinal"));
+            .field("action_name")
+            .subAggregation(
+                AggregationBuilders.terms("positions").field("event_attributes.position.ordinal").size(parameters.getMaxRank())
+            );
 
         searchSourceBuilder.aggregation(actionAgg);
 
@@ -98,12 +100,12 @@ public class CoecClickModel extends ClickModel {
                 Terms actionTerms = response.getAggregations().get("actions");
 
                 // Log overall statistics
-                LOGGER.info("Total buckets in aggregation: {}", actionTerms.getBuckets().size());
+                LOGGER.debug("Total buckets in aggregation: {}", actionTerms.getBuckets().size());
 
                 for (Terms.Bucket actionBucket : actionTerms.getBuckets()) {
                     String action = actionBucket.getKeyAsString();
                     long docCount = actionBucket.getDocCount();
-                    LOGGER.info("Action: {} - Count: {}", action, docCount);
+                    LOGGER.debug("Action: {} - Count: {}", action, docCount);
 
                     Terms positionTerms = actionBucket.getAggregations().get("positions");
                     for (Terms.Bucket positionBucket : positionTerms.getBuckets()) {
@@ -112,10 +114,10 @@ public class CoecClickModel extends ClickModel {
 
                         if ("click".equalsIgnoreCase(action)) {
                             clickCounts.put(position, count);
-                            LOGGER.info("Position {} clicks: {}", position, count);
+                            LOGGER.debug("Position {} clicks: {}", position, count);
                         } else if ("impression".equalsIgnoreCase(action)) {
                             impressionCounts.put(position, count);
-                            LOGGER.info("Position {} impressions: {}", position, count);
+                            LOGGER.debug("Position {} impressions: {}", position, count);
                         }
                     }
                 }
@@ -125,15 +127,15 @@ public class CoecClickModel extends ClickModel {
                     long impressions = impressionCounts.getOrDefault(rank, 0L);
                     long clicks = clickCounts.getOrDefault(rank, 0L);
 
-                    LOGGER.info("Rank {}: {} clicks / {} impressions", rank, clicks, impressions);
+                    LOGGER.debug("Rank {}: {} clicks / {} impressions", rank, clicks, impressions);
 
                     if (impressions > 0) {
                         double ctr = (double) clicks / impressions;
                         rankAggregatedClickThrough.put(rank, ctr);
-                        LOGGER.info("CTR for rank {}: {}", rank, ctr);
+                        LOGGER.debug("CTR for rank {}: {}", rank, ctr);
                     } else {
                         rankAggregatedClickThrough.put(rank, 0.0);
-                        LOGGER.info("No impressions for rank {}, CTR set to 0", rank);
+                        LOGGER.debug("No impressions for rank {}, CTR set to 0", rank);
                     }
                 }
 
@@ -190,6 +192,7 @@ public class CoecClickModel extends ClickModel {
                         String userQuery = event.getUserQuery();
                         String objectId = event.getEventAttributes().getObject().getObjectId();
                         String action = event.getActionName();
+                        int rank = event.getEventAttributes().getPosition().getOrdinal();
 
                         Set<ClickthroughRate> rates = queriesToClickthroughRates.computeIfAbsent(
                             userQuery,
@@ -204,10 +207,12 @@ public class CoecClickModel extends ClickModel {
 
                         if ("click".equalsIgnoreCase(action)) {
                             rate.logClick();
-                            LOGGER.debug("Logged click for query: {} doc: {}", userQuery, objectId);
+                            rate.logRank(rank);
+                            LOGGER.debug("Logged click for query: {} doc: {} rank: {}", userQuery, objectId, rank);
                         } else if ("impression".equalsIgnoreCase(action)) {
                             rate.logImpression();
-                            LOGGER.debug("Logged impression for query: {} doc: {}", userQuery, objectId);
+                            rate.logRank(rank);
+                            LOGGER.debug("Logged impression for query: {} doc: {} rank: {}", userQuery, objectId, rank);
                         }
                     } catch (Exception e) {
                         LOGGER.warn("Error processing hit: " + hit.getId(), e);
@@ -217,9 +222,9 @@ public class CoecClickModel extends ClickModel {
                 if (hits.length == 0) {
                     // Print final statistics
                     for (Map.Entry<String, Set<ClickthroughRate>> entry : queriesToClickthroughRates.entrySet()) {
-                        LOGGER.info("Query: {} - Number of docs: {}", entry.getKey(), entry.getValue().size());
+                        LOGGER.debug("Query: {} - Number of docs: {}", entry.getKey(), entry.getValue().size());
                         for (ClickthroughRate rate : entry.getValue()) {
-                            LOGGER.info(
+                            LOGGER.debug(
                                 "Doc: {} - Clicks: {} Impressions: {}",
                                 rate.getObjectId(),
                                 rate.getClicks(),
@@ -659,7 +664,7 @@ public class CoecClickModel extends ClickModel {
         Map<String, Set<ClickthroughRate>> clickthroughRates,
         ActionListener<Map<String, Map<String, String>>> listener
     ) {
-        LOGGER.info("Starting COEC calculation with rank CTR: {}", rankAggregatedClickThrough);
+        LOGGER.debug("Starting COEC calculation with rank CTR: {}", rankAggregatedClickThrough);
         Map<String, Map<String, String>> judgmentScores = new HashMap<>();
 
         for (Map.Entry<String, Set<ClickthroughRate>> entry : clickthroughRates.entrySet()) {
@@ -667,46 +672,35 @@ public class CoecClickModel extends ClickModel {
             Map<String, String> docScores = new HashMap<>();
 
             for (ClickthroughRate ctr : entry.getValue()) {
-                // Calculate denominator (expected clicks)
-                double expectedClicks = 0.0;
-                for (int rank = 0; rank < parameters.getMaxRank(); rank++) {
-                    double rankCtr = rankAggregatedClickThrough.getOrDefault(rank, 0.0);
-                    expectedClicks += rankCtr;
-                }
-                expectedClicks *= ctr.getImpressions();
+                // Get the lowest rank at which this query-document pair was interacted with
+                int observedRank = ctr.getRank();
+                double expectedCtrForThisRank = rankAggregatedClickThrough.getOrDefault(observedRank, 0.0);
+                // Calculate expected clicks for *this* document at its observed rank
+                double expectedClicksForDocAtRank = expectedCtrForThisRank * ctr.getImpressions();
 
-                // Calculate score
+                // Calculate COEC score
                 double score;
-                if (expectedClicks > 0) {
-                    score = ctr.getClicks() / expectedClicks;
-                    LOGGER.info(
-                        "Query: {} Doc: {} Clicks: {} Impressions: {} Expected: {} Score: {}",
-                        userQuery,
-                        ctr.getObjectId(),
-                        ctr.getClicks(),
-                        ctr.getImpressions(),
-                        expectedClicks,
-                        score
-                    );
+                if (expectedClicksForDocAtRank > 0) {
+                    score = ctr.getClicks() / expectedClicksForDocAtRank;
                 } else {
+                    // if there are neither impressions nor a rank-aggregated CTR the COEC score is 0
                     score = 0.0;
                 }
-
+                LOGGER.debug("judgment score: {}, query: {}, doc: {}, rank: {}", score, userQuery, ctr.getObjectId(), observedRank);
                 docScores.put(ctr.getObjectId(), String.format(Locale.ROOT, "%.3f", score));
             }
 
             if (!docScores.isEmpty()) {
                 judgmentScores.put(userQuery, docScores);
             }
+            LOGGER.debug(
+                "Final judgment scores size - Queries: {}, Total Documents: {}",
+                judgmentScores.size(),
+                judgmentScores.values().stream().mapToInt(Map::size).sum()
+            );
+
+            listener.onResponse(judgmentScores);
         }
-
-        LOGGER.info(
-            "Final judgment scores size - Queries: {}, Total Documents: {}",
-            judgmentScores.size(),
-            judgmentScores.values().stream().mapToInt(Map::size).sum()
-        );
-
-        listener.onResponse(judgmentScores);
     }
 
 }

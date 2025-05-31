@@ -16,6 +16,7 @@ import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENTS_UR
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -79,6 +80,9 @@ public class RestPutJudgmentAction extends BaseRestHandler {
                 String querySetId = (String) source.get("querySetId");
                 List<String> searchConfigurationList = ParserUtils.convertObjToList(source, "searchConfigurationList");
                 int size = (Integer) source.get("size");
+                boolean ignoreFailure = Optional.ofNullable((Boolean) source.get("ignoreFailure")).orElse(Boolean.FALSE);  // default to
+                                                                                                                           // false if not
+                                                                                                                           // provided
 
                 int tokenLimit = validateTokenLimit(source);
                 List<String> contextFields = ParserUtils.convertObjToList(source, "contextFields");
@@ -91,7 +95,8 @@ public class RestPutJudgmentAction extends BaseRestHandler {
                     searchConfigurationList,
                     size,
                     tokenLimit,
-                    contextFields
+                    contextFields,
+                    ignoreFailure
                 );
             }
             case UBI_JUDGMENT -> {
