@@ -10,5 +10,5 @@ package org.opensearch.searchrelevance.model;
 public enum ExperimentType {
     PAIRWISE_COMPARISON,
     POINTWISE_EVALUATION,
-    HYBRID_SEARCH
+    HYBRID_OPTIMIZER
 }

@@ -18,12 +18,12 @@ import lombok.Builder;
 import lombok.Getter;
 
 /**
- * Experiment is a system index object that store experiment results.
+ * Experiment is a system index object that store experiment variant results.
  */
 @AllArgsConstructor
 @Builder
 @Getter
-public class SubExperiment implements ToXContentObject {
+public class ExperimentVariant implements ToXContentObject {
     public static final String ID = "id";
     public static final String TIME_STAMP = "timestamp";
     public static final String TYPE = "type";

@@ -33,18 +33,18 @@ import org.opensearch.common.inject.Inject;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.searchrelevance.dao.ExperimentDao;
+import org.opensearch.searchrelevance.dao.ExperimentVariantDao;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
-import org.opensearch.searchrelevance.dao.SubExperimentDao;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.experiment.ExperimentOptionsFactory;
 import org.opensearch.searchrelevance.experiment.ExperimentOptionsForHybridSearch;
-import org.opensearch.searchrelevance.experiment.SubExperimentHybridSearchDTO;
+import org.opensearch.searchrelevance.experiment.ExperimentVariantHybridSearchDTO;
 import org.opensearch.searchrelevance.metrics.MetricsHelper;
 import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.Experiment;
 import org.opensearch.searchrelevance.model.ExperimentType;
-import org.opensearch.searchrelevance.model.SubExperiment;
+import org.opensearch.searchrelevance.model.ExperimentVariant;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
@@ -56,7 +56,7 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
 
     private final ClusterService clusterService;
     private final ExperimentDao experimentDao;
-    private final SubExperimentDao subExperimentDao;
+    private final ExperimentVariantDao experimentVariantDao;
     private final QuerySetDao querySetDao;
     private final SearchConfigurationDao searchConfigurationDao;
     private final MetricsHelper metricsHelper;
@@ -69,7 +69,7 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
         TransportService transportService,
         ActionFilters actionFilters,
         ExperimentDao experimentDao,
-        SubExperimentDao subExperimentDao,
+        ExperimentVariantDao experimentVariantDao,
         QuerySetDao querySetDao,
         SearchConfigurationDao searchConfigurationDao,
         MetricsHelper metricsHelper
@@ -77,7 +77,7 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
         super(PutExperimentAction.NAME, transportService, actionFilters, PutExperimentRequest::new);
         this.clusterService = clusterService;
         this.experimentDao = experimentDao;
-        this.subExperimentDao = subExperimentDao;
+        this.experimentVariantDao = experimentVariantDao;
         this.querySetDao = querySetDao;
         this.searchConfigurationDao = searchConfigurationDao;
         this.metricsHelper = metricsHelper;
@@ -97,7 +97,7 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
         // step 1: Create Indexes if not exist
         StepListener<Void> createIndexStep = new StepListener<>();
         experimentDao.createIndexIfAbsent(createIndexStep);
-        subExperimentDao.createIndexIfAbsent(createIndexStep);
+        experimentVariantDao.createIndexIfAbsent(createIndexStep);
 
         // step 2: Get QuerySet
         StepListener<Map<String, Object>> getQuerySetStep = new StepListener<>();
@@ -205,7 +205,7 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
                         error -> handleFailure(error, hasFailure, experimentId, request)
                     )
                 );
-            } else if (request.getType() == ExperimentType.HYBRID_SEARCH) {
+            } else if (request.getType() == ExperimentType.HYBRID_OPTIMIZER) {
                 Map<String, Object> defaultParametersForHybridSearch = ExperimentOptionsFactory
                     .createDefaultExperimentParametersForHybridSearch();
                 ExperimentOptionsForHybridSearch experimentOptionForHybridSearch =
@@ -213,31 +213,33 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
                         ExperimentOptionsFactory.HYBRID_SEARCH_EXPERIMENT_OPTIONS,
                         defaultParametersForHybridSearch
                     );
-                List<SubExperimentHybridSearchDTO> subExperimentDTOs = experimentOptionForHybridSearch.getParameterCombinations(true);
-                List<SubExperiment> subExperiments = new ArrayList<>();
-                for (SubExperimentHybridSearchDTO subExperimentDTO : subExperimentDTOs) {
+                List<ExperimentVariantHybridSearchDTO> experimentVariantDTOs = experimentOptionForHybridSearch.getParameterCombinations(
+                    true
+                );
+                List<ExperimentVariant> experimentVariants = new ArrayList<>();
+                for (ExperimentVariantHybridSearchDTO experimentVariantDTO : experimentVariantDTOs) {
                     Map<String, Object> parameters = new HashMap<>(
                         Map.of(
                             EXPERIMENT_OPTION_NORMALIZATION_TECHNIQUE,
-                            subExperimentDTO.getNormalizationTechnique(),
+                            experimentVariantDTO.getNormalizationTechnique(),
                             EXPERIMENT_OPTION_COMBINATION_TECHNIQUE,
-                            subExperimentDTO.getCombinationTechnique(),
+                            experimentVariantDTO.getCombinationTechnique(),
                             EXPERIMENT_OPTION_WEIGHTS_FOR_COMBINATION,
-                            subExperimentDTO.getQueryWeightsForCombination()
+                            experimentVariantDTO.getQueryWeightsForCombination()
                         )
                     );
-                    String subExperimentId = UUID.randomUUID().toString();
-                    SubExperiment subExperiment = new SubExperiment(
-                        subExperimentId,
+                    String experimentVariantId = UUID.randomUUID().toString();
+                    ExperimentVariant experimentVariant = new ExperimentVariant(
+                        experimentVariantId,
                         TimeUtils.getTimestamp(),
-                        ExperimentType.HYBRID_SEARCH,
+                        ExperimentType.HYBRID_OPTIMIZER,
                         AsyncStatus.PROCESSING,
                         experimentId,
                         parameters,
                         Map.of()
                     );
-                    subExperiments.add(subExperiment);
-                    subExperimentDao.putSubExperiment(subExperiment, ActionListener.wrap(response -> {}, e -> {}));
+                    experimentVariants.add(experimentVariant);
+                    experimentVariantDao.putExperimentVariant(experimentVariant, ActionListener.wrap(response -> {}, e -> {}));
                 }
                 metricsHelper.processEvaluationMetrics(
                     queryText,
@@ -257,7 +259,7 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
                             judgmentList
                         );
                     }, error -> handleFailure(error, hasFailure, experimentId, request)),
-                    subExperiments
+                    experimentVariants
                 );
             } else if (request.getType() == ExperimentType.POINTWISE_EVALUATION) {
                 metricsHelper.processEvaluationMetrics(

@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-import org.opensearch.searchrelevance.model.SubExperiment;
+import org.opensearch.searchrelevance.model.ExperimentVariant;
 
 /**
  * Utility class for a query source
@@ -26,20 +26,20 @@ public class QuerySourceUtil {
 
     /**
      * Creates a definition of a temporary search pipeline for hybrid search.
-     * @param subExperiment sub-experiment to create the pipeline for
+     * @param experimentVariant sub-experiment to create the pipeline for
      * @return definition of a temporary search pipeline
      */
-    public static Map<String, Object> createDefinitionOfTemporarySearchPipeline(final SubExperiment subExperiment) {
-        Map<String, Object> subExperimentParameters = subExperiment.getParameters();
+    public static Map<String, Object> createDefinitionOfTemporarySearchPipeline(final ExperimentVariant experimentVariant) {
+        Map<String, Object> experimentVariantParameters = experimentVariant.getParameters();
         Map<String, Object> normalizationTechniqueConfig = new HashMap<>(
-            Map.of("technique", subExperimentParameters.get(EXPERIMENT_OPTION_NORMALIZATION_TECHNIQUE))
+            Map.of("technique", experimentVariantParameters.get(EXPERIMENT_OPTION_NORMALIZATION_TECHNIQUE))
         );
 
         Map<String, Object> combinationTechniqueConfig = new HashMap<>(
-            Map.of("technique", subExperimentParameters.get(EXPERIMENT_OPTION_COMBINATION_TECHNIQUE))
+            Map.of("technique", experimentVariantParameters.get(EXPERIMENT_OPTION_COMBINATION_TECHNIQUE))
         );
-        if (Objects.nonNull(subExperimentParameters.get(EXPERIMENT_OPTION_WEIGHTS_FOR_COMBINATION))) {
-            float[] weights = (float[]) subExperimentParameters.get(EXPERIMENT_OPTION_WEIGHTS_FOR_COMBINATION);
+        if (Objects.nonNull(experimentVariantParameters.get(EXPERIMENT_OPTION_WEIGHTS_FOR_COMBINATION))) {
+            float[] weights = (float[]) experimentVariantParameters.get(EXPERIMENT_OPTION_WEIGHTS_FOR_COMBINATION);
             List<Double> weightsList = new ArrayList<>(weights.length);
             for (float weight : weights) {
                 weightsList.add((double) weight);
