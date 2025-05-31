@@ -36,11 +36,11 @@ import org.opensearch.common.inject.Inject;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.search.SearchHit;
 import org.opensearch.searchrelevance.dao.EvaluationResultDao;
+import org.opensearch.searchrelevance.dao.ExperimentVariantDao;
 import org.opensearch.searchrelevance.dao.JudgmentDao;
-import org.opensearch.searchrelevance.dao.SubExperimentDao;
 import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.EvaluationResult;
-import org.opensearch.searchrelevance.model.SubExperiment;
+import org.opensearch.searchrelevance.model.ExperimentVariant;
 import org.opensearch.searchrelevance.model.builder.SearchRequestBuilder;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.transport.client.Client;
@@ -57,7 +57,7 @@ public class MetricsHelper {
     private final Client client;
     private final JudgmentDao judgmentDao;
     private final EvaluationResultDao evaluationResultDao;
-    private final SubExperimentDao subExperimentDao;
+    private final ExperimentVariantDao experimentVariantDao;
 
     @Inject
     public MetricsHelper(
@@ -65,13 +65,13 @@ public class MetricsHelper {
         @NonNull Client client,
         @NonNull JudgmentDao judgmentDao,
         @NonNull EvaluationResultDao evaluationResultDao,
-        @NonNull SubExperimentDao subExperimentDao
+        @NonNull ExperimentVariantDao experimentVariantDao
     ) {
         this.clusterService = clusterService;
         this.client = client;
         this.judgmentDao = judgmentDao;
         this.evaluationResultDao = evaluationResultDao;
-        this.subExperimentDao = subExperimentDao;
+        this.experimentVariantDao = experimentVariantDao;
     }
 
     /**
@@ -187,7 +187,7 @@ public class MetricsHelper {
         int size,
         List<String> judgmentIds,
         ActionListener<Map<String, Object>> listener,
-        List<SubExperiment> subExperiments
+        List<ExperimentVariant> experimentVariants
     ) {
         if (indexAndQueries.isEmpty() || judgmentIds.isEmpty()) {
             listener.onFailure(new IllegalArgumentException("Missing required parameters"));
@@ -236,7 +236,7 @@ public class MetricsHelper {
                                     docIdToScores,
                                     configToEvalIds,
                                     listener,
-                                    subExperiments
+                                    experimentVariants
                                 );
                             }
                         } catch (Exception e) {
@@ -260,7 +260,7 @@ public class MetricsHelper {
                                     docIdToScores,
                                     configToEvalIds,
                                     listener,
-                                    subExperiments
+                                    experimentVariants
                                 );
                             }
                         }
@@ -281,10 +281,10 @@ public class MetricsHelper {
         Map<String, String> docIdToScores,
         Map<String, Object> configToEvalIds,
         ActionListener<Map<String, Object>> listener,
-        List<SubExperiment> subExperiments
+        List<ExperimentVariant> experimentVariants
     ) {
         AtomicBoolean hasFailure = new AtomicBoolean(false);
-        AtomicInteger pendingConfigurations = getNumberOfExperimentRuns(indexAndQueries, subExperiments);
+        AtomicInteger pendingConfigurations = getNumberOfExperimentRuns(indexAndQueries, experimentVariants);
         if (indexAndQueries.isEmpty()) {
             listener.onResponse(configToEvalIds);
             return;
@@ -299,7 +299,7 @@ public class MetricsHelper {
             String query = indexAndQueries.get(searchConfigurationId).get(1);
             String searchPipeline = indexAndQueries.get(searchConfigurationId).get(2);
 
-            if (Objects.isNull(subExperiments) || subExperiments.isEmpty()) {
+            if (Objects.isNull(experimentVariants) || experimentVariants.isEmpty()) {
                 processSearchConfigurationWithEmptyExperimentOptions(
                     queryText,
                     size,
@@ -327,22 +327,22 @@ public class MetricsHelper {
                     query,
                     hasFailure,
                     pendingConfigurations,
-                    subExperiments
+                    experimentVariants
                 );
             }
         }
     }
 
     /**
-     * Get number of experiment runs based on indexAndQueries and subExperiments
+     * Get number of experiment runs based on indexAndQueries and experimentVariants
      * @param indexAndQueries
-     * @param subExperiments
+     * @param experimentVariants
      * @return
      */
-    private AtomicInteger getNumberOfExperimentRuns(Map<String, List<String>> indexAndQueries, List<SubExperiment> subExperiments) {
-        if (Objects.nonNull(subExperiments)) {
-            // if there are sub experiments we must include them in number of runs
-            return new AtomicInteger(indexAndQueries.size() * subExperiments.size());
+    private AtomicInteger getNumberOfExperimentRuns(Map<String, List<String>> indexAndQueries, List<ExperimentVariant> experimentVariants) {
+        if (Objects.nonNull(experimentVariants)) {
+            // if there are experiment variants we must include them in number of runs
+            return new AtomicInteger(indexAndQueries.size() * experimentVariants.size());
         }
         return new AtomicInteger(indexAndQueries.size());
 
@@ -428,25 +428,25 @@ public class MetricsHelper {
         int size,
         List<String> judgmentIds,
         Map<String, String> docIdToScores,
-        Map<String, Object> configToSubExperiments,
+        Map<String, Object> configToExperimentVariants,
         ActionListener<Map<String, Object>> listener,
         String searchConfigurationId,
         String index,
         String query,
         AtomicBoolean hasFailure,
         AtomicInteger pendingConfigurations,
-        List<SubExperiment> subExperiments
+        List<ExperimentVariant> experimentVariants
     ) {
-        if (Objects.isNull(subExperiments) || subExperiments.isEmpty()) {
-            throw new IllegalArgumentException("sub experiment for hybrid search cannot be empty");
+        if (Objects.isNull(experimentVariants) || experimentVariants.isEmpty()) {
+            throw new IllegalArgumentException("experiment variant for hybrid search cannot be empty");
         }
-        synchronized (configToSubExperiments) {
-            if (configToSubExperiments.containsKey(searchConfigurationId) == false) {
-                configToSubExperiments.put(searchConfigurationId, new HashMap<String, Object>());
+        synchronized (configToExperimentVariants) {
+            if (configToExperimentVariants.containsKey(searchConfigurationId) == false) {
+                configToExperimentVariants.put(searchConfigurationId, new HashMap<String, Object>());
             }
         }
-        for (SubExperiment subExperiment : subExperiments) {
-            Map<String, Object> temporarySearchPipeline = createDefinitionOfTemporarySearchPipeline(subExperiment);
+        for (ExperimentVariant experimentVariant : experimentVariants) {
+            Map<String, Object> temporarySearchPipeline = createDefinitionOfTemporarySearchPipeline(experimentVariant);
             SearchRequest searchRequest = SearchRequestBuilder.buildRequestForHybridSearch(
                 index,
                 query,
@@ -457,7 +457,7 @@ public class MetricsHelper {
             final String evaluationId = UUID.randomUUID().toString();
             log.debug(
                 "Processing hybrid search sub-experiment: {} configuration: {} index: {}, query: {}, evaluationId: {}",
-                subExperiment.getId(),
+                experimentVariant.getId(),
                 searchConfigurationId,
                 index,
                 query,
@@ -472,7 +472,7 @@ public class MetricsHelper {
                         if (response.getHits().getTotalHits().value() == 0) {
                             log.warn("No hits found for search config: {}", searchConfigurationId);
                             if (pendingConfigurations.decrementAndGet() == 0) {
-                                listener.onResponse(configToSubExperiments);
+                                listener.onResponse(configToExperimentVariants);
                             }
                             return;
                         }
@@ -492,24 +492,24 @@ public class MetricsHelper {
                         );
 
                         evaluationResultDao.putEvaluationResult(evaluationResult, ActionListener.wrap(success -> {
-                            SubExperiment subExperimentResult = new SubExperiment(
-                                subExperiment.getId(),
+                            ExperimentVariant experimentVariantResult = new ExperimentVariant(
+                                experimentVariant.getId(),
                                 TimeUtils.getTimestamp(),
-                                subExperiment.getType(),
+                                experimentVariant.getType(),
                                 AsyncStatus.COMPLETED,
-                                subExperiment.getExperimentId(),
-                                subExperiment.getParameters(),
+                                experimentVariant.getExperimentId(),
+                                experimentVariant.getParameters(),
                                 Map.of("evaluationResultId", evaluationId)
                             );
                             StepListener<IndexResponse> voidStepListener = new StepListener<>();
-                            subExperimentDao.updateSubExperiment(subExperimentResult, voidStepListener);
+                            experimentVariantDao.updateExperimentVariant(experimentVariantResult, voidStepListener);
                             voidStepListener.whenComplete(indexResponse -> {
-                                synchronized (configToSubExperiments) {
-                                    Map<String, Object> map = (Map<String, Object>) configToSubExperiments.get(searchConfigurationId);
-                                    map.put(subExperiment.getId(), evaluationId);
+                                synchronized (configToExperimentVariants) {
+                                    Map<String, Object> map = (Map<String, Object>) configToExperimentVariants.get(searchConfigurationId);
+                                    map.put(experimentVariant.getId(), evaluationId);
                                 }
                                 if (pendingConfigurations.decrementAndGet() == 0) {
-                                    listener.onResponse(configToSubExperiments);
+                                    listener.onResponse(configToExperimentVariants);
                                 }
                             }, listener::onFailure);
                         }, error -> {
@@ -524,16 +524,16 @@ public class MetricsHelper {
 
                 @Override
                 public void onFailure(Exception e) {
-                    SubExperiment subExperimentResult = new SubExperiment(
-                        subExperiment.getId(),
+                    ExperimentVariant experimentVariantResult = new ExperimentVariant(
+                        experimentVariant.getId(),
                         TimeUtils.getTimestamp(),
-                        subExperiment.getType(),
+                        experimentVariant.getType(),
                         AsyncStatus.ERROR,
-                        subExperiment.getExperimentId(),
-                        subExperiment.getParameters(),
+                        experimentVariant.getExperimentId(),
+                        experimentVariant.getParameters(),
                         Map.of("evaluationResultId", evaluationId)
                     );
-                    subExperimentDao.updateSubExperiment(subExperimentResult, ActionListener.wrap(success -> {}, error -> {
+                    experimentVariantDao.updateExperimentVariant(experimentVariantResult, ActionListener.wrap(success -> {}, error -> {
                         hasFailure.set(true);
                         listener.onFailure(error);
                     }));
