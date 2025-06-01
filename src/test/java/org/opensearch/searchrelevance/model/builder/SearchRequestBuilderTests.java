@@ -129,4 +129,15 @@ public class SearchRequestBuilderTests extends OpenSearchTestCase {
         );
     }
 
+    public void testHybridQuerySearchConfiguration_whenLessThenTwoSubQueries_thenFail() {
+        String hybridQuery =
+            "{\"_source\":{\"exclude\":[\"passage_embedding\"]},\"query\":{\"hybrid\":{\"queries\":[{\"match\":{\"name\":\""
+                + WILDCARD_QUERY_TEXT
+                + "\"}}]}}}";
+        IllegalArgumentException exception = expectThrows(
+            IllegalArgumentException.class,
+            () -> SearchRequestBuilder.buildRequestForHybridSearch(TEST_INDEX, hybridQuery, Map.of(), TEST_QUERY_TEXT, TEST_SIZE)
+        );
+        assertEquals("invalid hybrid query: expected exactly [2] sub-queries but found [1]", exception.getMessage());
+    }
 }

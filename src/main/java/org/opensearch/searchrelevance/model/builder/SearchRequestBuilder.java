@@ -8,6 +8,7 @@
 package org.opensearch.searchrelevance.model.builder;
 
 import static org.opensearch.searchrelevance.common.PluginConstants.WILDCARD_QUERY_TEXT;
+import static org.opensearch.searchrelevance.experiment.QuerySourceUtil.validateHybridQuery;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -141,6 +142,8 @@ public class SearchRequestBuilder {
             );
             Map<String, Object> fullQueryMap = parser.map();
 
+            validateHybridQuery(fullQueryMap);
+
             // This implementation handles the 'query' field separately from other fields because:
             // 1. Custom query types (like hybrid, neural) are not registered in the default QueryBuilders
             // 2. Using WrapperQuery allows passing through any query structure without parsing
@@ -200,5 +203,4 @@ public class SearchRequestBuilder {
             throw new IllegalArgumentException("Failed to build search request", ex);
         }
     }
-
 }
