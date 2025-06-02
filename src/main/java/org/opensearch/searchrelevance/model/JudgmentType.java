@@ -9,5 +9,6 @@ package org.opensearch.searchrelevance.model;
 
 public enum JudgmentType {
     LLM_JUDGMENT,
-    UBI_JUDGMENT
+    UBI_JUDGMENT,
+    IMPORT_JUDGMENT
 }
