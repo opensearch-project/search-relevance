@@ -82,11 +82,11 @@ echo Indexed UBI data: $NUMBER_OF_QUERIES queries and $NUMBER_OF_EVENTS events
 echo
 
 echo Deleting queryset, search config, judgment and experiment indexes
-(curl -s -X DELETE "http://localhost:9200/.plugins-search-relevance-search-config" > /dev/null) || true
-(curl -s -X DELETE "http://localhost:9200/.plugins-search-relevance-queryset" > /dev/null) || true
-(curl -s -X DELETE "http://localhost:9200/.plugins-search-relevance-judgment" > /dev/null) || true
+(curl -s -X DELETE "http://localhost:9200/search-relevance-search-config" > /dev/null) || true
+(curl -s -X DELETE "http://localhost:9200/search-relevance-queryset" > /dev/null) || true
+(curl -s -X DELETE "http://localhost:9200/search-relevance-judgment" > /dev/null) || true
 (curl -s -X DELETE "http://localhost:9200/.plugins-search-relevance-experiment" > /dev/null) || true
-(curl -s -X DELETE "http://localhost:9200/.plugins-search-relevance-evaluation-result" > /dev/null) || true
+(curl -s -X DELETE "http://localhost:9200/search-relevance-evaluation-result" > /dev/null) || true
 
 sleep 2
 echo Create search configs
