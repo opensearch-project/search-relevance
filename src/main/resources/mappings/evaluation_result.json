@@ -6,6 +6,6 @@
     "searchText": { "type": "keyword" },
     "judgmentList": { "type": "keyword" },
     "documentIds": { "type": "keyword" },
-    "metrics": { "type": "object" }
+    "metrics": { "type": "object", "dynamic": true }
   }
 }

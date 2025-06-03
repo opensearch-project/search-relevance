@@ -5,7 +5,7 @@
     "type": { "type": "keyword" },
     "status": { "type": "keyword" },
     "experimentId": { "type": "keyword" },
-    "parameters": { "type":  "object" },
-    "results": { "type": "object" }
+    "parameters": { "type":  "object", "dynamic": true },
+    "results": { "type": "object", "dynamic": true }
   }
 }
