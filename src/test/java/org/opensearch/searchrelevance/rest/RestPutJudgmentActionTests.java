@@ -22,6 +22,7 @@ import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.plugin.SearchRelevanceRestTestCase;
+import org.opensearch.searchrelevance.transport.judgment.PutImportJudgmentRequest;
 import org.opensearch.searchrelevance.transport.judgment.PutJudgmentAction;
 import org.opensearch.searchrelevance.transport.judgment.PutLlmJudgmentRequest;
 import org.opensearch.searchrelevance.transport.judgment.PutUbiJudgmentRequest;
@@ -48,6 +49,46 @@ public class RestPutJudgmentActionTests extends SearchRelevanceRestTestCase {
         + "\"type\": \"UBI_JUDGMENT\","
         + "\"clickModel\": \"test_click_model\","
         + "\"maxRank\": 10"
+        + "}";
+
+    private static final String IMPORT_JUDGMENT_CONTENT = "{"
+        + "\"name\": \"test_name\","
+        + "\"description\": \"test_description\","
+        + "\"type\": \"IMPORT_JUDGMENT\","
+        + "\"judgmentScores\": {"
+        + "    \"red shoes\": ["
+        + "      {"
+        + "        \"docId\": \"B077ZJXCTS\","
+        + "        \"score\": \"0.000\""
+        + "      }"
+        + "    ],"
+        + "    \"blue jeans\": ["
+        + "      {"
+        + "        \"docId\": \"B071S6LTJJ\","
+        + "        \"score\": \"0.000\""
+        + "      }"
+        + "    ]"
+        + "  }"
+        + "}";
+
+    private static final String IMPORT_JUDGMENT_CONTENT_INVALID_SCORE = "{"
+        + "\"name\": \"test_name\","
+        + "\"description\": \"test_description\","
+        + "\"type\": \"IMPORT_JUDGMENT\","
+        + "\"judgmentScores\": {"
+        + "    \"red shoes\": ["
+        + "      {"
+        + "        \"docId\": \"B077ZJXCTS\","
+        + "        \"score\": \"0.000\""
+        + "      }"
+        + "    ],"
+        + "    \"blue jeans\": ["
+        + "      {"
+        + "        \"docId\": \"B071S6LTJJ\","
+        + "        \"score\": \"AWESOME\""
+        + "      }"
+        + "    ]"
+        + "  }"
         + "}";
 
     private static final String INVALID_TYPE_CONTENT = "{"
@@ -120,6 +161,31 @@ public class RestPutJudgmentActionTests extends SearchRelevanceRestTestCase {
             listener.onResponse(mockIndexResponse);
             return null;
         }).when(client).execute(eq(PutJudgmentAction.INSTANCE), any(PutUbiJudgmentRequest.class), any());
+
+        // Execute
+        restPutJudgmentAction.handleRequest(request, channel, client);
+
+        // Verify
+        ArgumentCaptor<BytesRestResponse> responseCaptor = ArgumentCaptor.forClass(BytesRestResponse.class);
+        verify(channel).sendResponse(responseCaptor.capture());
+        assertEquals(RestStatus.OK, responseCaptor.getValue().status());
+    }
+
+    public void testPutImportJudgment_Success() throws Exception {
+        // Setup
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        RestRequest request = createPutRestRequestWithContent(IMPORT_JUDGMENT_CONTENT, "judgments");
+        when(channel.request()).thenReturn(request);
+
+        // Mock index response
+        IndexResponse mockIndexResponse = mock(IndexResponse.class);
+        when(mockIndexResponse.getId()).thenReturn("test_id");
+
+        doAnswer(invocation -> {
+            ActionListener<IndexResponse> listener = invocation.getArgument(2);
+            listener.onResponse(mockIndexResponse);
+            return null;
+        }).when(client).execute(eq(PutJudgmentAction.INSTANCE), any(PutImportJudgmentRequest.class), any());
 
         // Execute
         restPutJudgmentAction.handleRequest(request, channel, client);

@@ -42,7 +42,8 @@ public class JudgmentsProcessorFactory {
         return switch (type) {
             case LLM_JUDGMENT -> new LlmJudgmentsProcessor(mlAccessor, querySetDao, searchConfigurationDao, judgmentCacheDao, client);
             case UBI_JUDGMENT -> new UbiJudgmentsProcessor(client);
-            default -> throw new IllegalArgumentException("Unsupported experiment type: " + type);
+            case IMPORT_JUDGMENT -> new ImportJudgmentsProcessor(client);
+            default -> throw new IllegalArgumentException("Unsupported judgment type: " + type);
         };
     }
 }

@@ -31,6 +31,7 @@ import org.opensearch.rest.RestRequest;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.model.JudgmentType;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
+import org.opensearch.searchrelevance.transport.judgment.PutImportJudgmentRequest;
 import org.opensearch.searchrelevance.transport.judgment.PutJudgmentAction;
 import org.opensearch.searchrelevance.transport.judgment.PutJudgmentRequest;
 import org.opensearch.searchrelevance.transport.judgment.PutLlmJudgmentRequest;
@@ -111,6 +112,10 @@ public class RestPutJudgmentAction extends BaseRestHandler {
                 String clickModel = (String) source.get("clickModel");
                 int maxRank = (int) source.get("maxRank");
                 createRequest = new PutUbiJudgmentRequest(type, name, description, clickModel, maxRank);
+            }
+            case IMPORT_JUDGMENT -> {
+                Map<String, Object> judgmentScores = (Map<String, Object>) source.get("judgmentScores");
+                createRequest = new PutImportJudgmentRequest(type, name, description, judgmentScores);
             }
             default -> {
                 throw new SearchRelevanceException("Unsupported experiment type: " + type, RestStatus.BAD_REQUEST);
