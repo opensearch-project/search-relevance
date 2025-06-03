@@ -342,7 +342,7 @@ public class MetricsHelper {
     private AtomicInteger getNumberOfExperimentRuns(Map<String, List<String>> indexAndQueries, List<ExperimentVariant> experimentVariants) {
         if (Objects.nonNull(experimentVariants)) {
             // if there are experiment variants we must include them in number of runs
-            return new AtomicInteger(indexAndQueries.size() * experimentVariants.size());
+            return new AtomicInteger(indexAndQueries.size() * (experimentVariants.size() == 0 ? 1 : experimentVariants.size()));
         }
         return new AtomicInteger(indexAndQueries.size());
 
