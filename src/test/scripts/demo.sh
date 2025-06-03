@@ -5,7 +5,11 @@
 # * An "ecommerce" style sample data
 # You can now exercise all the capabilities of SRW!  
 # 
+# It assumes that you are ran `docker compose build && docker compose up` to start the environment up.
 # It will clear out any existing data except ecommerce index if you pass --skip-ecommerce-step as a parameter.
+
+# Helper script
+exe() { (set -x ; "$@") | jq | tee RES; echo; }
 
 # Check for --skip-ecommerce-step parameter
 SKIP_ECOMMERCE=false
@@ -91,7 +95,7 @@ echo Deleting queryset, search config, judgment and experiment indexes
 sleep 2
 echo Create search configs
 
-exe() { (set -x ; "$@") | jq | tee RES; echo; }
+
 
 exe curl -s -X PUT "http://localhost:9200/_plugins/search_relevance/search_configurations" \
 -H "Content-type: application/json" \
@@ -173,10 +177,68 @@ exe curl -s -X PUT "localhost:9200/_plugins/search_relevance/judgments" \
    	"type": "UBI_JUDGMENT"
    }'
    
-JUDGMENT_LIST_ID=`jq -r '.judgment_id' < RES`
+UBI_JUDGMENT_LIST_ID=`jq -r '.judgment_id' < RES`
 
 # wait for judgments to be created in the background
-sleep 5
+sleep 2
+
+echo
+echo Import Judgements
+exe curl -s -X PUT "localhost:9200/_plugins/search_relevance/judgments" \
+-H "Content-type: application/json" \
+-d'{
+   	"name": "Imported Judgments",
+   	"description": "Judgments generated outside SRW",
+   	"type": "IMPORT_JUDGMENT",
+   	"judgmentScores": {
+      "red dress": [
+        {
+          "docId": "B077ZJXCTS",
+          "score": "0.000"
+        },
+        {
+          "docId": "B071S6LTJJ",
+          "score": "0.000"
+        },
+        {
+          "docId": "B01IDSPDJI",
+          "score": "0.000"
+        },
+        {
+          "docId": "B07QRCGL3G",
+          "score": "0.000"
+        },
+        {
+          "docId": "B074V6Q1DR",
+          "score": "0.000"
+        }
+      ],
+      "blue jeans": [
+        {
+          "docId": "B07L9V4Y98",
+          "score": "0.000"
+        },
+        {
+          "docId": "B01N0DSRJC",
+          "score": "0.000"
+        },
+        {
+          "docId": "B001CRAWCQ",
+          "score": "0.000"
+        },
+        {
+          "docId": "B075DGJZRM",
+          "score": "0.000"
+        },
+        {
+          "docId": "B009ZD297U",
+          "score": "0.000"
+        }
+      ]
+    }
+}' 
+
+IMPORTED_JUDGMENT_LIST_ID=`jq -r '.judgment_id' < RES`
 
 echo
 echo Create PAIRWISE Experiment
@@ -207,7 +269,7 @@ exe curl -s -X PUT "localhost:9200/_plugins/search_relevance/experiments" \
 -d"{
    	\"querySetId\": \"$QS\",
    	\"searchConfigurationList\": [\"$SC_BASELINE\"],
-    \"judgmentList\": [\"$JUDGMENT_LIST_ID\"],
+    \"judgmentList\": [\"$UBI_JUDGMENT_LIST_ID\"],
    	\"size\": 8,
    	\"type\": \"POINTWISE_EVALUATION\"
    }"
