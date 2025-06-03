@@ -12,8 +12,10 @@ import static org.opensearch.searchrelevance.experiment.ExperimentOptionsForHybr
 import static org.opensearch.searchrelevance.experiment.ExperimentOptionsForHybridSearch.EXPERIMENT_OPTION_WEIGHTS_FOR_COMBINATION;
 
 import java.util.ArrayList;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
@@ -23,6 +25,8 @@ import org.opensearch.searchrelevance.model.ExperimentVariant;
  * Utility class for a query source
  */
 public class QuerySourceUtil {
+
+    public static final int NUMBER_OF_SUBQUERIES_IN_HYBRID_QUERY = 2;
 
     /**
      * Creates a definition of a temporary search pipeline for hybrid search.
@@ -54,5 +58,35 @@ public class QuerySourceUtil {
         Map<String, Object> temporarySearchPipeline = new HashMap<>();
         temporarySearchPipeline.put("phase_results_processors", List.of(phaseProcessorObject));
         return temporarySearchPipeline;
+    }
+
+    /**
+     * Validate that the query in the search configuration is a hybrid query with two sub-queries.
+     * @param fullQueryMap
+     * @throws IOException
+     */
+    public static void validateHybridQuery(Map<String, Object> fullQueryMap) throws IOException {
+        if (fullQueryMap.containsKey("query") == false || fullQueryMap.get("query") instanceof Map == false) {
+            throw new IllegalArgumentException("query in search configuration does not have query");
+        }
+        Map<String, Object> queryMap = (Map<String, Object>) fullQueryMap.get("query");
+        if (queryMap.containsKey("hybrid") == false || queryMap.get("hybrid") instanceof Map<?, ?> == false) {
+            throw new IllegalArgumentException("query in search configuration does must be of type hybrid");
+        }
+        Map<String, Object> hybridMap = (Map<String, Object>) queryMap.get("hybrid");
+        if (hybridMap.containsKey("queries") == false || hybridMap.get("queries") instanceof List<?> == false) {
+            throw new IllegalArgumentException("hybrid query in search configuration does not have queries");
+        }
+        List<?> queriesMap = (List<?>) hybridMap.get("queries");
+        if (queriesMap.size() != NUMBER_OF_SUBQUERIES_IN_HYBRID_QUERY) {
+            throw new IllegalArgumentException(
+                String.format(
+                    Locale.ROOT,
+                    "invalid hybrid query: expected exactly [%d] sub-queries but found [%d]",
+                    NUMBER_OF_SUBQUERIES_IN_HYBRID_QUERY,
+                    queriesMap.size()
+                )
+            );
+        }
     }
 }

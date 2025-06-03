@@ -8,6 +8,7 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 - Added new experiment type for hybrid search ([#26](https://github.com/opensearch-project/search-relevance/pull/26))
 - Added feature flag for search relevance workbench ([#34](https://github.com/opensearch-project/search-relevance/pull/34))
 - [Enhancement] Extend data model to adopt different experiment options/parameters ([#29](https://github.com/opensearch-project/search-relevance/issues/29))
+- Added validation for hybrid query structure ([#40](https://github.com/opensearch-project/search-relevance/pull/40))
 
 ### Removed
 
@@ -18,6 +19,7 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - Change aggregation field from `action_name.keyword` to `action_name` to fix implicit judgments calculation ([#15](https://github.com/opensearch-project/search-relevance/issues/10)).
  - Fix COEC calculation: introduce rank in ClickthroughRate class, fix bucket size for positional aggregation, correct COEC claculation ([#23](https://github.com/opensearch-project/search-relevance/issues/23)).
  - LLM Judgment Processor Improvement ([#27](https://github.com/opensearch-project/search-relevance/pull/27))
- - Extend the `src/test/demo.sh` script to support pointwise experiments.
+ - Deal with experiment processing when no experiment variants exist. ([#45](https://github.com/opensearch-project/search-relevance/pull/45))
+
 
 ### Security
