@@ -25,7 +25,7 @@ public class SearchRelevanceSettings {
     public static final String SEARCH_RELEVANCE_WORKBENCH_ENABLED_KEY = "plugins.search_relevance.workbench_enabled";
     public static final Setting<Boolean> SEARCH_RELEVANCE_WORKBENCH_ENABLED = Setting.boolSetting(
         SEARCH_RELEVANCE_WORKBENCH_ENABLED_KEY,
-        true,
+        false,
         Setting.Property.NodeScope,
         Setting.Property.Dynamic
     );

@@ -227,6 +227,7 @@ testClusters.integTest {
             debugPort += 1
         }
     }
+    setting 'plugins.search_relevance.workbench_enabled', 'true'
 }
 
 run {
