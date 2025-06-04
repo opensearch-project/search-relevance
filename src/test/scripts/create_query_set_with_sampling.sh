@@ -1,4 +1,4 @@
-curl -s -X POST "localhost:9200/_plugins/search_relevance/query_sets" \
+curl -s -X POST "localhost:9200/_plugins/_search_relevance/query_sets" \
 -H "Content-type: application/json" \
 -d'{
    	"name": "test03",

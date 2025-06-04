@@ -1,4 +1,4 @@
-curl -s -X PUT "localhost:9200/_plugins/search_relevance/experiments" \
+curl -s -X PUT "localhost:9200/_plugins/_search_relevance/experiments" \
 -H "Content-type: application/json" \
 -d'{
    	"querySetId": "{query_set_id}",

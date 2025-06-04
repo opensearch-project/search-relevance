@@ -1,4 +1,4 @@
-curl -s -X GET "http://localhost:9200/_plugins/search_relevance/search_configurations" \
+curl -s -X GET "http://localhost:9200/_plugins/_search_relevance/search_configurations" \
 -H "Content-type: application/json" \
 -d'{
      "sort": {

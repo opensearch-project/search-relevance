@@ -16,7 +16,7 @@ public class PluginConstants {
     /** The transport action name prefix */
     public static final String TRANSPORT_ACTION_NAME_PREFIX = "cluster:admin/opensearch/search_relevance/";
     /** The base URI for this plugin's rest actions */
-    public static final String SEARCH_RELEVANCE_BASE_URI = "/_plugins/search_relevance";
+    public static final String SEARCH_RELEVANCE_BASE_URI = "/_plugins/_search_relevance";
 
     /** The URI for this plugin's queryset rest actions */
     public static final String QUERYSETS_URL = SEARCH_RELEVANCE_BASE_URI + "/query_sets";

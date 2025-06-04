@@ -10,6 +10,7 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 - [Enhancement] Extend data model to adopt different experiment options/parameters ([#29](https://github.com/opensearch-project/search-relevance/issues/29))
 - Added validation for hybrid query structure ([#40](https://github.com/opensearch-project/search-relevance/pull/40))
 - [Enhancement] Add support for importing judgments created externally from SRW.  ([#42](https://github.com/opensearch-project/search-relevance/pull/42)
+- Changing URL for plugin APIs to /_plugin/_search_relevance [backend] ([#62](https://github.com/opensearch-project/search-relevance/pull/62)
 
 ### Removed
 

@@ -76,7 +76,7 @@ sleep 2
 
 echo
 echo Upload Manually Curated Query Set 
-exe curl -s -X PUT "localhost:9200/_plugins/search_relevance/query_sets" \
+exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/query_sets" \
 -H "Content-type: application/json" \
 -d'{
    	"name": "TVs",
@@ -93,7 +93,7 @@ QUERY_SET_MANUAL=`jq -r '.query_set_id' < RES`
 
 echo
 echo Import Judgements
-exe curl -s -X PUT "localhost:9200/_plugins/search_relevance/judgments" \
+exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/judgments" \
 -H "Content-type: application/json" \
 -d'{
    	"name": "Imported Judgments",
@@ -154,7 +154,7 @@ echo
 echo BEGIN HYBRID OPTIMIZER DEMO
 echo
 echo Creating Hybrid Query to be Optimized
-exe curl -s -X PUT "http://localhost:9200/_plugins/search_relevance/search_configurations" \
+exe curl -s -X PUT "http://localhost:9200/_plugins/_search_relevance/search_configurations" \
 -H "Content-type: application/json" \
 -d'{
       "name": "hybrid_query_1",
@@ -170,7 +170,7 @@ echo Hybrid search config id: $SC_HYBRID
 echo
 echo Create HYBRID OPTIMIZER Experiment
 
-exe curl -s -X PUT "localhost:9200/_plugins/search_relevance/experiments" \
+exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/experiments" \
 -H "Content-type: application/json" \
 -d"{
    	\"querySetId\": \"$QUERY_SET_MANUAL\",
@@ -187,4 +187,4 @@ echo Experiment id: $EX_HO
 
 echo
 echo Show HYBRID OPTIMIZER Experiment
-exe curl -s -X GET localhost:9200/_plugins/search_relevance/experiments/$EX_HO
+exe curl -s -X GET localhost:9200/_plugins/_search_relevance/experiments/$EX_HO
