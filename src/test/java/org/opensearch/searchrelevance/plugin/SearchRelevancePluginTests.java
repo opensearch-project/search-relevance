@@ -10,6 +10,7 @@ package org.opensearch.searchrelevance.plugin;
 import static org.mockito.Mockito.when;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_CACHE_INDEX;
+import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_STATS_ENABLED;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_WORKBENCH_ENABLED;
 
 import java.util.Arrays;
@@ -47,6 +48,7 @@ import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
 import org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager;
 import org.opensearch.searchrelevance.metrics.MetricsHelper;
 import org.opensearch.searchrelevance.ml.MLAccessor;
+import org.opensearch.searchrelevance.stats.info.InfoStatsManager;
 import org.opensearch.searchrelevance.transport.experiment.DeleteExperimentAction;
 import org.opensearch.searchrelevance.transport.experiment.GetExperimentAction;
 import org.opensearch.searchrelevance.transport.experiment.PutExperimentAction;
@@ -101,7 +103,8 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
         EvaluationResultDao.class,
         JudgmentCacheDao.class,
         MLAccessor.class,
-        MetricsHelper.class
+        MetricsHelper.class,
+        InfoStatsManager.class
     );
 
     @Override
@@ -116,7 +119,7 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
 
         // Mock ClusterService
         when(clusterService.getClusterSettings()).thenReturn(
-            new ClusterSettings(settings, new HashSet<>(Arrays.asList(SEARCH_RELEVANCE_WORKBENCH_ENABLED)))
+            new ClusterSettings(settings, new HashSet<>(Arrays.asList(SEARCH_RELEVANCE_WORKBENCH_ENABLED, SEARCH_RELEVANCE_STATS_ENABLED)))
         );
         plugin = new SearchRelevancePlugin();
     }
@@ -165,7 +168,7 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
     }
 
     public void testTotalRestHandlers() {
-        assertEquals(13, plugin.getRestHandlers(Settings.EMPTY, null, null, null, null, null, null).size());
+        assertEquals(14, plugin.getRestHandlers(Settings.EMPTY, null, null, null, null, null, null).size());
     }
 
     public void testQuerySetTransportIsAdded() {
@@ -193,9 +196,12 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
 
     public void testGetSettings() {
         List<Setting<?>> settings = plugin.getSettings();
-        Setting<?> setting = settings.get(0);
-        assertEquals("plugins.search_relevance.workbench_enabled", setting.getKey());
-        assertEquals(1, settings.size());
-        assertEquals(false, setting.get(Settings.EMPTY));
+        Setting<?> setting0 = settings.get(0);
+        assertEquals("plugins.search_relevance.workbench_enabled", setting0.getKey());
+        Setting<?> setting1 = settings.get(1);
+        assertEquals("plugins.search_relevance.stats_enabled", setting1.getKey());
+        assertEquals(2, settings.size());
+        assertEquals(false, setting0.get(Settings.EMPTY));
+        assertEquals(true, setting1.get(Settings.EMPTY));
     }
 }

@@ -49,6 +49,8 @@ import org.opensearch.searchrelevance.ml.ChunkResult;
 import org.opensearch.searchrelevance.ml.MLAccessor;
 import org.opensearch.searchrelevance.model.JudgmentCache;
 import org.opensearch.searchrelevance.model.JudgmentType;
+import org.opensearch.searchrelevance.stats.events.EventStatName;
+import org.opensearch.searchrelevance.stats.events.EventStatsManager;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.transport.client.Client;
 
@@ -87,6 +89,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
 
     @Override
     public void generateJudgmentRating(Map<String, Object> metadata, ActionListener<List<Map<String, Object>>> listener) {
+        EventStatsManager.increment(EventStatName.LLM_JUDGMENT_SCORE_GENERATIONS);
         String querySetId = (String) metadata.get("querySetId");
         List<String> searchConfigurationList = (List<String>) metadata.get("searchConfigurationList");
         int size = (int) metadata.get("size");

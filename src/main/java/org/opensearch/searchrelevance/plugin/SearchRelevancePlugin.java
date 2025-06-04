@@ -9,6 +9,7 @@ package org.opensearch.searchrelevance.plugin;
 
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_CACHE_INDEX;
+import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_STATS_ENABLED;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_WORKBENCH_ENABLED;
 
 import java.util.Collection;
@@ -63,7 +64,10 @@ import org.opensearch.searchrelevance.rest.RestPutExperimentAction;
 import org.opensearch.searchrelevance.rest.RestPutJudgmentAction;
 import org.opensearch.searchrelevance.rest.RestPutQuerySetAction;
 import org.opensearch.searchrelevance.rest.RestPutSearchConfigurationAction;
+import org.opensearch.searchrelevance.rest.RestSearchRelevanceStatsAction;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
+import org.opensearch.searchrelevance.stats.events.EventStatsManager;
+import org.opensearch.searchrelevance.stats.info.InfoStatsManager;
 import org.opensearch.searchrelevance.transport.experiment.DeleteExperimentAction;
 import org.opensearch.searchrelevance.transport.experiment.DeleteExperimentTransportAction;
 import org.opensearch.searchrelevance.transport.experiment.GetExperimentAction;
@@ -90,6 +94,8 @@ import org.opensearch.searchrelevance.transport.searchConfiguration.GetSearchCon
 import org.opensearch.searchrelevance.transport.searchConfiguration.GetSearchConfigurationTransportAction;
 import org.opensearch.searchrelevance.transport.searchConfiguration.PutSearchConfigurationAction;
 import org.opensearch.searchrelevance.transport.searchConfiguration.PutSearchConfigurationTransportAction;
+import org.opensearch.searchrelevance.transport.stats.SearchRelevanceStatsAction;
+import org.opensearch.searchrelevance.transport.stats.SearchRelevanceStatsTransportAction;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.client.Client;
 import org.opensearch.watcher.ResourceWatcherService;
@@ -112,6 +118,7 @@ public class SearchRelevancePlugin extends Plugin implements ActionPlugin, Syste
     private MLAccessor mlAccessor;
     private MetricsHelper metricsHelper;
     private SearchRelevanceSettingsAccessor settingsAccessor;
+    private InfoStatsManager infoStatsManager;
 
     @Override
     public Collection<SystemIndexDescriptor> getSystemIndexDescriptors(Settings settings) {
@@ -149,6 +156,9 @@ public class SearchRelevancePlugin extends Plugin implements ActionPlugin, Syste
         this.mlAccessor = new MLAccessor(mlClient);
         this.metricsHelper = new MetricsHelper(clusterService, client, judgmentDao, evaluationResultDao, experimentVariantDao);
         this.settingsAccessor = new SearchRelevanceSettingsAccessor(clusterService, environment.settings());
+        this.infoStatsManager = new InfoStatsManager(settingsAccessor);
+        EventStatsManager.instance().initialize(settingsAccessor);
+
         return List.of(
             searchRelevanceIndicesManager,
             querySetDao,
@@ -159,7 +169,8 @@ public class SearchRelevancePlugin extends Plugin implements ActionPlugin, Syste
             evaluationResultDao,
             judgmentCacheDao,
             mlAccessor,
-            metricsHelper
+            metricsHelper,
+            infoStatsManager
         );
     }
 
@@ -186,7 +197,8 @@ public class SearchRelevancePlugin extends Plugin implements ActionPlugin, Syste
             new RestGetSearchConfigurationAction(settingsAccessor),
             new RestPutExperimentAction(settingsAccessor),
             new RestGetExperimentAction(settingsAccessor),
-            new RestDeleteExperimentAction(settingsAccessor)
+            new RestDeleteExperimentAction(settingsAccessor),
+            new RestSearchRelevanceStatsAction(settingsAccessor)
         );
     }
 
@@ -205,12 +217,13 @@ public class SearchRelevancePlugin extends Plugin implements ActionPlugin, Syste
             new ActionHandler<>(GetSearchConfigurationAction.INSTANCE, GetSearchConfigurationTransportAction.class),
             new ActionHandler<>(PutExperimentAction.INSTANCE, PutExperimentTransportAction.class),
             new ActionHandler<>(DeleteExperimentAction.INSTANCE, DeleteExperimentTransportAction.class),
-            new ActionHandler<>(GetExperimentAction.INSTANCE, GetExperimentTransportAction.class)
+            new ActionHandler<>(GetExperimentAction.INSTANCE, GetExperimentTransportAction.class),
+            new ActionHandler<>(SearchRelevanceStatsAction.INSTANCE, SearchRelevanceStatsTransportAction.class)
         );
     }
 
     @Override
     public List<Setting<?>> getSettings() {
-        return List.of(SEARCH_RELEVANCE_WORKBENCH_ENABLED);
+        return List.of(SEARCH_RELEVANCE_WORKBENCH_ENABLED, SEARCH_RELEVANCE_STATS_ENABLED);
     }
 }

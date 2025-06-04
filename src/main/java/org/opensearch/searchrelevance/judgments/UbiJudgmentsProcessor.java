@@ -20,6 +20,8 @@ import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.judgments.clickmodel.coec.CoecClickModel;
 import org.opensearch.searchrelevance.judgments.clickmodel.coec.CoecClickModelParameters;
 import org.opensearch.searchrelevance.model.JudgmentType;
+import org.opensearch.searchrelevance.stats.events.EventStatName;
+import org.opensearch.searchrelevance.stats.events.EventStatsManager;
 import org.opensearch.transport.client.Client;
 
 public class UbiJudgmentsProcessor implements BaseJudgmentsProcessor {
@@ -38,6 +40,7 @@ public class UbiJudgmentsProcessor implements BaseJudgmentsProcessor {
 
     @Override
     public void generateJudgmentRating(Map<String, Object> metadata, ActionListener<List<Map<String, Object>>> listener) {
+        EventStatsManager.increment(EventStatName.UBI_JUDGMENT_SCORE_GENERATIONS);
         String clickModel = (String) metadata.get("clickModel");
         int maxRank = (int) metadata.get("maxRank");
 
