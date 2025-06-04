@@ -7,9 +7,6 @@
  */
 package org.opensearch.searchrelevance.transport.searchConfiguration;
 
-import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.SEARCH_CONFIGURATION;
-
-import org.opensearch.ResourceNotFoundException;
 import org.opensearch.action.delete.DeleteResponse;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.HandledTransportAction;
@@ -41,12 +38,6 @@ public class DeleteSearchConfigurationTransportAction extends HandledTransportAc
 
     @Override
     protected void doExecute(Task task, OpenSearchDocRequest request, ActionListener<DeleteResponse> listener) {
-        // Validate cluster health first
-        if (!clusterService.state().routingTable().hasIndex(SEARCH_CONFIGURATION.getIndexName())) {
-            listener.onFailure(new ResourceNotFoundException("Index [" + SEARCH_CONFIGURATION.getIndexName() + "] not found"));
-            return;
-        }
-
         try {
             String searchConfigurationId = request.getId();
             if (searchConfigurationId == null || searchConfigurationId.trim().isEmpty()) {
