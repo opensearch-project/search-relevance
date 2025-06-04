@@ -11,10 +11,15 @@
 # Helper script
 exe() { (set -x ; "$@") | jq | tee RES; echo; }
 
-# Check for --skip-ecommerce-step parameter
+# Check for --skip-ecommerce parameter
+# Check for --skip-ubi parameter
 SKIP_ECOMMERCE=false
+SKIP_UBI=false
 for arg in "$@"; do
-  if [ "$arg" = "--skip-ecommerce-step" ]; then
+  if [ "$arg" = "--skip-ubi" ]; then
+    SKIP_UBI=true
+  fi
+  if [ "$arg" = "--skip-ecommerce" ]; then
     SKIP_ECOMMERCE=true
   fi
 done
@@ -44,44 +49,52 @@ if [ "$SKIP_ECOMMERCE" = false ]; then
     "index.mapping.total_fields.limit": 20000
   }'
 
+  echo
   echo Populating ecommerce index
-  curl -s -X POST "http://localhost:9200/ecommerce/_bulk?pretty" -H 'Content-Type: application/json' --data-binary @transformed_esci_1.json
+  # do 250 products
+  head -n 500 transformed_esci_1.json | curl -s -X POST "http://localhost:9200/index-name/_bulk?pretty" \
+    -H 'Content-Type: application/x-ndjson' --data-binary @-
+  # do all, requires extra RAM to be allocated to OS.
+  #curl -s -X POST "http://localhost:9200/ecommerce/_bulk?pretty" -H 'Content-Type: application/json' --data-binary @transformed_esci_1.json
 fi
 
-echo Deleting UBI indexes
-(curl -s -X DELETE "http://localhost:9200/ubi_queries" > /dev/null) || true
-(curl -s -X DELETE "http://localhost:9200/ubi_events" > /dev/null) || true
-
-echo Creating UBI indexes using mappings
-curl -s -X POST http://localhost:9200/_plugins/ubi/initialize
-
-echo Loading sample UBI data
-curl  -X POST 'http://localhost:9200/index-name/_bulk?pretty' --data-binary @../data-esci/ubi_queries_events.ndjson -H "Content-Type: application/x-ndjson"
-
-echo Refreshing UBI indexes to make indexed data available for query sampling
-curl -XPOST "http://localhost:9200/ubi_queries/_refresh"
-echo
-curl -XPOST "http://localhost:9200/ubi_events/_refresh"
-
-read -r -d '' QUERY_BODY << EOF
-{
-  "query": {
-    "match_all": {}
-  },
-  "size": 0
-}
-EOF
-
-NUMBER_OF_QUERIES=$(curl -s -XGET "http://localhost:9200/ubi_queries/_search" \
-  -H "Content-Type: application/json" \
-  -d "${QUERY_BODY}" | jq -r '.hits.total.value')
-
-NUMBER_OF_EVENTS=$(curl -s -XGET "http://localhost:9200/ubi_events/_search" \
-  -H "Content-Type: application/json" \
-  -d "${QUERY_BODY}" | jq -r '.hits.total.value')
+if [ "$SKIP_UBI" = false ]; then
+  echo Deleting UBI indexes
+  (curl -s -X DELETE "http://localhost:9200/ubi_queries" > /dev/null) || true
+  (curl -s -X DELETE "http://localhost:9200/ubi_events" > /dev/null) || true
   
-echo
-echo Indexed UBI data: $NUMBER_OF_QUERIES queries and $NUMBER_OF_EVENTS events
+  echo Creating UBI indexes using mappings
+  curl -s -X POST http://localhost:9200/_plugins/ubi/initialize
+  
+  echo Loading sample UBI data
+  curl  -X POST 'http://localhost:9200/index-name/_bulk?pretty' --data-binary @../data-esci/ubi_queries_events.ndjson -H "Content-Type: application/x-ndjson"
+  
+  echo Refreshing UBI indexes to make indexed data available for query sampling
+  curl -XPOST "http://localhost:9200/ubi_queries/_refresh"
+  echo
+  curl -XPOST "http://localhost:9200/ubi_events/_refresh"
+  
+  read -r -d '' QUERY_BODY << EOF
+  {
+    "query": {
+      "match_all": {}
+    },
+    "size": 0
+  }
+EOF
+  
+  NUMBER_OF_QUERIES=$(curl -s -XGET "http://localhost:9200/ubi_queries/_search" \
+    -H "Content-Type: application/json" \
+    -d "${QUERY_BODY}" | jq -r '.hits.total.value')
+  
+  NUMBER_OF_EVENTS=$(curl -s -XGET "http://localhost:9200/ubi_events/_search" \
+    -H "Content-Type: application/json" \
+    -d "${QUERY_BODY}" | jq -r '.hits.total.value')
+    
+  echo
+  echo "Indexed UBI data: $NUMBER_OF_QUERIES queries and $NUMBER_OF_EVENTS events"
+  
+fi
 
 echo
 
@@ -134,20 +147,38 @@ echo
 echo Baseline search config id: $SC_BASELINE
 echo Challenger search config id: $SC_CHALLENGER
 
+if [ "$SKIP_UBI" = false ]; then
+  echo
+  echo Create Query Sets by Sampling UBI Data
+  exe curl -s -X POST "localhost:9200/_plugins/search_relevance/query_sets" \
+  -H "Content-type: application/json" \
+  -d'{
+     	"name": "Top 20",
+     	"description": "Top 20 most frequent queries sourced from user searches.",
+     	"sampling": "topn",
+     	"querySetSize": 20
+  }'
+  
+  QUERY_SET_UBI=`jq -r '.query_set_id' < RES`
+  
+  sleep 2
+fi
+
 echo
-echo Create Query Sets
-exe curl -s -X POST "localhost:9200/_plugins/search_relevance/query_sets" \
+echo Upload Manually Curated Query Set 
+exe curl -s -X PUT "localhost:9200/_plugins/search_relevance/query_sets" \
 -H "Content-type: application/json" \
 -d'{
-   	"name": "Top 20",
-   	"description": "Top 20 most frequent queries sourced from user searches.",
-   	"sampling": "topn",
-   	"querySetSize": 20
+   	"name": "TVs",
+   	"description": "Some TVs that people might want",
+   	"sampling": "manual",
+   	"querySetQueries": [
+    	{"queryText": "tv"},
+    	{"queryText": "led tv"}
+    ]
 }'
 
-QS=`jq -r '.query_set_id' < RES`
-
-sleep 2
+QUERY_SET_MANUAL=`jq -r '.query_set_id' < RES`
 
 echo
 echo List Query Sets
@@ -163,24 +194,23 @@ exe curl -s -X GET "localhost:9200/_plugins/search_relevance/query_sets" \
      "size": 10
    }'
 
-echo
-echo Query Set id: $QS
-
-echo
-echo Create Implicit Judgments
-exe curl -s -X PUT "localhost:9200/_plugins/search_relevance/judgments" \
--H "Content-type: application/json" \
--d'{
-   	"clickModel": "coec",
-    "maxRank": 20,
-   	"name": "Implicit Judgements",
-   	"type": "UBI_JUDGMENT"
-   }'
-   
-UBI_JUDGMENT_LIST_ID=`jq -r '.judgment_id' < RES`
-
-# wait for judgments to be created in the background
-sleep 2
+if [ "$SKIP_UBI" = false ]; then
+  echo
+  echo Create Implicit Judgments
+  exe curl -s -X PUT "localhost:9200/_plugins/search_relevance/judgments" \
+  -H "Content-type: application/json" \
+  -d'{
+     	"clickModel": "coec",
+      "maxRank": 20,
+     	"name": "Implicit Judgements",
+     	"type": "UBI_JUDGMENT"
+    }'
+    
+  UBI_JUDGMENT_LIST_ID=`jq -r '.judgment_id' < RES`
+  
+  # wait for judgments to be created in the background
+  sleep 2
+fi
 
 echo
 echo Import Judgements
@@ -245,7 +275,7 @@ echo Create PAIRWISE Experiment
 exe curl -s -X PUT "localhost:9200/_plugins/search_relevance/experiments" \
 -H "Content-type: application/json" \
 -d"{
-   	\"querySetId\": \"$QS\",
+   	\"querySetId\": \"$QUERY_SET_MANUAL\",
    	\"searchConfigurationList\": [\"$SC_BASELINE\", \"$SC_CHALLENGER\"],
    	\"size\": 10,
    	\"type\": \"PAIRWISE_COMPARISON\"
@@ -267,9 +297,9 @@ echo Create POINTWISE Experiment
 exe curl -s -X PUT "localhost:9200/_plugins/search_relevance/experiments" \
 -H "Content-type: application/json" \
 -d"{
-   	\"querySetId\": \"$QS\",
+   	\"querySetId\": \"$QUERY_SET_MANUAL\",
    	\"searchConfigurationList\": [\"$SC_BASELINE\"],
-    \"judgmentList\": [\"$UBI_JUDGMENT_LIST_ID\"],
+    \"judgmentList\": [\"$IMPORTED_JUDGMENT_LIST_ID\"],
    	\"size\": 8,
    	\"type\": \"POINTWISE_EVALUATION\"
    }"
@@ -295,3 +325,45 @@ exe curl -s -X GET "http://localhost:9200/_plugins/search_relevance/experiments"
      },
      "size": 3
    }'
+
+   
+## BEGIN HYBRID OPTIMIZER DEMO ##
+echo
+echo
+echo BEGIN HYBRID OPTIMIZER DEMO
+echo
+echo Creating Hybrid Query to be Optimized
+exe curl -s -X PUT "http://localhost:9200/_plugins/search_relevance/search_configurations" \
+-H "Content-type: application/json" \
+-d'{
+      "name": "hybrid_query_1",
+      "query": "{\"query\":{\"hybrid\":{\"queries\":[{\"match\":{\"title\":\"%SearchText%\"}},{\"match\":{\"category\":\"%SearchText%\"}}]}}}",
+      "index": "ecommerce"
+}'
+
+SC_HYBRID=`jq -r '.search_configuration_id' < RES`
+
+echo
+echo Hybrid search config id: $SC_HYBRID
+
+echo
+echo Create HYBRID OPTIMIZER Experiment
+
+exe curl -s -X PUT "localhost:9200/_plugins/search_relevance/experiments" \
+-H "Content-type: application/json" \
+-d"{
+   	\"querySetId\": \"$QUERY_SET_MANUAL\",
+   	\"searchConfigurationList\": [\"$SC_HYBRID\"],
+    \"judgmentList\": [\"$IMPORTED_JUDGMENT_LIST_ID\"],
+   	\"size\": 10,
+   	\"type\": \"HYBRID_OPTIMIZER\"
+  }"
+
+EX_HO=`jq -r '.experiment_id' < RES`
+
+echo
+echo Experiment id: $EX_HO
+
+echo
+echo Show HYBRID OPTIMIZER Experiment
+exe curl -s -X GET localhost:9200/_plugins/search_relevance/experiments/$EX_HO
