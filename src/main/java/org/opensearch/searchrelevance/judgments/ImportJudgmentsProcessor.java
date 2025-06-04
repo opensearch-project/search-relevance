@@ -18,6 +18,8 @@ import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.model.JudgmentType;
+import org.opensearch.searchrelevance.stats.events.EventStatName;
+import org.opensearch.searchrelevance.stats.events.EventStatsManager;
 import org.opensearch.transport.client.Client;
 
 public class ImportJudgmentsProcessor implements BaseJudgmentsProcessor {
@@ -36,6 +38,7 @@ public class ImportJudgmentsProcessor implements BaseJudgmentsProcessor {
 
     @Override
     public void generateJudgmentRating(Map<String, Object> metadata, ActionListener<Map<String, Map<String, String>>> listener) {
+        EventStatsManager.increment(EventStatName.LLM_JUDGMENT_SCORE_GENERATIONS);
 
         Map<String, Object> sourceJudgementRatings = (Map<String, Object>) metadata.get("judgmentRatings");
         metadata.remove("judgmentRatings");

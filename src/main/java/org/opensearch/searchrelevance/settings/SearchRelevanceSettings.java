@@ -30,4 +30,15 @@ public class SearchRelevanceSettings {
         Setting.Property.Dynamic
     );
 
+    /**
+     * Enables or disables the Stats API and event stat collection.
+     * If stats API is called when stats are disabled, the response will 403.
+     * Event stat increment calls are also treated as no-ops.
+     */
+    public static final Setting<Boolean> SEARCH_RELEVANCE_STATS_ENABLED = Setting.boolSetting(
+        "plugins.search_relevance.stats_enabled",
+        true,
+        Setting.Property.NodeScope,
+        Setting.Property.Dynamic
+    );
 }
