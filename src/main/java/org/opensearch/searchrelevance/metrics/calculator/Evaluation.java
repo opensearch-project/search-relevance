@@ -13,10 +13,9 @@ import java.util.List;
 import java.util.Map;
 
 public class Evaluation {
-    public static final String METRICS_PRECISION_AT_5 = "precision@5";
-    public static final String METRICS_PRECISION_AT_10 = "precision@10";
+    public static final String METRICS_PRECISION_AT = "Precision@";
     public static final String METRICS_MEAN_AVERAGE_PRECISION = "MAP";
-    public static final String METRICS_NORMALIZED_DISCOUNTED_CUMULATIVE_GAIN = "ndcg";
+    public static final String METRICS_NORMALIZED_DISCOUNTED_CUMULATIVE_GAIN = "NDCG";
 
     /**
      * Precision@K - measures precision at a specific rank k
