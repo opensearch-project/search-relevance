@@ -114,7 +114,7 @@ echo Create search configs
 
 
 
-exe curl -s -X PUT "http://localhost:9200/_plugins/search_relevance/search_configurations" \
+exe curl -s -X PUT "http://localhost:9200/_plugins/_search_relevance/search_configurations" \
 -H "Content-type: application/json" \
 -d'{
       "name": "baseline",
@@ -124,7 +124,7 @@ exe curl -s -X PUT "http://localhost:9200/_plugins/search_relevance/search_confi
 
 SC_BASELINE=`jq -r '.search_configuration_id' < RES`
 
-exe curl -s -X PUT "http://localhost:9200/_plugins/search_relevance/search_configurations" \
+exe curl -s -X PUT "http://localhost:9200/_plugins/_search_relevance/search_configurations" \
 -H "Content-type: application/json" \
 -d'{
       "name": "baseline with title weight",
@@ -136,7 +136,7 @@ SC_CHALLENGER=`jq -r '.search_configuration_id' < RES`
 
 echo
 echo List search configurations
-exe curl -s -X GET "http://localhost:9200/_plugins/search_relevance/search_configurations" \
+exe curl -s -X GET "http://localhost:9200/_plugins/_search_relevance/search_configurations" \
 -H "Content-type: application/json" \
 -d'{
      "sort": {
@@ -154,7 +154,7 @@ echo Challenger search config id: $SC_CHALLENGER
 if [ "$SKIP_UBI" = false ]; then
   echo
   echo Create Query Sets by Sampling UBI Data
-  exe curl -s -X POST "localhost:9200/_plugins/search_relevance/query_sets" \
+  exe curl -s -X POST "localhost:9200/_plugins/_search_relevance/query_sets" \
   -H "Content-type: application/json" \
   -d'{
      	"name": "Top 20",
@@ -170,7 +170,7 @@ fi
 
 echo
 echo Upload Manually Curated Query Set 
-exe curl -s -X PUT "localhost:9200/_plugins/search_relevance/query_sets" \
+exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/query_sets" \
 -H "Content-type: application/json" \
 -d'{
    	"name": "TVs",
@@ -187,7 +187,7 @@ QUERY_SET_MANUAL=`jq -r '.query_set_id' < RES`
 echo
 echo List Query Sets
 
-exe curl -s -X GET "localhost:9200/_plugins/search_relevance/query_sets" \
+exe curl -s -X GET "localhost:9200/_plugins/_search_relevance/query_sets" \
 -H "Content-type: application/json" \
 -d'{
      "sort": {
@@ -201,7 +201,7 @@ exe curl -s -X GET "localhost:9200/_plugins/search_relevance/query_sets" \
 if [ "$SKIP_UBI" = false ]; then
   echo
   echo Create Implicit Judgments
-  exe curl -s -X PUT "localhost:9200/_plugins/search_relevance/judgments" \
+  exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/judgments" \
   -H "Content-type: application/json" \
   -d'{
      	"clickModel": "coec",
@@ -218,7 +218,7 @@ fi
 
 echo
 echo Import Judgements
-exe curl -s -X PUT "localhost:9200/_plugins/search_relevance/judgments" \
+exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/judgments" \
 -H "Content-type: application/json" \
 -d'{
    	"name": "Imported Judgments",
@@ -276,7 +276,7 @@ IMPORTED_JUDGMENT_LIST_ID=`jq -r '.judgment_id' < RES`
 
 echo
 echo Create PAIRWISE Experiment
-exe curl -s -X PUT "localhost:9200/_plugins/search_relevance/experiments" \
+exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/experiments" \
 -H "Content-type: application/json" \
 -d"{
    	\"querySetId\": \"$QUERY_SET_MANUAL\",
@@ -293,12 +293,12 @@ echo Experiment id: $EX_PAIRWISE
 
 echo
 echo Show PAIRWISE Experiment
-exe curl -s -X GET "localhost:9200/_plugins/search_relevance/experiments/$EX_PAIRWISE"
+exe curl -s -X GET "localhost:9200/_plugins/_search_relevance/experiments/$EX_PAIRWISE"
 
 echo
 echo Create POINTWISE Experiment
 
-exe curl -s -X PUT "localhost:9200/_plugins/search_relevance/experiments" \
+exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/experiments" \
 -H "Content-type: application/json" \
 -d"{
    	\"querySetId\": \"$QUERY_SET_MANUAL\",
@@ -315,11 +315,11 @@ echo Experiment id: $EX_POINTWISE
 
 echo
 echo Show POINTWISE Experiment
-exe curl -s -X GET "localhost:9200/_plugins/search_relevance/experiments/$EX_POINTWISE"
+exe curl -s -X GET "localhost:9200/_plugins/_search_relevance/experiments/$EX_POINTWISE"
 
 echo
 echo List experiments
-exe curl -s -X GET "http://localhost:9200/_plugins/search_relevance/experiments" \
+exe curl -s -X GET "http://localhost:9200/_plugins/_search_relevance/experiments" \
 -H "Content-type: application/json" \
 -d'{
      "sort": {
@@ -337,7 +337,7 @@ echo
 echo BEGIN HYBRID OPTIMIZER DEMO
 echo
 echo Creating Hybrid Query to be Optimized
-exe curl -s -X PUT "http://localhost:9200/_plugins/search_relevance/search_configurations" \
+exe curl -s -X PUT "http://localhost:9200/_plugins/_search_relevance/search_configurations" \
 -H "Content-type: application/json" \
 -d'{
       "name": "hybrid_query_1",
@@ -353,7 +353,7 @@ echo Hybrid search config id: $SC_HYBRID
 echo
 echo Create HYBRID OPTIMIZER Experiment
 
-exe curl -s -X PUT "localhost:9200/_plugins/search_relevance/experiments" \
+exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/experiments" \
 -H "Content-type: application/json" \
 -d"{
    	\"querySetId\": \"$QUERY_SET_MANUAL\",
@@ -370,4 +370,4 @@ echo Experiment id: $EX_HO
 
 echo
 echo Show HYBRID OPTIMIZER Experiment
-exe curl -s -X GET localhost:9200/_plugins/search_relevance/experiments/$EX_HO
+exe curl -s -X GET localhost:9200/_plugins/_search_relevance/experiments/$EX_HO
