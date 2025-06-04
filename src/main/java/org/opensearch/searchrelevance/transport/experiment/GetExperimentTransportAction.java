@@ -7,11 +7,9 @@
  */
 package org.opensearch.searchrelevance.transport.experiment;
 
-import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.EXPERIMENT;
-
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.opensearch.ResourceNotFoundException;
+import org.opensearch.action.StepListener;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.HandledTransportAction;
@@ -44,11 +42,8 @@ public class GetExperimentTransportAction extends HandledTransportAction<OpenSea
 
     @Override
     protected void doExecute(Task task, OpenSearchDocRequest request, ActionListener<SearchResponse> listener) {
-        // Validate cluster health first
-        if (!clusterService.state().routingTable().hasIndex(EXPERIMENT.getIndexName())) {
-            listener.onFailure(new ResourceNotFoundException("Index [" + EXPERIMENT.getIndexName() + "] not found"));
-            return;
-        }
+        StepListener<Void> createIndexStep = new StepListener<>();
+        experimentDao.createIndexIfAbsent(createIndexStep);
 
         try {
             if (request.getId() != null) {
