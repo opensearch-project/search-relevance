@@ -5,8 +5,12 @@
 # * An "ecommerce" style sample data
 # You can now exercise all the capabilities of SRW!  
 # 
-# It assumes that you are ran `docker compose build && docker compose up` to start the environment up.
-# It will clear out any existing data except ecommerce index if you pass --skip-ecommerce-step as a parameter.
+# There are two ways to start:
+# 
+# 1) `docker compose build && docker compose up` which enables UBI support and larger amounts of ecommerce data ingestion.
+# 2) `./gradlew run --preserve-data --debug-jvm` which faciliates debugging, but pass in --skip-ubi
+# 
+# It will clear out any existing data except ecommerce index if you pass --skip-ecommerce as a parameter.
 
 # Helper script
 exe() { (set -x ; "$@") | jq | tee RES; echo; }
@@ -293,7 +297,7 @@ exe curl -s -X GET "localhost:9200/_plugins/search_relevance/experiments/$EX_PAI
 
 echo
 echo Create POINTWISE Experiment
-# TODO the type UBI_EVALUTATION SHOULD BE POINTWISE_EVALUATION
+
 exe curl -s -X PUT "localhost:9200/_plugins/search_relevance/experiments" \
 -H "Content-type: application/json" \
 -d"{
