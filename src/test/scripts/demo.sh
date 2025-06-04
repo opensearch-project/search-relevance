@@ -102,6 +102,14 @@ fi
 
 echo
 
+curl -XPUT "http://localhost:9200/_cluster/settings" -H 'Content-Type: application/json' -d'
+{
+  "persistent" : {
+    "plugins.search_relevance.workbench_enabled" : true
+  }
+}
+'
+
 echo Deleting queryset, search config, judgment and experiment indexes
 (curl -s -X DELETE "http://localhost:9200/search-relevance-search-config" > /dev/null) || true
 (curl -s -X DELETE "http://localhost:9200/search-relevance-queryset" > /dev/null) || true
