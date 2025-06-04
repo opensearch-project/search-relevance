@@ -100,7 +100,7 @@ public class Evaluation {
         }
 
         Collections.sort(relevanceScores, Collections.reverseOrder());
-        relevanceScores = relevanceScores.subList(0, docIds.size());
+        relevanceScores = relevanceScores.subList(0, Math.min(docIds.size(), relevanceScores.size()));
         double idcg = 0.0;
 
         for (int i = 0; i < relevanceScores.size(); i++) {

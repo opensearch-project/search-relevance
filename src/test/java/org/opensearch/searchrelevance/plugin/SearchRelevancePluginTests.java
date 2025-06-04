@@ -196,6 +196,6 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
         Setting<?> setting = settings.get(0);
         assertEquals("plugins.search_relevance.workbench_enabled", setting.getKey());
         assertEquals(1, settings.size());
-        assertEquals(true, setting.get(Settings.EMPTY));
+        assertEquals(false, setting.get(Settings.EMPTY));
     }
 }
