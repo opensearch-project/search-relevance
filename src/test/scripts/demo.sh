@@ -3,7 +3,7 @@
 # This script quickly sets up a local Search Relevance Workbench from scratch with:
 # * User Behavior Insights sample data
 # * An "ecommerce" style sample data
-# You can now exercise all the capabilities of SRW!  
+# You can now exercise the Single Query comparison, Query Set Comparison and Search Evaluation experiments of SRW!  
 # 
 # There are two ways to start:
 # 
