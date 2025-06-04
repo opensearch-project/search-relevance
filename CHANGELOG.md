@@ -21,5 +21,6 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - Fix COEC calculation: introduce rank in ClickthroughRate class, fix bucket size for positional aggregation, correct COEC claculation ([#23](https://github.com/opensearch-project/search-relevance/issues/23)).
  - LLM Judgment Processor Improvement ([#27](https://github.com/opensearch-project/search-relevance/pull/27))
  - Deal with experiment processing when no experiment variants exist. ([#45](https://github.com/opensearch-project/search-relevance/pull/45))
+ - Create indexes for query sets, search configs, judgment lists if none of these were created or imported before to prevent errors for missing indexes in frontend. ([#55](https://github.com/opensearch-project/search-relevance/issues/55))
 
 ### Security
