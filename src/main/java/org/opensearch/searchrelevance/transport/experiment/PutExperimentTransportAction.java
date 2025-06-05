@@ -279,7 +279,8 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
                             judgmentList
                         );
                     }, error -> handleFailure(error, hasFailure, experimentId, request)),
-                    experimentVariants
+                    experimentVariants,
+                    experimentId
                 );
             } else if (request.getType() == ExperimentType.POINTWISE_EVALUATION) {
                 metricsHelper.processEvaluationMetrics(
@@ -299,7 +300,8 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
                             hasFailure,
                             judgmentList
                         );
-                    }, error -> handleFailure(error, hasFailure, experimentId, request))
+                    }, error -> handleFailure(error, hasFailure, experimentId, request)),
+                    experimentId
                 );
             } else {
                 throw new SearchRelevanceException("Unknown experimentType" + request.getType(), RestStatus.BAD_REQUEST);

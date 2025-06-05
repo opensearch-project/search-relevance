@@ -185,9 +185,10 @@ public class MetricsHelper {
         Map<String, List<String>> indexAndQueries,
         int size,
         List<String> judgmentIds,
-        ActionListener<Map<String, Object>> listener
+        ActionListener<Map<String, Object>> listener,
+        String experimentId
     ) {
-        processEvaluationMetrics(queryText, indexAndQueries, size, judgmentIds, listener, List.of());
+        processEvaluationMetrics(queryText, indexAndQueries, size, judgmentIds, listener, Collections.emptyList(), experimentId);
     }
 
     public void processEvaluationMetrics(
@@ -196,7 +197,8 @@ public class MetricsHelper {
         int size,
         List<String> judgmentIds,
         ActionListener<Map<String, Object>> listener,
-        List<ExperimentVariant> experimentVariants
+        List<ExperimentVariant> experimentVariants,
+        String experimentId
     ) {
         if (indexAndQueries.isEmpty() || judgmentIds.isEmpty()) {
             listener.onFailure(new IllegalArgumentException("Missing required parameters"));
@@ -245,7 +247,8 @@ public class MetricsHelper {
                                     docIdToScores,
                                     configToEvalIds,
                                     listener,
-                                    experimentVariants
+                                    experimentVariants,
+                                    experimentId
                                 );
                             }
                         } catch (Exception e) {
@@ -269,7 +272,8 @@ public class MetricsHelper {
                                     docIdToScores,
                                     configToEvalIds,
                                     listener,
-                                    experimentVariants
+                                    experimentVariants,
+                                    experimentId
                                 );
                             }
                         }
@@ -290,7 +294,8 @@ public class MetricsHelper {
         Map<String, String> docIdToScores,
         Map<String, Object> configToEvalIds,
         ActionListener<Map<String, Object>> listener,
-        List<ExperimentVariant> experimentVariants
+        List<ExperimentVariant> experimentVariants,
+        String experimentId
     ) {
         AtomicBoolean hasFailure = new AtomicBoolean(false);
         AtomicInteger pendingConfigurations = getNumberOfExperimentRuns(indexAndQueries, experimentVariants);
@@ -329,7 +334,8 @@ public class MetricsHelper {
                     dashboardSearchConfigName,
                     dashboardQuerySetName,
                     hasFailure,
-                    pendingConfigurations
+                    pendingConfigurations,
+                    experimentId
                 );
             } else {
                 processSearchConfigurationWithHybridExperimentOptions(
@@ -379,7 +385,8 @@ public class MetricsHelper {
         String dashboardSearchConfigName,
         String dashboardQuerySetName,
         AtomicBoolean hasFailure,
-        AtomicInteger pendingConfigurations
+        AtomicInteger pendingConfigurations,
+        String experimentId
     ) {
         SearchRequest searchRequest = buildSearchRequest(index, query, queryText, searchPipeline, size);
         final String evaluationId = UUID.randomUUID().toString();
@@ -433,6 +440,8 @@ public class MetricsHelper {
                     metrics.forEach((metricName, metricValue) -> {
                         final String resultId = UUID.randomUUID().toString();
 
+                        // Use experimentId rather than evaluationId
+                        // In the Dashboards, an evaluation refers to an experiment, therefore that is what we use
                         DashboardEvaluationResult dashboardEvaluationResult = new DashboardEvaluationResult(
                             resultId,
                             TimeUtils.getTimestamp(),
@@ -442,7 +451,7 @@ public class MetricsHelper {
                             metricName,
                             metricValue,
                             DASHBOARD_APPLICATION_NAME,
-                            evaluationId
+                            experimentId
                         );
 
                         // Store dashboard evaluation result
