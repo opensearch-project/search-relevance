@@ -1,4 +1,4 @@
-curl -s -X PUT "http://localhost:9200/_plugins/search_relevance/search_configurations" \
+curl -s -X PUT "http://localhost:9200/_plugins/_search_relevance/search_configurations" \
 -H "Content-type: application/json" \
 -d'{
       "name": "hybrid_search",

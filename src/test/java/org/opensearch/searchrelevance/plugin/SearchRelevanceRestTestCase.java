@@ -55,7 +55,7 @@ public abstract class SearchRelevanceRestTestCase extends OpenSearchTestCase {
         return new FakeRestRequest.Builder(NamedXContentRegistry.EMPTY).withContent(new BytesArray(content), XContentType.JSON)
             .withParams(params)
             .withMethod(RestRequest.Method.PUT)
-            .withPath("/_plugins/search_relevance/" + endpoint)
+            .withPath("/_plugins/_search_relevance/" + endpoint)
             .build();
     }
 
@@ -63,13 +63,13 @@ public abstract class SearchRelevanceRestTestCase extends OpenSearchTestCase {
         Map<String, String> params = new HashMap<>(additionalParams);
         return new FakeRestRequest.Builder(NamedXContentRegistry.EMPTY).withParams(params)
             .withMethod(RestRequest.Method.GET)
-            .withPath("/_plugins/search_relevance/" + endpoint + "/" + documentId)
+            .withPath("/_plugins/_search_relevance/" + endpoint + "/" + documentId)
             .build();
     }
 
     protected RestRequest createDeleteRestRequestWithPath(String endpoint, String documentId) {
         return new FakeRestRequest.Builder(NamedXContentRegistry.EMPTY).withMethod(RestRequest.Method.DELETE)
-            .withPath("/_plugins/search_relevance/" + endpoint + "/" + documentId)
+            .withPath("/_plugins/_search_relevance/" + endpoint + "/" + documentId)
             .build();
     }
 
@@ -77,7 +77,7 @@ public abstract class SearchRelevanceRestTestCase extends OpenSearchTestCase {
         Map<String, String> params = new HashMap<>();
         params.put(DOCUMENT_ID, documentId);
         return new FakeRestRequest.Builder(NamedXContentRegistry.EMPTY).withMethod(RestRequest.Method.DELETE)
-            .withPath("/_plugins/search_relevance/" + endpoint)
+            .withPath("/_plugins/_search_relevance/" + endpoint)
             .withParams(params)
             .build();
     }

@@ -10,6 +10,7 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 - [Enhancement] Extend data model to adopt different experiment options/parameters ([#29](https://github.com/opensearch-project/search-relevance/issues/29))
 - Added validation for hybrid query structure ([#40](https://github.com/opensearch-project/search-relevance/pull/40))
 - [Enhancement] Add support for importing judgments created externally from SRW.  ([#42](https://github.com/opensearch-project/search-relevance/pull/42)
+- Changing URL for plugin APIs to /_plugin/_search_relevance [backend] ([#62](https://github.com/opensearch-project/search-relevance/pull/62)
 
 ### Removed
 
@@ -21,6 +22,7 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - Fix COEC calculation: introduce rank in ClickthroughRate class, fix bucket size for positional aggregation, correct COEC claculation ([#23](https://github.com/opensearch-project/search-relevance/issues/23)).
  - LLM Judgment Processor Improvement ([#27](https://github.com/opensearch-project/search-relevance/pull/27))
  - Deal with experiment processing when no experiment variants exist. ([#45](https://github.com/opensearch-project/search-relevance/pull/45))
-  - Extend the `src/test/demo.sh` script to support pointwise and hybrid experiments.
+ - Extend the `src/test/demo.sh` script to support pointwise and hybrid experiments.
+  - Enable Search Relevance backend plugin as part of running demo scripts. ([#60](https://github.com/opensearch-project/search-relevance/pull/60))
 
 ### Security
