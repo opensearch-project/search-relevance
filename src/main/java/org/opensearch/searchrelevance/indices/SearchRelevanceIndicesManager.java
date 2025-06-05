@@ -10,6 +10,7 @@ package org.opensearch.searchrelevance.indices;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Objects;
 import java.util.function.BiConsumer;
 
 import org.opensearch.ResourceAlreadyExistsException;
@@ -19,6 +20,7 @@ import org.opensearch.action.StepListener;
 import org.opensearch.action.admin.indices.create.CreateIndexRequest;
 import org.opensearch.action.admin.indices.create.CreateIndexResponse;
 import org.opensearch.action.delete.DeleteResponse;
+import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.search.ShardSearchFailure;
@@ -42,7 +44,7 @@ import lombok.extern.log4j.Log4j2;
 import reactor.util.annotation.NonNull;
 
 /**
- * Manager for common search relevance system indices operations.
+ * Manager for common search relevance system indices actions.
  */
 @Log4j2
 public class SearchRelevanceIndicesManager {
@@ -111,46 +113,34 @@ public class SearchRelevanceIndicesManager {
      * @param docId - document id need to be executed
      * @param xContentBuilder - content need to be executed
      * @param index - system index
-     * @param listener - action lister for async operation
+     * @param listener - action lister for async action
      */
     public void putDoc(
         final String docId,
         final XContentBuilder xContentBuilder,
         final SearchRelevanceIndices index,
-        final ActionListener listener
+        final ActionListener<?> listener
     ) {
         SearchOperationContext searchOperationContext = SearchOperationContext.builder()
             .documentId(docId)
             .xContentBuilder(xContentBuilder)
             .index(index)
             .build();
-        executeWithIndexCreation(searchOperationContext, (context, actionListener) -> StashedThreadContext.run(client, () -> {
+        BiConsumer<SearchOperationContext, ActionListener<?>> action = (context, actionListener) -> StashedThreadContext.run(client, () -> {
             try {
+                @SuppressWarnings("unchecked")
+                ActionListener<IndexResponse> typedListener = (ActionListener<IndexResponse>) actionListener;
                 client.prepareIndex(context.getIndex().getIndexName())
                     .setId(context.getDocumentId())
                     .setOpType(OpType.CREATE)
                     .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
                     .setSource(context.getXContentBuilder())
-                    .execute(listener);
+                    .execute(typedListener);
             } catch (Exception e) {
                 throw new SearchRelevanceException("Failed to store doc", e, RestStatus.INTERNAL_SERVER_ERROR);
             }
-        }), listener);
-    }
-
-    /**
-     * Execute Dao method wrapping it in "create index if absent" function
-     * @param context
-     * @param operation
-     * @param listener
-     */
-    private <T> void executeWithIndexCreation(
-        SearchOperationContext context,
-        BiConsumer<SearchOperationContext, ActionListener<T>> operation,
-        ActionListener<T> listener
-    ) {
-        createIndexIfAbsentSync(context.getIndex());
-        operation.accept(context, listener);
+        });
+        executeAction(listener, searchOperationContext, action);
     }
 
     /**
@@ -158,7 +148,7 @@ public class SearchRelevanceIndicesManager {
      * @param docId - document id need to be executed
      * @param xContentBuilder - content need to be executed
      * @param index - system index
-     * @param listener - action lister for async operation
+     * @param listener - action lister for async action
      */
     public void updateDoc(
         final String docId,
@@ -171,9 +161,8 @@ public class SearchRelevanceIndicesManager {
             .xContentBuilder(xContentBuilder)
             .documentId(docId)
             .build();
-        executeWithIndexCreation(
-            searchOperationContext,
-            (searchOperationContext1, actionListener) -> StashedThreadContext.run(client, () -> {
+        BiConsumer<SearchOperationContext, ActionListener<?>> action = (searchOperationContext1, actionListener) -> StashedThreadContext
+            .run(client, () -> {
                 try {
                     client.prepareIndex(searchOperationContext1.getIndex().getIndexName())
                         .setId(searchOperationContext1.getDocumentId())
@@ -184,34 +173,34 @@ public class SearchRelevanceIndicesManager {
                 } catch (Exception e) {
                     throw new SearchRelevanceException("Failed to store doc", e, RestStatus.INTERNAL_SERVER_ERROR);
                 }
-            }),
-            listener
-        );
+            });
+        executeAction(listener, searchOperationContext, action);
     }
 
     /**
      * Delete a doc by doc id
      * @param docId - document id need to be executed
      * @param index - system index
-     * @param listener - action lister for async operation
+     * @param listener - action lister for async action
      */
     public void deleteDocByDocId(final String docId, final SearchRelevanceIndices index, final ActionListener<DeleteResponse> listener) {
         SearchOperationContext searchOperationContext = SearchOperationContext.builder().index(index).documentId(docId).build();
-        executeWithIndexCreation(
-            searchOperationContext,
-            (searchOperationContextArg, actionListener) -> StashedThreadContext.run(client, () -> {
+        BiConsumer<SearchOperationContext, ActionListener<?>> action = (searchOperationContextArg, actionListener) -> StashedThreadContext
+            .run(client, () -> {
                 try {
+                    @SuppressWarnings("unchecked")
+                    ActionListener<DeleteResponse> typedListener = (ActionListener<DeleteResponse>) actionListener;
                     client.prepareDelete(searchOperationContext.getIndex().getIndexName(), searchOperationContext.getDocumentId())
                         .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
-                        .execute(new ActionListener<DeleteResponse>() {  // Specify the generic type
+                        .execute(new ActionListener<>() {  // Specify the generic type
                             @Override
                             public void onResponse(DeleteResponse deleteResponse) {  // Properly typed parameter
-                                actionListener.onResponse(deleteResponse);
+                                typedListener.onResponse(deleteResponse);
                             }
 
                             @Override
                             public void onFailure(Exception e) {
-                                actionListener.onFailure(
+                                typedListener.onFailure(
                                     new SearchRelevanceException("Failed to delete doc", e, RestStatus.INTERNAL_SERVER_ERROR)
                                 );
                             }
@@ -219,24 +208,19 @@ public class SearchRelevanceIndicesManager {
                 } catch (Exception e) {
                     actionListener.onFailure(new SearchRelevanceException("Failed to delete doc", e, RestStatus.INTERNAL_SERVER_ERROR));
                 }
-            }),
-            listener
-        );
+            });
+        executeAction(listener, searchOperationContext, action);
     }
 
     /**
      * Get a doc by doc id
      * @param docId - document id need to be executed
      * @param index - system index
-     * @param listener - action lister for async operation
+     * @param listener - action lister for async action
      */
-    public SearchResponse getDocByDocId(
-        final String docId,
-        final SearchRelevanceIndices index,
-        final ActionListener<SearchResponse> listener
-    ) {
+    public SearchResponse getDocByDocId(final String docId, final SearchRelevanceIndices index, final ActionListener<?> listener) {
         SearchOperationContext searchOperationContext = SearchOperationContext.builder().index(index).documentId(docId).build();
-        executeWithIndexCreation(searchOperationContext, (searchOperationContextArg, actionListener) -> {
+        BiConsumer<SearchOperationContext, ActionListener<?>> action = (searchOperationContextArg, actionListener) -> {
             SearchRequest searchRequest = new SearchRequest(searchOperationContextArg.getIndex().getIndexName());
             SearchSourceBuilder sourceBuilder = new SearchSourceBuilder().query(
                 QueryBuilders.termQuery("_id", searchOperationContextArg.getDocumentId())
@@ -246,12 +230,14 @@ public class SearchRelevanceIndicesManager {
 
             StashedThreadContext.run(client, () -> {
                 try {
-                    client.search(searchRequest, new ActionListener<SearchResponse>() {
+                    @SuppressWarnings("unchecked")
+                    ActionListener<SearchResponse> typedListener = (ActionListener<SearchResponse>) actionListener;
+                    client.search(searchRequest, new ActionListener<>() {
                         @Override
                         public void onResponse(SearchResponse response) {
                             log.info("Successfully get doc id [{}]", searchOperationContextArg.getDocumentId());
                             if (response.getHits().getTotalHits().value() == 0) {
-                                actionListener.onFailure(
+                                typedListener.onFailure(
                                     new ResourceNotFoundException(
                                         "Document not found: " + searchOperationContextArg.getDocumentId(),
                                         RestStatus.NOT_FOUND
@@ -259,7 +245,7 @@ public class SearchRelevanceIndicesManager {
                                 );
                                 return;
                             }
-                            actionListener.onResponse(response);
+                            typedListener.onResponse(response);
                         }
 
                         @Override
@@ -273,7 +259,8 @@ public class SearchRelevanceIndicesManager {
                     actionListener.onFailure(new SearchRelevanceException("Failed to get doc", e, RestStatus.INTERNAL_SERVER_ERROR));
                 }
             });
-        }, listener);
+        };
+        executeAction(listener, searchOperationContext, action);
         return null;
     }
 
@@ -281,7 +268,7 @@ public class SearchRelevanceIndicesManager {
      * List docs by search request
      * @param searchSourceBuilder - search source builder to be executed
      * @param index - index to be executed
-     * @param listener - action lister for async operation
+     * @param listener - action lister for async action
      */
     public SearchResponse listDocsBySearchRequest(
         final SearchSourceBuilder searchSourceBuilder,
@@ -292,7 +279,7 @@ public class SearchRelevanceIndicesManager {
             .searchSourceBuilder(searchSourceBuilder)
             .index(index)
             .build();
-        executeWithIndexCreation(searchOperationContext, (context, actionListener) -> {
+        BiConsumer<SearchOperationContext, ActionListener<?>> action = (context, actionListener) -> {
             SearchRequest searchRequest = new SearchRequest(context.getIndex().getIndexName());
             searchRequest.source(context.getSearchSourceBuilder());
             StashedThreadContext.run(client, () -> {
@@ -332,7 +319,8 @@ public class SearchRelevanceIndicesManager {
                     actionListener.onFailure(new SearchRelevanceException("Failed to list docs", e, RestStatus.INTERNAL_SERVER_ERROR));
                 }
             });
-        }, listener);
+        };
+        executeAction(listener, searchOperationContext, action);
         return null;
     }
 
@@ -362,7 +350,62 @@ public class SearchRelevanceIndicesManager {
     }
 
     /**
-     *  DTO for search operation context
+     * Execute action that wraps it in "create index if absent" function
+     * @param listener
+     * @param searchOperationContext
+     * @param action
+     */
+    private void executeAction(
+        ActionListener<?> listener,
+        SearchOperationContext searchOperationContext,
+        BiConsumer<SearchOperationContext, ActionListener<?>> action
+    ) {
+        SearchRelevanceIndices index = searchOperationContext.getIndex();
+        if (Objects.isNull(index)) {
+            throw new SearchRelevanceException("index cannot be null", RestStatus.BAD_REQUEST);
+        }
+        if (index.isProtected()) {
+            executeWithIndexCreationAsynchronizedMode(searchOperationContext, action, listener);
+        } else {
+            executeWithIndexCreationSynchronizedMode(searchOperationContext, action, listener);
+        }
+    }
+
+    /**
+     * Execute Dao method wrapping it in "create index if absent" function
+     * @param context
+     * @param action
+     * @param listener
+     */
+    private <T> void executeWithIndexCreationSynchronizedMode(
+        SearchOperationContext context,
+        BiConsumer<SearchOperationContext, ActionListener<?>> action,
+        ActionListener<T> listener
+    ) {
+        createIndexIfAbsentSync(context.getIndex());
+        action.accept(context, listener);
+    }
+
+    /**
+     * Execute Dao method wrapping it in "create index if absent" function
+     * @param context
+     * @param action
+     * @param listener
+     */
+    private <T> void executeWithIndexCreationAsynchronizedMode(
+        SearchOperationContext context,
+        BiConsumer<SearchOperationContext, ActionListener<?>> action,
+        ActionListener<T> listener
+    ) {
+        StepListener<Void> createIndexStep = new StepListener<>();
+        createIndexIfAbsent(context.getIndex(), createIndexStep);
+        createIndexStep.whenComplete(v -> action.accept(context, listener), e -> {
+            throw e instanceof RuntimeException ? (RuntimeException) e : new IllegalStateException(e);
+        });
+    }
+
+    /**
+     *  DTO for search action context
      */
     @Builder
     @Getter
