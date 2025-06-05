@@ -126,6 +126,10 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
         }
     }
 
+    private String makeDashName(String id, String name) {
+        return id.substring(0, id.indexOf('-')) + ": " + name;
+    }
+
     private void triggerAsyncProcessing(String experimentId, PutExperimentRequest request) {
         try {
             QuerySet querySet = querySetDao.getQuerySetSync(request.getQuerySetId());
@@ -137,7 +141,15 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
                 .collect(Collectors.toList());
             Map<String, List<String>> indexAndQueries = new HashMap<>();
             for (SearchConfiguration config : searchConfigurations) {
-                indexAndQueries.put(config.id(), Arrays.asList(config.index(), config.query(), config.searchPipeline()));
+                indexAndQueries.put(config.id(),
+                    Arrays.asList(
+                        config.index(),
+                        config.query(),
+                        config.searchPipeline(),
+                        makeDashName(config.id(), config.name()),
+                        makeDashName(querySet.id(), querySet.name())
+                    )
+                );
             }
             calculateMetricsAsync(experimentId, request, indexAndQueries, queryTextWithReferences);
         } catch (Exception e) {
@@ -264,7 +276,8 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
                             judgmentList
                         );
                     }, error -> handleFailure(error, hasFailure, experimentId, request)),
-                    experimentVariants
+                    experimentVariants,
+                    experimentId
                 );
             } else if (request.getType() == ExperimentType.POINTWISE_EVALUATION) {
                 metricsHelper.processEvaluationMetrics(
@@ -284,7 +297,8 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
                             hasFailure,
                             judgmentList
                         );
-                    }, error -> handleFailure(error, hasFailure, experimentId, request))
+                    }, error -> handleFailure(error, hasFailure, experimentId, request)),
+                    experimentId
                 );
             } else {
                 throw new SearchRelevanceException("Unknown experimentType" + request.getType(), RestStatus.BAD_REQUEST);
