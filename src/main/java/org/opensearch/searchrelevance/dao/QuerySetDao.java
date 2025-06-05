@@ -12,7 +12,9 @@ import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.QUER
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.logging.log4j.LogManager;
@@ -135,7 +137,8 @@ public class QuerySetDao {
                     QuerySet querySet = convertToQuerySet(response);
                     LOGGER.debug("Converted response into queryset: [{}]", querySet);
 
-                    results.put(METRICS_QUERY_TEXT_FIELD_NAME, new ArrayList<>(querySet.querySetQueries().keySet()));
+                    final List<String> querySetQueries = new ArrayList<>(querySet.querySetQueries().keySet());
+                    results.put(METRICS_QUERY_TEXT_FIELD_NAME, Arrays.asList(querySetQueries, querySetId, querySet.name()));
                     stepListener.onResponse(results);
                 } catch (Exception e) {
                     LOGGER.error("Failed to convert response: [{}] into queryset.", response);

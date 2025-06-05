@@ -9,6 +9,8 @@ package org.opensearch.searchrelevance.transport.experiment;
 
 import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_INDEX_AND_QUERIES_FIELD_NAME;
 import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_QUERY_TEXT_FIELD_NAME;
+import static org.opensearch.searchrelevance.common.PluginConstants.DASHBOARD_SEARCH_CONFIG_KEY;
+import static org.opensearch.searchrelevance.common.PluginConstants.DASHBOARD_QUERY_SET_KEY;
 import static org.opensearch.searchrelevance.experiment.ExperimentOptionsForHybridSearch.EXPERIMENT_OPTION_COMBINATION_TECHNIQUE;
 import static org.opensearch.searchrelevance.experiment.ExperimentOptionsForHybridSearch.EXPERIMENT_OPTION_NORMALIZATION_TECHNIQUE;
 import static org.opensearch.searchrelevance.experiment.ExperimentOptionsForHybridSearch.EXPERIMENT_OPTION_WEIGHTS_FOR_COMBINATION;
@@ -136,9 +138,27 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
         );
     }
 
+    private Map<String, List<String>> dashboardSearchConfig(Map<String, List<String>> indexAndQueries) {
+        // Get first key and value (not designed for multiple search configs)
+        String searchConfigId = indexAndQueries.keySet().iterator().next();
+        String searchConfigName = indexAndQueries.get(searchConfigId).get(3);
+        String newName = searchConfigId.substring(0, searchConfigId.indexOf('-')) + ": " + searchConfigName;
+        return Map.of(DASHBOARD_SEARCH_CONFIG_KEY, List.of(newName));
+    }
+
+    private Map<String, List<String>> dashboardQuerySet(Map<String, Object> results) {
+        List<?> querySetEntries = (List<?>) results.get(METRICS_QUERY_TEXT_FIELD_NAME);
+        String querySetId = querySetEntries.get(1).toString();
+        String querySetName = querySetEntries.get(2).toString();
+        String newName = querySetId.substring(0, querySetId.indexOf('-')) + ": " + querySetName;
+        return Map.of(DASHBOARD_QUERY_SET_KEY, List.of(newName));
+    }
+
     private void calculateMetricsAsync(String experimentId, PutExperimentRequest request, Map<String, Object> results) {
         Map<String, List<String>> indexAndQueries = (Map<String, List<String>>) results.get(METRICS_INDEX_AND_QUERIES_FIELD_NAME);
-        List<String> queryTexts = (List<String>) results.get(METRICS_QUERY_TEXT_FIELD_NAME);
+        List<String> queryTexts = (List<String>) ((List<?>) results.get(METRICS_QUERY_TEXT_FIELD_NAME)).get(0);
+        indexAndQueries.putAll(dashboardSearchConfig(indexAndQueries));
+        indexAndQueries.putAll(dashboardQuerySet(results));
 
         if (queryTexts == null || indexAndQueries == null) {
             handleAsyncFailure(

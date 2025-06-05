@@ -40,6 +40,7 @@ import org.opensearch.repositories.RepositoriesService;
 import org.opensearch.rest.RestController;
 import org.opensearch.rest.RestHandler;
 import org.opensearch.script.ScriptService;
+import org.opensearch.searchrelevance.dao.DashboardEvaluationResultDao;
 import org.opensearch.searchrelevance.dao.EvaluationResultDao;
 import org.opensearch.searchrelevance.dao.ExperimentDao;
 import org.opensearch.searchrelevance.dao.ExperimentVariantDao;
@@ -112,6 +113,7 @@ public class SearchRelevancePlugin extends Plugin implements ActionPlugin, Syste
     private JudgmentDao judgmentDao;
     private EvaluationResultDao evaluationResultDao;
     private JudgmentCacheDao judgmentCacheDao;
+    private DashboardEvaluationResultDao dashboardEvaluationResultDao;
     private MLAccessor mlAccessor;
     private MetricsHelper metricsHelper;
     private SearchRelevanceSettingsAccessor settingsAccessor;
@@ -148,9 +150,17 @@ public class SearchRelevancePlugin extends Plugin implements ActionPlugin, Syste
         this.judgmentDao = new JudgmentDao(searchRelevanceIndicesManager);
         this.evaluationResultDao = new EvaluationResultDao(searchRelevanceIndicesManager);
         this.judgmentCacheDao = new JudgmentCacheDao(searchRelevanceIndicesManager);
+        this.dashboardEvaluationResultDao = new DashboardEvaluationResultDao(searchRelevanceIndicesManager);
         MachineLearningNodeClient mlClient = new MachineLearningNodeClient(client);
         this.mlAccessor = new MLAccessor(mlClient);
-        this.metricsHelper = new MetricsHelper(clusterService, client, judgmentDao, evaluationResultDao, experimentVariantDao);
+        this.metricsHelper = new MetricsHelper(
+            clusterService,
+            client,
+            judgmentDao,
+            evaluationResultDao,
+            experimentVariantDao,
+            dashboardEvaluationResultDao
+        );
         this.settingsAccessor = new SearchRelevanceSettingsAccessor(clusterService, environment.settings());
         return List.of(
             searchRelevanceIndicesManager,
