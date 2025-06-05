@@ -62,7 +62,6 @@ public class RestPutExperimentAction extends BaseRestHandler {
 
         String querySetId = (String) source.get("querySetId");
         List<String> searchConfigurationList = ParserUtils.convertObjToList(source, "searchConfigurationList");
-        int size = (Integer) source.get("size");
         List<String> judgmentList = ParserUtils.convertObjToList(source, "judgmentList");
 
         String typeString = (String) source.get("type");
@@ -73,7 +72,16 @@ public class RestPutExperimentAction extends BaseRestHandler {
             throw new IllegalArgumentException("Invalid or missing experiment type", e);
         }
 
-        PutExperimentRequest createRequest = new PutExperimentRequest(type, querySetId, searchConfigurationList, judgmentList, size);
+        PutExperimentRequest createRequest;
+        if (type == ExperimentType.POINTWISE_EVALUATION_IMPORT) {
+            // Handle import case
+            List<Map<String, Object>> evaluationResultList = ParserUtils.convertObjToListOfMaps(source, "evaluationResultList");
+            createRequest = new PutExperimentRequest(type, querySetId, searchConfigurationList, judgmentList, evaluationResultList);
+        } else {
+            // Handle regular case
+            int size = (Integer) source.get("size");
+            createRequest = new PutExperimentRequest(type, querySetId, searchConfigurationList, judgmentList, size);
+        }
 
         return channel -> client.execute(PutExperimentAction.INSTANCE, createRequest, new ActionListener<IndexResponse>() {
             @Override

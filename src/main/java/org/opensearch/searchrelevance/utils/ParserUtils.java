@@ -94,6 +94,21 @@ public class ParserUtils {
         return result;
     }
 
+    @SuppressWarnings("unchecked")
+    public static List<Map<String, Object>> convertObjToListOfMaps(Map<String, Object> source, String fieldName) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        Object rawList = source.get(fieldName);
+
+        if (rawList instanceof List<?>) {
+            ((List<?>) rawList).forEach(item -> {
+                if (item instanceof Map<?, ?>) {
+                    result.add((Map<String, Object>) item);
+                }
+            });
+        }
+        return result;
+    }
+
     public static String convertListToSortedStr(List<String> list) {
         List<String> sortedList = new ArrayList<>(list);
         Collections.sort(sortedList);

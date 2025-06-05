@@ -286,6 +286,9 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
                         );
                     }, error -> handleFailure(error, hasFailure, experimentId, request))
                 );
+            } else if (request.getType() == ExperimentType.POINTWISE_EVALUATION_IMPORT) {
+                // Handle import case - directly use provided evaluation results
+                handleImportedResults(queryText, request, finalResults, pendingQueries, experimentId, hasFailure, judgmentList);
             } else {
                 throw new SearchRelevanceException("Unknown experimentType" + request.getType(), RestStatus.BAD_REQUEST);
             }
@@ -308,6 +311,47 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
             synchronized (finalResults) {
                 queryResults.put(PAIRWISE_FIELD_NAME_QUERY_TEXT, queryText);
                 finalResults.add(queryResults);
+                if (pendingQueries.decrementAndGet() == 0) {
+                    updateFinalExperiment(experimentId, request, finalResults, judgmentList);
+                }
+            }
+        } catch (Exception e) {
+            handleFailure(e, hasFailure, experimentId, request);
+        }
+    }
+
+    private void handleImportedResults(
+        String queryText,
+        PutExperimentRequest request,
+        Map<String, Object> finalResults,
+        AtomicInteger pendingQueries,
+        String experimentId,
+        AtomicBoolean hasFailure,
+        List<String> judgmentList
+    ) {
+        if (hasFailure.get()) return;
+
+        try {
+            // Find the evaluation result for this specific query text
+            List<Map<String, Object>> evaluationResultList = request.getEvaluationResultList();
+            Map<String, Object> queryResults = null;
+
+            if (evaluationResultList != null) {
+                for (Map<String, Object> result : evaluationResultList) {
+                    if (queryText.equals(result.get("queryText"))) {
+                        queryResults = new HashMap<>(result);
+                        queryResults.remove("queryText"); // Remove queryText as it's used as the key
+                        break;
+                    }
+                }
+            }
+
+            if (queryResults == null) {
+                queryResults = new HashMap<>(); // Empty results if not found
+            }
+
+            synchronized (finalResults) {
+                finalResults.put(queryText, queryResults);
                 if (pendingQueries.decrementAndGet() == 0) {
                     updateFinalExperiment(experimentId, request, finalResults, judgmentList);
                 }
