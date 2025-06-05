@@ -10,6 +10,7 @@ package org.opensearch.searchrelevance.metrics;
 import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_PAIRWISE_COMPARISON_FIELD_NAME;
 import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_A;
 import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_B;
+import static org.opensearch.searchrelevance.common.PluginConstants.DASHBOARD_APPLICATION_NAME;
 import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_SNAPSHOTS;
 import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_SEARCH_CONFIGURATION_ID;
 import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_DOC_IDS;
@@ -47,7 +48,9 @@ import org.opensearch.search.SearchHit;
 import org.opensearch.searchrelevance.dao.EvaluationResultDao;
 import org.opensearch.searchrelevance.dao.ExperimentVariantDao;
 import org.opensearch.searchrelevance.dao.JudgmentDao;
+import org.opensearch.searchrelevance.dao.DashboardEvaluationResultDao;
 import org.opensearch.searchrelevance.model.AsyncStatus;
+import org.opensearch.searchrelevance.model.DashboardEvaluationResult;
 import org.opensearch.searchrelevance.model.EvaluationResult;
 import org.opensearch.searchrelevance.model.ExperimentVariant;
 import org.opensearch.searchrelevance.model.builder.SearchRequestBuilder;
@@ -67,6 +70,7 @@ public class MetricsHelper {
     private final JudgmentDao judgmentDao;
     private final EvaluationResultDao evaluationResultDao;
     private final ExperimentVariantDao experimentVariantDao;
+    private final DashboardEvaluationResultDao dashboardEvaluationResultDao;
 
     @Inject
     public MetricsHelper(
@@ -74,13 +78,15 @@ public class MetricsHelper {
         @NonNull Client client,
         @NonNull JudgmentDao judgmentDao,
         @NonNull EvaluationResultDao evaluationResultDao,
-        @NonNull ExperimentVariantDao experimentVariantDao
+        @NonNull ExperimentVariantDao experimentVariantDao,
+        @NonNull DashboardEvaluationResultDao dashboardEvaluationResultDao
     ) {
         this.clusterService = clusterService;
         this.client = client;
         this.judgmentDao = judgmentDao;
         this.evaluationResultDao = evaluationResultDao;
         this.experimentVariantDao = experimentVariantDao;
+        this.dashboardEvaluationResultDao = dashboardEvaluationResultDao;
     }
 
     /**
@@ -192,9 +198,10 @@ public class MetricsHelper {
         Map<String, List<String>> indexAndQueries,
         int size,
         List<String> judgmentIds,
-        ActionListener<Map<String, Object>> listener
+        ActionListener<Map<String, Object>> listener,
+        String experimentId
     ) {
-        processEvaluationMetrics(queryText, indexAndQueries, size, judgmentIds, listener, List.of());
+        processEvaluationMetrics(queryText, indexAndQueries, size, judgmentIds, listener, Collections.emptyList(), experimentId);
     }
 
     public void processEvaluationMetrics(
@@ -203,7 +210,8 @@ public class MetricsHelper {
         int size,
         List<String> judgmentIds,
         ActionListener<Map<String, Object>> listener,
-        List<ExperimentVariant> experimentVariants
+        List<ExperimentVariant> experimentVariants,
+        String experimentId
     ) {
         if (indexAndQueries.isEmpty() || judgmentIds.isEmpty()) {
             listener.onFailure(new IllegalArgumentException("Missing required parameters"));
@@ -254,7 +262,8 @@ public class MetricsHelper {
                                     docIdToRatings,
                                     configToEvalIds,
                                     listener,
-                                    experimentVariants
+                                    experimentVariants,
+                                    experimentId
                                 );
                             }
                         } catch (Exception e) {
@@ -278,7 +287,8 @@ public class MetricsHelper {
                                     docIdToRatings,
                                     configToEvalIds,
                                     listener,
-                                    experimentVariants
+                                    experimentVariants,
+                                    experimentId
                                 );
                             }
                         }
@@ -299,7 +309,8 @@ public class MetricsHelper {
         Map<String, String> docIdToScores,
         Map<String, Object> configToEvalIds,
         ActionListener<Map<String, Object>> listener,
-        List<ExperimentVariant> experimentVariants
+        List<ExperimentVariant> experimentVariants,
+        String experimentId
     ) {
         AtomicBoolean hasFailure = new AtomicBoolean(false);
         AtomicInteger pendingConfigurations = getNumberOfExperimentRuns(indexAndQueries, experimentVariants);
@@ -316,6 +327,8 @@ public class MetricsHelper {
             String index = indexAndQueries.get(searchConfigurationId).get(0);
             String query = indexAndQueries.get(searchConfigurationId).get(1);
             String searchPipeline = indexAndQueries.get(searchConfigurationId).get(2);
+            String dashboardSearchConfigName = indexAndQueries.get(searchConfigurationId).get(3);
+            String dashboardQuerySetName = indexAndQueries.get(searchConfigurationId).get(4);
 
             if (Objects.isNull(experimentVariants) || experimentVariants.isEmpty()) {
                 processSearchConfigurationWithEmptyExperimentOptions(
@@ -329,8 +342,11 @@ public class MetricsHelper {
                     index,
                     query,
                     searchPipeline,
+                    dashboardSearchConfigName,
+                    dashboardQuerySetName,
                     hasFailure,
-                    pendingConfigurations
+                    pendingConfigurations,
+                    experimentId
                 );
             } else {
                 processSearchConfigurationWithHybridExperimentOptions(
@@ -377,8 +393,11 @@ public class MetricsHelper {
         String index,
         String query,
         String searchPipeline,
+        String dashboardSearchConfigName,
+        String dashboardQuerySetName,
         AtomicBoolean hasFailure,
-        AtomicInteger pendingConfigurations
+        AtomicInteger pendingConfigurations,
+        String experimentId
     ) {
         SearchRequest searchRequest = buildSearchRequest(index, query, queryText, searchPipeline, size);
         final String evaluationId = UUID.randomUUID().toString();
@@ -428,6 +447,36 @@ public class MetricsHelper {
                         hasFailure.set(true);
                         listener.onFailure(error);
                     }));
+
+                    // Create dashboard evaluation results for all metrics
+                    metrics.forEach((metricEntry) -> {
+                        String metricName = metricEntry.get("metric").toString();
+                        String metricValue = metricEntry.get("value").toString();
+                        final String resultId = UUID.randomUUID().toString();
+
+                        // Use experimentId rather than evaluationId
+                        // In the Dashboards, an evaluation refers to an experiment, therefore that is what we use
+                        DashboardEvaluationResult dashboardEvaluationResult = new DashboardEvaluationResult(
+                            resultId,
+                            TimeUtils.getTimestamp(),
+                            dashboardSearchConfigName,
+                            dashboardQuerySetName,
+                            queryText,
+                            metricName,
+                            metricValue,
+                            DASHBOARD_APPLICATION_NAME,
+                            experimentId
+                        );
+
+                        // Store dashboard evaluation result
+                        dashboardEvaluationResultDao.putDashboardEvaluationResult(
+                            dashboardEvaluationResult,
+                            ActionListener.wrap(
+                                success -> log.debug("Successfully stored dashboard evaluation result for evaluation ID: {} and metric: {}", evaluationId, metricName),
+                                error -> log.error("Failed to store dashboard evaluation result for evaluation ID: {} and metric: {}", evaluationId, metricName, error)
+                            )
+                        );
+                    });
                 } catch (Exception e) {
                     hasFailure.set(true);
                     listener.onFailure(e);
