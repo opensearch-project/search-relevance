@@ -66,7 +66,7 @@ public class PutJudgmentActionTests extends OpenSearchTestCase {
         assertEquals(JudgmentType.IMPORT_JUDGMENT, serialized.getType());
         assertEquals("description", serialized.getDescription());
 
-        Map<String, String> query = (Map<String, String>) serialized.getJudgmentScores().get("red dress");
+        Map<String, String> query = (Map<String, String>) serialized.getJudgmentRatings().get("red dress");
         String score = query.get("B077ZJXCTS");
         assertEquals("0.700", score);
     }

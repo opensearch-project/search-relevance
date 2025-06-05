@@ -39,12 +39,12 @@ public class Evaluation {
 
     /**
      *
-     * @param judgmentScores the docid->judgment mapping for a query
-     * @return the total number of documents with judgment > 0 in the scores
+     * @param judgmentRatings the docid->judgment mapping for a query
+     * @return the total number of documents with judgment > 0 in the ratings
      */
-    private static int countRelevant(Map<String, String> judgmentScores) {
+    private static int countRelevant(Map<String, String> judgmentRatings) {
         int numRel = 0;
-        for (String value : judgmentScores.values()) {
+        for (String value : judgmentRatings.values()) {
             if (Double.valueOf(value) > 0) {
                 numRel++;
             }

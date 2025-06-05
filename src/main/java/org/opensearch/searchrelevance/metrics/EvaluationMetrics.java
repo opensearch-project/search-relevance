@@ -38,7 +38,7 @@ public class EvaluationMetrics {
 
         double coverage = totalCount > 0 ? Math.round((double) totalDocsWithScores / totalCount * 100.0) / 100.0 : 0.0;
 
-        // TODO: it's not guarantee that each docId will have its score, especially for UBI data.
+        // TODO: it's not guaranteed that each docId will have a rating.
         // Need to define a reliable rate. say, coverage > 80%, then the results become reliable
         currSearchConfigMetrics.put("coverage", String.valueOf(coverage));
 

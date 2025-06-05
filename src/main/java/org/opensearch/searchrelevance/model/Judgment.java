@@ -20,7 +20,7 @@ public class Judgment implements ToXContentObject {
     public static final String STATUS = "status";
     public static final String TYPE = "type";
     public static final String METADATA = "metadata";
-    public static final String JUDGMENT_SCORES = "judgmentScores";
+    public static final String JUDGMENT_RATINGS = "judgmentRatings";
 
     /**
      * Identifier of the system index
@@ -31,7 +31,7 @@ public class Judgment implements ToXContentObject {
     private final AsyncStatus status;
     private JudgmentType type;
     private Map<String, Object> metadata;
-    private Map<String, Map<String, String>> judgmentScores;
+    private Map<String, Map<String, String>> judgmentRatings;
 
     public Judgment(
         String id,
@@ -40,7 +40,7 @@ public class Judgment implements ToXContentObject {
         AsyncStatus status,
         JudgmentType type,
         Map<String, Object> metadata,
-        Map<String, Map<String, String>> judgmentScores
+        Map<String, Map<String, String>> judgmentRatings
     ) {
         this.id = id;
         this.timestamp = timestamp;
@@ -48,7 +48,7 @@ public class Judgment implements ToXContentObject {
         this.status = status;
         this.type = type;
         this.metadata = metadata;
-        this.judgmentScores = judgmentScores;
+        this.judgmentRatings = judgmentRatings;
     }
 
     @Override
@@ -60,17 +60,17 @@ public class Judgment implements ToXContentObject {
         xContentBuilder.field(STATUS, this.status.name().trim());
         xContentBuilder.field(TYPE, this.type.name().trim());
         xContentBuilder.field(METADATA, this.metadata);
-        // Start judgmentScores object
-        xContentBuilder.startObject(JUDGMENT_SCORES);
-        for (Map.Entry<String, Map<String, String>> queryEntry : this.judgmentScores.entrySet()) {
+        // Start judgmentRatings object
+        xContentBuilder.startObject(JUDGMENT_RATINGS);
+        for (Map.Entry<String, Map<String, String>> queryEntry : this.judgmentRatings.entrySet()) {
             xContentBuilder.startArray(queryEntry.getKey());
             for (Map.Entry<String, String> docEntry : queryEntry.getValue().entrySet()) {
-                xContentBuilder.startObject().field("docId", docEntry.getKey()).field("score", docEntry.getValue()).endObject();
+                xContentBuilder.startObject().field("docId", docEntry.getKey()).field("rating", docEntry.getValue()).endObject();
             }
             xContentBuilder.endArray();
         }
         xContentBuilder.endObject();
-        // End judgmentScores object
+        // End judgmentRatings object
         return xContentBuilder.endObject();
     }
 
@@ -99,7 +99,7 @@ public class Judgment implements ToXContentObject {
     }
 
     public Map<String, Map<String, String>> judgmentScores() {
-        return judgmentScores;
+        return judgmentRatings;
     }
 
 }

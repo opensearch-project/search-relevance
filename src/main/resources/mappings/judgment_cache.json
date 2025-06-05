@@ -5,6 +5,6 @@
     "querySet": { "type": "keyword" },
     "documentId": { "type": "keyword" },
     "contextFieldsStr": { "type": "keyword" },
-    "score": { "type": "keyword" }
+    "rating": { "type": "keyword" }
   }
 }

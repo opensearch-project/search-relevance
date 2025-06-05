@@ -40,7 +40,7 @@ public class PutImportJudgmentRequest extends PutJudgmentRequest {
         out.writeMap(judgmentScores);
     }
 
-    public Map<String, Object> getJudgmentScores() {
+    public Map<String, Object> getJudgmentRatings() {
         return judgmentScores;
     }
 
