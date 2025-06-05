@@ -144,7 +144,6 @@ public class SearchConfigurationDao {
                         indexAndQueries.put(
                             searchConfigurationId,
                             Arrays.asList(searchConfig.index(), searchConfig.query(), searchConfig.searchPipeline(), searchConfig.name())
-                            // Arrays.asList(searchConfig.index(), searchConfig.query(), searchConfig.searchPipeline())
                         );
                         groupedListener.onResponse(response);
                     } catch (Exception e) {
