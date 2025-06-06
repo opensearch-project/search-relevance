@@ -40,7 +40,7 @@ public class EvaluationMetrics {
 
         // docIds that don't have a score will be assumed irrelevant with a score of 0
         // Coverage is the metric of what percentage of docIds per query have score
-        currSearchConfigMetrics.put("Coverage@" + k, String.valueOf(coverage));
+        currSearchConfigMetrics.put(String.format(Locale.ROOT, "Coverage@%d", k), String.valueOf(coverage));
 
         currSearchConfigMetrics.put(METRICS_PRECISION_AT + k, String.valueOf(calculatePrecisionAtK(docIds, judgments, k)));
         currSearchConfigMetrics.put(METRICS_MEAN_AVERAGE_PRECISION_AT + k, String.valueOf(calculateMAPAtK(docIds, judgments, k)));
