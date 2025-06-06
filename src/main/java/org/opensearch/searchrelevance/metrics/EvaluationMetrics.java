@@ -7,7 +7,13 @@
  */
 package org.opensearch.searchrelevance.metrics;
 
-import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.*;
+import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.METRICS_MEAN_AVERAGE_PRECISION;
+import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.METRICS_NORMALIZED_DISCOUNTED_CUMULATIVE_GAIN;
+import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.METRICS_PRECISION_AT_10;
+import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.METRICS_PRECISION_AT_5;
+import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.calculateMAP;
+import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.calculateNDCG;
+import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.calculatePrecisionAtK;
 
 import java.util.HashMap;
 import java.util.List;
