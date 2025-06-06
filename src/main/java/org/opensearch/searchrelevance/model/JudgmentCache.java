@@ -21,7 +21,7 @@ public class JudgmentCache implements ToXContentObject {
     public static final String DOCUMENT_ID = "documentId";
     public static final String CONTEXT_FIELDS_STR = "contextFieldsStr";
     public static final String TIME_STAMP = "timestamp";
-    public static final String SCORE = "score";
+    public static final String RATING = "rating";
     public static final String MODEL_ID = "modelId";
 
     /**
@@ -32,7 +32,7 @@ public class JudgmentCache implements ToXContentObject {
     private String queryText;
     private String documentId;
     private String contextFieldsStr;
-    private String score;
+    private String rating;
     private String modelId;
 
     public JudgmentCache(
@@ -41,7 +41,7 @@ public class JudgmentCache implements ToXContentObject {
         String queryText,
         String documentId,
         List<String> contextFields,
-        String score,
+        String rating,
         String modelId
     ) {
         this.id = id;
@@ -49,7 +49,7 @@ public class JudgmentCache implements ToXContentObject {
         this.queryText = queryText;
         this.documentId = documentId;
         this.contextFieldsStr = convertListToSortedStr(contextFields);
-        this.score = score;
+        this.rating = rating;
         this.modelId = modelId;
     }
 
@@ -61,7 +61,7 @@ public class JudgmentCache implements ToXContentObject {
         xContentBuilder.field(QUERY_TEXT, this.queryText.trim());
         xContentBuilder.field(DOCUMENT_ID, this.documentId.trim());
         xContentBuilder.field(CONTEXT_FIELDS_STR, this.contextFieldsStr);
-        xContentBuilder.field(SCORE, this.score.trim());
+        xContentBuilder.field(RATING, this.rating.trim());
         xContentBuilder.field(MODEL_ID, this.modelId.trim());
         return xContentBuilder.endObject();
     }
@@ -87,6 +87,6 @@ public class JudgmentCache implements ToXContentObject {
     }
 
     public String score() {
-        return score;
+        return rating;
     }
 }

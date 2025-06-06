@@ -665,7 +665,7 @@ public class CoecClickModel extends ClickModel {
         ActionListener<Map<String, Map<String, String>>> listener
     ) {
         LOGGER.debug("Starting COEC calculation with rank CTR: {}", rankAggregatedClickThrough);
-        Map<String, Map<String, String>> judgmentScores = new HashMap<>();
+        Map<String, Map<String, String>> judgmentRatings = new HashMap<>();
 
         for (Map.Entry<String, Set<ClickthroughRate>> entry : clickthroughRates.entrySet()) {
             String userQuery = entry.getKey();
@@ -678,28 +678,28 @@ public class CoecClickModel extends ClickModel {
                 // Calculate expected clicks for *this* document at its observed rank
                 double expectedClicksForDocAtRank = expectedCtrForThisRank * ctr.getImpressions();
 
-                // Calculate COEC score
-                double score;
+                // Calculate COEC rating
+                double rating;
                 if (expectedClicksForDocAtRank > 0) {
-                    score = ctr.getClicks() / expectedClicksForDocAtRank;
+                    rating = ctr.getClicks() / expectedClicksForDocAtRank;
                 } else {
-                    // if there are neither impressions nor a rank-aggregated CTR the COEC score is 0
-                    score = 0.0;
+                    // if there are neither impressions nor a rank-aggregated CTR the COEC rating is 0
+                    rating = 0.0;
                 }
-                LOGGER.debug("judgment score: {}, query: {}, doc: {}, rank: {}", score, userQuery, ctr.getObjectId(), observedRank);
-                docScores.put(ctr.getObjectId(), String.format(Locale.ROOT, "%.3f", score));
+                LOGGER.debug("judgment rating: {}, query: {}, doc: {}, rank: {}", rating, userQuery, ctr.getObjectId(), observedRank);
+                docScores.put(ctr.getObjectId(), String.format(Locale.ROOT, "%.3f", rating));
             }
 
             if (!docScores.isEmpty()) {
-                judgmentScores.put(userQuery, docScores);
+                judgmentRatings.put(userQuery, docScores);
             }
             LOGGER.debug(
-                "Final judgment scores size - Queries: {}, Total Documents: {}",
-                judgmentScores.size(),
-                judgmentScores.values().stream().mapToInt(Map::size).sum()
+                "Final judgment ratings size - Queries: {}, Total Documents: {}",
+                judgmentRatings.size(),
+                judgmentRatings.values().stream().mapToInt(Map::size).sum()
             );
 
-            listener.onResponse(judgmentScores);
+            listener.onResponse(judgmentRatings);
         }
     }
 

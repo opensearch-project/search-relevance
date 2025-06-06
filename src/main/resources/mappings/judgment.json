@@ -5,6 +5,6 @@
     "name": { "type": "keyword" },
     "type": { "type": "keyword" },
     "metadata": { "type": "object", "dynamic": true },
-    "judgmentScores": { "type":  "object", "dynamic": true }
+    "judgmentRatings": { "type":  "object", "dynamic": true }
   }
 }

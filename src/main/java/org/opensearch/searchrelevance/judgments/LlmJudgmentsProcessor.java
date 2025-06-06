@@ -11,7 +11,7 @@ import static org.opensearch.searchrelevance.common.MLConstants.sanitizeLLMRespo
 import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_INDEX_AND_QUERIES_FIELD_NAME;
 import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_QUERY_TEXT_FIELD_NAME;
 import static org.opensearch.searchrelevance.model.JudgmentCache.CONTEXT_FIELDS_STR;
-import static org.opensearch.searchrelevance.model.JudgmentCache.SCORE;
+import static org.opensearch.searchrelevance.model.JudgmentCache.RATING;
 import static org.opensearch.searchrelevance.model.QueryWithReference.DELIMITER;
 import static org.opensearch.searchrelevance.model.builder.SearchRequestBuilder.buildSearchRequest;
 import static org.opensearch.searchrelevance.utils.ParserUtils.combinedIndexAndDocId;
@@ -86,7 +86,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
     }
 
     @Override
-    public void generateJudgmentScore(Map<String, Object> metadata, ActionListener<Map<String, Map<String, String>>> listener) {
+    public void generateJudgmentRating(Map<String, Object> metadata, ActionListener<Map<String, Map<String, String>>> listener) {
         String querySetId = (String) metadata.get("querySetId");
         List<String> searchConfigurationList = (List<String>) metadata.get("searchConfigurationList");
         int size = (int) metadata.get("size");
@@ -278,7 +278,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
      * @param tokenLimit - llm model token limit
      * @param contextFields - filters on specific context fields
      * @param unprocessedUnionHits - hits pending judged
-     * @param docIdToScore - map to store the judgment scores
+     * @param docIdToRating - map to store the judgment ratings
      * @param ignoreFailure - boolean to determine how to error handling
      * @param listener - listen each chunk results and update judgment cache at earliest
      */
@@ -288,17 +288,17 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         int tokenLimit,
         List<String> contextFields,
         Map<String, String> unprocessedUnionHits,
-        Map<String, String> docIdToScore,
+        Map<String, String> docIdToRating,
         boolean ignoreFailure,
         ActionListener<Map<String, String>> listener
     ) {
         LOGGER.debug("calculating LLM evaluation with modelId: {} and unprocessed unionHits: {}", modelId, unprocessedUnionHits);
-        LOGGER.debug("processed docIdToScore before llm evaluation: {}", docIdToScore);
+        LOGGER.debug("processed docIdToRating before llm evaluation: {}", docIdToRating);
 
         // If there are no unprocessed hits, return the cached results immediately
         if (unprocessedUnionHits.isEmpty()) {
             LOGGER.info("All hits found in cache, returning cached results for query: {}", queryTextWithReference);
-            listener.onResponse(docIdToScore);
+            listener.onResponse(docIdToRating);
             return;
         }
 
@@ -306,7 +306,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         String queryText = queryTextRefArr[0];
         String referenceAnswer = queryTextRefArr.length > 1 ? queryTextWithReference.split(DELIMITER, 2)[1] : null;
 
-        ConcurrentMap<String, String> processedScores = new ConcurrentHashMap<>(docIdToScore);
+        ConcurrentMap<String, String> processedRatings = new ConcurrentHashMap<>(docIdToRating);
         ConcurrentMap<Integer, List<Map<String, Object>>> combinedResponses = new ConcurrentHashMap<>();
         AtomicBoolean hasFailure = new AtomicBoolean(false); // Add flag to track if any failure has occurred
 
@@ -357,12 +357,12 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                             );
 
                             // Process combined responses
-                            for (List<Map<String, Object>> scores : combinedResponses.values()) {
-                                for (Map<String, Object> score : scores) {
-                                    String compositeKey = (String) score.get("id");
-                                    Double ratingScore = ((Number) score.get("rating_score")).doubleValue();
+                            for (List<Map<String, Object>> ratings : combinedResponses.values()) {
+                                for (Map<String, Object> rating : ratings) {
+                                    String compositeKey = (String) rating.get("id");
+                                    Double ratingScore = ((Number) rating.get("rating_score")).doubleValue();
                                     String docId = getDocIdFromCompositeKey(compositeKey);
-                                    processedScores.put(docId, ratingScore.toString());
+                                    processedRatings.put(docId, ratingScore.toString());
                                     updateJudgmentCache(
                                         compositeKey,
                                         queryTextWithReference,
@@ -373,7 +373,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                                 }
                             }
 
-                            listener.onResponse(processedScores);
+                            listener.onResponse(processedRatings);
                         }
                     } catch (Exception e) {
                         handleProcessingError(e, chunkResult.isLastChunk());
@@ -407,14 +407,14 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
      * @param queryTextWithReference - queryTextWithReference to be deduplicated
      * @param contextFields - contextFields to be deduplicated
      * @param docIds - overall docIds from search
-     * @param docIdToScore - add processed docIds and scores to global docIdToScore map
+     * @param docIdToRating - add processed docIds and ratings to global docIdToRating map
      */
     private void deduplicateFromProcessedDocs(
         String targetIndex,
         String queryTextWithReference,
         List<String> docIds,
         List<String> contextFields,
-        ConcurrentMap<String, String> docIdToScore,
+        ConcurrentMap<String, String> docIdToRating,
         ActionListener<List<String>> listener
     ) {
         AtomicInteger pendingChecks = new AtomicInteger(docIds.size());
@@ -428,17 +428,17 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                     if (response.getHits().getTotalHits().value() > 0) {
                         SearchHit hit = response.getHits().getHits()[0];
                         Map<String, Object> source = hit.getSourceAsMap();
-                        String score = (String) source.get(SCORE);
+                        String rating = (String) source.get(RATING);
                         String storedContextFields = (String) source.get(CONTEXT_FIELDS_STR);
                         LOGGER.debug(
-                            "Found existing judgment for docId: {}, score: {}, storedContextFields: {}",
+                            "Found existing judgment for docId: {}, rating: {}, storedContextFields: {}",
                             docId,
-                            score,
+                            rating,
                             storedContextFields
                         );
 
-                        synchronized (docIdToScore) {
-                            docIdToScore.put(docId, score);
+                        synchronized (docIdToRating) {
+                            docIdToRating.put(docId, rating);
                         }
                         unprocessedDocIds.remove(docId);
                     }
@@ -466,22 +466,16 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
     }
 
     /**
-     * Add new judgment cache entry with llm judgment score
+     * Add new judgment cache entry with llm judgment rating
      */
-    private void updateJudgmentCache(
-        String compositeKey,
-        String queryText,
-        List<String> contextFields,
-        String ratingScore,
-        String modelId
-    ) {
+    private void updateJudgmentCache(String compositeKey, String queryText, List<String> contextFields, String rating, String modelId) {
         JudgmentCache judgmentCache = new JudgmentCache(
             generateUniqueId(queryText, compositeKey, contextFields),
             TimeUtils.getTimestamp(),
             queryText,
             compositeKey,
             contextFields,
-            ratingScore,
+            rating,
             modelId
         );
         StepListener<Void> createIndexStep = new StepListener<>();

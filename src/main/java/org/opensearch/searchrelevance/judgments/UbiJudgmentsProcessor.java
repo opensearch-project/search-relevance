@@ -36,7 +36,7 @@ public class UbiJudgmentsProcessor implements BaseJudgmentsProcessor {
     }
 
     @Override
-    public void generateJudgmentScore(Map<String, Object> metadata, ActionListener<Map<String, Map<String, String>>> listener) {
+    public void generateJudgmentRating(Map<String, Object> metadata, ActionListener<Map<String, Map<String, String>>> listener) {
         String clickModel = (String) metadata.get("clickModel");
         int maxRank = (int) metadata.get("maxRank");
 

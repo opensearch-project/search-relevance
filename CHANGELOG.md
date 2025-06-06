@@ -11,6 +11,7 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 - Added validation for hybrid query structure ([#40](https://github.com/opensearch-project/search-relevance/pull/40))
 - [Enhancement] Add support for importing judgments created externally from SRW.  ([#42](https://github.com/opensearch-project/search-relevance/pull/42)
 - Changing URL for plugin APIs to /_plugin/_search_relevance [backend] ([#62](https://github.com/opensearch-project/search-relevance/pull/62)
+- Added lazy index creation for all APIs ([#65](https://github.com/opensearch-project/search-relevance/pull/65)
 
 ### Removed
 
@@ -23,6 +24,8 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - LLM Judgment Processor Improvement ([#27](https://github.com/opensearch-project/search-relevance/pull/27))
  - Deal with experiment processing when no experiment variants exist. ([#45](https://github.com/opensearch-project/search-relevance/pull/45))
  - Extend the `src/test/demo.sh` script to support pointwise and hybrid experiments.
-  - Enable Search Relevance backend plugin as part of running demo scripts. ([#60](https://github.com/opensearch-project/search-relevance/pull/60))
+ - Enable Search Relevance backend plugin as part of running demo scripts. ([#60](https://github.com/opensearch-project/search-relevance/pull/60))
+ - Move from Judgments being "scores" to Judgments being "ratings".  ([#64](https://github.com/opensearch-project/search-relevance/pull/64))
+ - Extend hybrid search optimizer demo script to use models. ([#69](https://github.com/opensearch-project/search-relevance/pull/69))
 
 ### Security

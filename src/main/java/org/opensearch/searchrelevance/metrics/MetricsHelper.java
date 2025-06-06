@@ -196,7 +196,7 @@ public class MetricsHelper {
 
         try {
             Map<String, Object> configToEvalIds = Collections.synchronizedMap(new HashMap<>());
-            Map<String, String> docIdToScores = new HashMap<>();
+            Map<String, String> docIdToRatings = new HashMap<>();
             AtomicInteger completedJudgments = new AtomicInteger(0);
 
             for (String judgmentId : judgmentIds) {
@@ -208,24 +208,27 @@ public class MetricsHelper {
                                 log.warn("No judgment found for ID: {}", judgmentId);
                             } else {
                                 Map<String, Object> sourceAsMap = judgmentResponse.getHits().getHits()[0].getSourceAsMap();
-                                Map<String, Object> judgmentScores = (Map<String, Object>) sourceAsMap.getOrDefault(
-                                    "judgmentScores",
+                                Map<String, Object> judgmentRatings = (Map<String, Object>) sourceAsMap.getOrDefault(
+                                    "judgmentRatings",
                                     Collections.emptyMap()
                                 );
-                                List<Map<String, Object>> queryScores = (List<Map<String, Object>>) judgmentScores.getOrDefault(
+                                List<Map<String, Object>> queryRatings = (List<Map<String, Object>>) judgmentRatings.getOrDefault(
                                     queryText,
                                     Collections.emptyList()
                                 );
 
-                                queryScores.forEach(
-                                    docScore -> docIdToScores.put((String) docScore.get("docId"), (String) docScore.get("score"))
+                                queryRatings.forEach(
+                                    docScoreRating -> docIdToRatings.put(
+                                        (String) docScoreRating.get("docId"),
+                                        (String) docScoreRating.get("rating")
+                                    )
                                 );
                             }
 
                             // Check if all judgments have been processed
                             if (completedJudgments.incrementAndGet() == judgmentIds.size()) {
-                                if (docIdToScores.isEmpty()) {
-                                    log.warn("No scores found for query: {} in any judgments", queryText);
+                                if (docIdToRatings.isEmpty()) {
+                                    log.warn("No ratings found for query: {} in any judgments", queryText);
                                 }
 
                                 processSearchConfigurations(
@@ -233,7 +236,7 @@ public class MetricsHelper {
                                     indexAndQueries,
                                     size,
                                     judgmentIds,
-                                    docIdToScores,
+                                    docIdToRatings,
                                     configToEvalIds,
                                     listener,
                                     experimentVariants
@@ -248,7 +251,7 @@ public class MetricsHelper {
                     public void onFailure(Exception e) {
                         log.error("Failed to fetch judgment {}: {}", judgmentId, e);
                         if (completedJudgments.incrementAndGet() == judgmentIds.size()) {
-                            if (docIdToScores.isEmpty()) {
+                            if (docIdToRatings.isEmpty()) {
                                 listener.onFailure(new IllegalStateException("Failed to fetch any valid judgments"));
                             } else {
                                 // Proceed with the judgments we were able to fetch
@@ -257,7 +260,7 @@ public class MetricsHelper {
                                     indexAndQueries,
                                     size,
                                     judgmentIds,
-                                    docIdToScores,
+                                    docIdToRatings,
                                     configToEvalIds,
                                     listener,
                                     experimentVariants

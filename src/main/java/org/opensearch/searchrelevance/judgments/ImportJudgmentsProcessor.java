@@ -35,35 +35,35 @@ public class ImportJudgmentsProcessor implements BaseJudgmentsProcessor {
     }
 
     @Override
-    public void generateJudgmentScore(Map<String, Object> metadata, ActionListener<Map<String, Map<String, String>>> listener) {
+    public void generateJudgmentRating(Map<String, Object> metadata, ActionListener<Map<String, Map<String, String>>> listener) {
 
-        Map<String, Object> sourceJudgementScores = (Map<String, Object>) metadata.get("judgmentScores");
-        metadata.remove("judgmentScores");
+        Map<String, Object> sourceJudgementRatings = (Map<String, Object>) metadata.get("judgmentRatings");
+        metadata.remove("judgmentRatings");
 
         // Create the result map in the expected format
-        Map<String, Map<String, String>> formattedScores = new HashMap<>();
+        Map<String, Map<String, String>> formattedRatings = new HashMap<>();
 
         // Process each query
-        for (Map.Entry<String, Object> queryEntry : sourceJudgementScores.entrySet()) {
+        for (Map.Entry<String, Object> queryEntry : sourceJudgementRatings.entrySet()) {
             String queryText = queryEntry.getKey();
-            Object scoreData = queryEntry.getValue();
+            Object ratingData = queryEntry.getValue();
 
-            if (!(scoreData instanceof List)) {
+            if (!(ratingData instanceof List)) {
                 listener.onFailure(
-                    new SearchRelevanceException("queryText " + queryText + " must have a list of score data.", RestStatus.BAD_REQUEST)
+                    new SearchRelevanceException("queryText " + queryText + " must have a list of rating data.", RestStatus.BAD_REQUEST)
                 );
                 return;
             }
 
-            Map<String, String> docScores = new HashMap<>();
+            Map<String, String> docRatings = new HashMap<>();
 
             @SuppressWarnings("unchecked")
-            List<Map<String, Object>> scoresList = (List<Map<String, Object>>) scoreData;
+            List<Map<String, Object>> ratingsList = (List<Map<String, Object>>) ratingData;
 
-            // Process each document's score
-            for (Map<String, Object> scoreInfo : scoresList) {
-                String docId = (String) scoreInfo.get("docId");
-                String score = (String) scoreInfo.get("score");
+            // Process each document's rating
+            for (Map<String, Object> ratingInfo : ratingsList) {
+                String docId = (String) ratingInfo.get("docId");
+                String rating = (String) ratingInfo.get("rating");
 
                 if (docId == null || docId.isEmpty()) {
                     listener.onFailure(
@@ -74,32 +74,32 @@ public class ImportJudgmentsProcessor implements BaseJudgmentsProcessor {
                     );
                     return;
                 }
-                if (score == null) {
+                if (rating == null) {
                     listener.onFailure(
-                        new SearchRelevanceException("score for queryText " + queryText + " must not be null", RestStatus.BAD_REQUEST)
+                        new SearchRelevanceException("rating for queryText " + queryText + " must not be null", RestStatus.BAD_REQUEST)
                     );
                     return;
                 }
                 try {
-                    Float.parseFloat(score);
+                    Float.parseFloat(rating);
                 } catch (NumberFormatException e) {
                     listener.onFailure(
                         new SearchRelevanceException(
-                            "score '" + score + "' for queryText " + queryText + " must be a valid float",
+                            "rating '" + rating + "' for queryText " + queryText + " must be a valid float",
                             RestStatus.BAD_REQUEST
                         )
                     );
                     return;
                 }
 
-                docScores.put(docId, score);
+                docRatings.put(docId, rating);
             }
 
-            // Add the formatted scores for this query
-            formattedScores.put(queryText, docScores);
+            // Add the formatted ratings for this query
+            formattedRatings.put(queryText, docRatings);
         }
 
-        listener.onResponse(formattedScores);
+        listener.onResponse(formattedRatings);
 
     }
 
