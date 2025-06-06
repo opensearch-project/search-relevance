@@ -47,7 +47,7 @@ jobs:
 
       - name: Upload Coverage Report
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -125,6 +125,6 @@ jobs:
           name: coverage-report-${{ matrix.os }}-${{ matrix.java }}
           path: ./
       - name: Upload Coverage Report
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}

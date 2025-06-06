@@ -7,16 +7,16 @@
  */
 package org.opensearch.searchrelevance.metrics;
 
-import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.METRICS_MEAN_AVERAGE_PRECISION;
-import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.METRICS_NORMALIZED_DISCOUNTED_CUMULATIVE_GAIN;
-import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.METRICS_PRECISION_AT_10;
-import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.METRICS_PRECISION_AT_5;
-import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.calculateMAP;
-import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.calculateNDCG;
+import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.METRICS_MEAN_AVERAGE_PRECISION_AT;
+import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.METRICS_NORMALIZED_DISCOUNTED_CUMULATIVE_GAIN_AT;
+import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.METRICS_PRECISION_AT;
+import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.calculateMAPAtK;
+import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.calculateNDCGAtK;
 import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.calculatePrecisionAtK;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -27,7 +27,7 @@ public class EvaluationMetrics {
     /**
      * calculate evaluation metrics with evaluation calculators.
      */
-    public static Map<String, String> calculateEvaluationMetrics(List<String> docIds, Map<String, String> judgments) {
+    public static Map<String, String> calculateEvaluationMetrics(List<String> docIds, Map<String, String> judgments, int k) {
         Map<String, String> currSearchConfigMetrics = new HashMap<>();
 
         List<String> docsWithScores = docIds.stream().filter(judgments::containsKey).toList();
@@ -38,14 +38,15 @@ public class EvaluationMetrics {
 
         double coverage = totalCount > 0 ? Math.round((double) totalDocsWithScores / totalCount * 100.0) / 100.0 : 0.0;
 
-        // TODO: it's not guarantee that each docId will have its score, especially for UBI data.
-        // Need to define a reliable rate. say, coverage > 80%, then the results become reliable
-        currSearchConfigMetrics.put("coverage", String.valueOf(coverage));
-
-        currSearchConfigMetrics.put(METRICS_PRECISION_AT_5, String.valueOf(calculatePrecisionAtK(docIds, judgments, 5)));
-        currSearchConfigMetrics.put(METRICS_PRECISION_AT_10, String.valueOf(calculatePrecisionAtK(docIds, judgments, 10)));
-        currSearchConfigMetrics.put(METRICS_MEAN_AVERAGE_PRECISION, String.valueOf(calculateMAP(docIds, judgments)));
-        currSearchConfigMetrics.put(METRICS_NORMALIZED_DISCOUNTED_CUMULATIVE_GAIN, String.valueOf(calculateNDCG(docIds, judgments)));
+        // docIds that don't have a score will be assumed irrelevant with a score of 0
+        // Coverage is the metric of what percentage of docIds per query have score
+        currSearchConfigMetrics.put(String.format(Locale.ROOT, "Coverage@%d", k), String.valueOf(coverage));
+        currSearchConfigMetrics.put(METRICS_PRECISION_AT + k, String.valueOf(calculatePrecisionAtK(docIds, judgments, k)));
+        currSearchConfigMetrics.put(METRICS_MEAN_AVERAGE_PRECISION_AT + k, String.valueOf(calculateMAPAtK(docIds, judgments, k)));
+        currSearchConfigMetrics.put(
+            METRICS_NORMALIZED_DISCOUNTED_CUMULATIVE_GAIN_AT + k,
+            String.valueOf(calculateNDCGAtK(docIds, judgments, k))
+        );
         return currSearchConfigMetrics;
     }
 }

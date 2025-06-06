@@ -8,7 +8,6 @@
 package org.opensearch.searchrelevance.transport.judgment;
 
 import static org.opensearch.searchrelevance.common.MetricsConstants.MODEL_ID;
-import static org.opensearch.searchrelevance.model.JudgmentType.UBI_JUDGMENT;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -101,7 +100,7 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
             }
             case IMPORT_JUDGMENT -> {
                 PutImportJudgmentRequest importRequest = (PutImportJudgmentRequest) request;
-                metadata.put("judgmentScores", importRequest.getJudgmentScores());
+                metadata.put("judgmentRatings", importRequest.getJudgmentRatings());
             }
         }
         return metadata;
@@ -111,14 +110,14 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
         LOGGER.info("Starting async processing for judgment: {}, type: {}, metadata: {}", judgmentId, request.getType(), metadata);
         BaseJudgmentsProcessor processor = judgmentsProcessorFactory.getProcessor(request.getType());
 
-        processor.generateJudgmentScore(metadata, ActionListener.wrap(judgmentScores -> {
+        processor.generateJudgmentRating(metadata, ActionListener.wrap(judgmentRatings -> {
             LOGGER.info(
-                "Generated judgment scores for {}, scores size: {}",
+                "Generated judgment ratings for {}, ratings size: {}",
                 judgmentId,
-                judgmentScores != null ? judgmentScores.size() : 0
+                judgmentRatings != null ? judgmentRatings.size() : 0
             );
-            updateFinalJudgment(judgmentId, request, metadata, judgmentScores);
-        }, error -> handleAsyncFailure(judgmentId, request, "Failed to generate judgment scores", error)));
+            updateFinalJudgment(judgmentId, request, metadata, judgmentRatings);
+        }, error -> handleAsyncFailure(judgmentId, request, "Failed to generate judgment ratings", error)));
     }
 
     private void updateFinalJudgment(

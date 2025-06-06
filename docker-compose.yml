@@ -1,5 +1,4 @@
 services:
-
   opensearch_search_relevance:
     build: .
     container_name: opensearch_search_relevance
@@ -54,7 +53,6 @@ services:
 volumes:
   opensearch-data:
 #  opensearch-css-data:
-
 
 networks:
   opensearch-net:

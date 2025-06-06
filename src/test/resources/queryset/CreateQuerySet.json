@@ -1,0 +1,10 @@
+{
+  "name": "query_set",
+  "description": "Test query set",
+  "sampling": "manual",
+  "querySetQueries": [
+    {"queryText": "phone"},
+    {"queryText": "iphone"},
+    {"queryText": "steel"}
+  ]
+}

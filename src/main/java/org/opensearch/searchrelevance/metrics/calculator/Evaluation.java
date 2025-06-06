@@ -13,10 +13,9 @@ import java.util.List;
 import java.util.Map;
 
 public class Evaluation {
-    public static final String METRICS_PRECISION_AT_5 = "precision@5";
-    public static final String METRICS_PRECISION_AT_10 = "precision@10";
-    public static final String METRICS_MEAN_AVERAGE_PRECISION = "MAP";
-    public static final String METRICS_NORMALIZED_DISCOUNTED_CUMULATIVE_GAIN = "ndcg";
+    public static final String METRICS_PRECISION_AT = "Precision@";
+    public static final String METRICS_MEAN_AVERAGE_PRECISION_AT = "MAP@";
+    public static final String METRICS_NORMALIZED_DISCOUNTED_CUMULATIVE_GAIN_AT = "NDCG@";
 
     /**
      * Precision@K - measures precision at a specific rank k
@@ -39,12 +38,12 @@ public class Evaluation {
 
     /**
      *
-     * @param judgmentScores the docid->judgment mapping for a query
-     * @return the total number of documents with judgment > 0 in the scores
+     * @param judgmentRatings the docid->judgment mapping for a query
+     * @return the total number of documents with judgment > 0 in the ratings
      */
-    private static int countRelevant(Map<String, String> judgmentScores) {
+    private static int countRelevant(Map<String, String> judgmentRatings) {
         int numRel = 0;
-        for (String value : judgmentScores.values()) {
+        for (String value : judgmentRatings.values()) {
             if (Double.valueOf(value) > 0) {
                 numRel++;
             }
@@ -55,11 +54,12 @@ public class Evaluation {
     /**
      * Mean Average Precision (MAP)
      */
-    public static double calculateMAP(List<String> docIds, Map<String, String> judgmentScores) {
+    public static double calculateMAPAtK(List<String> docIds, Map<String, String> judgmentScores, int k) {
         double sum = 0.0;
         int relevantCount = 0;
         int numRel = countRelevant(judgmentScores);
-        for (int i = 0; i < docIds.size(); i++) {
+        int size = Math.min(k, docIds.size());
+        for (int i = 0; i < size; i++) {
             String docId = docIds.get(i);
             if (judgmentScores.containsKey(docId) && Double.valueOf(judgmentScores.get(docId)) > 0) {
                 relevantCount++;
@@ -75,11 +75,12 @@ public class Evaluation {
     /**
      * Normalized Discounted Cumulative Gain (NDCG)
      */
-    public static double calculateNDCG(List<String> docIds, Map<String, String> judgmentScores) {
+    public static double calculateNDCGAtK(List<String> docIds, Map<String, String> judgmentScores, int k) {
         double dcg = 0.0;
-        double idcg = calculateIDCG(docIds, judgmentScores);
+        double idcg = calculateIDCG(docIds, judgmentScores, k);
+        int size = Math.min(k, docIds.size());
 
-        for (int i = 0; i < docIds.size(); i++) {
+        for (int i = 0; i < size; i++) {
             String docId = docIds.get(i);
             if (judgmentScores.containsKey(docId)) {
                 double relevance = Double.valueOf(judgmentScores.get(docId));
@@ -91,7 +92,7 @@ public class Evaluation {
         return Math.round(ndcg * 100.0) / 100.0;
     }
 
-    private static double calculateIDCG(List<String> docIds, Map<String, String> judgmentScores) {
+    private static double calculateIDCG(List<String> docIds, Map<String, String> judgmentScores, int k) {
         List<Double> relevanceScores = new ArrayList<>();
         // IDCG is computed on the full set of relevant documents
         // we truncate the list after sorting
@@ -100,7 +101,8 @@ public class Evaluation {
         }
 
         Collections.sort(relevanceScores, Collections.reverseOrder());
-        relevanceScores = relevanceScores.subList(0, Math.min(docIds.size(), relevanceScores.size()));
+        // we truncate the list to k if the list is larger than k. Otherwise we keep the full list
+        relevanceScores = relevanceScores.subList(0, Math.min(relevanceScores.size(), k));
         double idcg = 0.0;
 
         for (int i = 0; i < relevanceScores.size(); i++) {

@@ -23,9 +23,9 @@ public interface BaseJudgmentsProcessor {
     public JudgmentType getJudgmentType();
 
     /**
-     * Generate judgment score based on metadata
-     * @param metadata used generate judgment scores for various judgment type
+     * Generate judgment rating based on metadata
+     * @param metadata used to generate judgment ratings for various judgment type
      * @param listener async action
      */
-    public void generateJudgmentScore(Map<String, Object> metadata, ActionListener<Map<String, Map<String, String>>> listener);
+    public void generateJudgmentRating(Map<String, Object> metadata, ActionListener<Map<String, Map<String, String>>> listener);
 }
