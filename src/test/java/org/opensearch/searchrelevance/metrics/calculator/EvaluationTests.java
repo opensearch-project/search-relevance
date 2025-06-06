@@ -57,17 +57,17 @@ public class EvaluationTests extends OpenSearchTestCase {
         assertEquals(0.8, precision, 0.001);
     }
 
-    public void testCalculateMAP() {
-        double map = Evaluation.calculateMAP(this.results, this.judgments);
+    public void testCalculateMAPAtK() {
+        double map = Evaluation.calculateMAPAtK(this.results, this.judgments, 20);
         assertEquals(0.76, map, 0.001);
-        map = Evaluation.calculateMAP(this.results.subList(0, 5), this.judgments);
+        map = Evaluation.calculateMAPAtK(this.results.subList(0, 5), this.judgments, 5);
         assertEquals(0.25, map, 0.001);
     }
 
-    public void testCalculateNDCG() {
-        double ndcg = Evaluation.calculateNDCG(this.results, this.judgments);
+    public void testCalculateNDCGAtK() {
+        double ndcg = Evaluation.calculateNDCGAtK(this.results, this.judgments, 20);
         assertEquals(0.76, ndcg, 0.001);
-        ndcg = Evaluation.calculateNDCG(this.results.subList(0, 5), this.judgments);
+        ndcg = Evaluation.calculateNDCGAtK(this.results.subList(0, 5), this.judgments, 5);
         assertEquals(0.51, ndcg, 0.001);
     }
 }

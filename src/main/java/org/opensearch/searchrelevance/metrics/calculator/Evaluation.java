@@ -14,9 +14,8 @@ import java.util.Map;
 
 public class Evaluation {
     public static final String METRICS_PRECISION_AT = "Precision@";
-    public static final String METRICS_MEAN_AVERAGE_PRECISION = "MAP";
     public static final String METRICS_MEAN_AVERAGE_PRECISION_AT = "MAP@";
-    public static final String METRICS_NORMALIZED_DISCOUNTED_CUMULATIVE_GAIN = "NDCG";
+    public static final String METRICS_NORMALIZED_DISCOUNTED_CUMULATIVE_GAIN_AT = "NDCG@";
 
     /**
      * Precision@K - measures precision at a specific rank k
@@ -55,11 +54,12 @@ public class Evaluation {
     /**
      * Mean Average Precision (MAP)
      */
-    public static double calculateMAP(List<String> docIds, Map<String, String> judgmentScores) {
+    public static double calculateMAPAtK(List<String> docIds, Map<String, String> judgmentScores, int k) {
         double sum = 0.0;
         int relevantCount = 0;
         int numRel = countRelevant(judgmentScores);
-        for (int i = 0; i < docIds.size(); i++) {
+        int size = Math.min(k, docIds.size());
+        for (int i = 0; i < size; i++) {
             String docId = docIds.get(i);
             if (judgmentScores.containsKey(docId) && Double.valueOf(judgmentScores.get(docId)) > 0) {
                 relevantCount++;
@@ -75,11 +75,12 @@ public class Evaluation {
     /**
      * Normalized Discounted Cumulative Gain (NDCG)
      */
-    public static double calculateNDCG(List<String> docIds, Map<String, String> judgmentScores) {
+    public static double calculateNDCGAtK(List<String> docIds, Map<String, String> judgmentScores, int k) {
         double dcg = 0.0;
         double idcg = calculateIDCG(docIds, judgmentScores);
+        int size = Math.min(k, docIds.size());
 
-        for (int i = 0; i < docIds.size(); i++) {
+        for (int i = 0; i < size; i++) {
             String docId = docIds.get(i);
             if (judgmentScores.containsKey(docId)) {
                 double relevance = Double.valueOf(judgmentScores.get(docId));
