@@ -7,9 +7,6 @@
  */
 package org.opensearch.searchrelevance.transport.experiment;
 
-import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.EXPERIMENT;
-
-import org.opensearch.ResourceNotFoundException;
 import org.opensearch.action.delete.DeleteResponse;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.HandledTransportAction;
@@ -41,12 +38,6 @@ public class DeleteExperimentTransportAction extends HandledTransportAction<Open
 
     @Override
     protected void doExecute(Task task, OpenSearchDocRequest request, ActionListener<DeleteResponse> listener) {
-        // Validate cluster health first
-        if (!clusterService.state().routingTable().hasIndex(EXPERIMENT.getIndexName())) {
-            listener.onFailure(new ResourceNotFoundException("Index [" + EXPERIMENT.getIndexName() + "] not found"));
-            return;
-        }
-
         try {
             String experimentId = request.getId();
             if (experimentId == null || experimentId.trim().isEmpty()) {

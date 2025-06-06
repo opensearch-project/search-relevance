@@ -7,11 +7,8 @@
  */
 package org.opensearch.searchrelevance.transport.judgment;
 
-import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.JUDGMENT;
-
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.opensearch.ResourceNotFoundException;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.HandledTransportAction;
@@ -44,12 +41,6 @@ public class GetJudgmentTransportAction extends HandledTransportAction<OpenSearc
 
     @Override
     protected void doExecute(Task task, OpenSearchDocRequest request, ActionListener<SearchResponse> listener) {
-        // Validate cluster health first
-        if (!clusterService.state().routingTable().hasIndex(JUDGMENT.getIndexName())) {
-            listener.onFailure(new ResourceNotFoundException("Index [" + JUDGMENT.getIndexName() + "] not found"));
-            return;
-        }
-
         try {
             if (request.getId() != null) {
                 // Handle single judgment request
