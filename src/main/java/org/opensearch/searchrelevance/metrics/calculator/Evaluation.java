@@ -15,6 +15,7 @@ import java.util.Map;
 public class Evaluation {
     public static final String METRICS_PRECISION_AT = "Precision@";
     public static final String METRICS_MEAN_AVERAGE_PRECISION = "MAP";
+    public static final String METRICS_MEAN_AVERAGE_PRECISION_AT = "MAP@";
     public static final String METRICS_NORMALIZED_DISCOUNTED_CUMULATIVE_GAIN = "NDCG";
 
     /**
