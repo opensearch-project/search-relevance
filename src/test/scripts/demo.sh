@@ -34,16 +34,17 @@ if [ "$SKIP_ECOMMERCE" = false ]; then
   echo Deleting ecommerce sample data
   (curl -s -X DELETE "http://localhost:9200/ecommerce" > /dev/null) || true
 
+  ECOMMERCE_DATA_FILE="esci_us_opensearch-2025-06-06.json"
   # Check if data file exists locally, if not download it
-  if [ ! -f "transformed_esci_1.json" ]; then
+  if [ ! -f "$ECOMMERCE_DATA_FILE" ]; then
     echo "Data file not found locally. Downloading from S3..."
-    wget https://o19s-public-datasets.s3.amazonaws.com/chorus-opensearch-edition/transformed_esci_1.json
+    wget https://o19s-public-datasets.s3.amazonaws.com/esci_us_opensearch-2025-06-06.json
   fi
 
   echo "Creating ecommerce index using default bulk ingestion schema"
 
   # Create the index by reading in one doc
-  head -n 2 transformed_esci_1.json | curl -s -X POST "http://localhost:9200/index-name/_bulk?pretty" \
+  head -n 2 "$ECOMMERCE_DATA_FILE" | curl -s -X POST "http://localhost:9200/index-name/_bulk?pretty" \
     -H 'Content-Type: application/x-ndjson' --data-binary @-
 
   # Increase the mappings
@@ -56,10 +57,43 @@ if [ "$SKIP_ECOMMERCE" = false ]; then
   echo
   echo Populating ecommerce index
   # do 250 products
-  head -n 500 transformed_esci_1.json | curl -s -X POST "http://localhost:9200/index-name/_bulk?pretty" \
-    -H 'Content-Type: application/x-ndjson' --data-binary @-
-  # do all, requires extra RAM to be allocated to OS.
-  #curl -s -X POST "http://localhost:9200/ecommerce/_bulk?pretty" -H 'Content-Type: application/json' --data-binary @transformed_esci_1.json
+  #head -n 500 ../esci_us/esci_us_opensearch.json | curl -s -X POST "http://localhost:9200/index-name/_bulk" \
+  #  -H 'Content-Type: application/x-ndjson' --data-binary @-
+  # 
+  #  echo Populating ecommerce index
+   
+  # Get total line count of the file
+  TOTAL_LINES=$(wc -l < "$ECOMMERCE_DATA_FILE")
+  echo "Total lines in file: $TOTAL_LINES"
+  
+  # Calculate number of chunks (50000 lines per chunk)
+  CHUNK_SIZE=50000
+  CHUNKS=$(( (TOTAL_LINES + CHUNK_SIZE - 1) / CHUNK_SIZE ))
+  echo "Will process file in $CHUNKS chunks of $CHUNK_SIZE lines each"
+  
+  # Process file in chunks
+  for (( i=0; i<CHUNKS; i++ )); do
+    START_LINE=$(( i * CHUNK_SIZE + 1 ))
+    END_LINE=$(( (i + 1) * CHUNK_SIZE ))
+    
+    # Ensure we don't go past the end of the file
+    if [ $END_LINE -gt $TOTAL_LINES ]; then
+      END_LINE=$TOTAL_LINES
+    fi
+    
+    LINES_TO_PROCESS=$(( END_LINE - START_LINE + 1 ))
+    echo "Processing chunk $((i+1))/$CHUNKS: lines $START_LINE-$END_LINE ($LINES_TO_PROCESS lines)"
+    
+    # Use sed to extract the chunk and pipe to curl for indexing
+    sed -n "${START_LINE},${END_LINE}p" "$ECOMMERCE_DATA_FILE" | \
+      curl -s -o /dev/null -w "%{http_code}" -X POST "http://localhost:9200/ecommerce/_bulk" \
+      -H 'Content-Type: application/x-ndjson' --data-binary @- 
+    
+    # Give OpenSearch a moment to process the chunk
+    sleep 1
+  done
+  
+  echo "All data indexed successfully"
 fi
 
 if [ "$SKIP_UBI" = false ]; then
@@ -71,7 +105,7 @@ if [ "$SKIP_UBI" = false ]; then
   curl -s -X POST http://localhost:9200/_plugins/ubi/initialize
   
   echo Loading sample UBI data
-  curl  -X POST 'http://localhost:9200/index-name/_bulk?pretty' --data-binary @../data-esci/ubi_queries_events.ndjson -H "Content-Type: application/x-ndjson"
+  curl -o /dev/null -X POST 'http://localhost:9200/index-name/_bulk?pretty' --data-binary @../data-esci/ubi_queries_events.ndjson -H "Content-Type: application/x-ndjson"
   
   echo Refreshing UBI indexes to make indexed data available for query sampling
   curl -XPOST "http://localhost:9200/ubi_queries/_refresh"
@@ -116,6 +150,7 @@ echo Deleting queryset, search config, judgment and experiment indexes
 (curl -s -X DELETE "http://localhost:9200/search-relevance-judgment" > /dev/null) || true
 (curl -s -X DELETE "http://localhost:9200/.plugins-search-relevance-experiment" > /dev/null) || true
 (curl -s -X DELETE "http://localhost:9200/search-relevance-evaluation-result" > /dev/null) || true
+(curl -s -X DELETE "http://localhost:9200/search-relevance-experiment-variant" > /dev/null) || true
 
 sleep 2
 echo Create search configs
@@ -178,6 +213,8 @@ fi
 
 echo
 echo Upload Manually Curated Query Set 
+
+curl -s -X POST "http://localhost:9200/ecommerce/_bulk?pretty" -H 'Content-Type: application/json' --data-binary @transformed_esci_1.json
 exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/query_sets" \
 -H "Content-type: application/json" \
 -d'{
@@ -191,6 +228,17 @@ exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/query_sets" \
 }'
 
 QUERY_SET_MANUAL=`jq -r '.query_set_id' < RES`
+
+echo
+echo Upload ESCI Query Set 
+
+exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/query_sets" \
+-H "Content-type: application/json" \
+--data-binary @../data-esci/esci_us_queryset.json
+
+
+
+QUERY_SET_ESCI=`jq -r '.query_set_id' < RES`
 
 echo
 echo List Query Sets
@@ -225,7 +273,7 @@ if [ "$SKIP_UBI" = false ]; then
 fi
 
 echo
-echo Import Judgements
+echo Import Manaully Curated Judgements
 exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/judgments" \
 -H "Content-type: application/json" \
 -d'{
@@ -281,6 +329,24 @@ exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/judgments" \
 }' 
 
 IMPORTED_JUDGMENT_LIST_ID=`jq -r '.judgment_id' < RES`
+
+echo
+echo Upload ESCI Judgements 
+
+# TODO Fix the bug the we arne't creating the judgement index using our defintion in the api
+curl -s -X PUT "http://localhost:9200/search-relevance-judgment/_settings" \
+-H "Content-type: application/json" \
+-d'{
+  "index.mapping.total_fields.limit": 20000
+}'
+
+exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/judgments" \
+-H "Content-type: application/json" \
+--data-binary @../data-esci/esci_us_judgments.json
+
+
+
+ESCI_JUDGMENT_LIST_ID=`jq -r '.judgment_id' < RES`
 
 echo
 echo Create PAIRWISE Experiment

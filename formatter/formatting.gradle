@@ -18,6 +18,7 @@ allprojects {
         }
         format 'misc', {
             target '*.md', '*.gradle', '**/*.json', '**/*.yaml', '**/*.yml', '**/*.svg'
+            targetExclude 'src/test/data-esci**', 'src/test/scripts/
 
             trimTrailingWhitespace()
             endWithNewline()
