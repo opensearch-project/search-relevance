@@ -341,7 +341,7 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
                     if (queryText.equals(result.get("searchText"))) {
                         queryResults = new HashMap<>(result);
                         queryResults.remove("searchText"); // Remove searchText as it's used as the key
-                        
+
                         // If metrics are nested in a "metrics" object, flatten them to the top level
                         // to maintain compatibility with the existing data structure
                         if (queryResults.containsKey("metrics") && queryResults.get("metrics") instanceof Map) {
