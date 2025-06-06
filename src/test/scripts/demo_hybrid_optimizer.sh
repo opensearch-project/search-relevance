@@ -12,7 +12,7 @@
 exe() { (set -x ; "$@") | jq | tee RES; echo; }
 
 # Ansi color code variables
-MAJOR='\033[0;34m[QUICKSTART] '
+MAJOR='\033[0;34m[HO DEMO] '
 RESET='\033[0m' # No Color
 
 # Check for --skip-ecommerce parameter
@@ -36,19 +36,45 @@ curl -s -X PUT "http://localhost:9200/_cluster/settings" -H 'Content-Type: appli
     }
 }'
 
-echo -e "${MAJOR}Registering a model group.${RESET}"
-response=$(curl -s -X POST "http://localhost:9200/_plugins/_ml/model_groups/_register" \
+echo
+echo -e "${MAJOR}Lookup or Register a model group.${RESET}"
+response=$(curl -s -X POST "http://localhost:9200/_plugins/_ml/model_groups/_search" \
   -H 'Content-Type: application/json' \
   --data-binary '{
-    "name": "neural_search_model_group",
-    "description": "A model group for neural search models"
+    "query": {
+      "bool": {
+        "must": [
+          {
+            "terms": {
+              "name": [
+                "neural_search_model_group"
+              ]
+            }
+          }
+        ]
+      }
+    }
   }')
 
 # Extract the model_group_id from the JSON response
-model_group_id=$(echo "$response" | jq -r '.model_group_id')
+model_group_id=$(echo "$response" | jq -r '.hits.hits[0]._id')
 
-# Use the extracted model_group_id
-echo "Created Model Group with id: $model_group_id"
+# Check if model_group_id is blank or "null"
+if [ -z "$model_group_id" ] || [ "$model_group_id" = "null" ]; then
+  echo "No existing model group found, creating a new one..."
+  response=$(curl -s -X POST "http://localhost:9200/_plugins/_ml/model_groups/_register" \
+    -H 'Content-Type: application/json' \
+    --data-binary '{
+      "name": "neural_search_model_group",
+      "description": "A model group for neural search models"
+    }')
+
+  # Extract the model_group_id from the JSON response
+  model_group_id=$(echo "$response" | jq -r '.model_group_id')
+  echo "Created Model Group with id: $model_group_id"
+else
+  echo "Using existing Model Group with id: $model_group_id"
+fi
 
 echo -e "${MAJOR}Registering a model in the model group.${RESET}"
 response=$(curl -s -X POST "http://localhost:9200/_plugins/_ml/models/_register" \
