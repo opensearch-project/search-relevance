@@ -77,7 +77,7 @@ public class Evaluation {
      */
     public static double calculateNDCGAtK(List<String> docIds, Map<String, String> judgmentScores, int k) {
         double dcg = 0.0;
-        double idcg = calculateIDCG(docIds, judgmentScores);
+        double idcg = calculateIDCG(docIds, judgmentScores, k);
         int size = Math.min(k, docIds.size());
 
         for (int i = 0; i < size; i++) {
@@ -92,7 +92,7 @@ public class Evaluation {
         return Math.round(ndcg * 100.0) / 100.0;
     }
 
-    private static double calculateIDCG(List<String> docIds, Map<String, String> judgmentScores) {
+    private static double calculateIDCG(List<String> docIds, Map<String, String> judgmentScores, int k) {
         List<Double> relevanceScores = new ArrayList<>();
         // IDCG is computed on the full set of relevant documents
         // we truncate the list after sorting
@@ -101,7 +101,8 @@ public class Evaluation {
         }
 
         Collections.sort(relevanceScores, Collections.reverseOrder());
-        relevanceScores = relevanceScores.subList(0, Math.min(docIds.size(), relevanceScores.size()));
+        // we truncate the list to k if the list is larger than k. Otherwise we keep the full list
+        relevanceScores = relevanceScores.subList(0, Math.min(relevanceScores.size(), k));
         double idcg = 0.0;
 
         for (int i = 0; i < relevanceScores.size(); i++) {

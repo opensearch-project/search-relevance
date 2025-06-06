@@ -55,6 +55,10 @@ public class EvaluationTests extends OpenSearchTestCase {
         assertEquals(0.7, precision, 0.001);
         precision = Evaluation.calculatePrecisionAtK(this.results, this.judgments, 5);
         assertEquals(0.8, precision, 0.001);
+        precision = Evaluation.calculatePrecisionAtK(this.results.subList(0, 5), this.judgments, 8);
+        assertEquals(0.8, precision, 0.001);
+        precision = Evaluation.calculatePrecisionAtK(this.results.subList(0, 8), this.judgments, 5);
+        assertEquals(0.8, precision, 0.001);
     }
 
     public void testCalculateMAPAtK() {
@@ -62,12 +66,20 @@ public class EvaluationTests extends OpenSearchTestCase {
         assertEquals(0.76, map, 0.001);
         map = Evaluation.calculateMAPAtK(this.results.subList(0, 5), this.judgments, 5);
         assertEquals(0.25, map, 0.001);
+        map = Evaluation.calculateMAPAtK(this.results.subList(0, 5), this.judgments, 8);
+        assertEquals(0.25, map, 0.001);
+        map = Evaluation.calculateMAPAtK(this.results.subList(0, 8), this.judgments, 5);
+        assertEquals(0.25, map, 0.001);
     }
 
     public void testCalculateNDCGAtK() {
         double ndcg = Evaluation.calculateNDCGAtK(this.results, this.judgments, 20);
         assertEquals(0.76, ndcg, 0.001);
         ndcg = Evaluation.calculateNDCGAtK(this.results.subList(0, 5), this.judgments, 5);
+        assertEquals(0.51, ndcg, 0.001);
+        ndcg = Evaluation.calculateNDCGAtK(this.results.subList(0, 5), this.judgments, 8);
+        assertEquals(0.40, ndcg, 0.001);
+        ndcg = Evaluation.calculateNDCGAtK(this.results.subList(0, 8), this.judgments, 5);
         assertEquals(0.51, ndcg, 0.001);
     }
 }
