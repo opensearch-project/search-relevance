@@ -13,6 +13,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.opensearch.index.mapper.MapperService.INDEX_MAPPING_TOTAL_FIELDS_LIMIT_SETTING;
+import static org.opensearch.searchrelevance.common.PluginConstants.MAX_TOTAL_FIELDS_LIMIT;
 import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.QUERY_SET;
 
 import java.io.IOException;
@@ -121,6 +123,9 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         CreateIndexRequest capturedRequest = requestCaptor.getValue();
         assertEquals(QUERY_SET.getIndexName(), capturedRequest.index());
         assertEquals(QUERY_SET.getMapping(), capturedRequest.mappings());
+        Settings actualIndexSettings = capturedRequest.settings();
+        assertNotNull(actualIndexSettings);
+        assertEquals(Integer.toString(MAX_TOTAL_FIELDS_LIMIT), actualIndexSettings.get(INDEX_MAPPING_TOTAL_FIELDS_LIMIT_SETTING.getKey()));
 
         CreateIndexResponse response = new CreateIndexResponse(true, true, QUERY_SET.getIndexName());
         listenerCaptor.getValue().onResponse(response);

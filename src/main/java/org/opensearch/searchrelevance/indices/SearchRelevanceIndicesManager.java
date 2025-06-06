@@ -7,6 +7,9 @@
  */
 package org.opensearch.searchrelevance.indices;
 
+import static org.opensearch.index.mapper.MapperService.INDEX_MAPPING_TOTAL_FIELDS_LIMIT_SETTING;
+import static org.opensearch.searchrelevance.common.PluginConstants.MAX_TOTAL_FIELDS_LIMIT;
+
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -27,6 +30,7 @@ import org.opensearch.action.search.ShardSearchFailure;
 import org.opensearch.action.support.WriteRequest;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.io.Streams;
+import org.opensearch.common.settings.Settings;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.core.xcontent.XContentBuilder;
@@ -71,7 +75,8 @@ public class SearchRelevanceIndicesManager {
             stepListener.onResponse(null);
             return;
         }
-        final CreateIndexRequest createIndexRequest = new CreateIndexRequest(indexName).mapping(mapping);
+        Settings settings = Settings.builder().put(INDEX_MAPPING_TOTAL_FIELDS_LIMIT_SETTING.getKey(), MAX_TOTAL_FIELDS_LIMIT).build();
+        final CreateIndexRequest createIndexRequest = new CreateIndexRequest(indexName).mapping(mapping).settings(settings);
         StashedThreadContext.run(client, () -> client.admin().indices().create(createIndexRequest, new ActionListener<>() {
             @Override
             public void onResponse(final CreateIndexResponse createIndexResponse) {

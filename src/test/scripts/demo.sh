@@ -330,34 +330,6 @@ exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/judgments" \
 IMPORTED_JUDGMENT_LIST_ID=`jq -r '.judgment_id' < RES`
 
 echo
-echo Expand total fields limit for SRW indexes 
-
-# TODO Fix the bug the we need to increase the number of fields due to our use of dynamice field
-curl -s -X PUT "http://localhost:9200/.plugins-search-relevance-experiment/_settings" \
--H "Content-type: application/json" \
--d'{
-  "index.mapping.total_fields.limit": 20000
-}'
-
-curl -s -X PUT "http://localhost:9200/search-relevance-judgment/_settings" \
--H "Content-type: application/json" \
--d'{
-  "index.mapping.total_fields.limit": 20000
-}'
-
-curl -s -X PUT "http://localhost:9200/search-relevance-evaluation-result/_settings" \
--H "Content-type: application/json" \
--d'{
-  "index.mapping.total_fields.limit": 20000
-}'
-
-curl -s -X PUT "http://localhost:9200/search-relevance-experiment-variant/_settings" \
--H "Content-type: application/json" \
--d'{
-  "index.mapping.total_fields.limit": 20000
-}'
-
-echo
 echo Upload ESCI Judgments 
 
 exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/judgments" \
