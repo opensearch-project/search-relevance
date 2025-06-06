@@ -29,11 +29,11 @@ import lombok.SneakyThrows;
 
 @ThreadLeakScope(ThreadLeakScope.Scope.NONE)
 @OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.SUITE)
-public class SearchConfigIT extends BaseSearchRelevanceIT {
+public class SearchConfigurationIT extends BaseSearchRelevanceIT {
 
     @SneakyThrows
     public void testMainActions_whenCreateReadDeleteSearchConfig_thenSuccessful() {
-        String requestBody = Files.readString(Path.of(classLoader.getResource("searchconfig/CreateSearchConfig.json").toURI()));
+        String requestBody = Files.readString(Path.of(classLoader.getResource("searchconfig/CreateSearchConfiguration.json").toURI()));
         Response uploadResponse = makeRequest(
             client(),
             RestRequest.Method.PUT.name(),
