@@ -214,7 +214,6 @@ fi
 echo
 echo Upload Manually Curated Query Set 
 
-curl -s -X POST "http://localhost:9200/ecommerce/_bulk?pretty" -H 'Content-Type: application/json' --data-binary @transformed_esci_1.json
 exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/query_sets" \
 -H "Content-type: application/json" \
 -d'{
