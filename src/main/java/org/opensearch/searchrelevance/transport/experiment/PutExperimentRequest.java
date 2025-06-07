@@ -9,6 +9,7 @@ package org.opensearch.searchrelevance.transport.experiment;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 import org.opensearch.action.ActionRequest;
 import org.opensearch.action.ActionRequestValidationException;
@@ -24,6 +25,7 @@ public class PutExperimentRequest extends ActionRequest {
     private final List<String> searchConfigurationList;
     private final List<String> judgmentList;
     private final int size;
+    private final List<Map<String, Object>> evaluationResultList;
 
     public PutExperimentRequest(
         @NonNull ExperimentType type,
@@ -37,6 +39,22 @@ public class PutExperimentRequest extends ActionRequest {
         this.searchConfigurationList = searchConfigurationList;
         this.judgmentList = judgmentList;
         this.size = size;
+        this.evaluationResultList = null;
+    }
+
+    public PutExperimentRequest(
+        @NonNull ExperimentType type,
+        @NonNull String querySetId,
+        @NonNull List<String> searchConfigurationList,
+        @NonNull List<String> judgmentList,
+        @NonNull List<Map<String, Object>> evaluationResultList
+    ) {
+        this.type = type;
+        this.querySetId = querySetId;
+        this.searchConfigurationList = searchConfigurationList;
+        this.judgmentList = judgmentList;
+        this.size = 0; // Not used for import case
+        this.evaluationResultList = evaluationResultList;
     }
 
     public PutExperimentRequest(StreamInput in) throws IOException {
@@ -46,6 +64,7 @@ public class PutExperimentRequest extends ActionRequest {
         this.searchConfigurationList = in.readStringList();
         this.judgmentList = in.readStringList();
         this.size = in.readInt();
+        this.evaluationResultList = in.readBoolean() ? in.readList(StreamInput::readMap) : null;
     }
 
     @Override
@@ -56,6 +75,12 @@ public class PutExperimentRequest extends ActionRequest {
         out.writeStringArray(searchConfigurationList.toArray(new String[0]));
         out.writeStringArray(judgmentList.toArray(new String[0]));
         out.writeInt(size);
+        if (evaluationResultList != null) {
+            out.writeBoolean(true);
+            out.writeCollection(evaluationResultList, StreamOutput::writeMap);
+        } else {
+            out.writeBoolean(false);
+        }
     }
 
     public ExperimentType getType() {
@@ -76,6 +101,10 @@ public class PutExperimentRequest extends ActionRequest {
 
     public List<String> getJudgmentList() {
         return judgmentList;
+    }
+
+    public List<Map<String, Object>> getEvaluationResultList() {
+        return evaluationResultList;
     }
 
     @Override
