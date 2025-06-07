@@ -340,14 +340,7 @@ exe curl -s -X GET "http://localhost:9200/_plugins/_search_relevance/experiments
    }'
 
 echo
-echo Upload ESCI Judgments 
-
-# TODO Fix the bug the we arne't creating the judgement index using our defintion in the api
-curl -s -X PUT "http://localhost:9200/search-relevance-judgment/_settings" \
--H "Content-type: application/json" \
--d'{
-  "index.mapping.total_fields.limit": 20000
-}'
+echo Upload ESCI Judgments
 
 exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/judgments" \
 -H "Content-type: application/json" \
