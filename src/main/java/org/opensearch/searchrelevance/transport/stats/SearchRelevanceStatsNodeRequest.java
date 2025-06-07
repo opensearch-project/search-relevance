@@ -43,7 +43,7 @@ public class SearchRelevanceStatsNodeRequest extends TransportRequest {
     /**
      * Constructor
      *
-     * @param request NeuralStatsRequest
+     * @param request SearchRelevanceStatsRequest
      */
     public SearchRelevanceStatsNodeRequest(SearchRelevanceStatsRequest request) {
         this.request = request;

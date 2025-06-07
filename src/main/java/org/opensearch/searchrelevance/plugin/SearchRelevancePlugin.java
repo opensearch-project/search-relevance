@@ -96,6 +96,7 @@ import org.opensearch.searchrelevance.transport.searchConfiguration.PutSearchCon
 import org.opensearch.searchrelevance.transport.searchConfiguration.PutSearchConfigurationTransportAction;
 import org.opensearch.searchrelevance.transport.stats.SearchRelevanceStatsAction;
 import org.opensearch.searchrelevance.transport.stats.SearchRelevanceStatsTransportAction;
+import org.opensearch.searchrelevance.utils.ClusterUtil;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.client.Client;
 import org.opensearch.watcher.ResourceWatcherService;
@@ -118,6 +119,7 @@ public class SearchRelevancePlugin extends Plugin implements ActionPlugin, Syste
     private MLAccessor mlAccessor;
     private MetricsHelper metricsHelper;
     private SearchRelevanceSettingsAccessor settingsAccessor;
+    private ClusterUtil clusterUtil;
     private InfoStatsManager infoStatsManager;
 
     @Override
@@ -156,6 +158,7 @@ public class SearchRelevancePlugin extends Plugin implements ActionPlugin, Syste
         this.mlAccessor = new MLAccessor(mlClient);
         this.metricsHelper = new MetricsHelper(clusterService, client, judgmentDao, evaluationResultDao, experimentVariantDao);
         this.settingsAccessor = new SearchRelevanceSettingsAccessor(clusterService, environment.settings());
+        this.clusterUtil = new ClusterUtil(clusterService);
         this.infoStatsManager = new InfoStatsManager(settingsAccessor);
         EventStatsManager.instance().initialize(settingsAccessor);
 
@@ -198,7 +201,7 @@ public class SearchRelevancePlugin extends Plugin implements ActionPlugin, Syste
             new RestPutExperimentAction(settingsAccessor),
             new RestGetExperimentAction(settingsAccessor),
             new RestDeleteExperimentAction(settingsAccessor),
-            new RestSearchRelevanceStatsAction(settingsAccessor)
+            new RestSearchRelevanceStatsAction(settingsAccessor, clusterUtil)
         );
     }
 

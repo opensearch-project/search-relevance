@@ -18,6 +18,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.opensearch.Version;
 import org.opensearch.common.util.set.Sets;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.rest.BaseRestHandler;
@@ -30,6 +31,7 @@ import org.opensearch.searchrelevance.stats.events.EventStatName;
 import org.opensearch.searchrelevance.stats.info.InfoStatName;
 import org.opensearch.searchrelevance.transport.stats.SearchRelevanceStatsAction;
 import org.opensearch.searchrelevance.transport.stats.SearchRelevanceStatsRequest;
+import org.opensearch.searchrelevance.utils.ClusterUtil;
 import org.opensearch.transport.client.node.NodeClient;
 
 import com.google.common.collect.ImmutableList;
@@ -39,7 +41,7 @@ import lombok.AllArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 
 /**
- * Rest action handler for the neural stats API
+ * Rest action handler for the search relevance stats API
  * Calculates info stats and aggregates event stats from nodes and returns them in the response
  */
 @Log4j2
@@ -76,6 +78,7 @@ public class RestSearchRelevanceStatsAction extends BaseRestHandler {
     public static final int MAX_PARAM_LENGTH = 255;
 
     private SearchRelevanceSettingsAccessor settingsAccessor;
+    private ClusterUtil clusterUtil;
 
     private static final String NAME = "search_relevance_stats_action";
 
@@ -85,7 +88,7 @@ public class RestSearchRelevanceStatsAction extends BaseRestHandler {
         .map(str -> str.toLowerCase(Locale.ROOT))
         .collect(Collectors.toSet());
 
-    private static final Set<String> STATE_STAT_NAMES = EnumSet.allOf(InfoStatName.class)
+    private static final Set<String> INFO_STAT_NAMES = EnumSet.allOf(InfoStatName.class)
         .stream()
         .map(InfoStatName::getNameString)
         .map(str -> str.toLowerCase(Locale.ROOT))
@@ -101,7 +104,7 @@ public class RestSearchRelevanceStatsAction extends BaseRestHandler {
     private static final Set<String> RESPONSE_PARAMS = ImmutableSet.of(NODE_ID_PARAM, STAT_PARAM, INCLUDE_METADATA_PARAM, FLATTEN_PARAM);
 
     /**
-     * Validates a param string if its under the max length and matches simple string pattern
+     * Validates a param string if it's under the max length and matches simple string pattern
      * @param param the string to validate
      * @return whether it's valid
      */
@@ -153,7 +156,7 @@ public class RestSearchRelevanceStatsAction extends BaseRestHandler {
      * @return SearchRelevanceStatsRequest
      */
     private SearchRelevanceStatsRequest createStatsRequest(RestRequest request) {
-        SearchRelevanceStatsInput searchRelevanceStatsInput = createNeuralStatsInputFromRequestParams(request);
+        SearchRelevanceStatsInput searchRelevanceStatsInput = createSearchRelevanceStatsInputFromRequestParams(request);
         String[] nodeIdsArr = searchRelevanceStatsInput.getNodeIds().toArray(new String[0]);
 
         SearchRelevanceStatsRequest searchRelevanceStatsRequest = new SearchRelevanceStatsRequest(nodeIdsArr, searchRelevanceStatsInput);
@@ -162,7 +165,7 @@ public class RestSearchRelevanceStatsAction extends BaseRestHandler {
         return searchRelevanceStatsRequest;
     }
 
-    private SearchRelevanceStatsInput createNeuralStatsInputFromRequestParams(RestRequest request) {
+    private SearchRelevanceStatsInput createSearchRelevanceStatsInputFromRequestParams(RestRequest request) {
         SearchRelevanceStatsInput searchRelevanceStatsInput = new SearchRelevanceStatsInput();
 
         // Parse specified nodes
@@ -189,10 +192,11 @@ public class RestSearchRelevanceStatsAction extends BaseRestHandler {
     private void processStatsRequestParameters(RestRequest request, SearchRelevanceStatsInput searchRelevanceStatsInput) {
         // Determine which stat names to retrieve based on user parameters
         Optional<String[]> optionalStats = splitCommaSeparatedParam(request, STAT_PARAM);
+        Version minClusterVersion = clusterUtil.getClusterMinVersion();
 
         if (optionalStats.isPresent() == false || optionalStats.get().length == 0) {
             // No specific stats requested, add all stats by default
-            addAllStats(searchRelevanceStatsInput);
+            addAllStats(searchRelevanceStatsInput, minClusterVersion);
             return;
         }
 
@@ -201,32 +205,58 @@ public class RestSearchRelevanceStatsAction extends BaseRestHandler {
         for (String stat : stats) {
             // Validate parameter
             String normalizedStat = stat.toLowerCase(Locale.ROOT);
-            if (isValidParamString(normalizedStat) == false) {
+            if (isValidParamString(normalizedStat) == false || isValidEventOrInfoStatName(normalizedStat) == false) {
                 invalidStatNames.add(normalizedStat);
                 continue;
             }
 
-            if (EVENT_STAT_NAMES.contains(normalizedStat)) {
-                searchRelevanceStatsInput.getEventStatNames().add(EventStatName.from(normalizedStat));
-            } else if (STATE_STAT_NAMES.contains(normalizedStat)) {
-                searchRelevanceStatsInput.getInfoStatNames().add(InfoStatName.from(normalizedStat));
-            } else {
-                invalidStatNames.add(normalizedStat);
+            if (InfoStatName.isValidName(normalizedStat)) {
+                InfoStatName infoStatName = InfoStatName.from(normalizedStat);
+                if (infoStatName.version().onOrBefore(minClusterVersion)) {
+                    searchRelevanceStatsInput.getInfoStatNames().add(InfoStatName.from(normalizedStat));
+                }
+            } else if (EventStatName.isValidName(normalizedStat)) {
+                EventStatName eventStatName = EventStatName.from(normalizedStat);
+                if (eventStatName.version().onOrBefore(minClusterVersion)) {
+                    searchRelevanceStatsInput.getEventStatNames().add(EventStatName.from(normalizedStat));
+                }
             }
         }
 
         // When we reach this block, we must have added at least one stat to the input, or else invalid stats will be
-        // non empty. So throwing this exception here without adding all covers the empty input case.
+        // non-empty. So throwing this exception here without adding all covers the empty input case.
         if (invalidStatNames.isEmpty() == false) {
             throw new IllegalArgumentException(
-                unrecognized(request, invalidStatNames, Sets.union(EVENT_STAT_NAMES, STATE_STAT_NAMES), STAT_PARAM)
+                unrecognized(request, invalidStatNames, Sets.union(EVENT_STAT_NAMES, INFO_STAT_NAMES), STAT_PARAM)
             );
         }
     }
 
-    private void addAllStats(SearchRelevanceStatsInput searchRelevanceStatsInput) {
-        searchRelevanceStatsInput.getEventStatNames().addAll(EnumSet.allOf(EventStatName.class));
-        searchRelevanceStatsInput.getInfoStatNames().addAll(EnumSet.allOf(InfoStatName.class));
+    private void addAllStats(SearchRelevanceStatsInput searchRelevanceStatsInput, Version minVersion) {
+        if (minVersion == Version.CURRENT) {
+            searchRelevanceStatsInput.getInfoStatNames().addAll(EnumSet.allOf(InfoStatName.class));
+            searchRelevanceStatsInput.getEventStatNames().addAll(EnumSet.allOf(EventStatName.class));
+        } else {
+            // Use a separate case here to save on version comparison if not necessary
+            searchRelevanceStatsInput.getInfoStatNames()
+                .addAll(
+                    EnumSet.allOf(InfoStatName.class)
+                        .stream()
+                        .filter(statName -> statName.version().onOrBefore(minVersion))
+                        .collect(Collectors.toCollection(() -> EnumSet.noneOf(InfoStatName.class)))
+                );
+            searchRelevanceStatsInput.getEventStatNames()
+                .addAll(
+                    EnumSet.allOf(EventStatName.class)
+                        .stream()
+                        .filter(statName -> statName.version().onOrBefore(minVersion))
+                        .collect(Collectors.toCollection(() -> EnumSet.noneOf(EventStatName.class)))
+                );
+        }
+    }
+
+    private boolean isValidEventOrInfoStatName(String statName) {
+        return InfoStatName.isValidName(statName) || EventStatName.isValidName(statName);
     }
 
     private Optional<String[]> splitCommaSeparatedParam(RestRequest request, String paramName) {

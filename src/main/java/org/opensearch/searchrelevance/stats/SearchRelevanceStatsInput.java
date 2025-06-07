@@ -64,7 +64,7 @@ public class SearchRelevanceStatsInput implements ToXContentObject, Writeable {
     private boolean flatten;
 
     /**
-     * Builder constructor for creating NeuralStatsInput with specific filtering parameters.
+     * Builder constructor for creating SearchRelevanceStatsInput with specific filtering parameters.
      *
      * @param nodeIds node IDs to retrieve stats from
      * @param eventStatNames event stats to retrieve

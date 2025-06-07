@@ -24,6 +24,7 @@ import org.junit.Before;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.opensearch.Version;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
@@ -39,6 +40,7 @@ import org.opensearch.searchrelevance.stats.info.InfoStatName;
 import org.opensearch.searchrelevance.transport.stats.SearchRelevanceStatsAction;
 import org.opensearch.searchrelevance.transport.stats.SearchRelevanceStatsRequest;
 import org.opensearch.searchrelevance.transport.stats.SearchRelevanceStatsResponse;
+import org.opensearch.searchrelevance.utils.ClusterUtil;
 import org.opensearch.test.rest.FakeRestRequest;
 import org.opensearch.threadpool.TestThreadPool;
 import org.opensearch.threadpool.ThreadPool;
@@ -54,12 +56,19 @@ public class RestSearchRelevanceStatsActionTests extends SearchRelevanceRestTest
     @Mock
     private SearchRelevanceSettingsAccessor settingsAccessor;
 
+    @Mock
+    private ClusterUtil clusterUtil;
+
     @Before
     public void setup() {
         MockitoAnnotations.openMocks(this);
 
         threadPool = new TestThreadPool(this.getClass().getSimpleName() + "ThreadPool");
         client = spy(new NodeClient(Settings.EMPTY, threadPool));
+
+        when(clusterUtil.getClusterMinVersion()).thenReturn(Version.CURRENT);
+        when(settingsAccessor.isStatsEnabled()).thenReturn(true);
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
 
         doAnswer(invocation -> {
             ActionListener<SearchRelevanceStatsResponse> actionListener = invocation.getArgument(2);
@@ -75,9 +84,7 @@ public class RestSearchRelevanceStatsActionTests extends SearchRelevanceRestTest
     }
 
     public void test_execute() throws Exception {
-        when(settingsAccessor.isStatsEnabled()).thenReturn(true);
-        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
-        RestSearchRelevanceStatsAction restSearchRelevanceStatsAction = new RestSearchRelevanceStatsAction(settingsAccessor);
+        RestSearchRelevanceStatsAction restSearchRelevanceStatsAction = new RestSearchRelevanceStatsAction(settingsAccessor, clusterUtil);
 
         RestRequest request = getRestRequest();
         restSearchRelevanceStatsAction.handleRequest(request, channel, client);
@@ -92,11 +99,26 @@ public class RestSearchRelevanceStatsActionTests extends SearchRelevanceRestTest
         assertFalse(capturedInput.isIncludeMetadata());
     }
 
+    public void test_execute_olderVersion() throws Exception {
+        when(clusterUtil.getClusterMinVersion()).thenReturn(Version.V_3_0_0);
+
+        RestSearchRelevanceStatsAction restSearchRelevanceStatsAction = new RestSearchRelevanceStatsAction(settingsAccessor, clusterUtil);
+
+        RestRequest request = getRestRequest();
+        restSearchRelevanceStatsAction.handleRequest(request, channel, client);
+
+        ArgumentCaptor<SearchRelevanceStatsRequest> argumentCaptor = ArgumentCaptor.forClass(SearchRelevanceStatsRequest.class);
+        verify(client, times(1)).execute(eq(SearchRelevanceStatsAction.INSTANCE), argumentCaptor.capture(), any());
+
+        SearchRelevanceStatsInput capturedInput = argumentCaptor.getValue().getSearchRelevanceStatsInput();
+        assertEquals(capturedInput.getEventStatNames(), EnumSet.noneOf(EventStatName.class));
+        assertEquals(capturedInput.getInfoStatNames(), EnumSet.noneOf(InfoStatName.class));
+    }
+
     public void test_handleRequest_disabledForbidden() throws Exception {
         when(settingsAccessor.isStatsEnabled()).thenReturn(false);
-        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
 
-        RestSearchRelevanceStatsAction restSearchRelevanceStatsAction = new RestSearchRelevanceStatsAction(settingsAccessor);
+        RestSearchRelevanceStatsAction restSearchRelevanceStatsAction = new RestSearchRelevanceStatsAction(settingsAccessor, clusterUtil);
 
         RestRequest request = getRestRequest();
         restSearchRelevanceStatsAction.handleRequest(request, channel, client);
@@ -111,10 +133,7 @@ public class RestSearchRelevanceStatsActionTests extends SearchRelevanceRestTest
     }
 
     public void test_execute_statParameters() throws Exception {
-        when(settingsAccessor.isStatsEnabled()).thenReturn(true);
-        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
-
-        RestSearchRelevanceStatsAction restSearchRelevanceStatsAction = new RestSearchRelevanceStatsAction(settingsAccessor);
+        RestSearchRelevanceStatsAction restSearchRelevanceStatsAction = new RestSearchRelevanceStatsAction(settingsAccessor, clusterUtil);
 
         // Create request with stats not existing on 3.0.0
         Map<String, String> params = new HashMap<>();
@@ -122,8 +141,8 @@ public class RestSearchRelevanceStatsActionTests extends SearchRelevanceRestTest
             "stat",
             String.join(
                 ",",
-                EventStatName.LLM_JUDGMENT_SCORE_GENERATIONS.getNameString(),
-                EventStatName.UBI_JUDGMENT_SCORE_GENERATIONS.getNameString()
+                EventStatName.LLM_JUDGMENT_RATING_GENERATIONS.getNameString(),
+                EventStatName.UBI_JUDGMENT_RATING_GENERATIONS.getNameString()
             )
         );
         params.put("include_metadata", "true");
@@ -138,18 +157,43 @@ public class RestSearchRelevanceStatsActionTests extends SearchRelevanceRestTest
         SearchRelevanceStatsInput capturedInput = argumentCaptor.getValue().getSearchRelevanceStatsInput();
         assertEquals(
             capturedInput.getEventStatNames(),
-            EnumSet.of(EventStatName.LLM_JUDGMENT_SCORE_GENERATIONS, EventStatName.UBI_JUDGMENT_SCORE_GENERATIONS)
+            EnumSet.of(EventStatName.LLM_JUDGMENT_RATING_GENERATIONS, EventStatName.UBI_JUDGMENT_RATING_GENERATIONS)
         );
         assertEquals(capturedInput.getInfoStatNames(), EnumSet.noneOf(InfoStatName.class));
         assertTrue(capturedInput.isFlatten());
         assertTrue(capturedInput.isIncludeMetadata());
     }
 
-    public void test_handleRequest_invalidStatParameter() throws Exception {
-        when(settingsAccessor.isStatsEnabled()).thenReturn(true);
-        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+    public void test_execute_statParameters_olderVersion() throws Exception {
+        when(clusterUtil.getClusterMinVersion()).thenReturn(Version.V_3_0_0);
 
-        RestSearchRelevanceStatsAction restSearchRelevanceStatsAction = new RestSearchRelevanceStatsAction(settingsAccessor);
+        RestSearchRelevanceStatsAction restSearchRelevanceStatsAction = new RestSearchRelevanceStatsAction(settingsAccessor, clusterUtil);
+
+        // Create request with stats not existing on 3.0.0
+        Map<String, String> params = new HashMap<>();
+        params.put(
+            "stat",
+            String.join(
+                ",",
+                EventStatName.LLM_JUDGMENT_RATING_GENERATIONS.getNameString(),
+                EventStatName.UBI_JUDGMENT_RATING_GENERATIONS.getNameString(),
+                EventStatName.IMPORT_JUDGMENT_RATING_GENERATIONS.getNameString()
+            )
+        );
+        RestRequest request = new FakeRestRequest.Builder(NamedXContentRegistry.EMPTY).withParams(params).build();
+
+        restSearchRelevanceStatsAction.handleRequest(request, channel, client);
+
+        ArgumentCaptor<SearchRelevanceStatsRequest> argumentCaptor = ArgumentCaptor.forClass(SearchRelevanceStatsRequest.class);
+        verify(client, times(1)).execute(eq(SearchRelevanceStatsAction.INSTANCE), argumentCaptor.capture(), any());
+
+        SearchRelevanceStatsInput capturedInput = argumentCaptor.getValue().getSearchRelevanceStatsInput();
+        assertEquals(capturedInput.getEventStatNames(), EnumSet.noneOf(EventStatName.class));
+        assertEquals(capturedInput.getInfoStatNames(), EnumSet.noneOf(InfoStatName.class));
+    }
+
+    public void test_handleRequest_invalidStatParameter() throws Exception {
+        RestSearchRelevanceStatsAction restSearchRelevanceStatsAction = new RestSearchRelevanceStatsAction(settingsAccessor, clusterUtil);
 
         // Create request with invalid stat parameter
         Map<String, String> params = new HashMap<>();

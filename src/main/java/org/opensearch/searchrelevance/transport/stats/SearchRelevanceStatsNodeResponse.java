@@ -58,8 +58,8 @@ public class SearchRelevanceStatsNodeResponse extends BaseNodeResponse implement
      * @throws IOException throws an IO exception if the StreamInput cannot be read from
      */
     public static SearchRelevanceStatsNodeResponse readStats(StreamInput in) throws IOException {
-        SearchRelevanceStatsNodeResponse neuralStats = new SearchRelevanceStatsNodeResponse(in);
-        return neuralStats;
+        SearchRelevanceStatsNodeResponse response = new SearchRelevanceStatsNodeResponse(in);
+        return response;
     }
 
     @Override

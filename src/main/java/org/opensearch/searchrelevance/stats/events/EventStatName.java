@@ -12,6 +12,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.opensearch.Version;
 import org.opensearch.searchrelevance.stats.common.StatName;
 
 import lombok.Getter;
@@ -21,14 +22,30 @@ import lombok.Getter;
  */
 @Getter
 public enum EventStatName implements StatName {
-    IMPORT_JUDGMENT_SCORE_GENERATIONS("import_judgment_score_generations", "judgment", EventStatType.TIMESTAMPED_EVENT_COUNTER),
-    LLM_JUDGMENT_SCORE_GENERATIONS("llm_judgment_score_generations", "judgment", EventStatType.TIMESTAMPED_EVENT_COUNTER),
-    UBI_JUDGMENT_SCORE_GENERATIONS("ubi_judgment_score_generations", "judgment", EventStatType.TIMESTAMPED_EVENT_COUNTER),;
+    IMPORT_JUDGMENT_RATING_GENERATIONS(
+        "import_judgment_rating_generations",
+        "judgments",
+        EventStatType.TIMESTAMPED_EVENT_COUNTER,
+        Version.V_3_1_0
+    ),
+    LLM_JUDGMENT_RATING_GENERATIONS(
+        "llm_judgment_rating_generations",
+        "judgments",
+        EventStatType.TIMESTAMPED_EVENT_COUNTER,
+        Version.V_3_1_0
+    ),
+    UBI_JUDGMENT_RATING_GENERATIONS(
+        "ubi_judgment_rating_generations",
+        "judgments",
+        EventStatType.TIMESTAMPED_EVENT_COUNTER,
+        Version.V_3_1_0
+    ),;
 
     private final String nameString;
     private final String path;
     private final EventStatType statType;
     private EventStat eventStat;
+    private final Version version;
 
     /**
      * Enum lookup table by nameString
@@ -42,10 +59,11 @@ public enum EventStatName implements StatName {
      * @param path the unique path of the stat
      * @param statType the category of stat
      */
-    EventStatName(String nameString, String path, EventStatType statType) {
+    EventStatName(String nameString, String path, EventStatType statType, Version version) {
         this.nameString = nameString;
         this.path = path;
         this.statType = statType;
+        this.version = version;
 
         switch (statType) {
             case EventStatType.TIMESTAMPED_EVENT_COUNTER:
@@ -68,7 +86,7 @@ public enum EventStatName implements StatName {
      * @return the StatName enum associated with that String name
      */
     public static EventStatName from(String name) {
-        if (BY_NAME.containsKey(name) == false) {
+        if (isValidName(name) == false) {
             throw new IllegalArgumentException(String.format(Locale.ROOT, "Event stat not found: %s", name));
         }
         return BY_NAME.get(name);
@@ -83,6 +101,23 @@ public enum EventStatName implements StatName {
             return nameString;
         }
         return String.join(".", path, nameString);
+    }
+
+    /**
+     * Determines whether a given string is a valid stat name
+     * @param name name of the stat
+     * @return whether the name is valid
+     */
+    public static boolean isValidName(String name) {
+        return BY_NAME.containsKey(name);
+    }
+
+    /**
+     * Gets the version the stat was added
+     * @return the version the stat was added
+     */
+    public Version version() {
+        return this.version;
     }
 
     @Override

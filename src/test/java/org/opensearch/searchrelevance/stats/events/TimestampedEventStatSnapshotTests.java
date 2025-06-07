@@ -25,7 +25,7 @@ import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.test.OpenSearchTestCase;
 
 public class TimestampedEventStatSnapshotTests extends OpenSearchTestCase {
-    private static final EventStatName STAT_NAME = EventStatName.LLM_JUDGMENT_SCORE_GENERATIONS;
+    private static final EventStatName STAT_NAME = EventStatName.LLM_JUDGMENT_RATING_GENERATIONS;
 
     public void test_constructorAndGetters() {
         TimestampedEventStatSnapshot snapshot = new TimestampedEventStatSnapshot(STAT_NAME, 100L, 50L, 10L);

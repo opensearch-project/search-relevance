@@ -17,7 +17,7 @@ import org.opensearch.searchrelevance.stats.SearchRelevanceStatsInput;
 import lombok.Getter;
 
 /**
- * NeuralStatsRequest gets node (cluster) level Stats for Neural
+ * SearchRelevanceStatsRequest gets node (cluster) level Stats for search relevance
  * By default, all parameters will be true
  */
 public class SearchRelevanceStatsRequest extends BaseNodesRequest<SearchRelevanceStatsRequest> {

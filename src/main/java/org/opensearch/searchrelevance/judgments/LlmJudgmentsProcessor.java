@@ -89,7 +89,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
 
     @Override
     public void generateJudgmentRating(Map<String, Object> metadata, ActionListener<List<Map<String, Object>>> listener) {
-        EventStatsManager.increment(EventStatName.LLM_JUDGMENT_SCORE_GENERATIONS);
+        EventStatsManager.increment(EventStatName.LLM_JUDGMENT_RATING_GENERATIONS);
         String querySetId = (String) metadata.get("querySetId");
         List<String> searchConfigurationList = (List<String>) metadata.get("searchConfigurationList");
         int size = (int) metadata.get("size");

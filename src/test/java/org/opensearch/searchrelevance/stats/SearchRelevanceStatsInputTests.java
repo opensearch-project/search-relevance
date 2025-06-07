@@ -34,7 +34,7 @@ import org.opensearch.test.OpenSearchTestCase;
 public class SearchRelevanceStatsInputTests extends OpenSearchTestCase {
     private static final String NODE_ID_1 = "node1";
     private static final String NODE_ID_2 = "node2";
-    private static final EventStatName EVENT_STAT = EventStatName.LLM_JUDGMENT_SCORE_GENERATIONS;
+    private static final EventStatName EVENT_STAT = EventStatName.LLM_JUDGMENT_RATING_GENERATIONS;
     private static final InfoStatName STATE_STAT = InfoStatName.CLUSTER_VERSION;
 
     public void test_defaultConstructorEmpty() {

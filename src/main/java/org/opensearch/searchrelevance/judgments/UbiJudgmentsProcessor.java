@@ -40,7 +40,7 @@ public class UbiJudgmentsProcessor implements BaseJudgmentsProcessor {
 
     @Override
     public void generateJudgmentRating(Map<String, Object> metadata, ActionListener<List<Map<String, Object>>> listener) {
-        EventStatsManager.increment(EventStatName.UBI_JUDGMENT_SCORE_GENERATIONS);
+        EventStatsManager.increment(EventStatName.UBI_JUDGMENT_RATING_GENERATIONS);
         String clickModel = (String) metadata.get("clickModel");
         int maxRank = (int) metadata.get("maxRank");
 

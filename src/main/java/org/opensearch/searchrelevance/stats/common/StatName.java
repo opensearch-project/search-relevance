@@ -7,6 +7,8 @@
  */
 package org.opensearch.searchrelevance.stats.common;
 
+import org.opensearch.Version;
+
 /**
  * Interface for objects that hold stat name, path, and type information.
  * The stat name is used as the unique identifier for the stat. It can be used as a request parameter for user filtering.
@@ -30,4 +32,10 @@ public interface StatName {
      * @return the stat type
      */
     StatType getStatType();
+
+    /**
+     * The release version the stat that it was added in
+     * @return the version the stat was added
+     */
+    Version version();
 }
