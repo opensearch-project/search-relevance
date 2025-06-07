@@ -21,9 +21,9 @@ public class EventStatNameTests extends OpenSearchTestCase {
     public static final EnumSet<EventStatName> EVENT_STATS = EnumSet.allOf(EventStatName.class);
 
     public void test_fromValid() {
-        String validStatName = EventStatName.LLM_JUDGMENT_SCORE_GENERATIONS.getNameString();
+        String validStatName = EventStatName.LLM_JUDGMENT_RATING_GENERATIONS.getNameString();
         EventStatName result = EventStatName.from(validStatName);
-        assertEquals(EventStatName.LLM_JUDGMENT_SCORE_GENERATIONS, result);
+        assertEquals(EventStatName.LLM_JUDGMENT_RATING_GENERATIONS, result);
     }
 
     public void test_fromInvalid() {

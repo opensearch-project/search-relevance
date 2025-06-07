@@ -19,7 +19,7 @@ import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.test.OpenSearchTestCase;
 
 public class EventStatsManagerTests extends OpenSearchTestCase {
-    private static final EventStatName STAT_NAME = EventStatName.LLM_JUDGMENT_SCORE_GENERATIONS;
+    private static final EventStatName STAT_NAME = EventStatName.LLM_JUDGMENT_RATING_GENERATIONS;
 
     @Mock
     private SearchRelevanceSettingsAccessor mockSettingsAccessor;

@@ -62,7 +62,7 @@ public class SearchRelevanceStatsTransportActionTests extends OpenSearchTestCase
     private ClusterName clusterName;
 
     private static InfoStatName infoStatName = InfoStatName.CLUSTER_VERSION;
-    private static EventStatName eventStatName = EventStatName.LLM_JUDGMENT_SCORE_GENERATIONS;
+    private static EventStatName eventStatName = EventStatName.LLM_JUDGMENT_RATING_GENERATIONS;
 
     @Before
     public void setup() {

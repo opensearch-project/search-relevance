@@ -122,8 +122,8 @@ public class RestSearchRelevanceStatsActionTests extends SearchRelevanceRestTest
             "stat",
             String.join(
                 ",",
-                EventStatName.LLM_JUDGMENT_SCORE_GENERATIONS.getNameString(),
-                EventStatName.UBI_JUDGMENT_SCORE_GENERATIONS.getNameString()
+                EventStatName.LLM_JUDGMENT_RATING_GENERATIONS.getNameString(),
+                EventStatName.UBI_JUDGMENT_RATING_GENERATIONS.getNameString()
             )
         );
         params.put("include_metadata", "true");
@@ -138,7 +138,7 @@ public class RestSearchRelevanceStatsActionTests extends SearchRelevanceRestTest
         SearchRelevanceStatsInput capturedInput = argumentCaptor.getValue().getSearchRelevanceStatsInput();
         assertEquals(
             capturedInput.getEventStatNames(),
-            EnumSet.of(EventStatName.LLM_JUDGMENT_SCORE_GENERATIONS, EventStatName.UBI_JUDGMENT_SCORE_GENERATIONS)
+            EnumSet.of(EventStatName.LLM_JUDGMENT_RATING_GENERATIONS, EventStatName.UBI_JUDGMENT_RATING_GENERATIONS)
         );
         assertEquals(capturedInput.getInfoStatNames(), EnumSet.noneOf(InfoStatName.class));
         assertTrue(capturedInput.isFlatten());

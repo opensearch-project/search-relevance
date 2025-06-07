@@ -13,6 +13,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.opensearch.Version;
+import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.searchrelevance.stats.common.StatSnapshot;
 
@@ -88,9 +90,7 @@ public class InfoStatsManager {
      */
     private void addClusterVersionStat(Map<InfoStatName, SettableInfoStatSnapshot<?>> stats) {
         InfoStatName infoStatName = InfoStatName.CLUSTER_VERSION;
-        // TODO : fix this
-        // String version = neuralSearchClusterUtil.getClusterMinVersion().toString();
-        stats.put(infoStatName, new SettableInfoStatSnapshot<>(infoStatName, ""));
+        stats.put(infoStatName, new SettableInfoStatSnapshot<>(infoStatName, Version.CURRENT));
     }
 
     /**

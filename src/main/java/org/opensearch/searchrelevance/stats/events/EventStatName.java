@@ -21,9 +21,9 @@ import lombok.Getter;
  */
 @Getter
 public enum EventStatName implements StatName {
-    IMPORT_JUDGMENT_SCORE_GENERATIONS("import_judgment_score_generations", "judgment", EventStatType.TIMESTAMPED_EVENT_COUNTER),
-    LLM_JUDGMENT_SCORE_GENERATIONS("llm_judgment_score_generations", "judgment", EventStatType.TIMESTAMPED_EVENT_COUNTER),
-    UBI_JUDGMENT_SCORE_GENERATIONS("ubi_judgment_score_generations", "judgment", EventStatType.TIMESTAMPED_EVENT_COUNTER),;
+    IMPORT_JUDGMENT_RATING_GENERATIONS("import_judgment_rating_generations", "judgment", EventStatType.TIMESTAMPED_EVENT_COUNTER),
+    LLM_JUDGMENT_RATING_GENERATIONS("llm_judgment_rating_generations", "judgment", EventStatType.TIMESTAMPED_EVENT_COUNTER),
+    UBI_JUDGMENT_RATING_GENERATIONS("ubi_judgment_rating_generations", "judgment", EventStatType.TIMESTAMPED_EVENT_COUNTER),;
 
     private final String nameString;
     private final String path;

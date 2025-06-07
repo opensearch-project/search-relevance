@@ -18,7 +18,7 @@ import org.opensearch.test.OpenSearchTestCase;
 
 public class TimestampedEventStatTests extends OpenSearchTestCase {
     private static final long BUCKET_INTERVAL_MS = 60 * 1000; // 60 seconds
-    private static final EventStatName STAT_NAME = EventStatName.LLM_JUDGMENT_SCORE_GENERATIONS;
+    private static final EventStatName STAT_NAME = EventStatName.LLM_JUDGMENT_RATING_GENERATIONS;
 
     @Spy
     private TimestampedEventStat stat;

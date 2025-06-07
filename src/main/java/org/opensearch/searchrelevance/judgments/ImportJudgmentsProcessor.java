@@ -38,7 +38,7 @@ public class ImportJudgmentsProcessor implements BaseJudgmentsProcessor {
 
     @Override
     public void generateJudgmentRating(Map<String, Object> metadata, ActionListener<Map<String, Map<String, String>>> listener) {
-        EventStatsManager.increment(EventStatName.LLM_JUDGMENT_SCORE_GENERATIONS);
+        EventStatsManager.increment(EventStatName.IMPORT_JUDGMENT_RATING_GENERATIONS);
 
         Map<String, Object> sourceJudgementRatings = (Map<String, Object>) metadata.get("judgmentRatings");
         metadata.remove("judgmentRatings");

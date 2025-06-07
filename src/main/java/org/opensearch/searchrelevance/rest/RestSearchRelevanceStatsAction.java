@@ -39,7 +39,7 @@ import lombok.AllArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 
 /**
- * Rest action handler for the neural stats API
+ * Rest action handler for the search relevance stats API
  * Calculates info stats and aggregates event stats from nodes and returns them in the response
  */
 @Log4j2
@@ -153,7 +153,7 @@ public class RestSearchRelevanceStatsAction extends BaseRestHandler {
      * @return SearchRelevanceStatsRequest
      */
     private SearchRelevanceStatsRequest createStatsRequest(RestRequest request) {
-        SearchRelevanceStatsInput searchRelevanceStatsInput = createNeuralStatsInputFromRequestParams(request);
+        SearchRelevanceStatsInput searchRelevanceStatsInput = createSearchRelevanceStatsInputFromRequestParams(request);
         String[] nodeIdsArr = searchRelevanceStatsInput.getNodeIds().toArray(new String[0]);
 
         SearchRelevanceStatsRequest searchRelevanceStatsRequest = new SearchRelevanceStatsRequest(nodeIdsArr, searchRelevanceStatsInput);
@@ -162,7 +162,7 @@ public class RestSearchRelevanceStatsAction extends BaseRestHandler {
         return searchRelevanceStatsRequest;
     }
 
-    private SearchRelevanceStatsInput createNeuralStatsInputFromRequestParams(RestRequest request) {
+    private SearchRelevanceStatsInput createSearchRelevanceStatsInputFromRequestParams(RestRequest request) {
         SearchRelevanceStatsInput searchRelevanceStatsInput = new SearchRelevanceStatsInput();
 
         // Parse specified nodes

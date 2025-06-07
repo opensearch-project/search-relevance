@@ -129,7 +129,7 @@ public class SearchRelevanceStatsTransportAction extends TransportNodesAction<
      */
     @Override
     protected SearchRelevanceStatsNodeResponse nodeOperation(SearchRelevanceStatsNodeRequest request) {
-        // Reads from NeuralStats to node level stats on an individual node
+        // Reads node level stats on an individual node
         EnumSet<EventStatName> eventStatsToRetrieve = request.getRequest().getSearchRelevanceStatsInput().getEventStatNames();
         Map<EventStatName, TimestampedEventStatSnapshot> eventStatDataMap = eventStatsManager.getTimestampedEventStatSnapshots(
             eventStatsToRetrieve
