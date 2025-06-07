@@ -10,6 +10,7 @@ package org.opensearch.searchrelevance.settings;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.common.settings.Settings;
+import org.opensearch.searchrelevance.stats.events.EventStatsManager;
 
 import lombok.Getter;
 
@@ -19,6 +20,8 @@ import lombok.Getter;
 public class SearchRelevanceSettingsAccessor {
     @Getter
     private volatile boolean isWorkbenchEnabled;
+    @Getter
+    private volatile boolean isStatsEnabled;
 
     /**
      * Constructor, registers callbacks to update settings
@@ -28,12 +31,21 @@ public class SearchRelevanceSettingsAccessor {
     @Inject
     public SearchRelevanceSettingsAccessor(ClusterService clusterService, Settings settings) {
         isWorkbenchEnabled = SearchRelevanceSettings.SEARCH_RELEVANCE_WORKBENCH_ENABLED.get(settings);
+        isStatsEnabled = SearchRelevanceSettings.SEARCH_RELEVANCE_STATS_ENABLED.get(settings);
         registerSettingsCallbacks(clusterService);
     }
 
     private void registerSettingsCallbacks(ClusterService clusterService) {
         clusterService.getClusterSettings().addSettingsUpdateConsumer(SearchRelevanceSettings.SEARCH_RELEVANCE_WORKBENCH_ENABLED, value -> {
             isWorkbenchEnabled = value;
+        });
+
+        clusterService.getClusterSettings().addSettingsUpdateConsumer(SearchRelevanceSettings.SEARCH_RELEVANCE_STATS_ENABLED, value -> {
+            // If stats are being toggled off, clear and reset all stats
+            if (isStatsEnabled && (value == false)) {
+                EventStatsManager.instance().reset();
+            }
+            isStatsEnabled = value;
         });
     }
 }
