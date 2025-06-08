@@ -667,7 +667,6 @@ public class CoecClickModel extends ClickModel {
         ActionListener<List<Map<String, Object>>> listener
     ) {
         LOGGER.debug("Starting COEC calculation with rank CTR: {}", rankAggregatedClickThrough);
-        // Map<String, Map<String, String>> judgmentRatings = new HashMap<>();
         List<Map<String, Object>> judgmentRatings = new ArrayList<>();
 
         for (Map.Entry<String, Set<ClickthroughRate>> entry : clickthroughRates.entrySet()) {
@@ -702,7 +701,6 @@ public class CoecClickModel extends ClickModel {
             LOGGER.debug(
                 "Final judgment ratings size - Queries: {}, Total Documents: {}",
                 judgmentRatings.size(),
-                // judgmentRatings.values().stream().mapToInt(Map::size).sum()
                 judgmentRatings.stream().mapToInt(item -> ((Map<String, Object>) item.get("ratings")).size()).sum()
             );
             listener.onResponse(judgmentRatings);

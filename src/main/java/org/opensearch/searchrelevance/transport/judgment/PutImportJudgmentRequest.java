@@ -38,7 +38,6 @@ public class PutImportJudgmentRequest extends PutJudgmentRequest {
     @Override
     public void writeTo(StreamOutput out) throws IOException {
         super.writeTo(out);
-        // out.writeList(judgmentScores);
         out.writeCollection(judgmentScores, StreamOutput::writeMap);
     }
 

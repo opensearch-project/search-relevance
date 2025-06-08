@@ -45,7 +45,6 @@ public class ImportJudgmentsProcessor implements BaseJudgmentsProcessor {
         List<Map<String, Object>> formattedRatings = new ArrayList<>();
 
         // Process each query
-        // for (Map.Entry<String, Object> queryEntry : sourceJudgementRatings.entrySet()) {
         for (Map<String, Object> queryJudgment : sourceJudgementRatings) {
             String queryText = queryJudgment.get("query").toString();
             Object ratingData = queryJudgment.get("ratings");

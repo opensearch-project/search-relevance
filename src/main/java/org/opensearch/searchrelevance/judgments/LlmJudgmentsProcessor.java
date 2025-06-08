@@ -134,7 +134,6 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         Map<String, List<String>> indexAndQueries = (Map<String, List<String>>) results.get(METRICS_INDEX_AND_QUERIES_FIELD_NAME);
         List<String> queryTextWithReferences = (List<String>) results.get(METRICS_QUERY_TEXT_FIELD_NAME);
 
-        // Map<String, Map<String, String>> allJudgments = new HashMap<>();
         List<Map<String, Object>> allJudgments = new ArrayList<>();
         AtomicInteger remainingQueries = new AtomicInteger(queryTextWithReferences.size());
 
@@ -151,7 +150,6 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                     @Override
                     public void onResponse(Map<String, String> docIdToScore) {
                         synchronized (allJudgments) {
-                            // allJudgments.put(queryTextWithReference, docIdToScore);
                             Map<String, Object> judgmentForQuery = new HashMap<>();
                             judgmentForQuery.put("query", queryTextWithReference);
                             List<Map<String, String>> docIdRatings = docIdToScore.entrySet()
