@@ -7,6 +7,7 @@
  */
 package org.opensearch.searchrelevance.judgments;
 
+import java.util.List;
 import java.util.Map;
 
 import org.apache.logging.log4j.LogManager;
@@ -36,7 +37,7 @@ public class UbiJudgmentsProcessor implements BaseJudgmentsProcessor {
     }
 
     @Override
-    public void generateJudgmentRating(Map<String, Object> metadata, ActionListener<Map<String, Map<String, String>>> listener) {
+    public void generateJudgmentRating(Map<String, Object> metadata, ActionListener<List<Map<String, Object>>> listener) {
         String clickModel = (String) metadata.get("clickModel");
         int maxRank = (int) metadata.get("maxRank");
 
@@ -48,9 +49,9 @@ public class UbiJudgmentsProcessor implements BaseJudgmentsProcessor {
             StepListener<Map<String, Map<String, String>>> clickModelStep = new StepListener<>();
 
             try {
-                coecClickModel.calculateJudgments(new ActionListener<Map<String, Map<String, String>>>() {
+                coecClickModel.calculateJudgments(new ActionListener<>() {
                     @Override
-                    public void onResponse(Map<String, Map<String, String>> judgments) {
+                    public void onResponse(List<Map<String, Object>> judgments) {
                         listener.onResponse(judgments);
                     }
 

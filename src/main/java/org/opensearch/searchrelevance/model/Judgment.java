@@ -8,11 +8,17 @@
 package org.opensearch.searchrelevance.model;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 
 import org.opensearch.core.xcontent.ToXContentObject;
 import org.opensearch.core.xcontent.XContentBuilder;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+
+@Getter
+@AllArgsConstructor
 public class Judgment implements ToXContentObject {
     public static final String ID = "id";
     public static final String TIME_STAMP = "timestamp";
@@ -25,31 +31,13 @@ public class Judgment implements ToXContentObject {
     /**
      * Identifier of the system index
      */
-    private String id;
-    private String timestamp;
-    private String name;
+    private final String id;
+    private final String timestamp;
+    private final String name;
     private final AsyncStatus status;
-    private JudgmentType type;
-    private Map<String, Object> metadata;
-    private Map<String, Map<String, String>> judgmentRatings;
-
-    public Judgment(
-        String id,
-        String timestamp,
-        String name,
-        AsyncStatus status,
-        JudgmentType type,
-        Map<String, Object> metadata,
-        Map<String, Map<String, String>> judgmentRatings
-    ) {
-        this.id = id;
-        this.timestamp = timestamp;
-        this.name = name;
-        this.status = status;
-        this.type = type;
-        this.metadata = metadata;
-        this.judgmentRatings = judgmentRatings;
-    }
+    private final JudgmentType type;
+    private final Map<String, Object> metadata;
+    private final List<Map<String, Object>> judgmentRatings;
 
     @Override
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
@@ -61,45 +49,23 @@ public class Judgment implements ToXContentObject {
         xContentBuilder.field(TYPE, this.type.name().trim());
         xContentBuilder.field(METADATA, this.metadata);
         // Start judgmentRatings object
-        xContentBuilder.startObject(JUDGMENT_RATINGS);
-        for (Map.Entry<String, Map<String, String>> queryEntry : this.judgmentRatings.entrySet()) {
-            xContentBuilder.startArray(queryEntry.getKey());
-            for (Map.Entry<String, String> docEntry : queryEntry.getValue().entrySet()) {
-                xContentBuilder.startObject().field("docId", docEntry.getKey()).field("rating", docEntry.getValue()).endObject();
+        xContentBuilder.startArray(JUDGMENT_RATINGS);
+        for (Map<String, Object> judgment : this.judgmentRatings) {
+            xContentBuilder.startObject();
+            xContentBuilder.field("query", judgment.get("query"));
+            xContentBuilder.startArray("ratings");
+            for (Map<String, Object> rating : (List<Map<String, Object>>) judgment.get("ratings")) {
+                xContentBuilder.startObject();
+                for (Map.Entry<String, Object> entry : rating.entrySet()) {
+                    xContentBuilder.field(entry.getKey(), entry.getValue());
+                }
+                xContentBuilder.endObject();
             }
             xContentBuilder.endArray();
+            xContentBuilder.endObject();
         }
-        xContentBuilder.endObject();
+        xContentBuilder.endArray();
         // End judgmentRatings object
         return xContentBuilder.endObject();
     }
-
-    public String id() {
-        return id;
-    }
-
-    public String timestamp() {
-        return timestamp;
-    }
-
-    public String name() {
-        return name;
-    }
-
-    public AsyncStatus status() {
-        return status;
-    }
-
-    public JudgmentType type() {
-        return type;
-    }
-
-    public Map<String, Object> metadata() {
-        return metadata;
-    }
-
-    public Map<String, Map<String, String>> judgmentScores() {
-        return judgmentRatings;
-    }
-
 }

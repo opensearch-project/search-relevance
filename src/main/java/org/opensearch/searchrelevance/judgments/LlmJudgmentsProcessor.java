@@ -86,7 +86,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
     }
 
     @Override
-    public void generateJudgmentRating(Map<String, Object> metadata, ActionListener<Map<String, Map<String, String>>> listener) {
+    public void generateJudgmentRating(Map<String, Object> metadata, ActionListener<List<Map<String, Object>>> listener) {
         String querySetId = (String) metadata.get("querySetId");
         List<String> searchConfigurationList = (List<String>) metadata.get("searchConfigurationList");
         int size = (int) metadata.get("size");
@@ -129,12 +129,13 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         List<String> contextFields,
         Map<String, Object> results,
         boolean ignoreFailure,
-        ActionListener<Map<String, Map<String, String>>> listener
+        ActionListener<List<Map<String, Object>>> listener
     ) {
         Map<String, List<String>> indexAndQueries = (Map<String, List<String>>) results.get(METRICS_INDEX_AND_QUERIES_FIELD_NAME);
         List<String> queryTextWithReferences = (List<String>) results.get(METRICS_QUERY_TEXT_FIELD_NAME);
 
-        Map<String, Map<String, String>> allJudgments = new HashMap<>();
+        // Map<String, Map<String, String>> allJudgments = new HashMap<>();
+        List<Map<String, Object>> allJudgments = new ArrayList<>();
         AtomicInteger remainingQueries = new AtomicInteger(queryTextWithReferences.size());
 
         for (String queryTextWithReference : queryTextWithReferences) {
@@ -146,11 +147,19 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                 indexAndQueries,
                 queryTextWithReference,
                 ignoreFailure,
-                new ActionListener<Map<String, String>>() {
+                new ActionListener<>() {
                     @Override
                     public void onResponse(Map<String, String> docIdToScore) {
                         synchronized (allJudgments) {
-                            allJudgments.put(queryTextWithReference, docIdToScore);
+                            // allJudgments.put(queryTextWithReference, docIdToScore);
+                            Map<String, Object> judgmentForQuery = new HashMap<>();
+                            judgmentForQuery.put("query", queryTextWithReference);
+                            List<Map<String, String>> docIdRatings = docIdToScore.entrySet()
+                                .stream()
+                                .map(entry -> Map.of("docId", entry.getKey(), "rating", entry.getValue()))
+                                .toList();
+                            judgmentForQuery.put("ratings", docIdRatings);
+                            allJudgments.add(judgmentForQuery);
                         }
                         if (remainingQueries.decrementAndGet() == 0) {
                             listener.onResponse(allJudgments);

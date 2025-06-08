@@ -114,7 +114,7 @@ public class RestPutJudgmentAction extends BaseRestHandler {
                 createRequest = new PutUbiJudgmentRequest(type, name, description, clickModel, maxRank);
             }
             case IMPORT_JUDGMENT -> {
-                Map<String, Object> judgmentRatings = (Map<String, Object>) source.get("judgmentRatings");
+                List<Map<String, Object>> judgmentRatings = (List<Map<String, Object>>) source.get("judgmentRatings");
                 createRequest = new PutImportJudgmentRequest(type, name, description, judgmentRatings);
             }
             default -> {

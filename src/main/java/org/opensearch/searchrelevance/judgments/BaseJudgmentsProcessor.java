@@ -7,6 +7,7 @@
  */
 package org.opensearch.searchrelevance.judgments;
 
+import java.util.List;
 import java.util.Map;
 
 import org.opensearch.core.action.ActionListener;
@@ -27,5 +28,5 @@ public interface BaseJudgmentsProcessor {
      * @param metadata used to generate judgment ratings for various judgment type
      * @param listener async action
      */
-    public void generateJudgmentRating(Map<String, Object> metadata, ActionListener<Map<String, Map<String, String>>> listener);
+    public void generateJudgmentRating(Map<String, Object> metadata, ActionListener<List<Map<String, Object>>> listener);
 }

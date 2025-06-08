@@ -7,6 +7,7 @@
  */
 package org.opensearch.searchrelevance.judgments;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,18 +36,19 @@ public class ImportJudgmentsProcessor implements BaseJudgmentsProcessor {
     }
 
     @Override
-    public void generateJudgmentRating(Map<String, Object> metadata, ActionListener<Map<String, Map<String, String>>> listener) {
+    public void generateJudgmentRating(Map<String, Object> metadata, ActionListener<List<Map<String, Object>>> listener) {
 
-        Map<String, Object> sourceJudgementRatings = (Map<String, Object>) metadata.get("judgmentRatings");
+        List<Map<String, Object>> sourceJudgementRatings = (List<Map<String, Object>>) metadata.get("judgmentRatings");
         metadata.remove("judgmentRatings");
 
         // Create the result map in the expected format
-        Map<String, Map<String, String>> formattedRatings = new HashMap<>();
+        List<Map<String, Object>> formattedRatings = new ArrayList<>();
 
         // Process each query
-        for (Map.Entry<String, Object> queryEntry : sourceJudgementRatings.entrySet()) {
-            String queryText = queryEntry.getKey();
-            Object ratingData = queryEntry.getValue();
+        // for (Map.Entry<String, Object> queryEntry : sourceJudgementRatings.entrySet()) {
+        for (Map<String, Object> queryJudgment : sourceJudgementRatings) {
+            String queryText = queryJudgment.get("query").toString();
+            Object ratingData = queryJudgment.get("ratings");
 
             if (!(ratingData instanceof List)) {
                 listener.onFailure(
@@ -96,7 +98,14 @@ public class ImportJudgmentsProcessor implements BaseJudgmentsProcessor {
             }
 
             // Add the formatted ratings for this query
-            formattedRatings.put(queryText, docRatings);
+            Map<String, Object> queryRatings = new HashMap<>();
+            queryRatings.put("query", queryText);
+            List<Map<String, String>> docIdRatings = docRatings.entrySet()
+                .stream()
+                .map(entry -> Map.of("docId", entry.getKey(), "rating", entry.getValue()))
+                .toList();
+            queryRatings.put("ratings", docIdRatings);
+            formattedRatings.add(queryRatings);
         }
 
         listener.onResponse(formattedRatings);

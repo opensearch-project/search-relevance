@@ -9,7 +9,9 @@ package org.opensearch.searchrelevance.transport.judgment;
 
 import static org.opensearch.searchrelevance.common.MetricsConstants.MODEL_ID;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -71,7 +73,7 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
         judgmentDao.createIndexIfAbsent(createIndexStep);
 
         createIndexStep.whenComplete(v -> {
-            Judgment initialJudgment = new Judgment(id, timestamp, name, AsyncStatus.PROCESSING, type, metadata, new HashMap<>());
+            Judgment initialJudgment = new Judgment(id, timestamp, name, AsyncStatus.PROCESSING, type, metadata, new ArrayList<>());
             judgmentDao.putJudgement(initialJudgment, ActionListener.wrap(response -> {
                 // Trigger async processing and return initial response
                 triggerAsyncProcessing(id, request, metadata);
@@ -124,7 +126,7 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
         String judgmentId,
         PutJudgmentRequest request,
         Map<String, Object> metadata,
-        Map<String, Map<String, String>> judgmentScores
+        List<Map<String, Object>> judgmentScores
     ) {
         Judgment finalJudgment = new Judgment(
             judgmentId,
@@ -155,7 +157,7 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
             AsyncStatus.ERROR,
             request.getType(),
             Map.of("error", error.getMessage()),
-            new HashMap<>()
+            new ArrayList<>()
         );
 
         judgmentDao.updateJudgment(

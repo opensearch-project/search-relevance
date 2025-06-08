@@ -11,8 +11,6 @@ import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.JUDG
 
 import java.io.IOException;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.opensearch.action.StepListener;
 import org.opensearch.action.delete.DeleteResponse;
 import org.opensearch.action.search.SearchResponse;
@@ -28,7 +26,6 @@ import org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager;
 import org.opensearch.searchrelevance.model.Judgment;
 
 public class JudgmentDao {
-    private static final Logger LOGGER = LogManager.getLogger(JudgmentDao.class);
     private final SearchRelevanceIndicesManager searchRelevanceIndicesManager;
 
     @Inject
@@ -56,7 +53,7 @@ public class JudgmentDao {
         }
         try {
             searchRelevanceIndicesManager.putDoc(
-                judgment.id(),
+                judgment.getId(),
                 judgment.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS),
                 JUDGMENT,
                 listener
@@ -73,7 +70,7 @@ public class JudgmentDao {
         }
         try {
             searchRelevanceIndicesManager.updateDoc(
-                judgment.id(),
+                judgment.getId(),
                 judgment.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS),
                 JUDGMENT,
                 listener

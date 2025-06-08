@@ -7,6 +7,7 @@
  */
 package org.opensearch.searchrelevance.judgments.clickmodel;
 
+import java.util.List;
 import java.util.Map;
 
 import org.opensearch.core.action.ActionListener;
@@ -19,5 +20,5 @@ public abstract class ClickModel {
     /**
      * Calculate implicit judgments.
      */
-    public abstract void calculateJudgments(ActionListener<Map<String, Map<String, String>>> listener);
+    public abstract void calculateJudgments(ActionListener<List<Map<String, Object>>> listener);
 }

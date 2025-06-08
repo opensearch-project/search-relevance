@@ -1,0 +1,37 @@
+{
+  "name": "ESCI Judgments",
+  "description": "Judgments generated outside SRW",
+  "type": "IMPORT_JUDGMENT",
+  "judgmentRatings": [
+    {
+      "query": "t towels kitchen",
+      "ratings": [
+        {
+          "docId": "B07NCQWCQS",
+          "rating": "100.000"
+        },
+        {
+          "docId": "B07NPC54DK",
+          "rating": "100.000"
+        }
+      ]
+    },
+    {
+      "query": "table top bandsaw for metal",
+      "ratings": [
+        {
+          "docId": "B01M3YCXD2",
+          "rating": "100.000"
+        },
+        {
+          "docId": "B07CLM7HC6",
+          "rating": "100.000"
+        },
+        {
+          "docId": "B06XP1NJYG",
+          "rating": "10.000"
+        }
+      ]
+    }
+  ]
+}

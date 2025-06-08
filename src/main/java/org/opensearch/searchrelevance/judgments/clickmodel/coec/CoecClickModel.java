@@ -9,8 +9,10 @@ package org.opensearch.searchrelevance.judgments.clickmodel.coec;
 
 import static org.opensearch.searchrelevance.common.PluginConstants.UBI_EVENTS_INDEX;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -57,7 +59,7 @@ public class CoecClickModel extends ClickModel {
     }
 
     @Override
-    public void calculateJudgments(ActionListener<Map<String, Map<String, String>>> listener) {
+    public void calculateJudgments(ActionListener<List<Map<String, Object>>> listener) {
         // Step 1: Calculate rank-aggregated click-through
         getRankAggregatedClickThrough(ActionListener.wrap(rankAggregatedClickThrough -> {
             // Step 2: Get clickthrough rates
@@ -662,10 +664,11 @@ public class CoecClickModel extends ClickModel {
     private void calculateCoecJudgments(
         Map<Integer, Double> rankAggregatedClickThrough,
         Map<String, Set<ClickthroughRate>> clickthroughRates,
-        ActionListener<Map<String, Map<String, String>>> listener
+        ActionListener<List<Map<String, Object>>> listener
     ) {
         LOGGER.debug("Starting COEC calculation with rank CTR: {}", rankAggregatedClickThrough);
-        Map<String, Map<String, String>> judgmentRatings = new HashMap<>();
+        // Map<String, Map<String, String>> judgmentRatings = new HashMap<>();
+        List<Map<String, Object>> judgmentRatings = new ArrayList<>();
 
         for (Map.Entry<String, Set<ClickthroughRate>> entry : clickthroughRates.entrySet()) {
             String userQuery = entry.getKey();
@@ -691,14 +694,17 @@ public class CoecClickModel extends ClickModel {
             }
 
             if (!docScores.isEmpty()) {
-                judgmentRatings.put(userQuery, docScores);
+                Map<String, Object> queryRating = new HashMap<>();
+                queryRating.put("query", userQuery);
+                queryRating.put("ratings", docScores);
+                judgmentRatings.add(queryRating);
             }
             LOGGER.debug(
                 "Final judgment ratings size - Queries: {}, Total Documents: {}",
                 judgmentRatings.size(),
-                judgmentRatings.values().stream().mapToInt(Map::size).sum()
+                // judgmentRatings.values().stream().mapToInt(Map::size).sum()
+                judgmentRatings.stream().mapToInt(item -> ((Map<String, Object>) item.get("ratings")).size()).sum()
             );
-
             listener.onResponse(judgmentRatings);
         }
     }

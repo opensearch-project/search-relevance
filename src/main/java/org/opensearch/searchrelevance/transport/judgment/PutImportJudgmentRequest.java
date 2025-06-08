@@ -8,6 +8,7 @@
 package org.opensearch.searchrelevance.transport.judgment;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 
 import org.opensearch.core.common.io.stream.StreamInput;
@@ -17,13 +18,13 @@ import org.opensearch.searchrelevance.model.JudgmentType;
 import reactor.util.annotation.NonNull;
 
 public class PutImportJudgmentRequest extends PutJudgmentRequest {
-    private Map<String, Object> judgmentScores;
+    private List<Map<String, Object>> judgmentScores;
 
     public PutImportJudgmentRequest(
         @NonNull JudgmentType type,
         @NonNull String name,
         @NonNull String description,
-        @NonNull Map<String, Object> judgmentScores
+        @NonNull List<Map<String, Object>> judgmentScores
     ) {
         super(type, name, description);
         this.judgmentScores = judgmentScores;
@@ -31,16 +32,17 @@ public class PutImportJudgmentRequest extends PutJudgmentRequest {
 
     public PutImportJudgmentRequest(StreamInput in) throws IOException {
         super(in);
-        this.judgmentScores = in.readMap();
+        this.judgmentScores = in.readList(StreamInput::readMap);
     }
 
     @Override
     public void writeTo(StreamOutput out) throws IOException {
         super.writeTo(out);
-        out.writeMap(judgmentScores);
+        // out.writeList(judgmentScores);
+        out.writeCollection(judgmentScores, StreamOutput::writeMap);
     }
 
-    public Map<String, Object> getJudgmentRatings() {
+    public List<Map<String, Object>> getJudgmentRatings() {
         return judgmentScores;
     }
 

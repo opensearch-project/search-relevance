@@ -51,25 +51,32 @@ public class RestPutJudgmentActionTests extends SearchRelevanceRestTestCase {
         + "\"maxRank\": 10"
         + "}";
 
-    private static final String IMPORT_JUDGMENT_CONTENT = "{"
-        + "\"name\": \"test_name\","
-        + "\"description\": \"test_description\","
-        + "\"type\": \"IMPORT_JUDGMENT\","
-        + "\"judgmentRatings\": {"
-        + "    \"red shoes\": ["
-        + "      {"
-        + "        \"docId\": \"B077ZJXCTS\","
-        + "        \"rating\": \"0.000\""
-        + "      }"
-        + "    ],"
-        + "    \"blue jeans\": ["
-        + "      {"
-        + "        \"docId\": \"B071S6LTJJ\","
-        + "        \"rating\": \"0.000\""
-        + "      }"
-        + "    ]"
-        + "  }"
-        + "}";
+    private static final String IMPORT_JUDGMENT_CONTENT = """
+        {
+          "name": "test_name",
+          "description": "test_description",
+          "type": "IMPORT_JUDGMENT",
+          "judgmentRatings": [
+            {
+              "query": "red shoes",
+              "ratings": [
+                {
+                  "docId": "B077ZJXCTS",
+                  "rating": "0.000"
+                }
+              ]
+            },
+            {
+              "query": "blue jeans",
+              "ratings": [
+                {
+                  "docId": "B071S6LTJJ",
+                  "rating": "0.000"
+                }
+              ]
+            }
+          ]
+        }""";
 
     private static final String IMPORT_JUDGMENT_CONTENT_INVALID_RATING = "{"
         + "\"name\": \"test_name\","
@@ -109,7 +116,7 @@ public class RestPutJudgmentActionTests extends SearchRelevanceRestTestCase {
     public void testPrepareRequest_WorkbenchDisabled() throws Exception {
         // Setup
         when(settingsAccessor.isWorkbenchEnabled()).thenReturn(false);
-        RestRequest request = createPutRestRequestWithContent(LLM_JUDGMENT_CONTENT, "judgments");
+        RestRequest request = createPutRestRequestWithContent(LLM_JUDGMENT_CONTENT, "judgment");
         when(channel.request()).thenReturn(request);
 
         // Execute
@@ -124,7 +131,7 @@ public class RestPutJudgmentActionTests extends SearchRelevanceRestTestCase {
     public void testPutLlmJudgment_Success() throws Exception {
         // Setup
         when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
-        RestRequest request = createPutRestRequestWithContent(LLM_JUDGMENT_CONTENT, "judgments");
+        RestRequest request = createPutRestRequestWithContent(LLM_JUDGMENT_CONTENT, "judgment");
         when(channel.request()).thenReturn(request);
 
         // Mock index response
@@ -149,7 +156,7 @@ public class RestPutJudgmentActionTests extends SearchRelevanceRestTestCase {
     public void testPutUbiJudgment_Success() throws Exception {
         // Setup
         when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
-        RestRequest request = createPutRestRequestWithContent(UBI_JUDGMENT_CONTENT, "judgments");
+        RestRequest request = createPutRestRequestWithContent(UBI_JUDGMENT_CONTENT, "judgment");
         when(channel.request()).thenReturn(request);
 
         // Mock index response
@@ -174,7 +181,7 @@ public class RestPutJudgmentActionTests extends SearchRelevanceRestTestCase {
     public void testPutImportJudgment_Success() throws Exception {
         // Setup
         when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
-        RestRequest request = createPutRestRequestWithContent(IMPORT_JUDGMENT_CONTENT, "judgments");
+        RestRequest request = createPutRestRequestWithContent(IMPORT_JUDGMENT_CONTENT, "judgment");
         when(channel.request()).thenReturn(request);
 
         // Mock index response
@@ -214,7 +221,7 @@ public class RestPutJudgmentActionTests extends SearchRelevanceRestTestCase {
         // Setup
         when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
         String content = "{" + "\"name\": \"test_name\"," + "\"description\": \"test_description\"," + "\"type\": \"LLM_JUDGMENT\"" + "}";
-        RestRequest request = createPutRestRequestWithContent(content, "judgments");
+        RestRequest request = createPutRestRequestWithContent(content, "judgment");
         when(channel.request()).thenReturn(request);
 
         // Execute and verify
@@ -229,7 +236,7 @@ public class RestPutJudgmentActionTests extends SearchRelevanceRestTestCase {
     public void testPutJudgment_Failure() throws Exception {
         // Setup
         when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
-        RestRequest request = createPutRestRequestWithContent(LLM_JUDGMENT_CONTENT, "judgments");
+        RestRequest request = createPutRestRequestWithContent(LLM_JUDGMENT_CONTENT, "judgment");
         when(channel.request()).thenReturn(request);
 
         doAnswer(invocation -> {

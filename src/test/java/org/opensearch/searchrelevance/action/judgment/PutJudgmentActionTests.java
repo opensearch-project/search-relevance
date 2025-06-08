@@ -8,7 +8,7 @@
 package org.opensearch.searchrelevance.action.judgment;
 
 import java.io.IOException;
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.opensearch.common.io.stream.BytesStreamOutput;
@@ -40,22 +40,24 @@ public class PutJudgmentActionTests extends OpenSearchTestCase {
 
     public void testImportJudgementStream() throws IOException {
 
-        Map<String, Object> judgmentScores = new HashMap<>();
-
         // Add entries for "red dress" query
-        Map<String, String> redDressScores = new HashMap<>();
-        redDressScores.put("B077ZJXCTS", "0.700");
-        redDressScores.put("B071S6LTJJ", "0.000");
-        redDressScores.put("B01IDSPDJI", "0.000");
+        List<Map<String, String>> redDressScores = List.of(
+            Map.of("docId", "B077ZJXCTS", "rating", "0.700"),
+            Map.of("docId", "B071S6LTJJ", "rating", "0.000"),
+            Map.of("docId", "B01IDSPDJI", "rating", "0.000")
+        );
 
         // Add entries for "blue jeans" query
-        Map<String, String> blueJeansScores = new HashMap<>();
-        blueJeansScores.put("B07L9V4Y98", "0.000");
-        blueJeansScores.put("B077ZJXCTS", "0.600");
-        blueJeansScores.put("B001CRAWCQ", "0.000");
+        List<Map<String, String>> blueJeansScores = List.of(
+            Map.of("docId", "B07L9V4Y98", "rating", "0.000"),
+            Map.of("docId", "B077ZJXCTS", "rating", "0.600"),
+            Map.of("docId", "B001CRAWCQ", "rating", "0.000")
+        );
 
-        judgmentScores.put("red dress", redDressScores);
-        judgmentScores.put("blue jeans", blueJeansScores);
+        List<Map<String, Object>> judgmentScores = List.of(
+            Map.of("query", "red dress", "ratings", redDressScores),
+            Map.of("query", "blue jeans", "ratings", blueJeansScores)
+        );
 
         PutJudgmentRequest request = new PutImportJudgmentRequest(JudgmentType.IMPORT_JUDGMENT, "name", "description", judgmentScores);
         BytesStreamOutput output = new BytesStreamOutput();
@@ -66,8 +68,10 @@ public class PutJudgmentActionTests extends OpenSearchTestCase {
         assertEquals(JudgmentType.IMPORT_JUDGMENT, serialized.getType());
         assertEquals("description", serialized.getDescription());
 
-        Map<String, String> query = (Map<String, String>) serialized.getJudgmentRatings().get("red dress");
-        String score = query.get("B077ZJXCTS");
-        assertEquals("0.700", score);
+        Map<String, Object> queryAndRatings = (Map<String, Object>) serialized.getJudgmentRatings().get(0);
+        assertEquals("red dress", queryAndRatings.get("query"));
+        Map<String, String> ratings = (Map<String, String>) ((List<Map<String, String>>) queryAndRatings.get("ratings")).get(0);
+        assertEquals("B077ZJXCTS", ratings.get("docId"));
+        assertEquals("0.700", ratings.get("rating"));
     }
 }

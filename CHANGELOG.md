@@ -28,5 +28,6 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - Move from Judgments being "scores" to Judgments being "ratings".  ([#64](https://github.com/opensearch-project/search-relevance/pull/64))
  - Extend hybrid search optimizer demo script to use models. ([#69](https://github.com/opensearch-project/search-relevance/pull/69))
  - Set limit for number of fields programmatically during index creation ([#74](https://github.com/opensearch-project/search-relevance/pull/74)
+ - Change model for Judgment entity ([#77](https://github.com/opensearch-project/search-relevance/pull/77)
 
 ### Security

@@ -5,6 +5,24 @@
     "name": { "type": "keyword" },
     "type": { "type": "keyword" },
     "metadata": { "type": "object", "dynamic": true },
-    "judgmentRatings": { "type":  "object", "dynamic": true }
+    "judgmentRatings": {
+      "type": "nested",
+      "properties": {
+        "query": {
+          "type": "text"
+        },
+        "ratings": {
+          "type": "nested",
+          "properties": {
+            "docId": {
+              "type": "text"
+            },
+            "rating": {
+              "type": "float"
+            }
+          }
+        }
+      }
+    }
   }
 }
