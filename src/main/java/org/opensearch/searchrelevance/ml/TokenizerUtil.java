@@ -7,13 +7,15 @@
  */
 package org.opensearch.searchrelevance.ml;
 
-import java.util.List;
-
 import com.knuddels.jtokkit.Encodings;
 import com.knuddels.jtokkit.api.Encoding;
 import com.knuddels.jtokkit.api.EncodingRegistry;
 import com.knuddels.jtokkit.api.EncodingType;
+import com.knuddels.jtokkit.api.IntArrayList;
 import com.knuddels.jtokkit.api.ModelType;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  *  For OpenAI models, use their official tiktoken library - https://github.com/knuddelsgmbh/jtokkit
@@ -44,21 +46,26 @@ public class TokenizerUtil {
      * helper method to truncate text to token limit
      */
     public static String truncateString(String text, int tokenLimit) {
-        List<Integer> tokens = encode(text);
+        IntArrayList tokens = encoding.encode(text);
         if (tokens.size() <= tokenLimit) { // no truncation needed
             return text;
         }
-        return decode(tokens.subList(0, tokenLimit));
-    }
-
-    // Method to encode text to tokens
-    private static List<Integer> encode(String text) {
-        return encoding.encode(text);
+        // Convert to List for subList operation
+        List<Integer> tokenList = new ArrayList<>();
+        for (int i = 0; i < tokens.size(); i++) {
+            tokenList.add(tokens.get(i));
+        }
+        return decode(tokenList.subList(0, tokenLimit));
     }
 
     // Method to decode tokens back to text
     private static String decode(List<Integer> tokens) {
-        return encoding.decode(tokens);
+        // Convert List<Integer> to IntArrayList for decoding
+        IntArrayList intArrayList = new IntArrayList();
+        for (Integer token : tokens) {
+            intArrayList.add(token);
+        }
+        return encoding.decode(intArrayList);
     }
 
 }
