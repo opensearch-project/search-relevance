@@ -129,7 +129,7 @@ dependencies {
     runtimeOnly group: 'org.javassist', name: 'javassist', version: '3.29.2-GA'
     runtimeOnly group: 'org.opensearch', name: 'common-utils', version: "${opensearch_build}"
     runtimeOnly group: 'org.apache.commons', name: 'commons-text', version: '1.13.1'
-    runtimeOnly group: 'com.google.code.gson', name: 'gson', version: '2.10.1'
+    runtimeOnly group: 'com.google.code.gson', name: 'gson', version: '2.13.1'
     runtimeOnly group: 'org.json', name: 'json', version: '20250517'
     // json-path 2.9.0 depends on slf4j 2.0.11, which conflicts with the version used by OpenSearch core.
     // Excluding slf4j here since json-path is only used for testing, and logging failures in this context are acceptable.
