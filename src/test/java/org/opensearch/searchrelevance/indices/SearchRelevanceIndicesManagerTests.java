@@ -19,6 +19,7 @@ import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.QUER
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.lucene.search.TotalHits;
@@ -161,7 +162,7 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
     }
 
     public void testPutDocWhenSucceeded() throws IOException {
-        QuerySet querySet = new QuerySet("test_id", "test_name", "test_description", "test_timestamp", "test_sampling", Map.of());
+        QuerySet querySet = new QuerySet("test_id", "test_name", "test_description", "test_timestamp", "test_sampling", List.of());
         XContentBuilder xContentBuilder = querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
 
         IndexRequestBuilder indexRequestBuilder = mock(IndexRequestBuilder.class);
@@ -183,7 +184,7 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
     }
 
     public void testPutDocWhenFailed() throws IOException {
-        QuerySet querySet = new QuerySet("test_id", "test_name", "test_description", "test_timestamp", "test_sampling", Map.of());
+        QuerySet querySet = new QuerySet("test_id", "test_name", "test_description", "test_timestamp", "test_sampling", List.of());
         XContentBuilder xContentBuilder = querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
 
         when(client.prepareIndex(QUERY_SET.getIndexName())).thenThrow(
@@ -203,7 +204,7 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
 
     public void testGetDocByDocIdWhenSucceeded() throws IOException {
         String docId = "test_id";
-        QuerySet querySet = new QuerySet(docId, "test_name", "test_description", "test_timestamp", "test_sampling", Map.of());
+        QuerySet querySet = new QuerySet(docId, "test_name", "test_description", "test_timestamp", "test_sampling", List.of());
         XContentBuilder xContentBuilder = querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
 
         Map<String, Object> sourceMap = new HashMap<>();
@@ -268,8 +269,8 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
     }
 
     public void testListDocsWhenSucceeded() throws IOException {
-        QuerySet querySet1 = new QuerySet("id1", "name1", "desc1", "timestamp1", "sampling1", Map.of());
-        QuerySet querySet2 = new QuerySet("id2", "name2", "desc2", "timestamp2", "sampling2", Map.of());
+        QuerySet querySet1 = new QuerySet("id1", "name1", "desc1", "timestamp1", "sampling1", List.of());
+        QuerySet querySet2 = new QuerySet("id2", "name2", "desc2", "timestamp2", "sampling2", List.of());
 
         SearchHit[] hits = new SearchHit[] {
             new SearchHit(1, "id1", Map.of(), Map.of()).sourceRef(

@@ -12,8 +12,9 @@ import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.QUER
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -31,6 +32,7 @@ import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager;
 import org.opensearch.searchrelevance.model.QuerySet;
+import org.opensearch.searchrelevance.model.QuerySetEntry;
 
 /**
  * Data access object layer for query set system index
@@ -135,7 +137,10 @@ public class QuerySetDao {
                     QuerySet querySet = convertToQuerySet(response);
                     LOGGER.debug("Converted response into queryset: [{}]", querySet);
 
-                    results.put(METRICS_QUERY_TEXT_FIELD_NAME, new ArrayList<>(querySet.querySetQueries().keySet()));
+                    results.put(
+                        METRICS_QUERY_TEXT_FIELD_NAME,
+                        querySet.querySetQueries().stream().map(QuerySetEntry::queryText).collect(Collectors.toList())
+                    );
                     stepListener.onResponse(results);
                 } catch (Exception e) {
                     LOGGER.error("Failed to convert response: [{}] into queryset.", response);
@@ -155,13 +160,23 @@ public class QuerySetDao {
         SearchHit hit = response.getHits().getHits()[0];
         Map<String, Object> sourceMap = hit.getSourceAsMap();
 
+        // Convert querySetQueries from list of maps to List<QuerySetEntry>
+        List<QuerySetEntry> querySetEntries = new ArrayList<>();
+        Object querySetQueriesObj = sourceMap.get(QuerySet.QUERY_SET_QUERIES);
+        if (querySetQueriesObj instanceof List) {
+            List<Map<String, Object>> querySetQueriesList = (List<Map<String, Object>>) querySetQueriesObj;
+            querySetEntries = querySetQueriesList.stream()
+                .map(entryMap -> QuerySetEntry.Builder.builder().queryText((String) entryMap.get(QuerySetEntry.QUERY_TEXT)).build())
+                .collect(Collectors.toList());
+        }
+
         return QuerySet.Builder.builder()
-            .name((String) sourceMap.get(QuerySet.ID))
+            .id((String) sourceMap.get(QuerySet.ID))
             .name((String) sourceMap.get(QuerySet.NAME))
             .description((String) sourceMap.get(QuerySet.DESCRIPTION))
             .timestamp((String) sourceMap.get(QuerySet.TIME_STAMP))
             .sampling((String) sourceMap.get(QuerySet.SAMPLING))
-            .querySetQueries((Map<String, Integer>) sourceMap.getOrDefault(QuerySet.QUERY_SET_QUERIES, new HashMap<>()))
+            .querySetQueries(querySetEntries)
             .build();
     }
 }

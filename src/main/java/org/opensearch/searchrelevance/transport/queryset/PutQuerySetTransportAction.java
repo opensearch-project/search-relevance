@@ -7,14 +7,6 @@
  */
 package org.opensearch.searchrelevance.transport.queryset;
 
-import static org.opensearch.searchrelevance.model.QueryWithReference.DELIMITER;
-
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-
-import org.opensearch.action.StepListener;
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.HandledTransportAction;
@@ -25,10 +17,17 @@ import org.opensearch.core.rest.RestStatus;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.model.QuerySet;
+import org.opensearch.searchrelevance.model.QuerySetEntry;
 import org.opensearch.searchrelevance.model.QueryWithReference;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
+
+import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+import static org.opensearch.searchrelevance.model.QueryWithReference.DELIMITER;
 
 public class PutQuerySetTransportAction extends HandledTransportAction<PutQuerySetRequest, IndexResponse> {
     private final ClusterService clusterService;
@@ -66,14 +65,10 @@ public class PutQuerySetTransportAction extends HandledTransportAction<PutQueryS
             );
         }
         List<QueryWithReference> queryWithReferenceList = request.getQuerySetQueries();
-        Map<String, Integer> querySetQueries = convertQuerySetQueriesMap(queryWithReferenceList);
+        List<QuerySetEntry> querySetQueries = convertQuerySetQueriesList(queryWithReferenceList);
 
-        StepListener<Void> createIndexStep = new StepListener<>();
-        querySetDao.createIndexIfAbsent(createIndexStep);
-        createIndexStep.whenComplete(v -> {
-            QuerySet querySet = new QuerySet(id, name, description, timestamp, sampling, querySetQueries);
-            querySetDao.putQuerySet(querySet, listener);
-        }, listener::onFailure);
+        QuerySet querySet = new QuerySet(id, name, description, timestamp, sampling, querySetQueries);
+        querySetDao.putQuerySet(querySet, listener);
     }
 
     /**
@@ -84,19 +79,17 @@ public class PutQuerySetTransportAction extends HandledTransportAction<PutQueryS
      *     "referenceAnswer": "OpenSearch is a community-driven, open source search and analytics suite"
      * }
      * @param queryWithReferenceList - list of queryText and referenceAnswer pair
-     * @return - querySetQueries as a map of {queryText}#{referenceAnswer} and probability to alignn with UBI queryset
+     * @return - querySetQueries as a list of QuerySetEntry objects
      */
-    private Map<String, Integer> convertQuerySetQueriesMap(List<QueryWithReference> queryWithReferenceList) {
-        Map<String, Integer> result = new HashMap<>();
-        queryWithReferenceList.forEach(queryWithReference -> {
+    private List<QuerySetEntry> convertQuerySetQueriesList(List<QueryWithReference> queryWithReferenceList) {
+        return queryWithReferenceList.stream().map(queryWithReference -> {
+            String queryText;
             if (queryWithReference.getReferenceAnswer() != null && !queryWithReference.getReferenceAnswer().isEmpty()) {
-                String combinedStr = String.join(DELIMITER, queryWithReference.getQueryText(), queryWithReference.getReferenceAnswer());
-                result.put(combinedStr, 0);
+                queryText = String.join(DELIMITER, queryWithReference.getQueryText(), queryWithReference.getReferenceAnswer());
             } else {
-                result.put(queryWithReference.getQueryText(), 0);
+                queryText = queryWithReference.getQueryText();
             }
-
-        });
-        return result;
+            return QuerySetEntry.Builder.builder().queryText(queryText).build();
+        }).collect(Collectors.toList());
     }
 }

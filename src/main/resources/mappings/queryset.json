@@ -4,7 +4,12 @@
     "timestamp": { "type": "date", "format": "strict_date_time" },
     "name": { "type": "keyword" },
     "description": { "type": "text" },
-    "querySetQueries": { "type": "object" },
+    "querySetQueries": {
+      "type": "nested",
+      "properties": {
+        "queryText": { "type": "text" }
+      }
+    },
     "sampling": { "type": "keyword" }
   }
 }

@@ -32,7 +32,7 @@ public class RestPutQuerySetActionTests extends SearchRelevanceRestTestCase {
         + "\"description\": \"test_description\","
         + "\"sampling\": \"manual\","
         + "\"querySetQueries\": ["
-        + "  {\"queryText\": \"test\", \"referenceAnswer\": \"\"}"
+        + "  {\"queryText\": \"test\"}"
         + "]"
         + "}";
 
