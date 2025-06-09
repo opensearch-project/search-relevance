@@ -200,7 +200,7 @@ public class MetricsHelper {
             AtomicInteger completedJudgments = new AtomicInteger(0);
 
             for (String judgmentId : judgmentIds) {
-                judgmentDao.getJudgment(judgmentId, new ActionListener<SearchResponse>() {
+                judgmentDao.getJudgment(judgmentId, new ActionListener<>() {
                     @Override
                     public void onResponse(SearchResponse judgmentResponse) {
                         try {
@@ -208,21 +208,20 @@ public class MetricsHelper {
                                 log.warn("No judgment found for ID: {}", judgmentId);
                             } else {
                                 Map<String, Object> sourceAsMap = judgmentResponse.getHits().getHits()[0].getSourceAsMap();
-                                Map<String, Object> judgmentRatings = (Map<String, Object>) sourceAsMap.getOrDefault(
+                                List<Map<String, Object>> judgmentRatings = (List<Map<String, Object>>) sourceAsMap.getOrDefault(
                                     "judgmentRatings",
-                                    Collections.emptyMap()
-                                );
-                                List<Map<String, Object>> queryRatings = (List<Map<String, Object>>) judgmentRatings.getOrDefault(
-                                    queryText,
                                     Collections.emptyList()
                                 );
-
-                                queryRatings.forEach(
-                                    docScoreRating -> docIdToRatings.put(
-                                        (String) docScoreRating.get("docId"),
-                                        (String) docScoreRating.get("rating")
-                                    )
-                                );
+                                // TODO change this to more efficient approach, this is O(n) because we need to scan all list to find query
+                                for (Map<String, Object> rating : judgmentRatings) {
+                                    if (queryText.equals(rating.get("query"))) {
+                                        List<Map<String, String>> docScoreRatings = (List<Map<String, String>>) rating.get("ratings");
+                                        docScoreRatings.forEach(
+                                            docScoreRating -> docIdToRatings.put(docScoreRating.get("docId"), docScoreRating.get("rating"))
+                                        );
+                                        break;
+                                    }
+                                }
                             }
 
                             // Check if all judgments have been processed
