@@ -233,6 +233,27 @@ testClusters.integTest {
     setting 'plugins.search_relevance.workbench_enabled', 'true'
 }
 
+// Remote Integration Tests
+task integTestRemote(type: RestIntegTestTask) {
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+
+    systemProperty "https", System.getProperty("https")
+    systemProperty "user", System.getProperty("user")
+    systemProperty "password", System.getProperty("password")
+
+    systemProperty 'cluster.number_of_nodes', "${_numNodes}"
+
+    systemProperty 'tests.security.manager', 'false'
+
+    // run tests only if cluster has been set via system property
+    if (System.getProperty("tests.rest.cluster") != null) {
+        filter {
+            includeTestsMatching "org.opensearch.searchrelevance.*IT"
+        }
+    }
+}
+
 run {
     useCluster testClusters.integTest
 }
