@@ -12,7 +12,7 @@ import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.QUER
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.logging.log4j.LogManager;
@@ -65,7 +65,7 @@ public class QuerySetDao {
         }
         try {
             searchRelevanceIndicesManager.putDoc(
-                querySet.id(),
+                querySet.getId(),
                 querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS),
                 QUERY_SET,
                 listener
@@ -134,8 +134,8 @@ public class QuerySetDao {
                     LOGGER.info("Successfully get response: [{}]", response);
                     QuerySet querySet = convertToQuerySet(response);
                     LOGGER.debug("Converted response into queryset: [{}]", querySet);
-
-                    results.put(METRICS_QUERY_TEXT_FIELD_NAME, new ArrayList<>(querySet.querySetQueries().keySet()));
+                    List<String> queryTexts = querySet.getQuerySetQueries().stream().map(entry -> (String) entry.get("queryText")).toList();
+                    results.put(METRICS_QUERY_TEXT_FIELD_NAME, queryTexts);
                     stepListener.onResponse(results);
                 } catch (Exception e) {
                     LOGGER.error("Failed to convert response: [{}] into queryset.", response);
@@ -161,7 +161,7 @@ public class QuerySetDao {
             .description((String) sourceMap.get(QuerySet.DESCRIPTION))
             .timestamp((String) sourceMap.get(QuerySet.TIME_STAMP))
             .sampling((String) sourceMap.get(QuerySet.SAMPLING))
-            .querySetQueries((Map<String, Integer>) sourceMap.getOrDefault(QuerySet.QUERY_SET_QUERIES, new HashMap<>()))
+            .querySetQueries((List<Map<String, Object>>) sourceMap.getOrDefault(QuerySet.QUERY_SET_QUERIES, new ArrayList<>()))
             .build();
     }
 }

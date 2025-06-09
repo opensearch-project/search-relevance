@@ -9,12 +9,11 @@ package org.opensearch.searchrelevance.transport.queryset;
 
 import static org.opensearch.searchrelevance.model.QueryWithReference.DELIMITER;
 
-import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import org.opensearch.action.StepListener;
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.HandledTransportAction;
@@ -66,14 +65,10 @@ public class PutQuerySetTransportAction extends HandledTransportAction<PutQueryS
             );
         }
         List<QueryWithReference> queryWithReferenceList = request.getQuerySetQueries();
-        Map<String, Integer> querySetQueries = convertQuerySetQueriesMap(queryWithReferenceList);
+        List<Map<String, Object>> querySetQueries = convertQuerySetQueriesMap(queryWithReferenceList);
 
-        StepListener<Void> createIndexStep = new StepListener<>();
-        querySetDao.createIndexIfAbsent(createIndexStep);
-        createIndexStep.whenComplete(v -> {
-            QuerySet querySet = new QuerySet(id, name, description, timestamp, sampling, querySetQueries);
-            querySetDao.putQuerySet(querySet, listener);
-        }, listener::onFailure);
+        QuerySet querySet = new QuerySet(id, name, description, sampling, timestamp, querySetQueries);
+        querySetDao.putQuerySet(querySet, listener);
     }
 
     /**
@@ -86,14 +81,14 @@ public class PutQuerySetTransportAction extends HandledTransportAction<PutQueryS
      * @param queryWithReferenceList - list of queryText and referenceAnswer pair
      * @return - querySetQueries as a map of {queryText}#{referenceAnswer} and probability to alignn with UBI queryset
      */
-    private Map<String, Integer> convertQuerySetQueriesMap(List<QueryWithReference> queryWithReferenceList) {
-        Map<String, Integer> result = new HashMap<>();
+    private List<Map<String, Object>> convertQuerySetQueriesMap(List<QueryWithReference> queryWithReferenceList) {
+        List<Map<String, Object>> result = new ArrayList<>();
         queryWithReferenceList.forEach(queryWithReference -> {
             if (queryWithReference.getReferenceAnswer() != null && !queryWithReference.getReferenceAnswer().isEmpty()) {
                 String combinedStr = String.join(DELIMITER, queryWithReference.getQueryText(), queryWithReference.getReferenceAnswer());
-                result.put(combinedStr, 0);
+                result.add(Map.of("queryText", combinedStr, "frequency", 0));
             } else {
-                result.put(queryWithReference.getQueryText(), 0);
+                result.add(Map.of("queryText", queryWithReference.getQueryText(), "frequency", 0));
             }
 
         });

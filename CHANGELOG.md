@@ -20,14 +20,15 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - Update demo setup to be include ubi and ecommerce data sets and run in OS 3.1 ([#10](https://github.com/opensearch-project/search-relevance/issues/10))
  - Build search request with normal parsing and wrapper query ([#22](https://github.com/opensearch-project/search-relevance/pull/22))
  - Change aggregation field from `action_name.keyword` to `action_name` to fix implicit judgments calculation ([#15](https://github.com/opensearch-project/search-relevance/issues/10)).
- - Fix COEC calculation: introduce rank in ClickthroughRate class, fix bucket size for positional aggregation, correct COEC claculation ([#23](https://github.com/opensearch-project/search-relevance/issues/23)).
+ - Fix COEC calculation: introduce rank in ClickthroughRate class, fix bucket size for positional aggregation, correct COEC claculation ([#23](https://github.com/opensearch-project/search-relevance/issues/23))
  - LLM Judgment Processor Improvement ([#27](https://github.com/opensearch-project/search-relevance/pull/27))
  - Deal with experiment processing when no experiment variants exist. ([#45](https://github.com/opensearch-project/search-relevance/pull/45))
  - Extend the `src/test/demo.sh` script to support pointwise and hybrid experiments.
  - Enable Search Relevance backend plugin as part of running demo scripts. ([#60](https://github.com/opensearch-project/search-relevance/pull/60))
  - Move from Judgments being "scores" to Judgments being "ratings".  ([#64](https://github.com/opensearch-project/search-relevance/pull/64))
  - Extend hybrid search optimizer demo script to use models. ([#69](https://github.com/opensearch-project/search-relevance/pull/69))
- - Set limit for number of fields programmatically during index creation ([#74](https://github.com/opensearch-project/search-relevance/pull/74)
- - Change model for Judgment entity ([#77](https://github.com/opensearch-project/search-relevance/pull/77)
+ - Set limit for number of fields programmatically during index creation ([#74](https://github.com/opensearch-project/search-relevance/pull/74))
+ - Change model for Judgment entity ([#77](https://github.com/opensearch-project/search-relevance/pull/77))
+ - Change model for Query Set to more type restrictive ([#86](https://github.com/opensearch-project/search-relevance/pull/86))
 
 ### Security

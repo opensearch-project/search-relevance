@@ -7,8 +7,11 @@
  */
 package org.opensearch.searchrelevance.transport.queryset;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
@@ -80,10 +83,16 @@ public class PostQuerySetTransportAction extends HandledTransportAction<PostQuer
 
         StepListener<Void> createIndexStep = new StepListener<>();
         querySetDao.createIndexIfAbsent(createIndexStep);
-        Map<String, Integer> finalQuerySetQueries = querySetQueries;
-        createIndexStep.whenComplete(v -> {
-            QuerySet querySet = new QuerySet(id, name, description, timestamp, sampling, finalQuerySetQueries);
-            querySetDao.putQuerySet(querySet, listener);
-        }, listener::onFailure);
+        List<Map<String, Object>> finalQuerySetQueries = new ArrayList<>();
+        if (Objects.nonNull(querySetQueries)) {
+            for (Map.Entry<String, Integer> entry : querySetQueries.entrySet()) {
+                Map<String, Object> querySetQuery = new HashMap<>();
+                querySetQuery.put("queryText", entry.getKey());
+                querySetQuery.put("frequency", entry.getValue());
+                finalQuerySetQueries.add(querySetQuery);
+            }
+        }
+        QuerySet querySet = new QuerySet(id, name, description, sampling, timestamp, finalQuerySetQueries);
+        querySetDao.putQuerySet(querySet, listener);
     }
 }
