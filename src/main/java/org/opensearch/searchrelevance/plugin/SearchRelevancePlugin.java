@@ -94,12 +94,9 @@ import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.client.Client;
 import org.opensearch.watcher.ResourceWatcherService;
 
-import lombok.extern.log4j.Log4j2;
-
 /**
  * Search Relevance plugin class
  */
-@Log4j2
 public class SearchRelevancePlugin extends Plugin implements ActionPlugin, SystemIndexPlugin, ClusterPlugin, ExtensiblePlugin {
 
     private Client client;
