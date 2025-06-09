@@ -4,7 +4,7 @@
     "timestamp": { "type": "date", "format": "strict_date_time" },
     "name": { "type": "keyword" },
     "type": { "type": "keyword" },
-    "metadata": { "type": "object", "dynamic": true },
+    "metadata": { "type": "object", "dynamic": false },
     "judgmentRatings": {
       "type": "nested",
       "properties": {

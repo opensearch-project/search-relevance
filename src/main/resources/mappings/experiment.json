@@ -8,6 +8,6 @@
     "searchConfigurationList": { "type": "keyword" },
     "judgmentList": { "type": "keyword" },
     "size": {"type":  "keyword"},
-    "results": { "type": "object", "dynamic": true }
+    "results": { "type": "object", "dynamic": false }
   }
 }

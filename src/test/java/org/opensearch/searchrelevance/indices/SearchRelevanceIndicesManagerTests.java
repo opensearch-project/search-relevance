@@ -7,21 +7,6 @@
  */
 package org.opensearch.searchrelevance.indices;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-import static org.opensearch.index.mapper.MapperService.INDEX_MAPPING_TOTAL_FIELDS_LIMIT_SETTING;
-import static org.opensearch.searchrelevance.common.PluginConstants.MAX_TOTAL_FIELDS_LIMIT;
-import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.QUERY_SET;
-
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 import org.apache.lucene.search.TotalHits;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -62,6 +47,19 @@ import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.client.AdminClient;
 import org.opensearch.transport.client.Client;
 import org.opensearch.transport.client.IndicesAdminClient;
+
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.QUERY_SET;
 
 public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
     @Mock
@@ -124,9 +122,6 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         CreateIndexRequest capturedRequest = requestCaptor.getValue();
         assertEquals(QUERY_SET.getIndexName(), capturedRequest.index());
         assertEquals(QUERY_SET.getMapping(), capturedRequest.mappings());
-        Settings actualIndexSettings = capturedRequest.settings();
-        assertNotNull(actualIndexSettings);
-        assertEquals(Integer.toString(MAX_TOTAL_FIELDS_LIMIT), actualIndexSettings.get(INDEX_MAPPING_TOTAL_FIELDS_LIMIT_SETTING.getKey()));
 
         CreateIndexResponse response = new CreateIndexResponse(true, true, QUERY_SET.getIndexName());
         listenerCaptor.getValue().onResponse(response);

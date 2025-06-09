@@ -7,15 +7,9 @@
  */
 package org.opensearch.searchrelevance.indices;
 
-import static org.opensearch.index.mapper.MapperService.INDEX_MAPPING_TOTAL_FIELDS_LIMIT_SETTING;
-import static org.opensearch.searchrelevance.common.PluginConstants.MAX_TOTAL_FIELDS_LIMIT;
-
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.Objects;
-import java.util.function.BiConsumer;
-
+import lombok.Builder;
+import lombok.Getter;
+import lombok.extern.log4j.Log4j2;
 import org.opensearch.ResourceAlreadyExistsException;
 import org.opensearch.ResourceNotFoundException;
 import org.opensearch.action.DocWriteRequest.OpType;
@@ -30,7 +24,6 @@ import org.opensearch.action.search.ShardSearchFailure;
 import org.opensearch.action.support.WriteRequest;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.io.Streams;
-import org.opensearch.common.settings.Settings;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.core.xcontent.XContentBuilder;
@@ -41,11 +34,13 @@ import org.opensearch.search.internal.InternalSearchResponse;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.shared.StashedThreadContext;
 import org.opensearch.transport.client.Client;
-
-import lombok.Builder;
-import lombok.Getter;
-import lombok.extern.log4j.Log4j2;
 import reactor.util.annotation.NonNull;
+
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Objects;
+import java.util.function.BiConsumer;
 
 /**
  * Manager for common search relevance system indices actions.
@@ -75,8 +70,7 @@ public class SearchRelevanceIndicesManager {
             stepListener.onResponse(null);
             return;
         }
-        Settings settings = Settings.builder().put(INDEX_MAPPING_TOTAL_FIELDS_LIMIT_SETTING.getKey(), MAX_TOTAL_FIELDS_LIMIT).build();
-        final CreateIndexRequest createIndexRequest = new CreateIndexRequest(indexName).mapping(mapping).settings(settings);
+        final CreateIndexRequest createIndexRequest = new CreateIndexRequest(indexName).mapping(mapping);
         StashedThreadContext.run(client, () -> client.admin().indices().create(createIndexRequest, new ActionListener<>() {
             @Override
             public void onResponse(final CreateIndexResponse createIndexResponse) {

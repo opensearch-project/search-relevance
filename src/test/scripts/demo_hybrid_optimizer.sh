@@ -387,25 +387,3 @@ echo Experiment id: $EX_HO
 echo
 echo Show HYBRID OPTIMIZER Experiment
 exe curl -s -X GET localhost:9200/_plugins/_search_relevance/experiments/$EX_HO
-
-echo
-echo Expand total fields limit for SRW indexes 
-
-# TODO Fix the bug the we need to increase the number of fields due to our use of dynamice field
-curl -s -X PUT "http://localhost:9200/.plugins-search-relevance-experiment/_settings" \
--H "Content-type: application/json" \
--d'{
-  "index.mapping.total_fields.limit": 20000
-}'
-
-curl -s -X PUT "http://localhost:9200/search-relevance-judgment/_settings" \
--H "Content-type: application/json" \
--d'{
-  "index.mapping.total_fields.limit": 20000
-}'
-
-curl -s -X PUT "http://localhost:9200/search-relevance-experiment-variant/_settings" \
--H "Content-type: application/json" \
--d'{
-  "index.mapping.total_fields.limit": 20000
-}'

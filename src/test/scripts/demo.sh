@@ -47,13 +47,6 @@ if [ "$SKIP_ECOMMERCE" = false ]; then
   head -n 2 "$ECOMMERCE_DATA_FILE" | curl -s -X POST "http://localhost:9200/index-name/_bulk?pretty" \
     -H 'Content-Type: application/x-ndjson' --data-binary @-
 
-  # Increase the mappings
-  curl -s -X PUT "http://localhost:9200/ecommerce/_settings" \
-  -H "Content-type: application/json" \
-  -d'{
-    "index.mapping.total_fields.limit": 20000
-  }'
-
   echo
   echo Populating ecommerce index
   # do 250 products
