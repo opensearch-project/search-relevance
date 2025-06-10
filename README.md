@@ -12,13 +12,15 @@ This plugin provides resource management for each tool provided. For example, mo
 Exposing these powerful features through a simple UI is done through the  [Dashboards Search Relevance](https://github.com/opensearch-project/dashboards-search-relevance) plugin.
 
 > [!IMPORTANT]  
-> While shipping with OpenSearch, you must OPT IN to this feature.  To enable this run `curl -X PUT "http://localhost:9200/_cluster/settings" -H 'Content-Type: application/json' -d'
- {
-   "persistent" : {
-    "plugins.search_relevance.workbench_enabled" : true
-  }
-}
- '`
+> While shipping with OpenSearch, you must OPT IN to this feature.  To enable this run:
+> ```curl -X PUT "http://localhost:9200/_cluster/settings" -H 'Content-Type: application/json' -d'
+>  {
+>    "persistent" : {
+>     "plugins.search_relevance.workbench_enabled" : true
+>   }
+> }
+>  '
+> ```
 
 
 For tutorials on how to leverage these tools, see [here](https://docs.opensearch.org/docs/latest/search-plugins/search-relevance/).
