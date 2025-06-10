@@ -69,7 +69,11 @@ public class MLConstants {
         if (response == null) return "";
 
         // Remove special characters that might cause parsing issues
-        return response.replace("`", "").replace("\n", " ").trim();
+        String cleaned = response.replaceAll("``json", "").replace("`", "").replace("\n", " ").trim();
+        if (!cleaned.startsWith("[")) {
+            cleaned = "[" + cleaned + "]";
+        }
+        return cleaned;
     }
 
     public static int validateTokenLimit(Map<String, Object> source) {

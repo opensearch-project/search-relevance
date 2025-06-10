@@ -343,7 +343,9 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                                 continue;
                             }
 
-                            String sanitizedResponse = sanitizeLLMResponse("[" + entry.getValue() + "]");
+                            LOGGER.debug("response before sanitization: {}", entry.getValue());
+                            String sanitizedResponse = sanitizeLLMResponse(entry.getValue());
+                            LOGGER.debug("response after sanitization: {}", sanitizedResponse);
                             List<Map<String, Object>> scores = OBJECT_MAPPER.readValue(
                                 sanitizedResponse,
                                 new TypeReference<List<Map<String, Object>>>() {
