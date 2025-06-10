@@ -9,16 +9,19 @@
       "type": "nested",
       "properties": {
         "query": {
-          "type": "text"
+          "type": "text",
+          "index": false
         },
         "ratings": {
           "type": "nested",
           "properties": {
             "docId": {
-              "type": "text"
+              "type": "text",
+              "index": false
             },
             "rating": {
-              "type": "float"
+              "type": "float",
+              "index": false
             }
           }
         }

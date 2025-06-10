@@ -7,7 +7,7 @@
     "querySetQueries": {
       "type": "nested",
       "properties": {
-        "queryText": { "type": "text" }
+        "queryText": { "type": "text", "index": false }
       }
     },
     "sampling": { "type": "keyword" }
