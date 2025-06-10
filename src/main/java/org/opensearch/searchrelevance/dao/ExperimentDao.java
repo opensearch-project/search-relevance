@@ -10,6 +10,8 @@ package org.opensearch.searchrelevance.dao;
 import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.EXPERIMENT;
 
 import java.io.IOException;
+import java.util.Map;
+import java.util.Optional;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -25,10 +27,21 @@ import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager;
 import org.opensearch.searchrelevance.model.Experiment;
+import org.opensearch.searchrelevance.model.ExperimentType;
+import org.opensearch.searchrelevance.stats.events.EventStatName;
+import org.opensearch.searchrelevance.stats.events.EventStatsManager;
 
 public class ExperimentDao {
     private static final Logger LOGGER = LogManager.getLogger(ExperimentDao.class);
     private final SearchRelevanceIndicesManager searchRelevanceIndicesManager;
+    private static Map<ExperimentType, Runnable> experimentTypeIncrementers = Map.of(
+        ExperimentType.PAIRWISE_COMPARISON,
+        () -> EventStatsManager.increment(EventStatName.EXPERIMENT_PAIRWISE_COMPARISON_EXECUTIONS),
+        ExperimentType.POINTWISE_EVALUATION,
+        () -> EventStatsManager.increment(EventStatName.EXPERIMENT_POINTWISE_EVALUATION_EXECUTIONS),
+        ExperimentType.HYBRID_OPTIMIZER,
+        () -> EventStatsManager.increment(EventStatName.EXPERIMENT_HYBRID_OPTIMIZER_EXECUTIONS)
+    );
 
     public ExperimentDao(SearchRelevanceIndicesManager searchRelevanceIndicesManager) {
         this.searchRelevanceIndicesManager = searchRelevanceIndicesManager;
@@ -52,6 +65,8 @@ public class ExperimentDao {
             listener.onFailure(new SearchRelevanceException("Experiment cannot be null", RestStatus.BAD_REQUEST));
             return;
         }
+        // Increment stats
+        recordStats(experiment);
         try {
             searchRelevanceIndicesManager.putDoc(
                 experiment.id(),
@@ -120,5 +135,10 @@ public class ExperimentDao {
         }
 
         return searchRelevanceIndicesManager.listDocsBySearchRequest(sourceBuilder, EXPERIMENT, listener);
+    }
+
+    private void recordStats(Experiment experiment) {
+        EventStatsManager.increment(EventStatName.EXPERIMENT_EXECUTIONS);
+        Optional.ofNullable(experimentTypeIncrementers.get(experiment.type())).ifPresent(Runnable::run);
     }
 }

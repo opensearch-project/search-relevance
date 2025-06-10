@@ -39,6 +39,25 @@ public enum EventStatName implements StatName {
         "judgments",
         EventStatType.TIMESTAMPED_EVENT_COUNTER,
         Version.V_3_1_0
+    ),
+    EXPERIMENT_EXECUTIONS("experiment_executions", "experiments", EventStatType.TIMESTAMPED_EVENT_COUNTER, Version.V_3_1_0),
+    EXPERIMENT_PAIRWISE_COMPARISON_EXECUTIONS(
+        "experiment_pairwise_comparison_executions",
+        "experiments",
+        EventStatType.TIMESTAMPED_EVENT_COUNTER,
+        Version.V_3_1_0
+    ),
+    EXPERIMENT_POINTWISE_EVALUATION_EXECUTIONS(
+        "experiment_pointwise_evaluation_executions",
+        "experiments",
+        EventStatType.TIMESTAMPED_EVENT_COUNTER,
+        Version.V_3_1_0
+    ),
+    EXPERIMENT_HYBRID_OPTIMIZER_EXECUTIONS(
+        "experiment_hybrid_optimizer_executions",
+        "experiments",
+        EventStatType.TIMESTAMPED_EVENT_COUNTER,
+        Version.V_3_1_0
     ),;
 
     private final String nameString;
