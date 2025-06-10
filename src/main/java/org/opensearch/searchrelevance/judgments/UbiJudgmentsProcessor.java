@@ -63,7 +63,7 @@ public class UbiJudgmentsProcessor implements BaseJudgmentsProcessor {
                             if (!(ratingData instanceof Map)) {
                                 listener.onFailure(
                                     new SearchRelevanceException(
-                                        "queryText " + queryText + " must have rating data as a Map (HashMap).",
+                                        "queryText " + queryText + " must have rating data as a Map.",
                                         RestStatus.BAD_REQUEST
                                     )
                                 );
