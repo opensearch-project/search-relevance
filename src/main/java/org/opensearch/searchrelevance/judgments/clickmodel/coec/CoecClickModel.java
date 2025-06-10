@@ -84,7 +84,7 @@ public class CoecClickModel extends ClickModel {
 
         // Add aggregations to see distribution
         TermsAggregationBuilder actionAgg = AggregationBuilders.terms("actions")
-            .field("action_name")
+            .field("action_name.keyword")
             .subAggregation(
                 AggregationBuilders.terms("positions").field("event_attributes.position.ordinal").size(parameters.getMaxRank())
             );
@@ -196,7 +196,7 @@ public class CoecClickModel extends ClickModel {
                         if (userQuery == null || event.getEventAttributes() == null || event.getEventAttributes().getObject() == null) {
                             continue;
                         }
-                        
+
                         String objectId = event.getEventAttributes().getObject().getObjectId();
                         String action = event.getActionName();
                         int rank = event.getEventAttributes().getPosition().getOrdinal();
