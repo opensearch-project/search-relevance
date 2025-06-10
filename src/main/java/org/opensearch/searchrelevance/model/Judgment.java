@@ -54,7 +54,7 @@ public class Judgment implements ToXContentObject {
             xContentBuilder.startObject();
             xContentBuilder.field("query", judgment.get("query"));
             xContentBuilder.startArray("ratings");
-            // As it turns out, the ratings object in a judgment is not a list but instead an
+            // As it turns out, the ratings object in a judgment is sometimes not a list but instead an
             // object. {ratings={B077ZJXCTS=0.000, B071S6LTJJ=0.000,
             // B01IDSPDJI=0.000, B074V6Q1DR=0.000, B07QRCGL3G=0.000}, query=yeezy}
             if ((judgment.get("ratings")) instanceof Map) {
