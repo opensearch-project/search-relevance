@@ -13,7 +13,7 @@ Exposing these powerful features through a simple UI is done through the  [Dashb
 
 > [!IMPORTANT]  
 > While shipping with OpenSearch, you must OPT IN to this feature.  To enable this run:
-> ```/dev/null/curl-command.sh#L1-7
+> ```
 > curl -X PUT "http://localhost:9200/_cluster/settings" -H 'Content-Type: application/json' -d'
 >  {
 >    "persistent" : {
