@@ -33,23 +33,50 @@ java {
 }
 
 publishing {
+    repositories {
+        maven {
+            name = "Snapshots"
+            url = "https://aws.oss.sonatype.org/content/repositories/snapshots"
+            credentials {
+                username "$System.env.SONATYPE_USERNAME"
+                password "$System.env.SONATYPE_PASSWORD"
+            }
+        }
+        maven {
+            name = 'staging'
+            url = "${rootProject.buildDir}/local-staging-repo"
+        }
+    }
     publications {
         pluginZip(MavenPublication) { publication ->
             pom {
               name = pluginName
               description = pluginDescription
-              licenses {
-                license {
-                  name = "The Apache License, Version 2.0"
-                  url = "http://www.apache.org/licenses/LICENSE-2.0.txt"
+              groupId = "org.opensearch.plugin"
+            }
+        }
+        all {
+            pom {
+                name = "opensearch-search-relevance"
+                description = "OpenSearch Search Relevance plugin"
+            }
+            pom.withXml { XmlProvider xml ->
+                Node node = xml.asNode()
+                node.appendNode('inceptionYear', '2021')
+                if (!node.'description') {
+                    node.appendNode('description', description)
                 }
-              }
-              developers {
-                developer {
-                  name = "OpenSearch Search Relevance Plugin"
-                  url = "https://github.com/opensearch-project/opensearch-search-relevance"
+                if (!node.'licenses') {
+                    Node license = node.appendNode('licenses').appendNode('license')
+                    license.appendNode('name', "The Apache License, Version 2.0")
+                    license.appendNode('url', "http://www.apache.org/licenses/LICENSE-2.0.txt")
                 }
-              }
+
+                if (!node.'developers') {
+                    Node developer = node.appendNode('developers').appendNode('developer')
+                    developer.appendNode('name', 'OpenSearch')
+                    developer.appendNode('url', 'https://github.com/opensearch-project/search-relevance')
+                }
             }
         }
     }
