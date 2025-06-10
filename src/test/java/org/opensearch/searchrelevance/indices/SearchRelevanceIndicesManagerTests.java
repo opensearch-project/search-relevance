@@ -7,6 +7,19 @@
  */
 package org.opensearch.searchrelevance.indices;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.QUERY_SET;
+
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import org.apache.lucene.search.TotalHits;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -47,19 +60,6 @@ import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.client.AdminClient;
 import org.opensearch.transport.client.Client;
 import org.opensearch.transport.client.IndicesAdminClient;
-
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.QUERY_SET;
 
 public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
     @Mock

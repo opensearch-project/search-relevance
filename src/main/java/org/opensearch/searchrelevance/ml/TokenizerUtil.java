@@ -7,15 +7,15 @@
  */
 package org.opensearch.searchrelevance.ml;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import com.knuddels.jtokkit.Encodings;
 import com.knuddels.jtokkit.api.Encoding;
 import com.knuddels.jtokkit.api.EncodingRegistry;
 import com.knuddels.jtokkit.api.EncodingType;
 import com.knuddels.jtokkit.api.IntArrayList;
 import com.knuddels.jtokkit.api.ModelType;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  *  For OpenAI models, use their official tiktoken library - https://github.com/knuddelsgmbh/jtokkit

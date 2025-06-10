@@ -7,6 +7,12 @@
  */
 package org.opensearch.searchrelevance.transport.queryset;
 
+import static org.opensearch.searchrelevance.model.QueryWithReference.DELIMITER;
+
+import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.HandledTransportAction;
@@ -22,12 +28,6 @@ import org.opensearch.searchrelevance.model.QueryWithReference;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
-
-import java.util.List;
-import java.util.UUID;
-import java.util.stream.Collectors;
-
-import static org.opensearch.searchrelevance.model.QueryWithReference.DELIMITER;
 
 public class PutQuerySetTransportAction extends HandledTransportAction<PutQuerySetRequest, IndexResponse> {
     private final ClusterService clusterService;

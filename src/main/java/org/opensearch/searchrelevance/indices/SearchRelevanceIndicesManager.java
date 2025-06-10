@@ -7,9 +7,12 @@
  */
 package org.opensearch.searchrelevance.indices;
 
-import lombok.Builder;
-import lombok.Getter;
-import lombok.extern.log4j.Log4j2;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Objects;
+import java.util.function.BiConsumer;
+
 import org.opensearch.ResourceAlreadyExistsException;
 import org.opensearch.ResourceNotFoundException;
 import org.opensearch.action.DocWriteRequest.OpType;
@@ -34,13 +37,11 @@ import org.opensearch.search.internal.InternalSearchResponse;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.shared.StashedThreadContext;
 import org.opensearch.transport.client.Client;
-import reactor.util.annotation.NonNull;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.Objects;
-import java.util.function.BiConsumer;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.extern.log4j.Log4j2;
+import reactor.util.annotation.NonNull;
 
 /**
  * Manager for common search relevance system indices actions.
