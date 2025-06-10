@@ -6,6 +6,12 @@
     "searchText": { "type": "keyword" },
     "judgmentList": { "type": "keyword" },
     "documentIds": { "type": "keyword" },
-    "metrics": { "type": "object", "dynamic": false }
+    "metrics": {
+      "type": "nested",
+      "properties": {
+        "metric": { "type": "keyword" },
+        "value": { "type": "float" }
+      }
+    }
   }
 }

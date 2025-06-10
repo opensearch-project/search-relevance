@@ -6,6 +6,11 @@
     "status": { "type": "keyword" },
     "experimentId": { "type": "keyword" },
     "parameters": { "type":  "object", "dynamic": false },
-    "results": { "type": "object", "dynamic": false }
+    "results": {
+      "type": "object",
+      "properties": {
+        "evaluationResultId": { "type": "keyword" }
+      }
+    }
   }
 }

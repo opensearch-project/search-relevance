@@ -10,6 +10,15 @@ package org.opensearch.searchrelevance.metrics;
 import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_PAIRWISE_COMPARISON_FIELD_NAME;
 import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_A;
 import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_B;
+import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_SNAPSHOTS;
+import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_SEARCH_CONFIGURATION_ID;
+import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_DOC_IDS;
+import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_METRIC;
+import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_VALUE;
+import static org.opensearch.searchrelevance.common.MetricsConstants.POINTWISE_FIELD_NAME_EVALUATION_ID;
+import static org.opensearch.searchrelevance.common.MetricsConstants.POINTWISE_FIELD_NAME_EXPERIMENT_VARIANT_ID;
+import static org.opensearch.searchrelevance.common.MetricsConstants.POINTWISE_FIELD_NAME_EVALUATION_RESULTS;
+import static org.opensearch.searchrelevance.common.MetricsConstants.POINTWISE_FIELD_NAME_SEARCH_CONFIGURATION_ID;
 import static org.opensearch.searchrelevance.experiment.QuerySourceUtil.createDefinitionOfTemporarySearchPipeline;
 import static org.opensearch.searchrelevance.metrics.EvaluationMetrics.calculateEvaluationMetrics;
 import static org.opensearch.searchrelevance.metrics.PairwiseComparisonMetrics.calculatePairwiseMetrics;
@@ -134,7 +143,14 @@ public class MetricsHelper {
                 return;
             }
             // Add doc IDs for each search configuration
-            searchConfigToDocIds.forEach((configId, docIds) -> results.put(configId, docIds != null ? docIds : Collections.emptyList()));
+            List<Map<String, Object>> snapShots = new ArrayList<>();
+            searchConfigToDocIds.forEach((configId, docIds) -> {
+                Map<String, Object> snapshot = new HashMap<>();
+                snapshot.put(PAIRWISE_FIELD_NAME_SEARCH_CONFIGURATION_ID, configId);
+                snapshot.put(PAIRWISE_FIELD_NAME_DOC_IDS, docIds != null ? docIds : Collections.emptyList());
+                snapShots.add(snapshot);
+            });
+            results.put(PAIRWISE_FIELD_NAME_SNAPSHOTS, snapShots);
 
             // Prepare input for pairwise calculation
             Map<String, List<String>> pairwiseInput = new HashMap<>();
@@ -391,7 +407,7 @@ public class MetricsHelper {
                     SearchHit[] hits = response.getHits().getHits();
                     List<String> docIds = Arrays.stream(hits).map(SearchHit::getId).collect(Collectors.toList());
 
-                    Map<String, String> metrics = calculateEvaluationMetrics(docIds, docIdToScores, size);
+                    List<Map<String, Object>> metrics = calculateEvaluationMetrics(docIds, docIdToScores, size);
                     EvaluationResult evaluationResult = new EvaluationResult(
                         evaluationId,
                         TimeUtils.getTimestamp(),
@@ -403,7 +419,8 @@ public class MetricsHelper {
                     );
 
                     evaluationResultDao.putEvaluationResult(evaluationResult, ActionListener.wrap(success -> {
-                        configToEvalIds.put(searchConfigurationId, evaluationId);
+                        configToEvalIds.put(POINTWISE_FIELD_NAME_SEARCH_CONFIGURATION_ID, searchConfigurationId);
+                        configToEvalIds.put(POINTWISE_FIELD_NAME_EVALUATION_ID, evaluationId);
                         if (pendingConfigurations.decrementAndGet() == 0) {
                             listener.onResponse(configToEvalIds);
                         }
@@ -482,7 +499,7 @@ public class MetricsHelper {
                         SearchHit[] hits = response.getHits().getHits();
                         List<String> docIds = Arrays.stream(hits).map(SearchHit::getId).collect(Collectors.toList());
 
-                        Map<String, String> metrics = calculateEvaluationMetrics(docIds, docIdToScores, size);
+                        List<Map<String, Object>> metrics = calculateEvaluationMetrics(docIds, docIdToScores, size);
                         EvaluationResult evaluationResult = new EvaluationResult(
                             evaluationId,
                             TimeUtils.getTimestamp(),
@@ -511,7 +528,20 @@ public class MetricsHelper {
                                     map.put(experimentVariant.getId(), evaluationId);
                                 }
                                 if (pendingConfigurations.decrementAndGet() == 0) {
-                                    listener.onResponse(configToExperimentVariants);
+                                    Map<String, Object> transformedConfigToExperimentVariants = new HashMap<>();
+                                    transformedConfigToExperimentVariants.put(POINTWISE_FIELD_NAME_SEARCH_CONFIGURATION_ID, searchConfigurationId);
+                                    
+                                    List<Map<String, Object>> evaluationResults = new ArrayList<>();
+                                    Map<String, Object> configMap = (Map<String, Object>) configToExperimentVariants.get(searchConfigurationId);
+                                    configMap.forEach((variantId, evalId) -> {
+                                        Map<String, Object> result = new HashMap<>();
+                                        result.put(POINTWISE_FIELD_NAME_EVALUATION_ID, evalId);
+                                        result.put(POINTWISE_FIELD_NAME_EXPERIMENT_VARIANT_ID, variantId);
+                                        evaluationResults.add(result);
+                                    });
+                                    transformedConfigToExperimentVariants.put(POINTWISE_FIELD_NAME_EVALUATION_RESULTS, evaluationResults);
+                                    
+                                    listener.onResponse(transformedConfigToExperimentVariants);
                                 }
                             }, listener::onFailure);
                         }, error -> {

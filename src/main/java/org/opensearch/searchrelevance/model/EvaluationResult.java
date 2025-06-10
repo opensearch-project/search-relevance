@@ -36,7 +36,7 @@ public class EvaluationResult implements ToXContentObject {
     private final String searchText;
     private final List<String> judgmentIds;
     private final List<String> documentIds;
-    private final Map<String, String> metrics;
+    private final List<Map<String, Object>> metrics;
 
     public EvaluationResult(
         String id,
@@ -45,7 +45,7 @@ public class EvaluationResult implements ToXContentObject {
         String searchText,
         List<String> judgmentIds,
         List<String> documentIds,
-        Map<String, String> metrics
+        List<Map<String, Object>> metrics
     ) {
         this.id = id;
         this.timestamp = timestamp;
@@ -93,7 +93,7 @@ public class EvaluationResult implements ToXContentObject {
         return documentIds;
     }
 
-    public Map<String, String> metrics() {
+    public List<Map<String, Object>> metrics() {
         return metrics;
     }
 }

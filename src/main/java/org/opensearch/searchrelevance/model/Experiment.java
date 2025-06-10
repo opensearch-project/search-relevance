@@ -42,7 +42,7 @@ public class Experiment implements ToXContentObject {
     private final List<String> searchConfigurationList;
     private final List<String> judgmentList;
     private final int size;
-    private final Map<String, Object> results;
+    private final List<Map<String, Object>> results;
 
     public Experiment(
         String id,
@@ -53,7 +53,7 @@ public class Experiment implements ToXContentObject {
         List<String> searchConfigurationList,
         List<String> judgmentList,
         int size,
-        Map<String, Object> results
+        List<Map<String, Object>> results
     ) {
         this.id = id;
         this.timestamp = timestamp;
@@ -116,7 +116,7 @@ public class Experiment implements ToXContentObject {
         return size;
     }
 
-    public Map<String, Object> results() {
+    public List<Map<String, Object>> results() {
         return results;
     }
 
