@@ -7,6 +7,8 @@
  */
 package org.opensearch.searchrelevance.judgments;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -52,7 +54,87 @@ public class UbiJudgmentsProcessor implements BaseJudgmentsProcessor {
                 coecClickModel.calculateJudgments(new ActionListener<>() {
                     @Override
                     public void onResponse(List<Map<String, Object>> judgments) {
-                        listener.onResponse(judgments);
+                        // Create the result map in the expected format
+                        List<Map<String, Object>> formattedRatings = new ArrayList<>();
+                        for (Map<String, Object> queryJudgment : judgments) {
+                            String queryText = (String) queryJudgment.get("query");
+                            Object ratingData = queryJudgment.get("ratings");
+
+                            if (!(ratingData instanceof Map)) {
+                                listener.onFailure(
+                                    new SearchRelevanceException(
+                                        "queryText " + queryText + " must have rating data as a Map (HashMap).",
+                                        RestStatus.BAD_REQUEST
+                                    )
+                                );
+                                return;
+                            }
+
+                            @SuppressWarnings("unchecked")
+                            Map<String, Object> ratingsMap = (Map<String, Object>) ratingData; // Cast to Map, not List
+
+                            // Prepare a list to hold the docId and score maps for the current query
+                            List<Map<String, String>> docIdScoreList = new ArrayList<>();
+
+                            // Iterate over the entrySet of the HashMap ***
+                            for (Map.Entry<String, Object> entry : ratingsMap.entrySet()) {
+                                String docId = entry.getKey(); // The key is the docId
+                                Object ratingObject = entry.getValue(); // The value is the rating
+
+                                if (docId == null || docId.isEmpty()) {
+                                    // This case is unlikely if the keys of the map are docIds, but good for defensive coding
+                                    listener.onFailure(
+                                        new SearchRelevanceException(
+                                            "docId (map key) for queryText " + queryText + " must not be null or empty",
+                                            RestStatus.BAD_REQUEST
+                                        )
+                                    );
+                                    return;
+                                }
+                                if (ratingObject == null) {
+                                    listener.onFailure(
+                                        new SearchRelevanceException(
+                                            "rating for docId '" + docId + "' in queryText " + queryText + " must not be null",
+                                            RestStatus.BAD_REQUEST
+                                        )
+                                    );
+                                    return;
+                                }
+
+                                String rating = String.valueOf(ratingObject); // Convert rating to String
+
+                                try {
+                                    Float.parseFloat(rating);
+                                } catch (NumberFormatException e) {
+                                    listener.onFailure(
+                                        new SearchRelevanceException(
+                                            "rating '"
+                                                + rating
+                                                + "' for docId '"
+                                                + docId
+                                                + "' in queryText "
+                                                + queryText
+                                                + " must be a valid float",
+                                            RestStatus.BAD_REQUEST
+                                        )
+                                    );
+                                    return;
+                                }
+
+                                // Add the docId and score to the list for the current query
+                                Map<String, String> docScoreMap = new HashMap<>();
+                                docScoreMap.put("docId", docId);
+                                docScoreMap.put("score", rating);
+                                docIdScoreList.add(docScoreMap);
+                            }
+
+                            // Add the formatted ratings for this query
+                            Map<String, Object> queryRatings = new HashMap<>();
+                            queryRatings.put("query", queryText);
+                            queryRatings.put("ratings", docIdScoreList);
+                            formattedRatings.add(queryRatings);
+                        }
+                        listener.onResponse(formattedRatings);
                     }
 
                     @Override
