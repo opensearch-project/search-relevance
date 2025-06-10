@@ -33,5 +33,6 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - Fix judgment handling for implicit judgments to be aligned with data model for Judgment again ([#93](https://github.com/opensearch-project/search-relevance/pull/93)
  - Change model for Experiment and Evaluation Result entities: ([#99](https://github.com/opensearch-project/search-relevance/pull/99))
  - Refactor and fix LLM judgment duplication issue ([#98](https://github.com/opensearch-project/search-relevance/pull/98)))
+ - Change model for Experiment and Evaluation Result entities: ([#99](https://github.com/opensearch-project/search-relevance/pull/99))
 
 ### Security
