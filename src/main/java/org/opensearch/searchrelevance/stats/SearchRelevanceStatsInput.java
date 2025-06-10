@@ -64,6 +64,24 @@ public class SearchRelevanceStatsInput implements ToXContentObject, Writeable {
     private boolean flatten;
 
     /**
+     * Controls whether the response will include individual nodes
+     */
+    @Setter
+    private boolean includeIndividualNodes;
+
+    /**
+     * Controls whether the response will include aggregated nodes
+     */
+    @Setter
+    private boolean includeAllNodes;
+
+    /**
+     * Controls whether the response will include info nodes
+     */
+    @Setter
+    private boolean includeInfo;
+
+    /**
      * Builder constructor for creating SearchRelevanceStatsInput with specific filtering parameters.
      *
      * @param nodeIds node IDs to retrieve stats from
@@ -78,13 +96,19 @@ public class SearchRelevanceStatsInput implements ToXContentObject, Writeable {
         EnumSet<EventStatName> eventStatNames,
         EnumSet<InfoStatName> infoStatNames,
         boolean includeMetadata,
-        boolean flatten
+        boolean flatten,
+        boolean includeIndividualNodes,
+        boolean includeAllNodes,
+        boolean includeInfo
     ) {
         this.nodeIds = nodeIds;
         this.eventStatNames = eventStatNames;
         this.infoStatNames = infoStatNames;
         this.includeMetadata = includeMetadata;
         this.flatten = flatten;
+        this.includeIndividualNodes = includeIndividualNodes;
+        this.includeAllNodes = includeAllNodes;
+        this.includeInfo = includeInfo;
     }
 
     /**
@@ -97,6 +121,9 @@ public class SearchRelevanceStatsInput implements ToXContentObject, Writeable {
         this.infoStatNames = EnumSet.noneOf(InfoStatName.class);
         this.includeMetadata = false;
         this.flatten = false;
+        this.includeIndividualNodes = true;
+        this.includeAllNodes = true;
+        this.includeInfo = true;
     }
 
     /**
@@ -111,6 +138,9 @@ public class SearchRelevanceStatsInput implements ToXContentObject, Writeable {
         infoStatNames = input.readOptionalEnumSet(InfoStatName.class);
         includeMetadata = input.readBoolean();
         flatten = input.readBoolean();
+        includeIndividualNodes = input.readBoolean();
+        includeAllNodes = input.readBoolean();
+        includeInfo = input.readBoolean();
     }
 
     /**
@@ -126,6 +156,9 @@ public class SearchRelevanceStatsInput implements ToXContentObject, Writeable {
         out.writeOptionalEnumSet(infoStatNames);
         out.writeBoolean(includeMetadata);
         out.writeBoolean(flatten);
+        out.writeBoolean(includeIndividualNodes);
+        out.writeBoolean(includeAllNodes);
+        out.writeBoolean(includeInfo);
     }
 
     /**
@@ -150,7 +183,19 @@ public class SearchRelevanceStatsInput implements ToXContentObject, Writeable {
         }
         builder.field(RestSearchRelevanceStatsAction.INCLUDE_METADATA_PARAM, includeMetadata);
         builder.field(RestSearchRelevanceStatsAction.FLATTEN_PARAM, flatten);
+        builder.field(RestSearchRelevanceStatsAction.INCLUDE_INDIVIDUAL_NODES_PARAM, includeIndividualNodes);
+        builder.field(RestSearchRelevanceStatsAction.INCLUDE_ALL_NODES_PARAM, includeAllNodes);
+        builder.field(RestSearchRelevanceStatsAction.INCLUDE_INFO_PARAM, includeInfo);
         builder.endObject();
         return builder;
+    }
+
+    /**
+     * Helper to determine if we should fetch event stats or if we can skip them
+     * If we exclude both individual and all nodes, then there is no need to fetch any specific stats from nodes
+     * @return whether we need to fetch event stats
+     */
+    public boolean isIncludeEvents() {
+        return this.isIncludeAllNodes() || this.isIncludeIndividualNodes();
     }
 }

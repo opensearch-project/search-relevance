@@ -68,6 +68,21 @@ public class RestSearchRelevanceStatsAction extends BaseRestHandler {
     public static final String INCLUDE_METADATA_PARAM = "include_metadata";
 
     /**
+     * Query parameter name to include individual nodes data
+     */
+    public static final String INCLUDE_INDIVIDUAL_NODES_PARAM = "include_individual_nodes";
+
+    /**
+     * Query parameter name to include individual nodes data
+     */
+    public static final String INCLUDE_ALL_NODES_PARAM = "include_all_nodes";
+
+    /**
+     * Query parameter name to include individual nodes data
+     */
+    public static final String INCLUDE_INFO_PARAM = "include_info";
+
+    /**
      * Regex for valid params, containing only alphanumeric, -, or _
      */
     public static final String PARAM_REGEX = "^[A-Za-z0-9-_]+$";
@@ -101,7 +116,15 @@ public class RestSearchRelevanceStatsAction extends BaseRestHandler {
         new Route(RestRequest.Method.GET, SEARCH_RELEVANCE_BASE_URI + "/stats/{stat}")
     );
 
-    private static final Set<String> RESPONSE_PARAMS = ImmutableSet.of(NODE_ID_PARAM, STAT_PARAM, INCLUDE_METADATA_PARAM, FLATTEN_PARAM);
+    private static final Set<String> RESPONSE_PARAMS = ImmutableSet.of(
+        NODE_ID_PARAM,
+        STAT_PARAM,
+        INCLUDE_METADATA_PARAM,
+        FLATTEN_PARAM,
+        INCLUDE_INDIVIDUAL_NODES_PARAM,
+        INCLUDE_ALL_NODES_PARAM,
+        INCLUDE_INFO_PARAM
+    );
 
     /**
      * Validates a param string if it's under the max length and matches simple string pattern
@@ -183,6 +206,15 @@ public class RestSearchRelevanceStatsAction extends BaseRestHandler {
         boolean includeMetadata = request.paramAsBoolean(INCLUDE_METADATA_PARAM, false);
         searchRelevanceStatsInput.setIncludeMetadata(includeMetadata);
 
+        boolean includeIndividualNodes = request.paramAsBoolean(INCLUDE_INDIVIDUAL_NODES_PARAM, true);
+        searchRelevanceStatsInput.setIncludeIndividualNodes(includeIndividualNodes);
+
+        boolean includeAllNodes = request.paramAsBoolean(INCLUDE_ALL_NODES_PARAM, true);
+        searchRelevanceStatsInput.setIncludeAllNodes(includeAllNodes);
+
+        boolean includeInfo = request.paramAsBoolean(INCLUDE_INFO_PARAM, true);
+        searchRelevanceStatsInput.setIncludeInfo(includeInfo);
+
         // Process requested stats parameters
         processStatsRequestParameters(request, searchRelevanceStatsInput);
 
@@ -193,6 +225,8 @@ public class RestSearchRelevanceStatsAction extends BaseRestHandler {
         // Determine which stat names to retrieve based on user parameters
         Optional<String[]> optionalStats = splitCommaSeparatedParam(request, STAT_PARAM);
         Version minClusterVersion = clusterUtil.getClusterMinVersion();
+        boolean includeEvents = searchRelevanceStatsInput.isIncludeEvents();
+        boolean includeInfo = searchRelevanceStatsInput.isIncludeInfo();
 
         if (optionalStats.isPresent() == false || optionalStats.get().length == 0) {
             // No specific stats requested, add all stats by default
@@ -210,12 +244,12 @@ public class RestSearchRelevanceStatsAction extends BaseRestHandler {
                 continue;
             }
 
-            if (InfoStatName.isValidName(normalizedStat)) {
+            if (includeInfo && InfoStatName.isValidName(normalizedStat)) {
                 InfoStatName infoStatName = InfoStatName.from(normalizedStat);
                 if (infoStatName.version().onOrBefore(minClusterVersion)) {
                     searchRelevanceStatsInput.getInfoStatNames().add(InfoStatName.from(normalizedStat));
                 }
-            } else if (EventStatName.isValidName(normalizedStat)) {
+            } else if (includeEvents && EventStatName.isValidName(normalizedStat)) {
                 EventStatName eventStatName = EventStatName.from(normalizedStat);
                 if (eventStatName.version().onOrBefore(minClusterVersion)) {
                     searchRelevanceStatsInput.getEventStatNames().add(EventStatName.from(normalizedStat));
@@ -234,24 +268,32 @@ public class RestSearchRelevanceStatsAction extends BaseRestHandler {
 
     private void addAllStats(SearchRelevanceStatsInput searchRelevanceStatsInput, Version minVersion) {
         if (minVersion == Version.CURRENT) {
-            searchRelevanceStatsInput.getInfoStatNames().addAll(EnumSet.allOf(InfoStatName.class));
-            searchRelevanceStatsInput.getEventStatNames().addAll(EnumSet.allOf(EventStatName.class));
+            if (searchRelevanceStatsInput.isIncludeInfo()) {
+                searchRelevanceStatsInput.getInfoStatNames().addAll(EnumSet.allOf(InfoStatName.class));
+            }
+            if (searchRelevanceStatsInput.isIncludeEvents()) {
+                searchRelevanceStatsInput.getEventStatNames().addAll(EnumSet.allOf(EventStatName.class));
+            }
         } else {
             // Use a separate case here to save on version comparison if not necessary
-            searchRelevanceStatsInput.getInfoStatNames()
-                .addAll(
-                    EnumSet.allOf(InfoStatName.class)
-                        .stream()
-                        .filter(statName -> statName.version().onOrBefore(minVersion))
-                        .collect(Collectors.toCollection(() -> EnumSet.noneOf(InfoStatName.class)))
-                );
-            searchRelevanceStatsInput.getEventStatNames()
-                .addAll(
-                    EnumSet.allOf(EventStatName.class)
-                        .stream()
-                        .filter(statName -> statName.version().onOrBefore(minVersion))
-                        .collect(Collectors.toCollection(() -> EnumSet.noneOf(EventStatName.class)))
-                );
+            if (searchRelevanceStatsInput.isIncludeInfo()) {
+                searchRelevanceStatsInput.getInfoStatNames()
+                    .addAll(
+                        EnumSet.allOf(InfoStatName.class)
+                            .stream()
+                            .filter(statName -> statName.version().onOrBefore(minVersion))
+                            .collect(Collectors.toCollection(() -> EnumSet.noneOf(InfoStatName.class)))
+                    );
+            }
+            if (searchRelevanceStatsInput.isIncludeEvents()) {
+                searchRelevanceStatsInput.getEventStatNames()
+                    .addAll(
+                        EnumSet.allOf(EventStatName.class)
+                            .stream()
+                            .filter(statName -> statName.version().onOrBefore(minVersion))
+                            .collect(Collectors.toCollection(() -> EnumSet.noneOf(EventStatName.class)))
+                    );
+            }
         }
     }
 

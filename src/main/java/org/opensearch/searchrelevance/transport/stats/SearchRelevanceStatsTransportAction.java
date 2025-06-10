@@ -8,6 +8,7 @@
 package org.opensearch.searchrelevance.transport.stats;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -80,25 +81,27 @@ public class SearchRelevanceStatsTransportAction extends TransportNodesAction<
         List<SearchRelevanceStatsNodeResponse> responses,
         List<FailedNodeException> failures
     ) {
-        // Final object that will hold the stats in format Map<ResponsePath, Value>
-        Map<String, StatSnapshot<?>> resultStats = new HashMap<>();
-
         // Convert node level stats to map
         Map<String, Map<String, StatSnapshot<?>>> nodeIdToEventStats = processorNodeEventStatsIntoMap(responses);
 
         // Sum the map to aggregate
-        Map<String, StatSnapshot<?>> aggregatedNodeStats = aggregateNodesResponses(
-            responses,
-            request.getSearchRelevanceStatsInput().getEventStatNames()
-        );
+        Map<String, StatSnapshot<?>> aggregatedNodeStats = Collections.emptyMap();
+        if (request.getSearchRelevanceStatsInput().isIncludeAllNodes()) {
+            aggregatedNodeStats = aggregateNodesResponses(responses, request.getSearchRelevanceStatsInput().getEventStatNames());
+        }
 
         // Get info stats
-        Map<InfoStatName, StatSnapshot<?>> infoStats = infoStatsManager.getStats(request.getSearchRelevanceStatsInput().getInfoStatNames());
-
-        // Convert stat name keys into flat path strings
-        Map<String, StatSnapshot<?>> flatInfoStats = infoStats.entrySet()
-            .stream()
-            .collect(Collectors.toMap(entry -> entry.getKey().getFullPath(), Map.Entry::getValue));
+        Map<String, StatSnapshot<?>> flatInfoStats = Collections.emptyMap();
+        if (request.getSearchRelevanceStatsInput().isIncludeInfo()) {
+            // Get info stats
+            Map<InfoStatName, StatSnapshot<?>> infoStats = infoStatsManager.getStats(
+                request.getSearchRelevanceStatsInput().getInfoStatNames()
+            );
+            // Convert stat name keys into flat path strings
+            flatInfoStats = infoStats.entrySet()
+                .stream()
+                .collect(Collectors.toMap(entry -> entry.getKey().getFullPath(), Map.Entry::getValue));
+        }
 
         return new SearchRelevanceStatsResponse(
             clusterService.getClusterName(),
@@ -108,7 +111,10 @@ public class SearchRelevanceStatsTransportAction extends TransportNodesAction<
             aggregatedNodeStats,
             nodeIdToEventStats,
             request.getSearchRelevanceStatsInput().isFlatten(),
-            request.getSearchRelevanceStatsInput().isIncludeMetadata()
+            request.getSearchRelevanceStatsInput().isIncludeMetadata(),
+            request.getSearchRelevanceStatsInput().isIncludeIndividualNodes(),
+            request.getSearchRelevanceStatsInput().isIncludeAllNodes(),
+            request.getSearchRelevanceStatsInput().isIncludeInfo()
         );
     }
 

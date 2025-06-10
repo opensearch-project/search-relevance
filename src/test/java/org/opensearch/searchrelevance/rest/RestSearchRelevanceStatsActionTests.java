@@ -97,6 +97,77 @@ public class RestSearchRelevanceStatsActionTests extends SearchRelevanceRestTest
         assertEquals(capturedInput.getInfoStatNames(), EnumSet.allOf(InfoStatName.class));
         assertFalse(capturedInput.isFlatten());
         assertFalse(capturedInput.isIncludeMetadata());
+        assertTrue(capturedInput.isIncludeIndividualNodes());
+        assertTrue(capturedInput.isIncludeAllNodes());
+        assertTrue(capturedInput.isIncludeInfo());
+    }
+
+    public void test_execute_customParams_includePartial() throws Exception {
+        when(settingsAccessor.isStatsEnabled()).thenReturn(true);
+        when(clusterUtil.getClusterMinVersion()).thenReturn(Version.CURRENT);
+
+        RestSearchRelevanceStatsAction restSearchRelevanceStatsAction = new RestSearchRelevanceStatsAction(settingsAccessor, clusterUtil);
+
+        Map<String, String> params = Map.of(
+            RestSearchRelevanceStatsAction.FLATTEN_PARAM,
+            "true",
+            RestSearchRelevanceStatsAction.INCLUDE_METADATA_PARAM,
+            "true",
+            RestSearchRelevanceStatsAction.INCLUDE_INDIVIDUAL_NODES_PARAM,
+            "false",
+            RestSearchRelevanceStatsAction.INCLUDE_ALL_NODES_PARAM,
+            "true",
+            RestSearchRelevanceStatsAction.INCLUDE_INFO_PARAM,
+            "true"
+        );
+        RestRequest request = new FakeRestRequest.Builder(NamedXContentRegistry.EMPTY).withParams(params).build();
+
+        restSearchRelevanceStatsAction.handleRequest(request, channel, client);
+
+        ArgumentCaptor<SearchRelevanceStatsRequest> argumentCaptor = ArgumentCaptor.forClass(SearchRelevanceStatsRequest.class);
+        verify(client, times(1)).execute(eq(SearchRelevanceStatsAction.INSTANCE), argumentCaptor.capture(), any());
+
+        SearchRelevanceStatsInput capturedInput = argumentCaptor.getValue().getSearchRelevanceStatsInput();
+
+        assertEquals(capturedInput.getEventStatNames(), EnumSet.allOf(EventStatName.class));
+        assertEquals(capturedInput.getInfoStatNames(), EnumSet.allOf(InfoStatName.class));
+        assertTrue(capturedInput.isFlatten());
+        assertTrue(capturedInput.isIncludeMetadata());
+        assertFalse(capturedInput.isIncludeIndividualNodes());
+        assertTrue(capturedInput.isIncludeAllNodes());
+        assertTrue(capturedInput.isIncludeInfo());
+    }
+
+    public void test_execute_customParams_includeNone() throws Exception {
+        when(settingsAccessor.isStatsEnabled()).thenReturn(true);
+        when(clusterUtil.getClusterMinVersion()).thenReturn(Version.CURRENT);
+
+        RestSearchRelevanceStatsAction restSearchRelevanceStatsAction = new RestSearchRelevanceStatsAction(settingsAccessor, clusterUtil);
+
+        Map<String, String> params = new HashMap<>();
+        params.put(RestSearchRelevanceStatsAction.FLATTEN_PARAM, "true");
+        params.put(RestSearchRelevanceStatsAction.INCLUDE_METADATA_PARAM, "true");
+        params.put(RestSearchRelevanceStatsAction.INCLUDE_INDIVIDUAL_NODES_PARAM, "false");
+        params.put(RestSearchRelevanceStatsAction.INCLUDE_ALL_NODES_PARAM, "false");
+        params.put(RestSearchRelevanceStatsAction.INCLUDE_INFO_PARAM, "false");
+        RestRequest request = new FakeRestRequest.Builder(NamedXContentRegistry.EMPTY).withParams(params).build();
+
+        restSearchRelevanceStatsAction.handleRequest(request, channel, client);
+
+        ArgumentCaptor<SearchRelevanceStatsRequest> argumentCaptor = ArgumentCaptor.forClass(SearchRelevanceStatsRequest.class);
+        verify(client, times(1)).execute(eq(SearchRelevanceStatsAction.INSTANCE), argumentCaptor.capture(), any());
+
+        SearchRelevanceStatsInput capturedInput = argumentCaptor.getValue().getSearchRelevanceStatsInput();
+
+        // Since we we set individual nodes and all nodes to false, we shouldn't fetch any stats
+        assertEquals(capturedInput.getEventStatNames(), EnumSet.noneOf(EventStatName.class));
+        assertEquals(capturedInput.getInfoStatNames(), EnumSet.noneOf(InfoStatName.class));
+        assertTrue(capturedInput.isFlatten());
+        assertTrue(capturedInput.isIncludeMetadata());
+        assertFalse(capturedInput.isIncludeIndividualNodes());
+        assertFalse(capturedInput.isIncludeAllNodes());
+        assertFalse(capturedInput.isIncludeInfo());
+
     }
 
     public void test_execute_olderVersion() throws Exception {

@@ -38,6 +38,9 @@ public class SearchRelevanceStatsResponse extends BaseNodesResponse<SearchReleva
     private Map<String, Map<String, StatSnapshot<?>>> nodeIdToNodeEventStats;
     private boolean flatten;
     private boolean includeMetadata;
+    private boolean includeIndividualNodes;
+    private boolean includeAllNodes;
+    private boolean includeInfo;
 
     /**
      * Constructor
@@ -57,6 +60,9 @@ public class SearchRelevanceStatsResponse extends BaseNodesResponse<SearchReleva
         this.nodeIdToNodeEventStats = castedNodeIdToNodeEventStats;
         this.flatten = in.readBoolean();
         this.includeMetadata = in.readBoolean();
+        this.includeIndividualNodes = in.readBoolean();
+        this.includeAllNodes = in.readBoolean();
+        this.includeInfo = in.readBoolean();
     }
 
     /**
@@ -79,7 +85,10 @@ public class SearchRelevanceStatsResponse extends BaseNodesResponse<SearchReleva
         Map<String, StatSnapshot<?>> aggregatedNodeStats,
         Map<String, Map<String, StatSnapshot<?>>> nodeIdToNodeEventStats,
         boolean flatten,
-        boolean includeMetadata
+        boolean includeMetadata,
+        boolean includeIndividualNodes,
+        boolean includeAllNodes,
+        boolean includeInfo
     ) {
         super(clusterName, nodes, failures);
         this.infoStats = infoStats;
@@ -87,6 +96,9 @@ public class SearchRelevanceStatsResponse extends BaseNodesResponse<SearchReleva
         this.nodeIdToNodeEventStats = nodeIdToNodeEventStats;
         this.flatten = flatten;
         this.includeMetadata = includeMetadata;
+        this.includeIndividualNodes = includeIndividualNodes;
+        this.includeAllNodes = includeAllNodes;
+        this.includeInfo = includeInfo;
     }
 
     @Override
@@ -101,6 +113,10 @@ public class SearchRelevanceStatsResponse extends BaseNodesResponse<SearchReleva
         out.writeMap(downcastedNodeIdToNodeEventStats);
         out.writeBoolean(flatten);
         out.writeBoolean(includeMetadata);
+        out.writeBoolean(includeIndividualNodes);
+        out.writeBoolean(includeAllNodes);
+        out.writeBoolean(includeInfo);
+
     }
 
     @Override
@@ -115,20 +131,26 @@ public class SearchRelevanceStatsResponse extends BaseNodesResponse<SearchReleva
 
     @Override
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
-        Map<String, Object> formattedInfoStats = formatStats(infoStats);
-        builder.startObject(INFO_KEY_PREFIX);
-        builder.mapContents(formattedInfoStats);
-        builder.endObject();
+        if (includeInfo) {
+            Map<String, Object> formattedInfoStats = formatStats(infoStats);
+            builder.startObject(INFO_KEY_PREFIX);
+            builder.mapContents(formattedInfoStats);
+            builder.endObject();
+        }
 
-        Map<String, Object> formattedAggregatedNodeStats = formatStats(aggregatedNodeStats);
-        builder.startObject(AGGREGATED_NODES_KEY_PREFIX);
-        builder.mapContents(formattedAggregatedNodeStats);
-        builder.endObject();
+        if (includeAllNodes) {
+            Map<String, Object> formattedAggregatedNodeStats = formatStats(aggregatedNodeStats);
+            builder.startObject(AGGREGATED_NODES_KEY_PREFIX);
+            builder.mapContents(formattedAggregatedNodeStats);
+            builder.endObject();
+        }
 
-        Map<String, Object> formattedNodeEventStats = formatNodeEventStats(nodeIdToNodeEventStats);
-        builder.startObject(NODES_KEY_PREFIX);
-        builder.mapContents(formattedNodeEventStats);
-        builder.endObject();
+        if (includeIndividualNodes) {
+            Map<String, Object> formattedNodeEventStats = formatNodeEventStats(nodeIdToNodeEventStats);
+            builder.startObject(NODES_KEY_PREFIX);
+            builder.mapContents(formattedNodeEventStats);
+            builder.endObject();
+        }
 
         return builder;
     }
