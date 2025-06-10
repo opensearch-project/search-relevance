@@ -54,12 +54,24 @@ public class Judgment implements ToXContentObject {
             xContentBuilder.startObject();
             xContentBuilder.field("query", judgment.get("query"));
             xContentBuilder.startArray("ratings");
-            for (Map<String, Object> rating : (List<Map<String, Object>>) judgment.get("ratings")) {
-                xContentBuilder.startObject();
-                for (Map.Entry<String, Object> entry : rating.entrySet()) {
+            // As it turns out, the ratings object in a judgment is not a list but instead an
+            // object. {ratings={B077ZJXCTS=0.000, B071S6LTJJ=0.000,
+            // B01IDSPDJI=0.000, B074V6Q1DR=0.000, B07QRCGL3G=0.000}, query=yeezy}
+            if ((judgment.get("ratings")) instanceof Map) {
+                Map<String, Object> ratings = (Map<String, Object>) judgment.get("ratings");
+                for (Map.Entry<String, Object> entry : ratings.entrySet()) {
+                    xContentBuilder.startObject();
                     xContentBuilder.field(entry.getKey(), entry.getValue());
+                    xContentBuilder.endObject();
                 }
-                xContentBuilder.endObject();
+            } else {
+                for (Map<String, Object> rating : (List<Map<String, Object>>) judgment.get("ratings")) {
+                    xContentBuilder.startObject();
+                    for (Map.Entry<String, Object> entry : rating.entrySet()) {
+                        xContentBuilder.field(entry.getKey(), entry.getValue());
+                    }
+                    xContentBuilder.endObject();
+                }
             }
             xContentBuilder.endArray();
             xContentBuilder.endObject();

@@ -192,6 +192,11 @@ public class CoecClickModel extends ClickModel {
                     try {
                         UbiEvent event = JsonUtils.fromJson(hit.getSourceAsString(), UbiEvent.class);
                         String userQuery = event.getUserQuery();
+                        // In some events the attributes or userQuery can be null.
+                        if (userQuery == null || event.getEventAttributes() == null || event.getEventAttributes().getObject() == null) {
+                            continue;
+                        }
+                        
                         String objectId = event.getEventAttributes().getObject().getObjectId();
                         String action = event.getActionName();
                         int rank = event.getEventAttributes().getPosition().getOrdinal();
