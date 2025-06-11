@@ -7,13 +7,12 @@
  */
 package org.opensearch.searchrelevance.transport.experiment;
 
-import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_INDEX_AND_QUERIES_FIELD_NAME;
-import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_QUERY_TEXT_FIELD_NAME;
 import static org.opensearch.searchrelevance.experiment.ExperimentOptionsForHybridSearch.EXPERIMENT_OPTION_COMBINATION_TECHNIQUE;
 import static org.opensearch.searchrelevance.experiment.ExperimentOptionsForHybridSearch.EXPERIMENT_OPTION_NORMALIZATION_TECHNIQUE;
 import static org.opensearch.searchrelevance.experiment.ExperimentOptionsForHybridSearch.EXPERIMENT_OPTION_WEIGHTS_FOR_COMBINATION;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -21,10 +20,10 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.opensearch.action.StepListener;
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.HandledTransportAction;
@@ -45,6 +44,8 @@ import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.Experiment;
 import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.model.ExperimentVariant;
+import org.opensearch.searchrelevance.model.QuerySet;
+import org.opensearch.searchrelevance.model.SearchConfiguration;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
@@ -90,27 +91,11 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
             return;
         }
 
-        String id = UUID.randomUUID().toString();
-        String timestamp = TimeUtils.getTimestamp();
-        Map<String, Object> results = new HashMap<>();
-
-        // step 1: Create Indexes if not exist
-        StepListener<Void> createIndexStep = new StepListener<>();
-        experimentDao.createIndexIfAbsent(createIndexStep);
-        experimentVariantDao.createIndexIfAbsent(createIndexStep);
-
-        // step 2: Get QuerySet
-        StepListener<Map<String, Object>> getQuerySetStep = new StepListener<>();
-        createIndexStep.whenComplete(
-            v -> { querySetDao.getQuerySetWithStepListener(request.getQuerySetId(), results, getQuerySetStep); },
-            listener::onFailure
-        );
-
-        // Step 3: Create initial experiment record with status "PROCESSING"
-        getQuerySetStep.whenComplete(v -> {
+        try {
+            String id = UUID.randomUUID().toString();
             Experiment initialExperiment = new Experiment(
                 id,
-                timestamp,
+                TimeUtils.getTimestamp(),
                 request.getType(),
                 AsyncStatus.PROCESSING,
                 request.getQuerySetId(),
@@ -119,38 +104,57 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
                 request.getSize(),
                 new HashMap<>()
             );
+
+            // Store initial experiment and return ID immediately
             experimentDao.putExperiment(initialExperiment, ActionListener.wrap(response -> {
-                triggerAsyncProcessing(id, request, results);
+                // Return response immediately
                 listener.onResponse((IndexResponse) response);
-            }, e -> { listener.onFailure(e); }));
-        }, listener::onFailure);
+
+                // Start async processing
+                triggerAsyncProcessing(id, request);
+            }, e -> {
+                LOGGER.error("Failed to create initial experiment", e);
+                listener.onFailure(
+                    new SearchRelevanceException("Failed to create initial experiment", e, RestStatus.INTERNAL_SERVER_ERROR)
+                );
+            }));
+
+        } catch (Exception e) {
+            LOGGER.error("Failed to process experiment request", e);
+            listener.onFailure(new SearchRelevanceException("Failed to process experiment request", e, RestStatus.INTERNAL_SERVER_ERROR));
+        }
     }
 
-    private void triggerAsyncProcessing(String experimentId, PutExperimentRequest request, Map<String, Object> results) {
-        searchConfigurationDao.getSearchConfigsWithStepListener(
-            request.getSearchConfigurationList(),
-            results,
-            ActionListener.wrap(searchConfigResults -> {
-                calculateMetricsAsync(experimentId, request, searchConfigResults);
-            }, error -> { handleAsyncFailure(experimentId, request, "Failed at async step 1: Get Search Configurations", error); })
-        );
+    private void triggerAsyncProcessing(String experimentId, PutExperimentRequest request) {
+        try {
+            QuerySet querySet = querySetDao.getQuerySetSync(request.getQuerySetId());
+            List<String> queryTextWithReferences = querySet.querySetQueries().stream().map(e -> e.queryText()).collect(Collectors.toList());
+
+            List<SearchConfiguration> searchConfigurations = request.getSearchConfigurationList()
+                .stream()
+                .map(id -> searchConfigurationDao.getSearchConfigurationSync(id))
+                .collect(Collectors.toList());
+            Map<String, List<String>> indexAndQueries = new HashMap<>();
+            for (SearchConfiguration config : searchConfigurations) {
+                indexAndQueries.put(config.id(), Arrays.asList(config.index(), config.query(), config.searchPipeline()));
+            }
+            calculateMetricsAsync(experimentId, request, indexAndQueries, queryTextWithReferences);
+        } catch (Exception e) {
+            handleAsyncFailure(experimentId, request, "Failed to start async processing", e);
+        }
     }
 
-    private void calculateMetricsAsync(String experimentId, PutExperimentRequest request, Map<String, Object> results) {
-        Map<String, List<String>> indexAndQueries = (Map<String, List<String>>) results.get(METRICS_INDEX_AND_QUERIES_FIELD_NAME);
-        List<String> queryTexts = (List<String>) results.get(METRICS_QUERY_TEXT_FIELD_NAME);
-
-        if (queryTexts == null || indexAndQueries == null) {
-            handleAsyncFailure(
-                experimentId,
-                request,
-                "Failed to calculate metrics: Missing required data",
-                new IllegalStateException("Missing required data for metrics calculation")
-            );
-            return;
+    private void calculateMetricsAsync(
+        String experimentId,
+        PutExperimentRequest request,
+        Map<String, List<String>> indexAndQueries,
+        List<String> queryTextWithReferences
+    ) {
+        if (queryTextWithReferences == null || indexAndQueries == null) {
+            throw new IllegalStateException("Missing required data for metrics calculation");
         }
 
-        processQueryTextMetrics(experimentId, request, indexAndQueries, queryTexts);
+        processQueryTextMetrics(experimentId, request, indexAndQueries, queryTextWithReferences);
     }
 
     private void processQueryTextMetrics(

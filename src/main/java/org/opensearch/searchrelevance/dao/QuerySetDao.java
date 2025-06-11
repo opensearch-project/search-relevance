@@ -99,6 +99,14 @@ public class QuerySetDao {
         return searchRelevanceIndicesManager.getDocByDocId(querySetId, QUERY_SET, listener);
     }
 
+    public QuerySet getQuerySetSync(String querySetId) {
+        if (querySetId == null || querySetId.isEmpty()) {
+            throw new SearchRelevanceException("querySetId must not be null or empty", RestStatus.BAD_REQUEST);
+        }
+        SearchResponse response = searchRelevanceIndicesManager.getDocByDocIdSync(querySetId, QUERY_SET);
+        return convertToQuerySet(response);
+    }
+
     /**
      * List query set by source builder
      * @param sourceBuilder - source builder to be searched

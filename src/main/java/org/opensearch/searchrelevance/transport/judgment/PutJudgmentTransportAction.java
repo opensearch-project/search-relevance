@@ -17,7 +17,6 @@ import java.util.UUID;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.opensearch.action.StepListener;
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.HandledTransportAction;
@@ -31,7 +30,6 @@ import org.opensearch.searchrelevance.judgments.BaseJudgmentsProcessor;
 import org.opensearch.searchrelevance.judgments.JudgmentsProcessorFactory;
 import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.Judgment;
-import org.opensearch.searchrelevance.model.JudgmentType;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
@@ -63,23 +61,33 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
             listener.onFailure(new SearchRelevanceException("Request cannot be null", RestStatus.BAD_REQUEST));
             return;
         }
-        String id = UUID.randomUUID().toString();
-        String timestamp = TimeUtils.getTimestamp();
-        String name = request.getName();
-        JudgmentType type = request.getType();
-        Map<String, Object> metadata = buildMetadata(request);
+        try {
+            String id = UUID.randomUUID().toString();
+            Judgment initialJudgment = new Judgment(
+                id,
+                TimeUtils.getTimestamp(),
+                request.getName(),
+                AsyncStatus.PROCESSING,
+                request.getType(),
+                buildMetadata(request),
+                new ArrayList<>()
+            );
 
-        StepListener<Void> createIndexStep = new StepListener<>();
-        judgmentDao.createIndexIfAbsent(createIndexStep);
-
-        createIndexStep.whenComplete(v -> {
-            Judgment initialJudgment = new Judgment(id, timestamp, name, AsyncStatus.PROCESSING, type, metadata, new ArrayList<>());
             judgmentDao.putJudgement(initialJudgment, ActionListener.wrap(response -> {
-                // Trigger async processing and return initial response
-                triggerAsyncProcessing(id, request, metadata);
+                // Return response immediately
                 listener.onResponse((IndexResponse) response);
-            }, listener::onFailure));
-        }, listener::onFailure);
+
+                // Trigger async processing in the background
+                triggerAsyncProcessing(id, request, initialJudgment.getMetadata());
+            }, e -> {
+                LOGGER.error("Failed to create initial judgment", e);
+                listener.onFailure(new SearchRelevanceException("Failed to create initial judgment", e, RestStatus.INTERNAL_SERVER_ERROR));
+            }));
+
+        } catch (Exception e) {
+            LOGGER.error("Failed to process judgment request", e);
+            listener.onFailure(new SearchRelevanceException("Failed to process judgment request", e, RestStatus.INTERNAL_SERVER_ERROR));
+        }
     }
 
     private Map<String, Object> buildMetadata(PutJudgmentRequest request) {

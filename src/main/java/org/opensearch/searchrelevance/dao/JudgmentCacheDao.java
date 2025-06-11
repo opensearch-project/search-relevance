@@ -12,14 +12,12 @@ import static org.opensearch.searchrelevance.model.JudgmentCache.CONTEXT_FIELDS_
 import static org.opensearch.searchrelevance.model.JudgmentCache.DOCUMENT_ID;
 import static org.opensearch.searchrelevance.model.JudgmentCache.QUERY_TEXT;
 import static org.opensearch.searchrelevance.utils.ParserUtils.convertListToSortedStr;
-import static org.opensearch.searchrelevance.utils.ParserUtils.convertSortedStrToList;
 
 import java.io.IOException;
 import java.util.List;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.opensearch.ResourceAlreadyExistsException;
 import org.opensearch.action.StepListener;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.common.inject.Inject;
@@ -27,8 +25,10 @@ import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.core.xcontent.ToXContent;
+import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.index.query.BoolQueryBuilder;
 import org.opensearch.index.query.QueryBuilders;
+import org.opensearch.search.SearchHit;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager;
@@ -84,87 +84,32 @@ public class JudgmentCacheDao {
             return;
         }
 
-        // First check if the document exists
-        getJudgmentCache(
-            judgmentCache.queryText(),
-            judgmentCache.documentId(),
-            convertSortedStrToList(judgmentCache.contextFieldsStr()),
-            new ActionListener<SearchResponse>() {
-                @Override
-                public void onResponse(SearchResponse searchResponse) {
-                    try {
-                        if (searchResponse.getHits().getTotalHits().value() > 0) {
-                            // Document exists, update it
-                            searchRelevanceIndicesManager.updateDoc(
-                                judgmentCache.id(),
-                                judgmentCache.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS),
-                                JUDGMENT_CACHE,
-                                ActionListener.wrap(response -> {
-                                    LOGGER.debug(
-                                        "Successfully updated judgment cache for queryText: {} and documentId: {}",
-                                        judgmentCache.queryText(),
-                                        judgmentCache.documentId()
-                                    );
-                                    listener.onResponse(response);
-                                }, e -> {
-                                    LOGGER.error(
-                                        "Failed to update judgment cache for queryText: {} and documentId: {}",
-                                        judgmentCache.queryText(),
-                                        judgmentCache.documentId(),
-                                        e
-                                    );
-                                    listener.onFailure(e);
-                                })
-                            );
-                        } else {
-                            // Document doesn't exist, create it
-                            searchRelevanceIndicesManager.putDoc(
-                                judgmentCache.id(),
-                                judgmentCache.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS),
-                                JUDGMENT_CACHE,
-                                ActionListener.wrap(response -> {
-                                    LOGGER.debug(
-                                        "Successfully created judgment cache for queryText: {} and documentId: {}",
-                                        judgmentCache.queryText(),
-                                        judgmentCache.documentId()
-                                    );
-                                    listener.onResponse(response);
-                                }, e -> {
-                                    if (e instanceof ResourceAlreadyExistsException) {
-                                        // Handle race condition where document was created between our check and create
-                                        LOGGER.debug(
-                                            "Judgment cache already exists for queryText: {} and documentId: {}",
-                                            judgmentCache.queryText(),
-                                            judgmentCache.documentId()
-                                        );
-                                        listener.onResponse(null);
-                                    } else {
-                                        LOGGER.error(
-                                            "Failed to create judgment cache for queryText: {} and documentId: {}",
-                                            judgmentCache.queryText(),
-                                            judgmentCache.documentId(),
-                                            e
-                                        );
-                                        listener.onFailure(e);
-                                    }
-                                })
-                            );
-                        }
-                    } catch (IOException e) {
-                        listener.onFailure(
-                            new SearchRelevanceException("Failed to prepare judgment cache document", e, RestStatus.INTERNAL_SERVER_ERROR)
-                        );
-                    }
-                }
+        try {
+            // Create XContent once
+            XContentBuilder content = judgmentCache.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
 
-                @Override
-                public void onFailure(Exception e) {
-                    listener.onFailure(
-                        new SearchRelevanceException("Failed to check existing judgment cache", e, RestStatus.INTERNAL_SERVER_ERROR)
-                    );
-                }
-            }
-        );
+            // Use updateDoc which will create or update the document
+            searchRelevanceIndicesManager.updateDoc(judgmentCache.id(), content, JUDGMENT_CACHE, ActionListener.wrap(response -> {
+                LOGGER.debug(
+                    "Successfully upserted judgment cache for queryText: {} and documentId: {}",
+                    judgmentCache.queryText(),
+                    judgmentCache.documentId()
+                );
+                listener.onResponse(response);
+            }, e -> {
+                LOGGER.error(
+                    "Failed to upsert judgment cache for queryText: {} and documentId: {}",
+                    judgmentCache.queryText(),
+                    judgmentCache.documentId(),
+                    e
+                );
+                listener.onFailure(new SearchRelevanceException("Failed to upsert judgment cache", e, RestStatus.INTERNAL_SERVER_ERROR));
+            }));
+        } catch (IOException e) {
+            listener.onFailure(
+                new SearchRelevanceException("Failed to prepare judgment cache document", e, RestStatus.INTERNAL_SERVER_ERROR)
+            );
+        }
     }
 
     /**
@@ -181,14 +126,34 @@ public class JudgmentCacheDao {
         ActionListener<SearchResponse> listener
     ) {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        String contextFieldsStr = contextFields != null ? convertListToSortedStr(contextFields) : "";
 
-        BoolQueryBuilder boolQuery = QueryBuilders.boolQuery();
-        boolQuery.must(QueryBuilders.termQuery(QUERY_TEXT + ".keyword", queryText));
-        boolQuery.must(QueryBuilders.termQuery(DOCUMENT_ID + ".keyword", documentId));
-        boolQuery.must(QueryBuilders.termQuery(CONTEXT_FIELDS_STR + ".keyword", convertListToSortedStr(contextFields)));
+        LOGGER.debug(
+            "Building cache search query - queryText: '{}', documentId: '{}', contextFields: '{}'",
+            queryText,
+            documentId,
+            contextFieldsStr
+        );
+
+        BoolQueryBuilder boolQuery = QueryBuilders.boolQuery()
+            .must(QueryBuilders.matchQuery(QUERY_TEXT, queryText))
+            .must(QueryBuilders.matchQuery(DOCUMENT_ID, documentId));
+
+        if (contextFields != null && !contextFields.isEmpty()) {
+            boolQuery.must(QueryBuilders.matchQuery(CONTEXT_FIELDS_STR, contextFieldsStr));
+        }
 
         searchSourceBuilder.query(boolQuery);
 
-        return searchRelevanceIndicesManager.listDocsBySearchRequest(searchSourceBuilder, JUDGMENT_CACHE, listener);
+        ActionListener<SearchResponse> wrappedListener = ActionListener.wrap(response -> {
+            if (response.getHits().getTotalHits().value() > 0) {
+                SearchHit hit = response.getHits().getHits()[0];
+            }
+            listener.onResponse(response);
+        }, e -> {
+            listener.onFailure(e);
+        });
+
+        return searchRelevanceIndicesManager.listDocsBySearchRequest(searchSourceBuilder, JUDGMENT_CACHE, wrappedListener);
     }
 }
