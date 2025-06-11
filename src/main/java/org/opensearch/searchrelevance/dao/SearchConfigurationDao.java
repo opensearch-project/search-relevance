@@ -95,6 +95,14 @@ public class SearchConfigurationDao {
         return searchRelevanceIndicesManager.getDocByDocId(searchConfigurationId, SEARCH_CONFIGURATION, listener);
     }
 
+    public SearchConfiguration getSearchConfigurationSync(String searchConfigurationId) {
+        if (searchConfigurationId == null || searchConfigurationId.isEmpty()) {
+            throw new SearchRelevanceException("searchConfigurationId must not be null or empty", RestStatus.BAD_REQUEST);
+        }
+        SearchResponse response = searchRelevanceIndicesManager.getDocByDocIdSync(searchConfigurationId, SEARCH_CONFIGURATION);
+        return convertToSearchConfiguration(response);
+    }
+
     /**
      * List searchConfigurationId by source builder
      * @param sourceBuilder - source builder to be searched

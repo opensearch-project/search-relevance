@@ -108,6 +108,14 @@ public class SearchRelevanceIndicesManager {
         StashedThreadContext.run(client, () -> client.admin().indices().create(createIndexRequest));
     }
 
+    public SearchResponse getDocByDocIdSync(final String docId, final SearchRelevanceIndices index) {
+        SearchRequest searchRequest = new SearchRequest(index.getIndexName());
+        SearchSourceBuilder sourceBuilder = new SearchSourceBuilder().query(QueryBuilders.termQuery("_id", docId)).size(1);
+        searchRequest.source(sourceBuilder);
+
+        return client.search(searchRequest).actionGet();
+    }
+
     /**
      * Put a doc to the system index
      * @param docId - document id need to be executed
