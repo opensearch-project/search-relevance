@@ -185,49 +185,46 @@ if [ "$SKIP_ECOMMERCE" = false ]; then
 
   echo "Creating ecommerce index using predefined schema"
 
-  # Create the index by reading in one doc
-  head -n 2 "$ECOMMERCE_DATA_FILE" | curl -s -X POST "http://localhost:9200/index-name/_bulk?pretty" \
-    -H 'Content-Type: application/x-ndjson' --data-binary @-
-
+  curl -s -X PUT "http://localhost:9200/ecommerce" -H 'Content-Type: application/json' --data-binary @../data-esci/schema.json
 
   echo
   echo Populating ecommerce index
   # do 250 products
   #head -n 500 ../esci_us/esci_us_opensearch.json | curl -s -X POST "http://localhost:9200/index-name/_bulk" \
   #  -H 'Content-Type: application/x-ndjson' --data-binary @-
-  # 
-   
+  #
+
   # Get total line count of the file
   TOTAL_LINES=$(wc -l < "$ECOMMERCE_DATA_FILE")
   echo "Total lines in file: $TOTAL_LINES"
-  
+
   # Calculate number of chunks (50000 lines per chunk)
   CHUNK_SIZE=50000
   CHUNKS=$(( (TOTAL_LINES + CHUNK_SIZE - 1) / CHUNK_SIZE ))
   echo "Will process file in $CHUNKS chunks of $CHUNK_SIZE lines each"
-  
+
   # Process file in chunks
   for (( i=0; i<CHUNKS; i++ )); do
     START_LINE=$(( i * CHUNK_SIZE + 1 ))
     END_LINE=$(( (i + 1) * CHUNK_SIZE ))
-    
+
     # Ensure we don't go past the end of the file
     if [ $END_LINE -gt $TOTAL_LINES ]; then
       END_LINE=$TOTAL_LINES
     fi
-    
+
     LINES_TO_PROCESS=$(( END_LINE - START_LINE + 1 ))
     echo "Processing chunk $((i+1))/$CHUNKS: lines $START_LINE-$END_LINE ($LINES_TO_PROCESS lines)"
-    
+
     # Use sed to extract the chunk and pipe to curl for indexing
     sed -n "${START_LINE},${END_LINE}p" "$ECOMMERCE_DATA_FILE" | \
-      curl -s -o /dev/null -w "%{http_code}" -X POST "http://localhost:9200/ecommerce/_bulk" \
-      -H 'Content-Type: application/x-ndjson' --data-binary @- 
-    
+      curl -s -o /dev/null -w "%{http_code}" -X POST "http://localhost:9200/ecommerce/_bulk?pipeline=embeddings-pipeline" \
+      -H 'Content-Type: application/x-ndjson' --data-binary @-
+
     # Give OpenSearch a moment to process the chunk
     sleep 1
   done
-  
+
   echo "All data indexed successfully"
 
 fi
@@ -300,7 +297,7 @@ exe curl -s -X POST "localhost:9200/_plugins/_search_relevance/query_sets" \
 QUERY_SET_UBI=`jq -r '.query_set_id' < RES`
 
 echo
-echo Upload ESCI Query Set 
+echo Upload ESCI Query Set
 
 exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/query_sets" \
 -H "Content-type: application/json" \
