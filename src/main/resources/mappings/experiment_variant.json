@@ -7,7 +7,7 @@
     "experimentId": { "type": "keyword" },
     "parameters": { "type":  "object", "dynamic": false },
     "results": {
-      "type": "object",
+      "type": "nested",
       "properties": {
         "evaluationResultId": { "type": "keyword" }
       }
