@@ -34,10 +34,13 @@ import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgmentRequest, IndexResponse> {
     private final ClusterService clusterService;
     private final JudgmentDao judgmentDao;
     private final JudgmentsProcessorFactory judgmentsProcessorFactory;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     private static final Logger LOGGER = LogManager.getLogger(PutJudgmentTransportAction.class);
 
@@ -90,37 +93,77 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
         }
     }
 
-    private Map<String, Object> buildMetadata(PutJudgmentRequest request) {
-        Map<String, Object> metadata = new HashMap<>();
+    private List<Map<String, Object>> buildMetadata(PutJudgmentRequest request) {
+        List<Map<String, Object>> metadata = new ArrayList<>();
         switch (request.getType()) {
             case LLM_JUDGMENT -> {
                 PutLlmJudgmentRequest llmRequest = (PutLlmJudgmentRequest) request;
-                metadata.put(MODEL_ID, llmRequest.getModelId());
-                metadata.put("querySetId", llmRequest.getQuerySetId());
-                metadata.put("size", llmRequest.getSize());
-                metadata.put("searchConfigurationList", llmRequest.getSearchConfigurationList());
-                metadata.put("tokenLimit", llmRequest.getTokenLimit());
-                metadata.put("contextFields", llmRequest.getContextFields());
-                metadata.put("ignoreFailure", llmRequest.isIgnoreFailure());
+                metadata.add(createMetadataEntry(MODEL_ID, llmRequest.getModelId()));
+                metadata.add(createMetadataEntry("querySetId", llmRequest.getQuerySetId()));
+                metadata.add(createMetadataEntry("size", llmRequest.getSize()));
+                metadata.add(createMetadataEntry("searchConfigurationList", llmRequest.getSearchConfigurationList()));
+                metadata.add(createMetadataEntry("tokenLimit", llmRequest.getTokenLimit()));
+                metadata.add(createMetadataEntry("contextFields", llmRequest.getContextFields()));
+                metadata.add(createMetadataEntry("ignoreFailure", llmRequest.isIgnoreFailure()));
             }
             case UBI_JUDGMENT -> {
                 PutUbiJudgmentRequest ubiRequest = (PutUbiJudgmentRequest) request;
-                metadata.put("clickModel", ubiRequest.getClickModel());
-                metadata.put("maxRank", ubiRequest.getMaxRank());
+                metadata.add(createMetadataEntry("clickModel", ubiRequest.getClickModel()));
+                metadata.add(createMetadataEntry("maxRank", ubiRequest.getMaxRank()));
             }
             case IMPORT_JUDGMENT -> {
                 PutImportJudgmentRequest importRequest = (PutImportJudgmentRequest) request;
-                metadata.put("judgmentRatings", importRequest.getJudgmentRatings());
+                metadata.add(createMetadataEntry("judgmentRatings", importRequest.getJudgmentRatings()));
             }
         }
         return metadata;
     }
 
-    private void triggerAsyncProcessing(String judgmentId, PutJudgmentRequest request, Map<String, Object> metadata) {
+    /**
+     * Create a metadata entry with name-value structure
+     */
+    private Map<String, Object> createMetadataEntry(String name, Object value) {
+        // Convert complex objects to JSON strings for text field storage
+        if (value instanceof List || value instanceof Map) {
+            try {
+                value = objectMapper.writeValueAsString(value);
+            } catch (Exception e) {
+                value = value.toString();
+            }
+        }
+        return Map.of("name", name, "value", value);
+    }
+
+    /**
+     * Convert nested List<Map<String, Object>> to flat Map<String, Object> format
+     */
+    private Map<String, Object> convertNestedListToMap(List<Map<String, Object>> nestedList) {
+        Map<String, Object> flatMap = new HashMap<>();
+        if (nestedList != null) {
+            for (Map<String, Object> item : nestedList) {
+                Object name = item.get("name");
+                Object value = item.get("value");
+                if (name != null) {
+                    // Try to deserialize JSON strings back to objects
+                    if (value instanceof String && (((String) value).startsWith("[") || ((String) value).startsWith("{"))) {
+                        try {
+                            value = objectMapper.readValue((String) value, Object.class);
+                        } catch (Exception e) {
+                            // Keep as string if parsing fails
+                        }
+                    }
+                    flatMap.put(name.toString(), value);
+                }
+            }
+        }
+        return flatMap;
+    }
+
+    private void triggerAsyncProcessing(String judgmentId, PutJudgmentRequest request, List<Map<String, Object>> metadata) {
         LOGGER.info("Starting async processing for judgment: {}, type: {}, metadata: {}", judgmentId, request.getType(), metadata);
         BaseJudgmentsProcessor processor = judgmentsProcessorFactory.getProcessor(request.getType());
 
-        processor.generateJudgmentRating(metadata, ActionListener.wrap(judgmentRatings -> {
+        processor.generateJudgmentRating(convertNestedListToMap(metadata), ActionListener.wrap(judgmentRatings -> {
             LOGGER.info(
                 "Generated judgment ratings for {}, ratings size: {}",
                 judgmentId,
@@ -133,7 +176,7 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
     private void updateFinalJudgment(
         String judgmentId,
         PutJudgmentRequest request,
-        Map<String, Object> metadata,
+        List<Map<String, Object>> metadata,
         List<Map<String, Object>> judgmentScores
     ) {
         Judgment finalJudgment = new Judgment(
@@ -164,7 +207,7 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
             request.getName(),
             AsyncStatus.ERROR,
             request.getType(),
-            Map.of("error", error.getMessage()),
+            List.of(createMetadataEntry("error", error.getMessage())),
             new ArrayList<>()
         );
 

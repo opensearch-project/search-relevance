@@ -240,7 +240,7 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
                         ExperimentType.HYBRID_OPTIMIZER,
                         AsyncStatus.PROCESSING,
                         experimentId,
-                        parameters,
+                        convertMapToNestedList(parameters),
                         Map.of()
                     );
                     experimentVariants.add(experimentVariant);
@@ -372,5 +372,12 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
                 e -> LOGGER.error("Failed to update error status for experiment: " + experimentId, e)
             )
         );
+    }
+
+    /**
+     * Convert flat Map<String, Object> to nested List<Map<String, Object>> format
+     */
+    private List<Map<String, Object>> convertMapToNestedList(Map<String, Object> flatMap) {
+        return flatMap.entrySet().stream().map(entry -> Map.of("name", entry.getKey(), "value", entry.getValue())).toList();
     }
 }

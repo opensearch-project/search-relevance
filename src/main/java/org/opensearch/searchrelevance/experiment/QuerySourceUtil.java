@@ -34,16 +34,15 @@ public class QuerySourceUtil {
      * @return definition of a temporary search pipeline
      */
     public static Map<String, Object> createDefinitionOfTemporarySearchPipeline(final ExperimentVariant experimentVariant) {
-        Map<String, Object> experimentVariantParameters = experimentVariant.getParameters();
         Map<String, Object> normalizationTechniqueConfig = new HashMap<>(
-            Map.of("technique", experimentVariantParameters.get(EXPERIMENT_OPTION_NORMALIZATION_TECHNIQUE))
+            Map.of("technique", experimentVariant.getParameterValue(EXPERIMENT_OPTION_NORMALIZATION_TECHNIQUE))
         );
 
         Map<String, Object> combinationTechniqueConfig = new HashMap<>(
-            Map.of("technique", experimentVariantParameters.get(EXPERIMENT_OPTION_COMBINATION_TECHNIQUE))
+            Map.of("technique", experimentVariant.getParameterValue(EXPERIMENT_OPTION_COMBINATION_TECHNIQUE))
         );
-        if (Objects.nonNull(experimentVariantParameters.get(EXPERIMENT_OPTION_WEIGHTS_FOR_COMBINATION))) {
-            float[] weights = (float[]) experimentVariantParameters.get(EXPERIMENT_OPTION_WEIGHTS_FOR_COMBINATION);
+        if (Objects.nonNull(experimentVariant.getParameterValue(EXPERIMENT_OPTION_WEIGHTS_FOR_COMBINATION))) {
+            float[] weights = (float[]) experimentVariant.getParameterValue(EXPERIMENT_OPTION_WEIGHTS_FOR_COMBINATION);
             List<Double> weightsList = new ArrayList<>(weights.length);
             for (float weight : weights) {
                 weightsList.add((double) weight);

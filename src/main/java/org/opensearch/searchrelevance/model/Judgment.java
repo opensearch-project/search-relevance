@@ -36,7 +36,7 @@ public class Judgment implements ToXContentObject {
     private final String name;
     private final AsyncStatus status;
     private final JudgmentType type;
-    private final Map<String, Object> metadata;
+    private final List<Map<String, Object>> metadata;
     private final List<Map<String, Object>> judgmentRatings;
 
     @Override
