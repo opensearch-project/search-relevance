@@ -31,5 +31,6 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
  - Set limit for number of fields programmatically during index creation ([#74](https://github.com/opensearch-project/search-relevance/pull/74)
  - Change model for Judgment entity ([#77](https://github.com/opensearch-project/search-relevance/pull/77)
  - Fix judgment handling for implicit judgments to be aligned with data model for Judgment again ([#93](https://github.com/opensearch-project/search-relevance/pull/93)
+ - Refactor and fix LLM judgment duplication issue ([#98](https://github.com/opensearch-project/search-relevance/pull/98)))
 
 ### Security
