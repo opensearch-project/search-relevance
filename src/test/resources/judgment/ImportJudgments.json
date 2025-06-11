@@ -4,32 +4,362 @@
   "type": "IMPORT_JUDGMENT",
   "judgmentRatings": [
     {
-      "query": "t towels kitchen",
+      "query": "metal frame",
       "ratings": [
         {
-          "docId": "B07NCQWCQS",
-          "rating": "100.000"
+          "rating": "1.0",
+          "docId": "B071XJXHPN"
         },
         {
-          "docId": "B07NPC54DK",
-          "rating": "100.000"
+          "rating": "0.9",
+          "docId": "B097Q69V1B"
+        },
+        {
+          "rating": "1.0",
+          "docId": "B087BLP58S"
+        },
+        {
+          "rating": "0.7",
+          "docId": "B07H8Y4F1Z"
+        },
+        {
+          "rating": "0.4",
+          "docId": "B078GJZ7G4"
+        },
+        {
+          "rating": "0.9",
+          "docId": "B00TLYRBMG"
+        },
+        {
+          "rating": "1.0",
+          "docId": "B0104OHETQ"
+        },
+        {
+          "rating": "0.9",
+          "docId": "B08G46SS1T"
+        },
+        {
+          "rating": "1.0",
+          "docId": "B08SW96GLC"
+        },
+        {
+          "rating": "0.7",
+          "docId": "B01MQL9K1K"
         }
       ]
     },
     {
-      "query": "table top bandsaw for metal",
+      "query": "metal frame",
       "ratings": [
         {
-          "docId": "B01M3YCXD2",
-          "rating": "100.000"
+          "rating": "1.0",
+          "docId": "B071XJXHPN"
         },
         {
-          "docId": "B07CLM7HC6",
-          "rating": "100.000"
+          "rating": "0.9",
+          "docId": "B097Q69V1B"
         },
         {
-          "docId": "B06XP1NJYG",
-          "rating": "10.000"
+          "rating": "1.0",
+          "docId": "B087BLP58S"
+        },
+        {
+          "rating": "0.7",
+          "docId": "B07H8Y4F1Z"
+        },
+        {
+          "rating": "0.4",
+          "docId": "B078GJZ7G4"
+        },
+        {
+          "rating": "0.9",
+          "docId": "B00TLYRBMG"
+        },
+        {
+          "rating": "1.0",
+          "docId": "B0104OHETQ"
+        },
+        {
+          "rating": "0.9",
+          "docId": "B08G46SS1T"
+        },
+        {
+          "rating": "1.0",
+          "docId": "B08SW96GLC"
+        },
+        {
+          "rating": "0.7",
+          "docId": "B01MQL9K1K"
+        }
+      ]
+    },
+    {
+      "query": "steel",
+      "ratings": [
+        {
+          "rating": "0.9",
+          "docId": "B07F6DLM8L"
+        },
+        {
+          "rating": "1.0",
+          "docId": "B0096XMXAM"
+        },
+        {
+          "rating": "0.9",
+          "docId": "B083BNG1ZH"
+        },
+        {
+          "rating": "1.0",
+          "docId": "B01J6QN8QQ"
+        },
+        {
+          "rating": "0.9",
+          "docId": "B00KAJR4JQ"
+        },
+        {
+          "rating": "1.0",
+          "docId": "B0044ZA066"
+        },
+        {
+          "rating": "0.0",
+          "docId": "B07GXJ2VZS"
+        },
+        {
+          "rating": "1.0",
+          "docId": "B076WNDFDW"
+        },
+        {
+          "rating": "0.9",
+          "docId": "B07QFC2YXC"
+        },
+        {
+          "rating": "0.9",
+          "docId": "B00J4JKPBC"
+        }
+      ]
+    },
+    {
+      "query": "steel",
+      "ratings": [
+        {
+          "rating": "0.9",
+          "docId": "B07F6DLM8L"
+        },
+        {
+          "rating": "1.0",
+          "docId": "B0096XMXAM"
+        },
+        {
+          "rating": "0.9",
+          "docId": "B083BNG1ZH"
+        },
+        {
+          "rating": "1.0",
+          "docId": "B01J6QN8QQ"
+        },
+        {
+          "rating": "0.9",
+          "docId": "B00KAJR4JQ"
+        },
+        {
+          "rating": "1.0",
+          "docId": "B0044ZA066"
+        },
+        {
+          "rating": "0.0",
+          "docId": "B07GXJ2VZS"
+        },
+        {
+          "rating": "1.0",
+          "docId": "B076WNDFDW"
+        },
+        {
+          "rating": "0.9",
+          "docId": "B07QFC2YXC"
+        },
+        {
+          "rating": "0.9",
+          "docId": "B00J4JKPBC"
+        }
+      ]
+    },
+    {
+      "query": "keyboard",
+      "ratings": [
+        {
+          "rating": "0.9",
+          "docId": "B07VJXFFJW"
+        },
+        {
+          "rating": "0.9",
+          "docId": "B00VHKM72Q"
+        },
+        {
+          "rating": "0.7",
+          "docId": "B07GWPXK4M"
+        },
+        {
+          "rating": "0.9",
+          "docId": "B08W491VJP"
+        },
+        {
+          "rating": "1.0",
+          "docId": "B01D8YNJH0"
+        },
+        {
+          "rating": "0.9",
+          "docId": "B07YCVFFL3"
+        },
+        {
+          "rating": "1.0",
+          "docId": "B00004Z5RA"
+        },
+        {
+          "rating": "0.7",
+          "docId": "B07PMG7N6C"
+        },
+        {
+          "rating": "0.9",
+          "docId": "B078CY8YDZ"
+        },
+        {
+          "rating": "1.0",
+          "docId": "B088R1D8BM"
+        }
+      ]
+    },
+    {
+      "query": "iphone",
+      "ratings": [
+        {
+          "rating": "0.6",
+          "docId": "B0817YJBN5"
+        },
+        {
+          "rating": "0.9",
+          "docId": "B07FW397QN"
+        },
+        {
+          "rating": "0.9",
+          "docId": "B07G5KS48G"
+        },
+        {
+          "rating": "0.7",
+          "docId": "B07B8B6QQR"
+        },
+        {
+          "rating": "1.0",
+          "docId": "B07XYSXDDC"
+        },
+        {
+          "rating": "0.9",
+          "docId": "B07DT6HC32"
+        },
+        {
+          "rating": "0.9",
+          "docId": "B07CK461SR"
+        },
+        {
+          "rating": "0.9",
+          "docId": "B07RD44TGF"
+        },
+        {
+          "rating": "0.7",
+          "docId": "B01JR4OTJM"
+        },
+        {
+          "rating": "0.7",
+          "docId": "B07CZDMQQ9"
+        }
+      ]
+    },
+    {
+      "query": "keyboard",
+      "ratings": [
+        {
+          "rating": "0.9",
+          "docId": "B07VJXFFJW"
+        },
+        {
+          "rating": "0.9",
+          "docId": "B00VHKM72Q"
+        },
+        {
+          "rating": "0.7",
+          "docId": "B07GWPXK4M"
+        },
+        {
+          "rating": "0.9",
+          "docId": "B08W491VJP"
+        },
+        {
+          "rating": "1.0",
+          "docId": "B01D8YNJH0"
+        },
+        {
+          "rating": "0.9",
+          "docId": "B07YCVFFL3"
+        },
+        {
+          "rating": "1.0",
+          "docId": "B00004Z5RA"
+        },
+        {
+          "rating": "0.7",
+          "docId": "B07PMG7N6C"
+        },
+        {
+          "rating": "0.9",
+          "docId": "B078CY8YDZ"
+        },
+        {
+          "rating": "1.0",
+          "docId": "B088R1D8BM"
+        }
+      ]
+    },
+    {
+      "query": "iphone",
+      "ratings": [
+        {
+          "rating": "0.6",
+          "docId": "B0817YJBN5"
+        },
+        {
+          "rating": "0.9",
+          "docId": "B07FW397QN"
+        },
+        {
+          "rating": "0.9",
+          "docId": "B07G5KS48G"
+        },
+        {
+          "rating": "0.7",
+          "docId": "B07B8B6QQR"
+        },
+        {
+          "rating": "1.0",
+          "docId": "B07XYSXDDC"
+        },
+        {
+          "rating": "0.9",
+          "docId": "B07DT6HC32"
+        },
+        {
+          "rating": "0.9",
+          "docId": "B07CK461SR"
+        },
+        {
+          "rating": "0.9",
+          "docId": "B07RD44TGF"
+        },
+        {
+          "rating": "0.7",
+          "docId": "B01JR4OTJM"
+        },
+        {
+          "rating": "0.7",
+          "docId": "B07CZDMQQ9"
         }
       ]
     }

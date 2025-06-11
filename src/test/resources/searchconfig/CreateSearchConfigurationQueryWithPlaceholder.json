@@ -1,0 +1,6 @@
+{
+  "name": "placeholder_title_match",
+  "index": "ecommerce",
+  "query": "{\"query\":{\"match\":{\"title\":\"%SearchText%\"}}}",
+  "searchPipeline": ""
+}

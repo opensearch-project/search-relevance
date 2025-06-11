@@ -13,6 +13,7 @@ import static org.opensearch.client.RestClientBuilder.DEFAULT_MAX_CONN_TOTAL;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -27,8 +28,10 @@ import org.apache.hc.client5.http.ssl.NoopHostnameVerifier;
 import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.HttpEntity;
+import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.hc.core5.http.HttpHost;
 import org.apache.hc.core5.http.ParseException;
+import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.apache.hc.core5.http.message.BasicHeader;
 import org.apache.hc.core5.http.nio.ssl.TlsStrategy;
@@ -44,6 +47,9 @@ import org.opensearch.client.WarningsHandler;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.unit.TimeValue;
 import org.opensearch.common.util.concurrent.ThreadContext;
+import org.opensearch.common.xcontent.XContentHelper;
+import org.opensearch.common.xcontent.XContentType;
+import org.opensearch.core.rest.RestStatus;
 import org.opensearch.core.xcontent.DeprecationHandler;
 import org.opensearch.core.xcontent.MediaType;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
@@ -51,6 +57,7 @@ import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.test.rest.OpenSearchRestTestCase;
 
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakScope;
+import com.google.common.collect.ImmutableList;
 
 @ThreadLeakScope(ThreadLeakScope.Scope.NONE)
 public class BaseSearchRelevanceIT extends OpenSearchRestTestCase {
@@ -64,6 +71,8 @@ public class BaseSearchRelevanceIT extends OpenSearchRestTestCase {
     private static final String INTERNAL_INDICES_PREFIX = ".";
     public static final String DEFAULT_USER_AGENT = "Kibana";
     private static String protocol;
+
+    protected static final Locale LOCALE = Locale.ROOT;
 
     protected final ClassLoader classLoader = this.getClass().getClassLoader();
 
@@ -228,5 +237,39 @@ public class BaseSearchRelevanceIT extends OpenSearchRestTestCase {
                 adminClient().performRequest(new Request("DELETE", "/" + indexName));
             }
         }
+    }
+
+    protected void createIndexWithConfiguration(final String indexName, String indexConfiguration) throws Exception {
+        Response response = makeRequest(
+            client(),
+            "PUT",
+            indexName,
+            null,
+            toHttpEntity(indexConfiguration),
+            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
+        );
+        Map<String, Object> node = XContentHelper.convertToMap(
+            XContentType.JSON.xContent(),
+            EntityUtils.toString(response.getEntity()),
+            false
+        );
+        assertEquals("true", node.get("acknowledged").toString());
+        assertEquals(indexName, node.get("index").toString());
+    }
+
+    protected String replacePlaceholders(String template, Map<String, String> replacements) {
+        String result = template;
+        for (Map.Entry<String, String> entry : replacements.entrySet()) {
+            result = result.replace("{{" + entry.getKey() + "}}", entry.getValue());
+        }
+        return result;
+    }
+
+    protected void bulkIngest(final String index, String requestBody) throws IOException {
+        Request request = new Request("POST", "/_bulk?refresh=true");
+        request.setJsonEntity(requestBody);
+
+        Response response = client().performRequest(request);
+        assertEquals(request.getEndpoint() + ": failed", RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
     }
 }

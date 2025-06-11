@@ -1,0 +1,7 @@
+{
+  "querySetId": "{{query_set_id}}",
+  "searchConfigurationList": ["{{search_configuration_id}}"],
+  "judgmentList": ["{{judgment_id}}"],
+  "size": 5,
+  "type": "POINTWISE_EVALUATION"
+}

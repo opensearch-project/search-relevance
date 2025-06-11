@@ -81,7 +81,7 @@ public class JudgmentsIT extends BaseSearchRelevanceIT {
         assertNotNull(firstJudgment.get("query"));
         List<Map<String, Object>> ratings = (List<Map<String, Object>>) firstJudgment.get("ratings");
         assertNotNull(ratings);
-        assertEquals(2, ratings.size());
+        assertEquals(10, ratings.size());
         for (Map<String, Object> rating : ratings) {
             assertNotNull(rating.get("docId"));
             assertNotNull(rating.get("rating"));
@@ -90,7 +90,7 @@ public class JudgmentsIT extends BaseSearchRelevanceIT {
         assertNotNull(secondJudgment.get("query"));
         List<Map<String, Object>> ratingsSecondJudgment = (List<Map<String, Object>>) secondJudgment.get("ratings");
         assertNotNull(ratingsSecondJudgment);
-        assertEquals(3, ratingsSecondJudgment.size());
+        assertEquals(10, ratingsSecondJudgment.size());
         for (Map<String, Object> rating : ratingsSecondJudgment) {
             assertNotNull(rating.get("docId"));
             assertNotNull(rating.get("rating"));
