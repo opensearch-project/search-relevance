@@ -4,13 +4,7 @@
     "timestamp": { "type": "date", "format": "strict_date_time" },
     "name": { "type": "keyword" },
     "type": { "type": "keyword" },
-    "metadata": {
-      "type": "nested",
-      "properties": {
-        "name": { "type": "keyword" },
-        "value": { "type": "object", "enabled": false }
-      }
-    },
+    "metadata": { "type": "object", "dynamic": false },
     "judgmentRatings": {
       "type": "nested",
       "properties": {
