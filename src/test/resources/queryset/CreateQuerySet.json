@@ -3,29 +3,8 @@
   "description": "Test query set",
   "sampling": "manual",
   "querySetQueries": [
-    {
-      "queryText": "phone"
-    },
-    {
-      "queryText": "iphone"
-    },
-    {
-      "queryText": "steel"
-    },
-    {
-      "queryText": "keyboard"
-    },
-    {
-      "queryText": "diamond wheel"
-    },
-    {
-      "queryText": "button"
-    },
-    {
-      "queryText": "metal frame"
-    },
-    {
-      "queryText": "giangentic form"
-    }
+    {"queryText": "phone"},
+    {"queryText": "iphone"},
+    {"queryText": "steel"}
   ]
 }
