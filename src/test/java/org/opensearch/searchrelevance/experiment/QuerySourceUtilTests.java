@@ -27,10 +27,7 @@ public class QuerySourceUtilTests extends OpenSearchTestCase {
         // Given
         ExperimentVariant experimentHybridSearchDao = ExperimentVariant.builder()
             .parameters(
-                List.of(
-                    Map.of("name", EXPERIMENT_OPTION_NORMALIZATION_TECHNIQUE, "value", "min_max"),
-                    Map.of("name", EXPERIMENT_OPTION_COMBINATION_TECHNIQUE, "value", "arithmetic_mean")
-                )
+                Map.of(EXPERIMENT_OPTION_NORMALIZATION_TECHNIQUE, "min_max", EXPERIMENT_OPTION_COMBINATION_TECHNIQUE, "arithmetic_mean")
             )
             .build();
 

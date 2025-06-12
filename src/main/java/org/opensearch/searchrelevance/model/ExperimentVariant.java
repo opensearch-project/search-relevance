@@ -8,7 +8,6 @@
 package org.opensearch.searchrelevance.model;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.Map;
 
 import org.opensearch.core.xcontent.ToXContentObject;
@@ -41,7 +40,7 @@ public class ExperimentVariant implements ToXContentObject {
     private final ExperimentType type;
     private final AsyncStatus status;
     private final String experimentId;
-    private final List<Map<String, Object>> parameters;
+    private final Map<String, Object> parameters;
     private final Map<String, Object> results;
 
     @Override
@@ -55,21 +54,5 @@ public class ExperimentVariant implements ToXContentObject {
         xContentBuilder.field(PARAMETERS, this.parameters);
         xContentBuilder.field(RESULTS, this.results);
         return xContentBuilder.endObject();
-    }
-
-    /**
-     * Get parameter value by name from the nested parameters structure
-     * @param parameterName the name of the parameter to retrieve
-     * @return the parameter value or null if not found
-     */
-    public Object getParameterValue(String parameterName) {
-        if (parameters == null) {
-            return null;
-        }
-        return parameters.stream()
-            .filter(param -> parameterName.equals(param.get("name")))
-            .map(param -> param.get("value"))
-            .findFirst()
-            .orElse(null);
     }
 }

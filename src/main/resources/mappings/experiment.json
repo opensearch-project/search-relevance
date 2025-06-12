@@ -8,12 +8,6 @@
     "searchConfigurationList": { "type": "keyword" },
     "judgmentList": { "type": "keyword" },
     "size": {"type":  "keyword"},
-    "results": {
-      "type": "nested",
-      "properties": {
-        "metric": { "type": "keyword" },
-        "value": { "type": "double" }
-      }
-    }
+    "results": { "type": "object", "dynamic": false }
   }
 }
