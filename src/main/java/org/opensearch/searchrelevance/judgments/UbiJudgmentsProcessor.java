@@ -127,7 +127,7 @@ public class UbiJudgmentsProcessor implements BaseJudgmentsProcessor {
                                 // Add the docId and score to the list for the current query
                                 Map<String, String> docScoreMap = new HashMap<>();
                                 docScoreMap.put("docId", docId);
-                                docScoreMap.put("score", rating);
+                                docScoreMap.put("rating", rating);
                                 docIdScoreList.add(docScoreMap);
                             }
 

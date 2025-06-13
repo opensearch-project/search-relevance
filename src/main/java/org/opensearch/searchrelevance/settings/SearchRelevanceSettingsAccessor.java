@@ -22,6 +22,8 @@ public class SearchRelevanceSettingsAccessor {
     private volatile boolean isWorkbenchEnabled;
     @Getter
     private volatile boolean isStatsEnabled;
+    @Getter
+    private volatile int maxQuerySetAllowed;
 
     /**
      * Constructor, registers callbacks to update settings
@@ -32,6 +34,7 @@ public class SearchRelevanceSettingsAccessor {
     public SearchRelevanceSettingsAccessor(ClusterService clusterService, Settings settings) {
         isWorkbenchEnabled = SearchRelevanceSettings.SEARCH_RELEVANCE_WORKBENCH_ENABLED.get(settings);
         isStatsEnabled = SearchRelevanceSettings.SEARCH_RELEVANCE_STATS_ENABLED.get(settings);
+        maxQuerySetAllowed = SearchRelevanceSettings.SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT.get(settings);
         registerSettingsCallbacks(clusterService);
     }
 
@@ -47,5 +50,10 @@ public class SearchRelevanceSettingsAccessor {
             }
             isStatsEnabled = value;
         });
+
+        clusterService.getClusterSettings()
+            .addSettingsUpdateConsumer(SearchRelevanceSettings.SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT, value -> {
+                maxQuerySetAllowed = value;
+            });
     }
 }

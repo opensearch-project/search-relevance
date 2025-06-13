@@ -10,6 +10,7 @@ package org.opensearch.searchrelevance.plugin;
 import static org.mockito.Mockito.when;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_CACHE_INDEX;
+import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_STATS_ENABLED;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_WORKBENCH_ENABLED;
 
@@ -119,7 +120,12 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
 
         // Mock ClusterService
         when(clusterService.getClusterSettings()).thenReturn(
-            new ClusterSettings(settings, new HashSet<>(Arrays.asList(SEARCH_RELEVANCE_WORKBENCH_ENABLED, SEARCH_RELEVANCE_STATS_ENABLED)))
+            new ClusterSettings(
+                settings,
+                new HashSet<>(
+                    Arrays.asList(SEARCH_RELEVANCE_WORKBENCH_ENABLED, SEARCH_RELEVANCE_STATS_ENABLED, SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT)
+                )
+            )
         );
         plugin = new SearchRelevancePlugin();
     }
@@ -196,12 +202,18 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
 
     public void testGetSettings() {
         List<Setting<?>> settings = plugin.getSettings();
+        assertEquals(3, settings.size());
+
         Setting<?> setting0 = settings.get(0);
         assertEquals("plugins.search_relevance.workbench_enabled", setting0.getKey());
+        assertEquals(false, setting0.get(Settings.EMPTY));
+
         Setting<?> setting1 = settings.get(1);
         assertEquals("plugins.search_relevance.stats_enabled", setting1.getKey());
-        assertEquals(2, settings.size());
-        assertEquals(false, setting0.get(Settings.EMPTY));
         assertEquals(true, setting1.get(Settings.EMPTY));
+
+        Setting<?> setting2 = settings.get(2);
+        assertEquals("plugins.search_relevance.query_set.maximum", setting2.getKey());
+        assertEquals(1000, setting2.get(Settings.EMPTY));
     }
 }

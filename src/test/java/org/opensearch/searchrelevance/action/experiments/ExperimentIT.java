@@ -88,7 +88,8 @@ public class ExperimentIT extends BaseSearchRelevanceIT {
         deleteIndex(INDEX_NAME_ESCI);
     }
 
-    private void assertEvaluationResults(Map<String, String> queryTextToEvaluationId, String judgmentId, String searchConfigurationId) throws IOException {
+    private void assertEvaluationResults(Map<String, String> queryTextToEvaluationId, String judgmentId, String searchConfigurationId)
+        throws IOException {
         // assert every evaluation result
         for (String queryTerm : queryTextToEvaluationId.keySet()) {
             String evaluationId = queryTextToEvaluationId.get(queryTerm);
@@ -130,7 +131,12 @@ public class ExperimentIT extends BaseSearchRelevanceIT {
         }
     }
 
-    private Map<String, String> assertExperimentCreation(String experimentId, String judgmentId, String searchConfigurationId, String querySetId) throws IOException {
+    private Map<String, String> assertExperimentCreation(
+        String experimentId,
+        String judgmentId,
+        String searchConfigurationId,
+        String querySetId
+    ) throws IOException {
         String getExperimentByIdUrl = String.join("/", EXPERIMENT_INDEX, "_doc", experimentId);
         Response getExperimentResponse = makeRequest(
             client(),
@@ -187,7 +193,8 @@ public class ExperimentIT extends BaseSearchRelevanceIT {
         return queryTextToEvaluationId;
     }
 
-    private String createExperiment(String querySetId, String searchConfigurationId, String judgmentId) throws IOException, URISyntaxException, InterruptedException {
+    private String createExperiment(String querySetId, String searchConfigurationId, String judgmentId) throws IOException,
+        URISyntaxException, InterruptedException {
         String createExperimentBody = replacePlaceholders(
             Files.readString(Path.of(classLoader.getResource("experiment/CreateExperimentPointwiseEvaluation.json").toURI())),
             Map.of("query_set_id", querySetId, "search_configuration_id", searchConfigurationId, "judgment_id", judgmentId)
@@ -247,11 +254,12 @@ public class ExperimentIT extends BaseSearchRelevanceIT {
     @SneakyThrows
     private String createSearchConfiguration() {
         String createSearchConfigurationRequestBody = Files.readString(
-                Path.of(classLoader.getResource("searchconfig/CreateSearchConfigurationQueryWithPlaceholder.json").toURI()));
+            Path.of(classLoader.getResource("searchconfig/CreateSearchConfigurationQueryWithPlaceholder.json").toURI())
+        );
         Response createSearchConfigurationResponse = makeRequest(
             client(),
             RestRequest.Method.PUT.name(),
-                SEARCH_CONFIGURATIONS_URL,
+            SEARCH_CONFIGURATIONS_URL,
             null,
             toHttpEntity(createSearchConfigurationRequestBody),
             ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))

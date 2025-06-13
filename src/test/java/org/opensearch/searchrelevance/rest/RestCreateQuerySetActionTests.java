@@ -63,6 +63,7 @@ public class RestCreateQuerySetActionTests extends SearchRelevanceRestTestCase {
     public void testPrepareRequest_WorkbenchEnabled_Success() throws Exception {
         // Setup
         when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        when(settingsAccessor.getMaxQuerySetAllowed()).thenReturn(1000);
         RestRequest request = createPutRestRequestWithContent(FULL_TEST_CONTENT, "query_sets");
         when(channel.request()).thenReturn(request);
 
@@ -87,6 +88,7 @@ public class RestCreateQuerySetActionTests extends SearchRelevanceRestTestCase {
     public void testPrepareRequest_WorkbenchEnabled_Failure() throws Exception {
         // Setup
         when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        when(settingsAccessor.getMaxQuerySetAllowed()).thenReturn(1000);
         RestRequest request = createPutRestRequestWithContent(FULL_TEST_CONTENT, "query_sets");
         when(channel.request()).thenReturn(request);
 
@@ -108,6 +110,7 @@ public class RestCreateQuerySetActionTests extends SearchRelevanceRestTestCase {
     public void testPrepareRequest_DefaultValues() throws Exception {
         // Setup
         when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        when(settingsAccessor.getMaxQuerySetAllowed()).thenReturn(1000);
         RestRequest request = createPutRestRequestWithContent(MINIMAL_TEST_CONTENT, "query_sets");
         when(channel.request()).thenReturn(request);
 
