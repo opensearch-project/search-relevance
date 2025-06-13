@@ -7,6 +7,8 @@
  */
 package org.opensearch.searchrelevance.indices;
 
+import static org.opensearch.searchrelevance.common.PluginConstants.DASHBOARD_EVALUATION_RESULT_INDEX;
+import static org.opensearch.searchrelevance.common.PluginConstants.DASHBOARD_EVALUATION_RESULT_INDEX_MAPPING;
 import static org.opensearch.searchrelevance.common.PluginConstants.EVALUATION_RESULT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.EVALUATION_RESULT_INDEX_MAPPING;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX;
@@ -66,7 +68,12 @@ public enum SearchRelevanceIndices {
     /**
      * Experiment Variant Index
      */
-    EXPERIMENT_VARIANT(EXPERIMENT_VARIANT_INDEX, EXPERIMENT_VARIANT_INDEX_MAPPING, false);
+    EXPERIMENT_VARIANT(EXPERIMENT_VARIANT_INDEX, EXPERIMENT_VARIANT_INDEX_MAPPING, false),
+
+    /**
+     * Dashboard Evaluation Result Index
+     */
+    DASHBOARD_EVALUATION_RESULT(DASHBOARD_EVALUATION_RESULT_INDEX, DASHBOARD_EVALUATION_RESULT_INDEX_MAPPING, false);
 
     private final String indexName;
     private final String mapping;

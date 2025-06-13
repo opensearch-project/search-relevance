@@ -51,6 +51,8 @@ public class PluginConstants {
     public static final String JUDGMENT_CACHE_INDEX_MAPPING = "mappings/judgment_cache.json";
     public static final String EXPERIMENT_VARIANT_INDEX = "search-relevance-experiment-variant";
     public static final String EXPERIMENT_VARIANT_INDEX_MAPPING = "mappings/experiment_variant.json";
+    public static final String DASHBOARD_EVALUATION_RESULT_INDEX = "srw_metrics_search-relevance-evaluation-result";
+    public static final String DASHBOARD_EVALUATION_RESULT_INDEX_MAPPING = "mappings/dashboard_evaluation_result.json";
 
     /**
      * UBI
@@ -58,4 +60,9 @@ public class PluginConstants {
     public static final String UBI_QUERIES_INDEX = "ubi_queries";
     public static final String USER_QUERY_FIELD = "user_query";
     public static final String UBI_EVENTS_INDEX = "ubi_events";
+
+    /**
+     * Application name for dashboard evaluation results
+     */
+    public static final String DASHBOARD_APPLICATION_NAME = "search-relevance-workbench";
 }
