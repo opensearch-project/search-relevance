@@ -26,6 +26,8 @@ public class PluginConstants {
     public static final String JUDGMENTS_URL = SEARCH_RELEVANCE_BASE_URI + "/judgments";
     /** The URI for this plugin's search configurations rest actions */
     public static final String SEARCH_CONFIGURATIONS_URL = SEARCH_RELEVANCE_BASE_URI + "/search_configurations";
+    /** The URI for this plugin's documents rest actions */
+    public static final String DOCUMENTS_URL = SEARCH_RELEVANCE_BASE_URI + "/documents";
 
     /** The URI PARAMS placeholders */
     public static final String DOCUMENT_ID = "id";
@@ -51,6 +53,8 @@ public class PluginConstants {
     public static final String JUDGMENT_CACHE_INDEX_MAPPING = "mappings/judgment_cache.json";
     public static final String EXPERIMENT_VARIANT_INDEX = "search-relevance-experiment-variant";
     public static final String EXPERIMENT_VARIANT_INDEX_MAPPING = "mappings/experiment_variant.json";
+    public static final String DOCUMENT_INDEX = "search-relevance-document";
+    public static final String DOCUMENT_INDEX_MAPPING = "mappings/document.json";
 
     /**
      * UBI
