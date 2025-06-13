@@ -38,6 +38,7 @@ import org.apache.hc.core5.http.nio.ssl.TlsStrategy;
 import org.apache.hc.core5.ssl.SSLContextBuilder;
 import org.apache.hc.core5.util.Timeout;
 import org.junit.After;
+import org.junit.Before;
 import org.opensearch.client.Request;
 import org.opensearch.client.RequestOptions;
 import org.opensearch.client.Response;
@@ -49,15 +50,19 @@ import org.opensearch.common.unit.TimeValue;
 import org.opensearch.common.util.concurrent.ThreadContext;
 import org.opensearch.common.xcontent.XContentHelper;
 import org.opensearch.common.xcontent.XContentType;
+import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.core.xcontent.DeprecationHandler;
 import org.opensearch.core.xcontent.MediaType;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
+import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.test.rest.OpenSearchRestTestCase;
 
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakScope;
 import com.google.common.collect.ImmutableList;
+
+import lombok.SneakyThrows;
 
 @ThreadLeakScope(ThreadLeakScope.Scope.NONE)
 public class BaseSearchRelevanceIT extends OpenSearchRestTestCase {
@@ -75,6 +80,41 @@ public class BaseSearchRelevanceIT extends OpenSearchRestTestCase {
     protected static final Locale LOCALE = Locale.ROOT;
 
     protected final ClassLoader classLoader = this.getClass().getClassLoader();
+
+    @Before
+    public void setupSettings() {
+        if (isUpdateClusterSettings()) {
+            updateClusterSettings();
+        }
+    }
+
+    protected void updateClusterSettings() {
+        updateClusterSettings("plugins.search_relevance.workbench_enabled", true);
+    }
+
+    public boolean isUpdateClusterSettings() {
+        return true;
+    }
+
+    @SneakyThrows
+    protected void updateClusterSettings(final String settingKey, final Object value) {
+        XContentBuilder builder = XContentFactory.jsonBuilder()
+            .startObject()
+            .startObject("persistent")
+            .field(settingKey, value)
+            .endObject()
+            .endObject();
+        Response response = makeRequest(
+            client(),
+            "PUT",
+            "_cluster/settings",
+            null,
+            toHttpEntity(builder.toString()),
+            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, ""))
+        );
+
+        assertEquals(RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
+    }
 
     protected static Response makeRequest(
         RestClient client,
