@@ -196,7 +196,7 @@ public class PostExperimentTransportAction extends HandledTransportAction<PostEx
                     }
                 }, error -> {
                     hasFailure.set(true);
-                    LOGGER.error(error);
+                    handleFailure(error, hasFailure, experimentId, request);
                 }));
             }
         } else {
@@ -207,35 +207,34 @@ public class PostExperimentTransportAction extends HandledTransportAction<PostEx
         }
     }
 
-    private void handleQueryResults(
-        String queryText,
-        Map<String, Object> queryResults,
-        List<Map<String, Object>> finalResults,
-        AtomicInteger pendingQueries,
-        String experimentId,
-        PostExperimentRequest request,
-        AtomicBoolean hasFailure,
-        List<String> judgmentList
-    ) {
-        if (hasFailure.get()) return;
-
-        try {
-            synchronized (finalResults) {
-                queryResults.put(PAIRWISE_FIELD_NAME_QUERY_TEXT, queryText);
-                finalResults.add(queryResults);
-                if (pendingQueries.decrementAndGet() == 0) {
-                    updateFinalExperiment(experimentId, request, finalResults, judgmentList);
-                }
-            }
-        } catch (Exception e) {
-            handleFailure(e, hasFailure, experimentId, request);
-        }
-    }
-
     private void handleFailure(Exception error, AtomicBoolean hasFailure, String experimentId, PostExperimentRequest request) {
         if (hasFailure.compareAndSet(false, true)) {
             handleAsyncFailure(experimentId, request, "Failed to process metrics", error);
         }
+    }
+
+    private void handleAsyncFailure(String experimentId, PutExperimentRequest request, String message, Exception error) {
+        LOGGER.error(message + " for experiment: " + experimentId, error);
+
+        Experiment errorExperiment = new Experiment(
+            experimentId,
+            TimeUtils.getTimestamp(),
+            request.getType(),
+            AsyncStatus.ERROR,
+            request.getQuerySetId(),
+            request.getSearchConfigurationList(),
+            request.getJudgmentList(),
+            request.getSize(),
+            List.of(Map.of("error", error.getMessage()))
+        );
+
+        experimentDao.updateExperiment(
+            errorExperiment,
+            ActionListener.wrap(
+                response -> LOGGER.info("Updated experiment {} status to ERROR", experimentId),
+                e -> LOGGER.error("Failed to update error status for experiment: " + experimentId, e)
+            )
+        );
     }
 
     private void updateFinalExperiment(
