@@ -1,3 +1,11 @@
+# Example of a large dataset!
+# You must update the values in it first to match
+# what is in SRW already. 
+# curl -s -X POST "localhost:9200/_plugins/_search_relevance/experiments" \
+# -H "Content-type: application/json" \
+# -d @../data-esci/esci_us_external_experiment.json
+
+
 curl -s -X POST "localhost:9200/_plugins/_search_relevance/experiments" \
 -H "Content-type: application/json" \
 -d'{
