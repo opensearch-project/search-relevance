@@ -4,6 +4,8 @@ This directory contains:
 
 2) Queries (`esci_us_queryset.json`) and matching Judgments (`esci_us_judgments.json`) sourced from the ESCI data set.
 
+3) A externally run experiment (`esci_us_superlinked_experiment.json`) that can be imported into SRW that was built using jthe same ESCI data set.
+
 https://github.com/amazon-science/esci-data
 
 @article{reddy2022shopping,
