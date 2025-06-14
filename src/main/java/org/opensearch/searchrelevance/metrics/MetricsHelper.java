@@ -10,14 +10,12 @@ package org.opensearch.searchrelevance.metrics;
 import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_PAIRWISE_COMPARISON_FIELD_NAME;
 import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_A;
 import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_B;
-import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_SNAPSHOTS;
-import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_SEARCH_CONFIGURATION_ID;
 import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_DOC_IDS;
-import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_METRIC;
-import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_VALUE;
+import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_SEARCH_CONFIGURATION_ID;
+import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_SNAPSHOTS;
 import static org.opensearch.searchrelevance.common.MetricsConstants.POINTWISE_FIELD_NAME_EVALUATION_ID;
-import static org.opensearch.searchrelevance.common.MetricsConstants.POINTWISE_FIELD_NAME_EXPERIMENT_VARIANT_ID;
 import static org.opensearch.searchrelevance.common.MetricsConstants.POINTWISE_FIELD_NAME_EVALUATION_RESULTS;
+import static org.opensearch.searchrelevance.common.MetricsConstants.POINTWISE_FIELD_NAME_EXPERIMENT_VARIANT_ID;
 import static org.opensearch.searchrelevance.common.MetricsConstants.POINTWISE_FIELD_NAME_SEARCH_CONFIGURATION_ID;
 import static org.opensearch.searchrelevance.experiment.QuerySourceUtil.createDefinitionOfTemporarySearchPipeline;
 import static org.opensearch.searchrelevance.metrics.EvaluationMetrics.calculateEvaluationMetrics;
@@ -529,10 +527,15 @@ public class MetricsHelper {
                                 }
                                 if (pendingConfigurations.decrementAndGet() == 0) {
                                     Map<String, Object> transformedConfigToExperimentVariants = new HashMap<>();
-                                    transformedConfigToExperimentVariants.put(POINTWISE_FIELD_NAME_SEARCH_CONFIGURATION_ID, searchConfigurationId);
-                                    
+                                    transformedConfigToExperimentVariants.put(
+                                        POINTWISE_FIELD_NAME_SEARCH_CONFIGURATION_ID,
+                                        searchConfigurationId
+                                    );
+
                                     List<Map<String, Object>> evaluationResults = new ArrayList<>();
-                                    Map<String, Object> configMap = (Map<String, Object>) configToExperimentVariants.get(searchConfigurationId);
+                                    Map<String, Object> configMap = (Map<String, Object>) configToExperimentVariants.get(
+                                        searchConfigurationId
+                                    );
                                     configMap.forEach((variantId, evalId) -> {
                                         Map<String, Object> result = new HashMap<>();
                                         result.put(POINTWISE_FIELD_NAME_EVALUATION_ID, evalId);
@@ -540,7 +543,7 @@ public class MetricsHelper {
                                         evaluationResults.add(result);
                                     });
                                     transformedConfigToExperimentVariants.put(POINTWISE_FIELD_NAME_EVALUATION_RESULTS, evaluationResults);
-                                    
+
                                     listener.onResponse(transformedConfigToExperimentVariants);
                                 }
                             }, listener::onFailure);
