@@ -30,7 +30,7 @@ public class PostExperimentActionTests extends OpenSearchTestCase {
                 "documentIds",
                 List.of("d1", "d2"),
                 "metrics",
-                Map.of("dcg@10", 0.8, "ndcg@10", 0.75)
+                List.of(Map.of("metric", "dcg@10", "value", 0.8), Map.of("metric", "ndcg@10", "value", 0.75))
             )
         );
 
@@ -59,9 +59,14 @@ public class PostExperimentActionTests extends OpenSearchTestCase {
         assertTrue(result.containsKey("documentIds"));
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> metrics = (Map<String, Object>) result.get("metrics");
-        assertEquals(0.8, metrics.get("dcg@10"));
-        assertEquals(0.75, metrics.get("ndcg@10"));
+        List<Map<String, Object>> metrics = (List<Map<String, Object>>) result.get("metrics");
+        Map<String, Object> dcg = metrics.get(0);
+        assertEquals("dcg@10", dcg.get("metric"));
+        assertEquals(0.8, dcg.get("value"));
+
+        Map<String, Object> ndcg = metrics.get(1);
+        assertEquals("ndcg@10", ndcg.get("metric"));
+        assertEquals(0.75, ndcg.get("value"));
 
         assertEquals(10, serialized.getSize());
     }
