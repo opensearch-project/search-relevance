@@ -10,6 +10,11 @@ package org.opensearch.searchrelevance.rest;
 import static java.util.Collections.singletonList;
 import static org.opensearch.rest.RestRequest.Method.PUT;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENTS_URI;
+import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_LIST;
+import static org.opensearch.searchrelevance.common.PluginConstants.QUERYSET_ID;
+import static org.opensearch.searchrelevance.common.PluginConstants.SEARCH_CONFIGURATION_LIST;
+import static org.opensearch.searchrelevance.common.PluginConstants.SIZE;
+import static org.opensearch.searchrelevance.common.PluginConstants.TYPE;
 
 import java.io.IOException;
 import java.util.List;
@@ -60,12 +65,12 @@ public class RestPutExperimentAction extends BaseRestHandler {
         XContentParser parser = request.contentParser();
         Map<String, Object> source = parser.map();
 
-        String querySetId = (String) source.get("querySetId");
-        List<String> searchConfigurationList = ParserUtils.convertObjToList(source, "searchConfigurationList");
-        int size = (Integer) source.get("size");
-        List<String> judgmentList = ParserUtils.convertObjToList(source, "judgmentList");
+        String querySetId = (String) source.get(QUERYSET_ID);
+        List<String> searchConfigurationList = ParserUtils.convertObjToList(source, SEARCH_CONFIGURATION_LIST);
+        int size = (Integer) source.get(SIZE);
+        List<String> judgmentList = ParserUtils.convertObjToList(source, JUDGMENT_LIST);
 
-        String typeString = (String) source.get("type");
+        String typeString = (String) source.get(TYPE);
         ExperimentType type;
         try {
             type = ExperimentType.valueOf(typeString);

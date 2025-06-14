@@ -9,7 +9,11 @@ package org.opensearch.searchrelevance.rest;
 
 import static java.util.Collections.singletonList;
 import static org.opensearch.rest.RestRequest.Method.PUT;
+import static org.opensearch.searchrelevance.common.PluginConstants.INDEX;
+import static org.opensearch.searchrelevance.common.PluginConstants.NAME;
+import static org.opensearch.searchrelevance.common.PluginConstants.QUERY;
 import static org.opensearch.searchrelevance.common.PluginConstants.SEARCH_CONFIGURATIONS_URL;
+import static org.opensearch.searchrelevance.common.PluginConstants.SEARCH_PIPELINE;
 
 import java.io.IOException;
 import java.util.List;
@@ -28,6 +32,7 @@ import org.opensearch.rest.RestRequest;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.searchrelevance.transport.searchConfiguration.PutSearchConfigurationAction;
 import org.opensearch.searchrelevance.transport.searchConfiguration.PutSearchConfigurationRequest;
+import org.opensearch.searchrelevance.utils.TextValidationUtil;
 import org.opensearch.transport.client.node.NodeClient;
 
 import lombok.AllArgsConstructor;
@@ -59,10 +64,16 @@ public class RestPutSearchConfigurationAction extends BaseRestHandler {
         XContentParser parser = request.contentParser();
         Map<String, Object> source = parser.map();
 
-        String name = (String) source.get("name");
-        String index = (String) source.get("index");
-        String queryBody = (String) source.get("query");
-        String searchPipeline = (String) source.getOrDefault("searchPipeline", "");
+        String name = (String) source.get(NAME);
+        TextValidationUtil.ValidationResult nameValidation = TextValidationUtil.validateText(name);
+        if (!nameValidation.isValid()) {
+            return channel -> channel.sendResponse(
+                new BytesRestResponse(RestStatus.BAD_REQUEST, "Invalid name: " + nameValidation.getErrorMessage())
+            );
+        }
+        String index = (String) source.get(INDEX);
+        String queryBody = (String) source.get(QUERY);
+        String searchPipeline = (String) source.getOrDefault(SEARCH_PIPELINE, "");
 
         PutSearchConfigurationRequest createRequest = new PutSearchConfigurationRequest(name, index, queryBody, searchPipeline);
 

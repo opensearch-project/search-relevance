@@ -9,7 +9,12 @@ package org.opensearch.searchrelevance.rest;
 
 import static java.util.Collections.singletonList;
 import static org.opensearch.rest.RestRequest.Method.PUT;
+import static org.opensearch.searchrelevance.common.PluginConstants.DESCRIPTION;
+import static org.opensearch.searchrelevance.common.PluginConstants.MANUAL;
+import static org.opensearch.searchrelevance.common.PluginConstants.NAME;
 import static org.opensearch.searchrelevance.common.PluginConstants.QUERYSETS_URL;
+import static org.opensearch.searchrelevance.common.PluginConstants.QUERY_SET_QUERIES;
+import static org.opensearch.searchrelevance.common.PluginConstants.SAMPLING;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -31,6 +36,7 @@ import org.opensearch.searchrelevance.model.QueryWithReference;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.searchrelevance.transport.queryset.PutQuerySetAction;
 import org.opensearch.searchrelevance.transport.queryset.PutQuerySetRequest;
+import org.opensearch.searchrelevance.utils.TextValidationUtil;
 import org.opensearch.transport.client.node.NodeClient;
 
 import lombok.AllArgsConstructor;
@@ -62,14 +68,31 @@ public class RestPutQuerySetAction extends BaseRestHandler {
         XContentParser parser = request.contentParser();
         Map<String, Object> source = parser.map();
 
-        String name = (String) source.get("name");
-        String description = (String) source.get("description");
+        String name = (String) source.get(NAME);
+        TextValidationUtil.ValidationResult nameValidation = TextValidationUtil.validateText(name);
+        if (!nameValidation.isValid()) {
+            return channel -> channel.sendResponse(
+                new BytesRestResponse(RestStatus.BAD_REQUEST, "Invalid name: " + nameValidation.getErrorMessage())
+            );
+        }
+        String description = (String) source.get(DESCRIPTION);
+        if (description != null) {
+            TextValidationUtil.ValidationResult descriptionValidation = TextValidationUtil.validateText(description);
+            if (!descriptionValidation.isValid()) {
+                return channel -> channel.sendResponse(
+                    new BytesRestResponse(RestStatus.BAD_REQUEST, "Invalid description: " + descriptionValidation.getErrorMessage())
+                );
+            }
+        }
         // Default values for sampling as manual
-        String sampling = (String) source.getOrDefault("sampling", "manual");
+        String sampling = (String) source.getOrDefault(SAMPLING, MANUAL);
 
         List<QueryWithReference> querySetQueries;
-        if (sampling.equals("manual")) {
-            List<Object> rawQueries = (List<Object>) source.get("querySetQueries");
+        if (sampling.equals(MANUAL)) {
+            List<Object> rawQueries = (List<Object>) source.get(QUERY_SET_QUERIES);
+            if (rawQueries.size() > settingsAccessor.getMaxQuerySetAllowed()) {
+                return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.FORBIDDEN, "Query Set Limit Exceeded."));
+            }
             querySetQueries = rawQueries.stream().map(obj -> {
                 Map<String, String> queryMap = (Map<String, String>) obj;
                 return new QueryWithReference(queryMap.get("queryText"), queryMap.getOrDefault("referenceAnswer", ""));

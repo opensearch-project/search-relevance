@@ -62,6 +62,7 @@ public class RestPutQuerySetActionTests extends SearchRelevanceRestTestCase {
     public void testPrepareRequest_WorkbenchEnabled() throws Exception {
         // Setup
         when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        when(settingsAccessor.getMaxQuerySetAllowed()).thenReturn(1000);
         RestRequest request = createPutRestRequestWithContent(TEST_CONTENT, "query_sets");
         when(channel.request()).thenReturn(request);
         // Mock index response
@@ -85,6 +86,7 @@ public class RestPutQuerySetActionTests extends SearchRelevanceRestTestCase {
     public void testPrepareRequest_FailureCase() throws Exception {
         // Setup
         when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        when(settingsAccessor.getMaxQuerySetAllowed()).thenReturn(1000);
         RestRequest request = createPutRestRequestWithContent(TEST_CONTENT, "query_sets");
         when(channel.request()).thenReturn(request);
 

@@ -20,7 +20,7 @@ public class SearchRelevanceSettings {
 
     /**
      * Gates the functionality of search relevance workbench
-     * By defaulted, we enable the functionalities
+     * By defaulted, we disable the functionalities
      */
     public static final String SEARCH_RELEVANCE_WORKBENCH_ENABLED_KEY = "plugins.search_relevance.workbench_enabled";
     public static final Setting<Boolean> SEARCH_RELEVANCE_WORKBENCH_ENABLED = Setting.boolSetting(
@@ -38,6 +38,18 @@ public class SearchRelevanceSettings {
     public static final Setting<Boolean> SEARCH_RELEVANCE_STATS_ENABLED = Setting.boolSetting(
         "plugins.search_relevance.stats_enabled",
         true,
+        Setting.Property.NodeScope,
+        Setting.Property.Dynamic
+    );
+
+    /**
+     * Gates the maximum limit of search relevance query set size
+     * By defaulted, we set the value as 150
+     */
+    public static final String SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT_KEY = "plugins.search_relevance.query_set.maximum";
+    public static final Setting<Integer> SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT = Setting.intSetting(
+        SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT_KEY,
+        1000,
         Setting.Property.NodeScope,
         Setting.Property.Dynamic
     );

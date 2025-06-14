@@ -9,6 +9,7 @@ package org.opensearch.searchrelevance.plugin;
 
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_CACHE_INDEX;
+import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_STATS_ENABLED;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_WORKBENCH_ENABLED;
 
@@ -227,6 +228,6 @@ public class SearchRelevancePlugin extends Plugin implements ActionPlugin, Syste
 
     @Override
     public List<Setting<?>> getSettings() {
-        return List.of(SEARCH_RELEVANCE_WORKBENCH_ENABLED, SEARCH_RELEVANCE_STATS_ENABLED);
+        return List.of(SEARCH_RELEVANCE_WORKBENCH_ENABLED, SEARCH_RELEVANCE_STATS_ENABLED, SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT);
     }
 }
