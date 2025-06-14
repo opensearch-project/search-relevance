@@ -150,9 +150,7 @@ public class JudgmentCacheDao {
                 SearchHit hit = response.getHits().getHits()[0];
             }
             listener.onResponse(response);
-        }, e -> {
-            listener.onFailure(e);
-        });
+        }, e -> { listener.onFailure(e); });
 
         return searchRelevanceIndicesManager.listDocsBySearchRequest(searchSourceBuilder, JUDGMENT_CACHE, wrappedListener);
     }
