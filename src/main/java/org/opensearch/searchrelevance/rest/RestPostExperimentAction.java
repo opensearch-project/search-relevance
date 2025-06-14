@@ -62,6 +62,7 @@ public class RestPostExperimentAction extends BaseRestHandler {
 
         String querySetId = (String) source.get("querySetId");
         List<String> searchConfigurationList = ParserUtils.convertObjToList(source, "searchConfigurationList");
+        int size = (Integer) source.get("size");
         List<String> judgmentList = ParserUtils.convertObjToList(source, "judgmentList");
 
         List<Map<String, Object>> evaluationResultList = ParserUtils.convertObjToListOfMaps(source, "evaluationResultList");
@@ -78,6 +79,7 @@ public class RestPostExperimentAction extends BaseRestHandler {
             querySetId,
             searchConfigurationList,
             judgmentList,
+            size,
             evaluationResultList
         );
 

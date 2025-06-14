@@ -25,19 +25,24 @@ public class PostExperimentRequest extends ActionRequest {
     private final List<String> searchConfigurationList;
     private final List<String> judgmentList;
     private final List<Map<String, Object>> evaluationResultList;
+    private final int size;
 
     public PostExperimentRequest(
         @NonNull ExperimentType type,
         @NonNull String querySetId,
         @NonNull List<String> searchConfigurationList,
         @NonNull List<String> judgmentList,
+        @NonNull int size,
         @NonNull List<Map<String, Object>> evaluationResultList
+
     ) {
         this.type = type;
         this.querySetId = querySetId;
         this.searchConfigurationList = searchConfigurationList;
         this.judgmentList = judgmentList;
+        this.size = size;
         this.evaluationResultList = evaluationResultList;
+
     }
 
     public PostExperimentRequest(StreamInput in) throws IOException {
@@ -46,6 +51,7 @@ public class PostExperimentRequest extends ActionRequest {
         this.querySetId = in.readString();
         this.searchConfigurationList = in.readStringList();
         this.judgmentList = in.readStringList();
+        this.size = in.readInt();
         this.evaluationResultList = in.readBoolean() ? in.readList(StreamInput::readMap) : null;
     }
 
@@ -56,6 +62,7 @@ public class PostExperimentRequest extends ActionRequest {
         out.writeString(querySetId);
         out.writeStringArray(searchConfigurationList.toArray(new String[0]));
         out.writeStringArray(judgmentList.toArray(new String[0]));
+        out.writeInt(size);
         if (evaluationResultList != null) {
             out.writeBoolean(true);
             out.writeCollection(evaluationResultList, StreamOutput::writeMap);
@@ -78,6 +85,10 @@ public class PostExperimentRequest extends ActionRequest {
 
     public List<String> getJudgmentList() {
         return judgmentList;
+    }
+
+    public int getSize() {
+        return size;
     }
 
     public List<Map<String, Object>> getEvaluationResultList() {

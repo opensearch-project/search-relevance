@@ -39,6 +39,7 @@ public class PostExperimentActionTests extends OpenSearchTestCase {
             "1234",
             List.of("5678", "0000"),
             List.of("5678", "0000"),
+            10,
             evaluationResults
         );
 
@@ -61,6 +62,8 @@ public class PostExperimentActionTests extends OpenSearchTestCase {
         Map<String, Object> metrics = (Map<String, Object>) result.get("metrics");
         assertEquals(0.8, metrics.get("dcg@10"));
         assertEquals(0.75, metrics.get("ndcg@10"));
+
+        assertEquals(10, serialized.getSize());
     }
 
     public void testRequestValidation() {
