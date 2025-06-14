@@ -12,7 +12,6 @@ import static org.opensearch.searchrelevance.common.MetricsConstants.POINTWISE_F
 import static org.opensearch.searchrelevance.common.MetricsConstants.POINTWISE_FIELD_NAME_SEARCH_CONFIGURATION_ID;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -42,7 +41,6 @@ import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.EvaluationResult;
 import org.opensearch.searchrelevance.model.Experiment;
 import org.opensearch.searchrelevance.model.ExperimentType;
-import org.opensearch.searchrelevance.model.QuerySet;
 import org.opensearch.searchrelevance.model.SearchConfiguration;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.tasks.Task;
@@ -129,13 +127,6 @@ public class PostExperimentTransportAction extends HandledTransportAction<PostEx
 
     private void triggerAsyncProcessing(String experimentId, PostExperimentRequest request) {
         try {
-            QuerySet querySet = querySetDao.getQuerySetSync(request.getQuerySetId());
-            List<String> queryTextWithReferences = querySet.querySetQueries().stream().map(e -> e.queryText()).collect(Collectors.toList());
-
-            List<String> queries = request.getEvaluationResultList()
-                .stream()
-                .map(e -> (String) e.get("searchText"))
-                .collect(Collectors.toList());
 
             List<SearchConfiguration> searchConfigurations = request.getSearchConfigurationList()
                 .stream()
@@ -150,90 +141,55 @@ public class PostExperimentTransportAction extends HandledTransportAction<PostEx
             if (request.getJudgmentList().size() != 1) {
                 throw new Exception("Must have exactly one judgment list. Had " + request.getJudgmentList().size() + " size.");
             }
-            String judgmentListId = request.getJudgmentList().get(0);
 
-            Map<String, List<String>> indexAndQueries = new HashMap<>();
-            for (SearchConfiguration config : searchConfigurations) {
-                indexAndQueries.put(config.id(), Arrays.asList(config.index(), config.query(), config.searchPipeline()));
-            }
-            processExperiment(experimentId, request, searchConfigurationId, judgmentListId, indexAndQueries, queries);
+            processExperiment(experimentId, request, searchConfigurationId);
         } catch (Exception e) {
             handleAsyncFailure(experimentId, request, "Failed to start async processing", e);
         }
     }
 
-    private void processExperiment(
-        String experimentId,
-        PostExperimentRequest request,
-        String searchConfigurationId,
-        String judgmentListId,
-        Map<String, List<String>> indexAndQueries,
-        List<String> queryTexts
-    ) {
+    private void processExperiment(String experimentId, PostExperimentRequest request, String searchConfigurationId) {
         List<Map<String, Object>> finalResults = Collections.synchronizedList(new ArrayList<>());
-        AtomicInteger pendingQueries = new AtomicInteger(queryTexts.size());
+        AtomicInteger pendingQueries = new AtomicInteger(request.getEvaluationResultList().size());
         AtomicBoolean hasFailure = new AtomicBoolean(false);
 
-        importExperiment(
-            experimentId,
-            request,
-            searchConfigurationId,
-            judgmentListId,
-            indexAndQueries,
-            queryTexts,
-            finalResults,
-            pendingQueries,
-            hasFailure,
-            request.getJudgmentList()
-        );
+        importExperiment(experimentId, request, searchConfigurationId, finalResults, pendingQueries, hasFailure);
     }
 
     private void importExperiment(
         String experimentId,
         PostExperimentRequest request,
         String searchConfigurationId,
-        String judgmentListId,
-        Map<String, List<String>> indexAndQueries,
-        List<String> queryTexts,
         List<Map<String, Object>> finalResults,
         AtomicInteger pendingQueries,
-        AtomicBoolean hasFailure,
-        List<String> judgmentList
+        AtomicBoolean hasFailure
     ) {
         if (request.getType() == ExperimentType.POINTWISE_EVALUATION) {
-            if (request.getJudgmentList().size() != 1) {
-                // throw new Exception("Must have exactly one judgment list. Had " + request.getJudgmentList().size() + " size.");
-            }
-            List localJudgmentListId = request.getJudgmentList();
+
+            List judgmentList = request.getJudgmentList();
             for (Map<String, Object> evalResultMap : request.getEvaluationResultList()) {
                 final String evaluationId = UUID.randomUUID().toString();
-                LOGGER.warn("evaluation id " + evaluationId);
-                String localQueryText = (String) evalResultMap.get("searchText");
-                // List localJudgmentIds = (List) evalResultMap.get("judgmentIds");
 
-                List localMetrics = (List) evalResultMap.get("metrics");
-                List localDocIds = (List) evalResultMap.get("documentIds");
-
-                List<Map<String, Object>> metrics = List.of(Map.of("dcg@10", 0.8, "ndcg@10", 0.75));
+                String queryText = (String) evalResultMap.get("searchText");
+                List metrics = (List) evalResultMap.get("metrics");
+                List documentIds = (List) evalResultMap.get("documentIds");
 
                 EvaluationResult evaluationResult = new EvaluationResult(
                     evaluationId,
                     TimeUtils.getTimestamp(),
                     searchConfigurationId,
-                    localQueryText,
-                    localJudgmentListId,
-                    localDocIds,
-                    localMetrics.subList(0, 4)
+                    queryText,
+                    judgmentList,
+                    documentIds,
+                    metrics
                 );
 
                 evaluationResultDao.putEvaluationResult(evaluationResult, ActionListener.wrap(success -> {
                     Map<String, Object> evalResults = Collections.synchronizedMap(new HashMap<>());
                     evalResults.put(POINTWISE_FIELD_NAME_SEARCH_CONFIGURATION_ID, searchConfigurationId);
                     evalResults.put(POINTWISE_FIELD_NAME_EVALUATION_ID, evaluationId);
-                    evalResults.put(PAIRWISE_FIELD_NAME_QUERY_TEXT, localQueryText);
+                    evalResults.put(PAIRWISE_FIELD_NAME_QUERY_TEXT, queryText);
                     finalResults.add(evalResults);
-                    // configToEvalIds.put(POINTWISE_FIELD_NAME_SEARCH_CONFIGURATION_ID, searchConfigurationId);
-                    // configToEvalIds.put(POINTWISE_FIELD_NAME_EVALUATION_ID, evaluationId);
 
                     if (pendingQueries.decrementAndGet() == 0) {
                         updateFinalExperiment(experimentId, request, finalResults, judgmentList);
@@ -241,59 +197,13 @@ public class PostExperimentTransportAction extends HandledTransportAction<PostEx
                 }, error -> {
                     hasFailure.set(true);
                     LOGGER.error(error);
-                    // listener.onFailure(error);
                 }));
             }
         } else {
             throw new SearchRelevanceException(
-                "experimentType" + request.getType() + " not supported for import scenario",
+                "Importing experimentType" + request.getType() + " is not supported",
                 RestStatus.BAD_REQUEST
             );
-        }
-
-        if (false) {
-            for (String queryText : queryTexts) {
-                if (request.getType() == ExperimentType.POINTWISE_EVALUATION) {
-                    final String evaluationId = UUID.randomUUID().toString();
-                    LOGGER.warn("evaluation id " + evaluationId);
-
-                    List<String> judgmentIds = List.of(judgmentListId);
-                    List<String> docIds = List.of("doca", "docb");
-                    List<Map<String, Object>> metrics = List.of(Map.of("dcg@10", 0.8, "ndcg@10", 0.75));
-                    EvaluationResult evaluationResult = new EvaluationResult(
-                        evaluationId,
-                        TimeUtils.getTimestamp(),
-                        searchConfigurationId,
-                        queryText,
-                        judgmentIds,
-                        docIds,
-                        metrics
-                    );
-
-                    Map<String, Object> queryResults = new HashMap<String, Object>();
-                    queryResults.put(PAIRWISE_FIELD_NAME_QUERY_TEXT, queryText);
-                    queryResults.put(POINTWISE_FIELD_NAME_SEARCH_CONFIGURATION_ID, searchConfigurationId);
-                    queryResults.put(POINTWISE_FIELD_NAME_EVALUATION_ID, evaluationId);
-                    evaluationResultDao.putEvaluationResult(evaluationResult, ActionListener.wrap(success -> {
-                        finalResults.add(queryResults);
-                        // configToEvalIds.put(POINTWISE_FIELD_NAME_SEARCH_CONFIGURATION_ID, searchConfigurationId);
-                        // configToEvalIds.put(POINTWISE_FIELD_NAME_EVALUATION_ID, evaluationId);
-                        if (pendingQueries.decrementAndGet() == 0) {
-                            updateFinalExperiment(experimentId, request, finalResults, judgmentList);
-                        }
-                    }, error -> {
-                        hasFailure.set(true);
-                        LOGGER.error(error);
-                        // listener.onFailure(error);
-                    }));
-
-                } else {
-                    throw new SearchRelevanceException(
-                        "experimentType" + request.getType() + " not supported for import scenario",
-                        RestStatus.BAD_REQUEST
-                    );
-                }
-            }
         }
     }
 
