@@ -38,21 +38,55 @@ public class ExperimentOptionsForHybridSearchTests extends OpenSearchTestCase {
 
         // Then
         assertNotNull(result);
-        assertEquals(12, result.size()); // 2 normalization * 2 combination * 2 weight values (0.0, 0.5, 1.0)
+        assertEquals(12, result.size()); // 2 normalization * 2 combination * 3 weight values (0.0, 0.5, 1.0)
 
-        // Verify first combination
-        ExperimentVariantHybridSearchDTO firstCombination = result.get(0);
-        assertEquals("min_max", firstCombination.getNormalizationTechnique());
-        assertEquals("arithmetic_mean", firstCombination.getCombinationTechnique());
-        assertEquals(0.0f, firstCombination.getQueryWeightsForCombination()[0], DELTA_FOR_FLOAT_ASSERTION);
-        assertEquals(1.0f, firstCombination.getQueryWeightsForCombination()[1], DELTA_FOR_FLOAT_ASSERTION);
+        // Instead of relying on specific order, check that all expected combinations are present
+        Set<String> expectedNormTechniques = Set.of("min_max", "l2");
+        Set<String> expectedCombTechniques = Set.of("arithmetic_mean", "harmonic_mean");
+        Set<Float> expectedWeights = Set.of(0.0f, 0.5f, 1.0f);
 
-        // Verify last combination
-        ExperimentVariantHybridSearchDTO lastCombination = result.get(result.size() - 1);
-        assertEquals("l2", lastCombination.getNormalizationTechnique());
-        assertEquals("harmonic_mean", lastCombination.getCombinationTechnique());
-        assertEquals(1.0f, lastCombination.getQueryWeightsForCombination()[0], DELTA_FOR_FLOAT_ASSERTION);
-        assertEquals(0.0f, lastCombination.getQueryWeightsForCombination()[1], DELTA_FOR_FLOAT_ASSERTION);
+        // Track which combinations we've found
+        Set<String> foundNormTechniques = new HashSet<>();
+        Set<String> foundCombTechniques = new HashSet<>();
+        Set<Float> foundWeights = new HashSet<>();
+
+        // Verify all combinations
+        for (ExperimentVariantHybridSearchDTO combo : result) {
+            foundNormTechniques.add(combo.getNormalizationTechnique());
+            foundCombTechniques.add(combo.getCombinationTechnique());
+            foundWeights.add(combo.getQueryWeightsForCombination()[0]);
+
+            // Verify weights sum to 1.0
+            assertEquals(
+                1.0f,
+                combo.getQueryWeightsForCombination()[0] + combo.getQueryWeightsForCombination()[1],
+                DELTA_FOR_FLOAT_ASSERTION
+            );
+        }
+
+        // Verify we found all expected values
+        assertEquals(expectedNormTechniques, foundNormTechniques);
+        assertEquals(expectedCombTechniques, foundCombTechniques);
+        assertEquals(expectedWeights, foundWeights);
+
+        // Check for specific weight combinations
+        boolean foundWeight00 = false;
+        boolean foundWeight10 = false;
+
+        for (ExperimentVariantHybridSearchDTO combo : result) {
+            float weight0 = combo.getQueryWeightsForCombination()[0];
+            float weight1 = combo.getQueryWeightsForCombination()[1];
+
+            if (Math.abs(weight0) < DELTA_FOR_FLOAT_ASSERTION && Math.abs(weight1 - 1.0f) < DELTA_FOR_FLOAT_ASSERTION) {
+                foundWeight00 = true;
+            }
+            if (Math.abs(weight0 - 1.0f) < DELTA_FOR_FLOAT_ASSERTION && Math.abs(weight1) < DELTA_FOR_FLOAT_ASSERTION) {
+                foundWeight10 = true;
+            }
+        }
+
+        assertTrue("Missing weight combination [0.0, 1.0]", foundWeight00);
+        assertTrue("Missing weight combination [1.0, 0.0]", foundWeight10);
     }
 
     public void testGetParameterCombinations_whenIncludeWeightsFalse_thenReturnDefaultWeights() {
