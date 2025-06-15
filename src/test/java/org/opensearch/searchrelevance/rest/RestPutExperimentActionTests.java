@@ -71,6 +71,7 @@ public class RestPutExperimentActionTests extends SearchRelevanceRestTestCase {
     public void testPutExperiment_Success() throws Exception {
         // Setup
         when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        when(settingsAccessor.getMaxQuerySetAllowed()).thenReturn(1000);
         RestRequest request = createPutRestRequestWithContent(VALID_EXPERIMENT_CONTENT, "experiments");
         when(channel.request()).thenReturn(request);
 
@@ -97,6 +98,7 @@ public class RestPutExperimentActionTests extends SearchRelevanceRestTestCase {
     public void testPutExperiment_InvalidType() throws Exception {
         // Setup
         when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        when(settingsAccessor.getMaxQuerySetAllowed()).thenReturn(1000);
         RestRequest request = createPutRestRequestWithContent(INVALID_TYPE_CONTENT, "experiments");
         when(channel.request()).thenReturn(request);
 
@@ -111,6 +113,7 @@ public class RestPutExperimentActionTests extends SearchRelevanceRestTestCase {
     public void testPutExperiment_Failure() throws Exception {
         // Setup
         when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        when(settingsAccessor.getMaxQuerySetAllowed()).thenReturn(1000);
         RestRequest request = createPutRestRequestWithContent(VALID_EXPERIMENT_CONTENT, "experiments");
         when(channel.request()).thenReturn(request);
 

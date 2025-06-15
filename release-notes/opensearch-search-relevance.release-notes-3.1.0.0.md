@@ -29,3 +29,4 @@ Compatible with OpenSearch 3.1.0
 - Fix judgment handling for implicit judgments to be aligned with data model for Judgment again ([#93](https://github.com/opensearch-project/search-relevance/pull/93)
 - Change model for Experiment and Evaluation Result entities: ([#99](https://github.com/opensearch-project/search-relevance/pull/99))
 - Refactor and fix LLM judgment duplication issue ([#98](https://github.com/opensearch-project/search-relevance/pull/98)))
+- add text validation and query set file size check ([#116](https://github.com/opensearch-project/search-relevance/pull/116)))
