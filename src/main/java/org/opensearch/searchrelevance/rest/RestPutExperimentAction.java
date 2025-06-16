@@ -28,6 +28,7 @@ import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.rest.BaseRestHandler;
 import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestRequest;
+import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.searchrelevance.transport.experiment.PutExperimentAction;
@@ -71,14 +72,60 @@ public class RestPutExperimentAction extends BaseRestHandler {
         List<String> judgmentList = ParserUtils.convertObjToList(source, JUDGMENT_LIST);
 
         String typeString = (String) source.get(TYPE);
-        ExperimentType type;
+        ExperimentType experimentType;
+
         try {
-            type = ExperimentType.valueOf(typeString);
+            experimentType = ExperimentType.valueOf(typeString);
         } catch (IllegalArgumentException | NullPointerException e) {
-            throw new IllegalArgumentException("Invalid or missing experiment type", e);
+            throw new IllegalArgumentException("Invalid or missing experiment type");
         }
 
-        PutExperimentRequest createRequest = new PutExperimentRequest(type, querySetId, searchConfigurationList, judgmentList, size);
+        if (searchConfigurationList == null || searchConfigurationList.isEmpty()) {
+            throw new IllegalArgumentException("searchConfigurationList cannot be null or empty");
+        }
+
+        switch (experimentType) {
+            case PAIRWISE_COMPARISON:
+                if (searchConfigurationList.size() != 2) {
+                    throw new SearchRelevanceException(
+                        "PAIRWISE_COMPARISON requires exactly 2 search configurations",
+                        RestStatus.BAD_REQUEST
+                    );
+                }
+                if (searchConfigurationList.get(0).equals(searchConfigurationList.get(1))) {
+                    throw new SearchRelevanceException(
+                        "PAIRWISE_COMPARISON requires distinct search configurations",
+                        RestStatus.BAD_REQUEST
+                    );
+                }
+                break;
+
+            case POINTWISE_EVALUATION:
+                if (searchConfigurationList.size() != 1) {
+                    throw new SearchRelevanceException(
+                        "POINTWISE_EVALUATION requires exactly 1 search configuration",
+                        RestStatus.BAD_REQUEST
+                    );
+                }
+                break;
+
+            case HYBRID_OPTIMIZER:
+                if (searchConfigurationList.size() != 1) {
+                    throw new SearchRelevanceException("HYBRID_OPTIMIZER requires exactly 1 search configuration", RestStatus.BAD_REQUEST);
+                }
+                break;
+
+            default:
+                throw new IllegalArgumentException("Unsupported experiment type: " + experimentType);
+        }
+
+        PutExperimentRequest createRequest = new PutExperimentRequest(
+            experimentType,
+            querySetId,
+            searchConfigurationList,
+            judgmentList,
+            size
+        );
 
         return channel -> client.execute(PutExperimentAction.INSTANCE, createRequest, new ActionListener<IndexResponse>() {
             @Override

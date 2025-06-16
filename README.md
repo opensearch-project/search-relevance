@@ -11,7 +11,7 @@ This plugin provides resource management for each tool provided. For example, mo
 
 Exposing these powerful features through a simple UI is done through the  [Dashboards Search Relevance](https://github.com/opensearch-project/dashboards-search-relevance) plugin.
 
-> [!IMPORTANT]  
+> [!IMPORTANT]
 > While shipping with OpenSearch, you must OPT IN to this feature.  To enable this run:
 > ```
 > curl -X PUT "http://localhost:9200/_cluster/settings" -H 'Content-Type: application/json' -d'
