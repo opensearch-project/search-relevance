@@ -8,6 +8,7 @@
 package org.opensearch.searchrelevance.transport.judgment;
 
 import static org.opensearch.searchrelevance.common.MetricsConstants.MODEL_ID;
+import static org.opensearch.searchrelevance.ubi.UbiValidator.checkUbiIndicesExist;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -104,6 +105,10 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
                 metadata.put("ignoreFailure", llmRequest.isIgnoreFailure());
             }
             case UBI_JUDGMENT -> {
+                if (!checkUbiIndicesExist(clusterService)) {
+                    throw new SearchRelevanceException("UBI is not initialized", RestStatus.CONFLICT);
+                }
+                ;
                 PutUbiJudgmentRequest ubiRequest = (PutUbiJudgmentRequest) request;
                 metadata.put("clickModel", ubiRequest.getClickModel());
                 metadata.put("maxRank", ubiRequest.getMaxRank());

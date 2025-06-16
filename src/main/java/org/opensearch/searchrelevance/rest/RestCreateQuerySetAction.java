@@ -9,7 +9,12 @@ package org.opensearch.searchrelevance.rest;
 
 import static java.util.Collections.singletonList;
 import static org.opensearch.rest.RestRequest.Method.POST;
+import static org.opensearch.searchrelevance.common.PluginConstants.DEFAULTED_QUERY_SET_SIZE;
+import static org.opensearch.searchrelevance.common.PluginConstants.DESCRIPTION;
+import static org.opensearch.searchrelevance.common.PluginConstants.NAME;
 import static org.opensearch.searchrelevance.common.PluginConstants.QUERYSETS_URL;
+import static org.opensearch.searchrelevance.common.PluginConstants.QUERY_SET_SIZE;
+import static org.opensearch.searchrelevance.common.PluginConstants.SAMPLING;
 
 import java.io.IOException;
 import java.util.List;
@@ -28,6 +33,8 @@ import org.opensearch.rest.RestRequest;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.searchrelevance.transport.queryset.PostQuerySetAction;
 import org.opensearch.searchrelevance.transport.queryset.PostQuerySetRequest;
+import org.opensearch.searchrelevance.ubi.ProbabilityProportionalToSizeQuerySampler;
+import org.opensearch.searchrelevance.utils.TextValidationUtil;
 import org.opensearch.transport.client.node.NodeClient;
 
 import lombok.AllArgsConstructor;
@@ -59,11 +66,30 @@ public class RestCreateQuerySetAction extends BaseRestHandler {
         XContentParser parser = request.contentParser();
         Map<String, Object> source = parser.map();
 
-        String name = (String) source.get("name");
-        String description = (String) source.get("description");
+        String name = (String) source.get(NAME);
+        TextValidationUtil.ValidationResult nameValidation = TextValidationUtil.validateText(name);
+        if (!nameValidation.isValid()) {
+            return channel -> channel.sendResponse(
+                new BytesRestResponse(RestStatus.BAD_REQUEST, "Invalid name: " + nameValidation.getErrorMessage())
+            );
+        }
+
+        String description = (String) source.get(DESCRIPTION);
+        if (description != null) {
+            TextValidationUtil.ValidationResult descriptionValidation = TextValidationUtil.validateText(description);
+            if (!descriptionValidation.isValid()) {
+                return channel -> channel.sendResponse(
+                    new BytesRestResponse(RestStatus.BAD_REQUEST, "Invalid description: " + descriptionValidation.getErrorMessage())
+                );
+            }
+        }
+
         // Default values for sampling and querySetSize if they're not in your current API
-        String sampling = (String) source.getOrDefault("sampling", "pptss");
-        int querySetSize = (int) source.getOrDefault("querySetSize", 10);
+        String sampling = (String) source.getOrDefault(SAMPLING, ProbabilityProportionalToSizeQuerySampler.NAME);
+        int querySetSize = (int) source.getOrDefault(QUERY_SET_SIZE, DEFAULTED_QUERY_SET_SIZE);
+        if (querySetSize > settingsAccessor.getMaxQuerySetAllowed()) {
+            return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.FORBIDDEN, "Query Set Limit Exceeded."));
+        }
 
         PostQuerySetRequest createRequest = new PostQuerySetRequest(name, description, sampling, querySetSize);
 
