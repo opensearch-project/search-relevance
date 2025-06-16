@@ -21,6 +21,7 @@ import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestRequest;
+import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.plugin.SearchRelevanceRestTestCase;
 import org.opensearch.searchrelevance.transport.experiment.PutExperimentAction;
 import org.opensearch.searchrelevance.transport.experiment.PutExperimentRequest;
@@ -31,13 +32,21 @@ public class RestPutExperimentActionTests extends SearchRelevanceRestTestCase {
     private static final String VALID_EXPERIMENT_CONTENT = "{"
         + "\"type\": \"POINTWISE_EVALUATION\","
         + "\"querySetId\": \"test_query_set_id\","
-        + "\"searchConfigurationList\": [\"config1\", \"config2\"],"
+        + "\"searchConfigurationList\": [\"config1\"],"
         + "\"judgmentList\": [\"judgment1\", \"judgment2\"],"
         + "\"size\": 10"
         + "}";
 
     private static final String INVALID_TYPE_CONTENT = "{"
         + "\"type\": \"INVALID_TYPE\","
+        + "\"querySetId\": \"test_query_set_id\","
+        + "\"searchConfigurationList\": [\"config1\"],"
+        + "\"judgmentList\": [\"judgment1\", \"judgment2\"],"
+        + "\"size\": 10"
+        + "}";
+
+    private static final String INVALID_SEARCH_CONFIGURATION_CONTENT = "{"
+        + "\"type\": \"POINTWISE_EVALUATION\","
         + "\"querySetId\": \"test_query_set_id\","
         + "\"searchConfigurationList\": [\"config1\", \"config2\"],"
         + "\"judgmentList\": [\"judgment1\", \"judgment2\"],"
@@ -130,5 +139,18 @@ public class RestPutExperimentActionTests extends SearchRelevanceRestTestCase {
         ArgumentCaptor<BytesRestResponse> responseCaptor = ArgumentCaptor.forClass(BytesRestResponse.class);
         verify(channel).sendResponse(responseCaptor.capture());
         assertEquals(RestStatus.INTERNAL_SERVER_ERROR, responseCaptor.getValue().status());
+    }
+
+    public void testPutExperiment_InputValidationFailure() throws Exception {
+        // Setup
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        RestRequest request = createPutRestRequestWithContent(INVALID_SEARCH_CONFIGURATION_CONTENT, "experiments");
+        when(channel.request()).thenReturn(request);
+
+        SearchRelevanceException exception = expectThrows(
+            SearchRelevanceException.class,
+            () -> restPutExperimentAction.handleRequest(request, channel, client)
+        );
+        assertTrue(exception.getMessage().contains("POINTWISE_EVALUATION"));
     }
 }
