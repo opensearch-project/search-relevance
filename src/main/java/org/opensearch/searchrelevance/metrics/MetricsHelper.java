@@ -359,7 +359,9 @@ public class MetricsHelper {
                     query,
                     hasFailure,
                     pendingConfigurations,
-                    experimentVariants
+                    experimentVariants,
+                    dashboardSearchConfigName,
+                    dashboardQuerySetName
                 );
             }
         }
@@ -463,7 +465,8 @@ public class MetricsHelper {
                             metricName,
                             (float)metricValue,
                             DASHBOARD_APPLICATION_NAME,
-                            experimentId
+                            experimentId,
+                            ""
                         );
 
                         // Store dashboard evaluation result
@@ -501,7 +504,9 @@ public class MetricsHelper {
         String query,
         AtomicBoolean hasFailure,
         AtomicInteger pendingConfigurations,
-        List<ExperimentVariant> experimentVariants
+        List<ExperimentVariant> experimentVariants,
+        String dashboardSearchConfigName,
+        String dashboardQuerySetName
     ) {
         if (Objects.isNull(experimentVariants) || experimentVariants.isEmpty()) {
             throw new IllegalArgumentException("experiment variant for hybrid search cannot be empty");
@@ -547,6 +552,36 @@ public class MetricsHelper {
                         List<String> docIds = Arrays.stream(hits).map(SearchHit::getId).collect(Collectors.toList());
 
                         List<Map<String, Object>> metrics = calculateEvaluationMetrics(docIds, docIdToScores, size);
+                        
+                        // Create dashboard evaluation results for all metrics
+                        metrics.forEach((metricEntry) -> {
+                            String metricName = metricEntry.get("metric").toString();
+                            double metricValue = (double)metricEntry.get("value");
+                            final String resultId = UUID.randomUUID().toString();
+
+                            DashboardEvaluationResult dashboardEvaluationResult = new DashboardEvaluationResult(
+                                resultId,
+                                TimeUtils.getTimestamp(),
+                                dashboardSearchConfigName,
+                                dashboardQuerySetName,
+                                queryText,
+                                metricName,
+                                (float)metricValue,
+                                DASHBOARD_APPLICATION_NAME,
+                                experimentVariant.getExperimentId(),
+                                experimentVariant.getLabel()
+                            );
+
+                            // Store dashboard evaluation result
+                            dashboardEvaluationResultDao.putDashboardEvaluationResult(
+                                dashboardEvaluationResult,
+                                ActionListener.wrap(
+                                    success -> log.debug("Successfully stored dashboard evaluation result for evaluation ID: {} and metric: {}", evaluationId, metricName),
+                                    error -> log.error("Failed to store dashboard evaluation result for evaluation ID: {} and metric: {}", evaluationId, metricName, error)
+                                )
+                            );
+                        });
+                        
                         EvaluationResult evaluationResult = new EvaluationResult(
                             evaluationId,
                             TimeUtils.getTimestamp(),
@@ -565,7 +600,8 @@ public class MetricsHelper {
                                 AsyncStatus.COMPLETED,
                                 experimentVariant.getExperimentId(),
                                 experimentVariant.getParameters(),
-                                Map.of("evaluationResultId", evaluationId)
+                                Map.of("evaluationResultId", evaluationId),
+                                experimentVariant.getLabel()
                             );
                             StepListener<IndexResponse> voidStepListener = new StepListener<>();
                             experimentVariantDao.updateExperimentVariant(experimentVariantResult, voidStepListener);
@@ -615,7 +651,8 @@ public class MetricsHelper {
                         AsyncStatus.ERROR,
                         experimentVariant.getExperimentId(),
                         experimentVariant.getParameters(),
-                        Map.of("evaluationResultId", evaluationId)
+                        Map.of("evaluationResultId", evaluationId),
+                        experimentVariant.getLabel()
                     );
                     experimentVariantDao.updateExperimentVariant(experimentVariantResult, ActionListener.wrap(success -> {}, error -> {
                         hasFailure.set(true);

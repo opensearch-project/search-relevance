@@ -246,6 +246,15 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
                         )
                     );
                     String experimentVariantId = UUID.randomUUID().toString();
+                    
+                    float[] weightsArray = experimentVariantDTO.getQueryWeightsForCombination();
+                    String firstWeight = weightsArray != null && weightsArray.length > 0 ? String.valueOf(weightsArray[0]) : "null";
+                    
+                    String variantLabel = makeDashName(experimentVariantId,
+                        firstWeight + "," +
+                        experimentVariantDTO.getNormalizationTechnique() + "," +
+                        experimentVariantDTO.getCombinationTechnique()
+                    );
                     ExperimentVariant experimentVariant = new ExperimentVariant(
                         experimentVariantId,
                         TimeUtils.getTimestamp(),
@@ -253,7 +262,8 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
                         AsyncStatus.PROCESSING,
                         experimentId,
                         parameters,
-                        Map.of()
+                        Map.of(),
+                        variantLabel
                     );
                     experimentVariants.add(experimentVariant);
                     experimentVariantDao.putExperimentVariant(experimentVariant, ActionListener.wrap(response -> {}, e -> {}));

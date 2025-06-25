@@ -31,6 +31,7 @@ public class ExperimentVariant implements ToXContentObject {
     public static final String EXPERIMENT_ID = "experimentId";
     public static final String PARAMETERS = "parameters";
     public static final String RESULTS = "results";
+    public static final String LABEL = "label";
 
     /**
      * Identifier of the system index
@@ -42,6 +43,7 @@ public class ExperimentVariant implements ToXContentObject {
     private final String experimentId;
     private final Map<String, Object> parameters;
     private final Map<String, Object> results;
+    private final String label;
 
     @Override
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
@@ -53,6 +55,9 @@ public class ExperimentVariant implements ToXContentObject {
         xContentBuilder.field(EXPERIMENT_ID, this.experimentId.trim());
         xContentBuilder.field(PARAMETERS, this.parameters);
         xContentBuilder.field(RESULTS, this.results);
+        if (this.label != null) {
+            xContentBuilder.field(LABEL, this.label);
+        }
         return xContentBuilder.endObject();
     }
 }

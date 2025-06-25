@@ -5,6 +5,7 @@
     "type": { "type": "keyword" },
     "status": { "type": "keyword" },
     "experimentId": { "type": "keyword" },
+    "label": { "type": "keyword" },
     "parameters": { "type":  "object", "dynamic": false },
     "results": {
       "type": "nested",

@@ -26,6 +26,7 @@ public class DashboardEvaluationResult implements ToXContentObject {
     public static final String VALUE = "value";
     public static final String APPLICATION = "application";
     public static final String EVALUATION_ID = "evaluation_id";
+    public static final String VARIANT_LABEL = "variant_label";
 
     private final String id;
     private final String timestamp;
@@ -36,6 +37,7 @@ public class DashboardEvaluationResult implements ToXContentObject {
     private final float value;
     private final String application;
     private final String evaluationId;
+    private final String variantLabel;
 
     public DashboardEvaluationResult(
         String id,
@@ -46,7 +48,8 @@ public class DashboardEvaluationResult implements ToXContentObject {
         String metric,
         float value,
         String application,
-        String evaluationId
+        String evaluationId,
+        String variantLabel
     ) {
         this.id = id;
         this.timestamp = timestamp;
@@ -57,6 +60,7 @@ public class DashboardEvaluationResult implements ToXContentObject {
         this.value = value;
         this.application = application;
         this.evaluationId = evaluationId;
+        this.variantLabel = variantLabel;
     }
 
     @Override
@@ -71,6 +75,7 @@ public class DashboardEvaluationResult implements ToXContentObject {
         xContentBuilder.field(VALUE, this.value);
         xContentBuilder.field(APPLICATION, this.application.trim());
         xContentBuilder.field(EVALUATION_ID, this.evaluationId.trim());
+        xContentBuilder.field(VARIANT_LABEL, this.variantLabel.trim());
         return xContentBuilder.endObject();
     }
 
@@ -108,5 +113,9 @@ public class DashboardEvaluationResult implements ToXContentObject {
 
     public String evaluationId() {
         return evaluationId;
+    }
+
+    public String variantLabel() {
+        return variantLabel;
     }
 } 

@@ -29,6 +29,7 @@ public class QuerySourceUtilTests extends OpenSearchTestCase {
             .parameters(
                 Map.of(EXPERIMENT_OPTION_NORMALIZATION_TECHNIQUE, "min_max", EXPERIMENT_OPTION_COMBINATION_TECHNIQUE, "arithmetic_mean")
             )
+            .label("test-label")
             .build();
 
         // When
