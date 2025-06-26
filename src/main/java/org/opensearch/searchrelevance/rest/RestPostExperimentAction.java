@@ -62,7 +62,8 @@ public class RestPostExperimentAction extends BaseRestHandler {
 
         String querySetId = (String) source.get("querySetId");
         List<String> searchConfigurationList = ParserUtils.convertObjToList(source, "searchConfigurationList");
-        int size = (Integer) source.get("size");
+        Integer sizeObj = (Integer) source.get("size");
+        int size = sizeObj != null ? sizeObj.intValue() : 10; // Default size to 10 if not provided
         List<String> judgmentList = ParserUtils.convertObjToList(source, "judgmentList");
 
         List<Map<String, Object>> evaluationResultList = ParserUtils.convertObjToListOfMaps(source, "evaluationResultList");
