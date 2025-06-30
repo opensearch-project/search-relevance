@@ -96,7 +96,7 @@ public class SearchRelevanceIndicesManager {
      * Create a search relevance index if not exists, using synchronize calls
      * @param index
      */
-    private void createIndexIfAbsentSync(final SearchRelevanceIndices index) {
+    public void createIndexIfAbsentSync(final SearchRelevanceIndices index) {
         String indexName = index.getIndexName();
         String mapping = index.getMapping();
 
@@ -105,7 +105,21 @@ public class SearchRelevanceIndicesManager {
             return;
         }
         final CreateIndexRequest createIndexRequest = new CreateIndexRequest(indexName).mapping(mapping);
-        StashedThreadContext.run(client, () -> client.admin().indices().create(createIndexRequest));
+        StashedThreadContext.run(client, () -> client.admin().indices().create(createIndexRequest, new ActionListener<>() {
+            @Override
+            public void onResponse(final CreateIndexResponse createIndexResponse) {
+                log.info("Successfully created index [{}]", indexName);
+            }
+
+            @Override
+            public void onFailure(final Exception e) {
+                if (e instanceof ResourceAlreadyExistsException) {
+                    log.info("index[{}] already exist", indexName);
+                    return;
+                }
+                log.error("Failed to create index [{}]", indexName, e);
+            }
+        }));
     }
 
     public SearchResponse getDocByDocIdSync(final String docId, final SearchRelevanceIndices index) {

@@ -427,57 +427,52 @@ public class MetricsHelper {
                     List<String> docIds = Arrays.stream(hits).map(SearchHit::getId).collect(Collectors.toList());
 
                     List<Map<String, Object>> metrics = calculateEvaluationMetrics(docIds, docIdToScores, size);
-                    EvaluationResult evaluationResult = new EvaluationResult(
+                    
+                    // Create dashboard evaluation results for all metrics first, then create EvaluationResult
+                    populateDashboardEvaluationResultsSequentially(
+                        metrics,
                         evaluationId,
-                        TimeUtils.getTimestamp(),
-                        searchConfigurationId,
+                        dashboardSearchConfigName,
+                        dashboardQuerySetName,
                         queryText,
-                        judgmentIds,
-                        docIds,
-                        metrics
-                    );
+                        experimentId,
+                        "",
+                        new ActionListener<Void>() {
+                            @Override
+                            public void onResponse(Void response) {
+                                log.debug("Successfully completed dashboard evaluation results population for evaluation ID: {}", evaluationId);
+                                
+                                // Now create the EvaluationResult after dashboard results are populated
+                                EvaluationResult evaluationResult = new EvaluationResult(
+                                    evaluationId,
+                                    TimeUtils.getTimestamp(),
+                                    searchConfigurationId,
+                                    queryText,
+                                    judgmentIds,
+                                    docIds,
+                                    metrics
+                                );
 
-                    evaluationResultDao.putEvaluationResult(evaluationResult, ActionListener.wrap(success -> {
-                        configToEvalIds.put(POINTWISE_FIELD_NAME_SEARCH_CONFIGURATION_ID, searchConfigurationId);
-                        configToEvalIds.put(POINTWISE_FIELD_NAME_EVALUATION_ID, evaluationId);
-                        if (pendingConfigurations.decrementAndGet() == 0) {
-                            listener.onResponse(configToEvalIds);
+                                evaluationResultDao.putEvaluationResult(evaluationResult, ActionListener.wrap(success -> {
+                                    configToEvalIds.put(POINTWISE_FIELD_NAME_SEARCH_CONFIGURATION_ID, searchConfigurationId);
+                                    configToEvalIds.put(POINTWISE_FIELD_NAME_EVALUATION_ID, evaluationId);
+                                    if (pendingConfigurations.decrementAndGet() == 0) {
+                                        listener.onResponse(configToEvalIds);
+                                    }
+                                }, error -> {
+                                    hasFailure.set(true);
+                                    listener.onFailure(error);
+                                }));
+                            }
+
+                            @Override
+                            public void onFailure(Exception e) {
+                                log.error("Failed to populate dashboard evaluation results for evaluation ID: {}", evaluationId, e);
+                                hasFailure.set(true);
+                                listener.onFailure(e);
+                            }
                         }
-                    }, error -> {
-                        hasFailure.set(true);
-                        listener.onFailure(error);
-                    }));
-
-                    // Create dashboard evaluation results for all metrics
-                    metrics.forEach((metricEntry) -> {
-                        String metricName = metricEntry.get("metric").toString();
-                        double metricValue = (double)metricEntry.get("value");
-                        final String resultId = UUID.randomUUID().toString();
-
-                        // Use experimentId rather than evaluationId
-                        // In the Dashboards, an evaluation refers to an experiment, therefore that is what we use
-                        DashboardEvaluationResult dashboardEvaluationResult = new DashboardEvaluationResult(
-                            resultId,
-                            TimeUtils.getTimestamp(),
-                            dashboardSearchConfigName,
-                            dashboardQuerySetName,
-                            queryText,
-                            metricName,
-                            (float)metricValue,
-                            DASHBOARD_APPLICATION_NAME,
-                            experimentId,
-                            ""
-                        );
-
-                        // Store dashboard evaluation result
-                        dashboardEvaluationResultDao.putDashboardEvaluationResult(
-                            dashboardEvaluationResult,
-                            ActionListener.wrap(
-                                success -> log.debug("Successfully stored dashboard evaluation result for evaluation ID: {} and metric: {}", evaluationId, metricName),
-                                error -> log.error("Failed to store dashboard evaluation result for evaluation ID: {} and metric: {}", evaluationId, metricName, error)
-                            )
-                        );
-                    });
+                    );
                 } catch (Exception e) {
                     hasFailure.set(true);
                     listener.onFailure(e);
@@ -553,89 +548,85 @@ public class MetricsHelper {
 
                         List<Map<String, Object>> metrics = calculateEvaluationMetrics(docIds, docIdToScores, size);
                         
-                        // Create dashboard evaluation results for all metrics
-                        metrics.forEach((metricEntry) -> {
-                            String metricName = metricEntry.get("metric").toString();
-                            double metricValue = (double)metricEntry.get("value");
-                            final String resultId = UUID.randomUUID().toString();
-
-                            DashboardEvaluationResult dashboardEvaluationResult = new DashboardEvaluationResult(
-                                resultId,
-                                TimeUtils.getTimestamp(),
-                                dashboardSearchConfigName,
-                                dashboardQuerySetName,
-                                queryText,
-                                metricName,
-                                (float)metricValue,
-                                DASHBOARD_APPLICATION_NAME,
-                                experimentVariant.getExperimentId(),
-                                experimentVariant.getLabel()
-                            );
-
-                            // Store dashboard evaluation result
-                            dashboardEvaluationResultDao.putDashboardEvaluationResult(
-                                dashboardEvaluationResult,
-                                ActionListener.wrap(
-                                    success -> log.debug("Successfully stored dashboard evaluation result for evaluation ID: {} and metric: {}", evaluationId, metricName),
-                                    error -> log.error("Failed to store dashboard evaluation result for evaluation ID: {} and metric: {}", evaluationId, metricName, error)
-                                )
-                            );
-                        });
-                        
-                        EvaluationResult evaluationResult = new EvaluationResult(
+                        // Create dashboard evaluation results for all metrics first, then create EvaluationResult
+                        populateDashboardEvaluationResultsSequentially(
+                            metrics,
                             evaluationId,
-                            TimeUtils.getTimestamp(),
-                            searchConfigurationId,
+                            dashboardSearchConfigName,
+                            dashboardQuerySetName,
                             queryText,
-                            judgmentIds,
-                            docIds,
-                            metrics
+                            experimentVariant.getExperimentId(),
+                            experimentVariant.getLabel(),
+                            new ActionListener<Void>() {
+                                @Override
+                                public void onResponse(Void response) {
+                                    log.debug("Successfully completed dashboard evaluation results population for evaluation ID: {}", evaluationId);
+                                    
+                                    // Now create the EvaluationResult after dashboard results are populated
+                                    EvaluationResult evaluationResult = new EvaluationResult(
+                                        evaluationId,
+                                        TimeUtils.getTimestamp(),
+                                        searchConfigurationId,
+                                        queryText,
+                                        judgmentIds,
+                                        docIds,
+                                        metrics
+                                    );
+
+                                    evaluationResultDao.putEvaluationResult(evaluationResult, ActionListener.wrap(success -> {
+                                        ExperimentVariant experimentVariantResult = new ExperimentVariant(
+                                            experimentVariant.getId(),
+                                            TimeUtils.getTimestamp(),
+                                            experimentVariant.getType(),
+                                            AsyncStatus.COMPLETED,
+                                            experimentVariant.getExperimentId(),
+                                            experimentVariant.getParameters(),
+                                            Map.of("evaluationResultId", evaluationId),
+                                            experimentVariant.getLabel()
+                                        );
+                                        StepListener<IndexResponse> voidStepListener = new StepListener<>();
+                                        experimentVariantDao.updateExperimentVariant(experimentVariantResult, voidStepListener);
+                                        voidStepListener.whenComplete(indexResponse -> {
+                                            synchronized (configToExperimentVariants) {
+                                                Map<String, Object> map = (Map<String, Object>) configToExperimentVariants.get(searchConfigurationId);
+                                                map.put(experimentVariant.getId(), evaluationId);
+                                            }
+                                            if (pendingConfigurations.decrementAndGet() == 0) {
+                                                Map<String, Object> transformedConfigToExperimentVariants = new HashMap<>();
+                                                transformedConfigToExperimentVariants.put(
+                                                    POINTWISE_FIELD_NAME_SEARCH_CONFIGURATION_ID,
+                                                    searchConfigurationId
+                                                );
+
+                                                List<Map<String, Object>> evaluationResults = new ArrayList<>();
+                                                Map<String, Object> configMap = (Map<String, Object>) configToExperimentVariants.get(
+                                                    searchConfigurationId
+                                                );
+                                                configMap.forEach((variantId, evalId) -> {
+                                                    Map<String, Object> result = new HashMap<>();
+                                                    result.put(POINTWISE_FIELD_NAME_EVALUATION_ID, evalId);
+                                                    result.put(POINTWISE_FIELD_NAME_EXPERIMENT_VARIANT_ID, variantId);
+                                                    evaluationResults.add(result);
+                                                });
+                                                transformedConfigToExperimentVariants.put(POINTWISE_FIELD_NAME_EVALUATION_RESULTS, evaluationResults);
+
+                                                listener.onResponse(transformedConfigToExperimentVariants);
+                                            }
+                                        }, listener::onFailure);
+                                    }, error -> {
+                                        hasFailure.set(true);
+                                        listener.onFailure(error);
+                                    }));
+                                }
+
+                                @Override
+                                public void onFailure(Exception e) {
+                                    log.error("Failed to populate dashboard evaluation results for evaluation ID: {}", evaluationId, e);
+                                    hasFailure.set(true);
+                                    listener.onFailure(e);
+                                }
+                            }
                         );
-
-                        evaluationResultDao.putEvaluationResult(evaluationResult, ActionListener.wrap(success -> {
-                            ExperimentVariant experimentVariantResult = new ExperimentVariant(
-                                experimentVariant.getId(),
-                                TimeUtils.getTimestamp(),
-                                experimentVariant.getType(),
-                                AsyncStatus.COMPLETED,
-                                experimentVariant.getExperimentId(),
-                                experimentVariant.getParameters(),
-                                Map.of("evaluationResultId", evaluationId),
-                                experimentVariant.getLabel()
-                            );
-                            StepListener<IndexResponse> voidStepListener = new StepListener<>();
-                            experimentVariantDao.updateExperimentVariant(experimentVariantResult, voidStepListener);
-                            voidStepListener.whenComplete(indexResponse -> {
-                                synchronized (configToExperimentVariants) {
-                                    Map<String, Object> map = (Map<String, Object>) configToExperimentVariants.get(searchConfigurationId);
-                                    map.put(experimentVariant.getId(), evaluationId);
-                                }
-                                if (pendingConfigurations.decrementAndGet() == 0) {
-                                    Map<String, Object> transformedConfigToExperimentVariants = new HashMap<>();
-                                    transformedConfigToExperimentVariants.put(
-                                        POINTWISE_FIELD_NAME_SEARCH_CONFIGURATION_ID,
-                                        searchConfigurationId
-                                    );
-
-                                    List<Map<String, Object>> evaluationResults = new ArrayList<>();
-                                    Map<String, Object> configMap = (Map<String, Object>) configToExperimentVariants.get(
-                                        searchConfigurationId
-                                    );
-                                    configMap.forEach((variantId, evalId) -> {
-                                        Map<String, Object> result = new HashMap<>();
-                                        result.put(POINTWISE_FIELD_NAME_EVALUATION_ID, evalId);
-                                        result.put(POINTWISE_FIELD_NAME_EXPERIMENT_VARIANT_ID, variantId);
-                                        evaluationResults.add(result);
-                                    });
-                                    transformedConfigToExperimentVariants.put(POINTWISE_FIELD_NAME_EVALUATION_RESULTS, evaluationResults);
-
-                                    listener.onResponse(transformedConfigToExperimentVariants);
-                                }
-                            }, listener::onFailure);
-                        }, error -> {
-                            hasFailure.set(true);
-                            listener.onFailure(error);
-                        }));
                     } catch (Exception e) {
                         hasFailure.set(true);
                         listener.onFailure(e);
@@ -664,5 +655,99 @@ public class MetricsHelper {
                 }
             });
         }
+    }
+
+    /**
+     * Helper method to populate dashboard evaluation results sequentially
+     * Only populates the next metric if the previous one was successfully stored
+     */
+    private void populateDashboardEvaluationResultsSequentially(
+        List<Map<String, Object>> metrics,
+        String evaluationId,
+        String dashboardSearchConfigName,
+        String dashboardQuerySetName,
+        String queryText,
+        String experimentId,
+        String experimentVariantLabel,
+        ActionListener<Void> completionListener
+    ) {
+        if (metrics == null || metrics.isEmpty()) {
+            completionListener.onResponse(null);
+            return;
+        }
+
+        populateDashboardEvaluationResultRecursive(
+            metrics,
+            0,
+            evaluationId,
+            dashboardSearchConfigName,
+            dashboardQuerySetName,
+            queryText,
+            experimentId,
+            experimentVariantLabel,
+            completionListener
+        );
+    }
+
+    private void populateDashboardEvaluationResultRecursive(
+        List<Map<String, Object>> metrics,
+        int currentIndex,
+        String evaluationId,
+        String dashboardSearchConfigName,
+        String dashboardQuerySetName,
+        String queryText,
+        String experimentId,
+        String experimentVariantLabel,
+        ActionListener<Void> completionListener
+    ) {
+        if (currentIndex >= metrics.size()) {
+            // All metrics have been processed successfully
+            completionListener.onResponse(null);
+            return;
+        }
+
+        Map<String, Object> metricEntry = metrics.get(currentIndex);
+        String metricName = metricEntry.get("metric").toString();
+        double metricValue = (double) metricEntry.get("value");
+        final String resultId = UUID.randomUUID().toString();
+
+        DashboardEvaluationResult dashboardEvaluationResult = new DashboardEvaluationResult(
+            resultId,
+            TimeUtils.getTimestamp(),
+            dashboardSearchConfigName,
+            dashboardQuerySetName,
+            queryText,
+            metricName,
+            (float) metricValue,
+            DASHBOARD_APPLICATION_NAME,
+            experimentId,
+            experimentVariantLabel
+        );
+
+        // Store dashboard evaluation result
+        dashboardEvaluationResultDao.putDashboardEvaluationResult(
+            dashboardEvaluationResult,
+            ActionListener.wrap(
+                success -> {
+                    log.debug("Successfully stored dashboard evaluation result for evaluation ID: {} and metric: {}", evaluationId, metricName);
+                    // Process the next metric recursively
+                    populateDashboardEvaluationResultRecursive(
+                        metrics,
+                        currentIndex + 1,
+                        evaluationId,
+                        dashboardSearchConfigName,
+                        dashboardQuerySetName,
+                        queryText,
+                        experimentId,
+                        experimentVariantLabel,
+                        completionListener
+                    );
+                },
+                error -> {
+                    log.error("Failed to store dashboard evaluation result for evaluation ID: {} and metric: {}", evaluationId, metricName, error);
+                    completionListener.onFailure(error);
+                }
+            )
+        );
     }
 }
