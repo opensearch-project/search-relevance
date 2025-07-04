@@ -8,6 +8,8 @@
 package org.opensearch.searchrelevance.model;
 
 import java.io.IOException;
+import java.text.NumberFormat;
+import java.util.Locale;
 import java.util.Map;
 
 import org.opensearch.core.xcontent.ToXContentObject;
@@ -42,6 +44,33 @@ public class ExperimentVariant implements ToXContentObject {
     private final String experimentId;
     private final Map<String, Object> parameters;
     private final Map<String, Object> results;
+
+    /**
+     * Computes the textual parameters for this experiment variant based on its parameters.
+     * The textual parameters are generated on-demand and not stored.
+     *
+     * @return The computed textual parameters string
+     */
+    public String getTextualParameters() {
+        Object weightsObj = parameters.get("weights");
+        String weightsString = "null";
+        if (weightsObj instanceof float[] weightsArray && weightsArray.length > 0) {
+            StringBuilder weightsBuilder = new StringBuilder();
+            NumberFormat formatter = NumberFormat.getNumberInstance(Locale.ROOT);
+            formatter.setMaximumFractionDigits(2);
+            formatter.setMinimumFractionDigits(0);
+            for (int i = 0; i < weightsArray.length; i++) {
+                if (i > 0) {
+                    weightsBuilder.append(";");
+                }
+                weightsBuilder.append(formatter.format(weightsArray[i]));
+            }
+            weightsString = weightsBuilder.toString();
+        }
+        String normalizationTechnique = String.valueOf(parameters.getOrDefault("normalization", "unknown"));
+        String combinationTechnique = String.valueOf(parameters.getOrDefault("combination", "unknown"));
+        return combinationTechnique + ", " + normalizationTechnique + ", " + weightsString;
+    }
 
     @Override
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
