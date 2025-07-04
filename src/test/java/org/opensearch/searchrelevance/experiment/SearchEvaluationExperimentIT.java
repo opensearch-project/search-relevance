@@ -161,6 +161,11 @@ public class SearchEvaluationExperimentIT extends BaseExperimentIT {
             // Verify search configuration reference
             assertEquals("Search configuration ID should match", searchConfigurationId, evaluationSource.get("searchConfigurationId"));
 
+            // Verify experiment fields are present for pointwise evaluation experiments
+            assertNotNull("experimentId should be present", evaluationSource.get("experimentId"));
+            assertNotNull("experimentVariantId should be present", evaluationSource.get("experimentVariantId"));
+            assertNull("experimentVariantParameters should be null for pointwise evaluation", evaluationSource.get("experimentVariantParameters"));
+
             // Verify we have metrics
             List<Map> metrics = (List<Map>) evaluationSource.get("metrics");
             assertNotNull("Metrics should exist", metrics);

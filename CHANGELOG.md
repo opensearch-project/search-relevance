@@ -9,6 +9,7 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 ### Features
 
 ### Enhancements
+* Added fields to experiment results to facilitate Dashboard visualization ([#174](https://github.com/opensearch-project/search-relevance/pull/174))
 * Added tasks scheduling and management mechanism for hybrid optimizer experiments ([#139](https://github.com/opensearch-project/search-relevance/pull/139))
 * Enabled tasks scheduling for pointwise experiments ([#167](https://github.com/opensearch-project/search-relevance/pull/167))
 
