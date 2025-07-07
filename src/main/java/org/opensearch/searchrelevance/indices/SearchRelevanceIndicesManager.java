@@ -71,6 +71,7 @@ public class SearchRelevanceIndicesManager {
             stepListener.onResponse(null);
             return;
         }
+
         final CreateIndexRequest createIndexRequest = new CreateIndexRequest(indexName).mapping(mapping);
         StashedThreadContext.run(client, () -> client.admin().indices().create(createIndexRequest, new ActionListener<>() {
             @Override
@@ -86,8 +87,8 @@ public class SearchRelevanceIndicesManager {
                     stepListener.onResponse(null);
                     return;
                 }
-                log.error("Failed to create index [{}]", indexName, e);
-                stepListener.onFailure(e);
+                log.warn("Failed to create index [{}] - continuing without cache optimization", indexName);
+                stepListener.onResponse(null);
             }
         }));
     }
