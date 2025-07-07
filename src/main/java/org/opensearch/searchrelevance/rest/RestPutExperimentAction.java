@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
+import org.opensearch.ExceptionsHelper;
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
@@ -145,7 +146,7 @@ public class RestPutExperimentAction extends BaseRestHandler {
             @Override
             public void onFailure(Exception e) {
                 try {
-                    channel.sendResponse(new BytesRestResponse(channel, RestStatus.INTERNAL_SERVER_ERROR, e));
+                    channel.sendResponse(new BytesRestResponse(channel, ExceptionsHelper.status(e), e));
                 } catch (IOException ex) {
                     log.error("Failed to send error response", ex);
                 }

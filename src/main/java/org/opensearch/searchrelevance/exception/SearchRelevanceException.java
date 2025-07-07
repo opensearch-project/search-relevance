@@ -46,4 +46,9 @@ public class SearchRelevanceException extends OpenSearchException {
         super(message, cause);
         this.restStatus = restStatus;
     }
+
+    @Override
+    public RestStatus status() {
+        return restStatus;
+    }
 }

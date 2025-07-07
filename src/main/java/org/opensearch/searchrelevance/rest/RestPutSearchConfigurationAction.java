@@ -21,6 +21,7 @@ import java.util.Map;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.opensearch.ExceptionsHelper;
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
@@ -95,7 +96,7 @@ public class RestPutSearchConfigurationAction extends BaseRestHandler {
             @Override
             public void onFailure(Exception e) {
                 try {
-                    channel.sendResponse(new BytesRestResponse(channel, RestStatus.INTERNAL_SERVER_ERROR, e));
+                    channel.sendResponse(new BytesRestResponse(channel, ExceptionsHelper.status(e), e));
                 } catch (IOException ex) {
                     LOGGER.error("Failed to send error response", ex);
                 }
