@@ -317,6 +317,11 @@ public class HybridOptimizerExperimentIT extends BaseExperimentIT {
         // Verify the search text matches the query
         assertEquals("Evaluation search text should match query", queryText, evaluationSource.get("searchText"));
 
+        // Verify experiment fields are present for hybrid optimizer experiments
+        assertNotNull("experimentId should be present", evaluationSource.get("experimentId"));
+        assertNotNull("experimentVariantId should be present for hybrid experiments", evaluationSource.get("experimentVariantId"));
+        assertNotNull("experimentVariantParameters should be present for hybrid experiments", evaluationSource.get("experimentVariantParameters"));
+
         // Verify we have metrics
         List<Map> metrics = (List<Map>) evaluationSource.get("metrics");
         assertNotNull("Metrics should exist", metrics);
