@@ -68,6 +68,18 @@ public class EvaluationResult implements ToXContentObject {
         this.experimentVariantParameters = experimentVariantParameters;
     }
 
+    public EvaluationResult(
+        String id,
+        String timestamp,
+        String searchConfigurationId,
+        String searchText,
+        List<String> judgmentIds,
+        List<String> documentIds,
+        List<Map<String, Object>> metrics
+    ) {
+        this(id, timestamp, searchConfigurationId, searchText, judgmentIds, documentIds, metrics, null, null, null);
+    }
+
     @Override
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
         XContentBuilder xContentBuilder = builder.startObject();

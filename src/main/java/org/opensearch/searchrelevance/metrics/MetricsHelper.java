@@ -184,8 +184,7 @@ public class MetricsHelper {
         int size,
         List<String> judgmentIds,
         ActionListener<Map<String, Object>> listener,
-        List<ExperimentVariant> experimentVariants,
-        String experimentId
+        List<ExperimentVariant> experimentVariants
     ) {
         if (indexAndQueries.isEmpty() || judgmentIds.isEmpty()) {
             listener.onFailure(new IllegalArgumentException("Missing required parameters"));
@@ -236,8 +235,7 @@ public class MetricsHelper {
                                     docIdToRatings,
                                     configToEvalIds,
                                     listener,
-                                    experimentVariants,
-                                    experimentId
+                                    experimentVariants
                                 );
                             }
                         } catch (Exception e) {
@@ -261,8 +259,7 @@ public class MetricsHelper {
                                     docIdToRatings,
                                     configToEvalIds,
                                     listener,
-                                    experimentVariants,
-                                    experimentId
+                                    experimentVariants
                                 );
                             }
                         }
@@ -283,8 +280,7 @@ public class MetricsHelper {
         Map<String, String> docIdToScores,
         Map<String, Object> configToEvalIds,
         ActionListener<Map<String, Object>> listener,
-        List<ExperimentVariant> experimentVariants,
-        String experimentId
+        List<ExperimentVariant> experimentVariants
     ) {
         AtomicBoolean hasFailure = new AtomicBoolean(false);
         AtomicInteger pendingConfigurations = getNumberOfExperimentRuns(indexAndQueries, experimentVariants);
@@ -315,8 +311,7 @@ public class MetricsHelper {
                     query,
                     searchPipeline,
                     hasFailure,
-                    pendingConfigurations,
-                    experimentId
+                    pendingConfigurations
                 );
             } else {
                 processSearchConfigurationWithHybridExperimentOptions(
@@ -331,8 +326,7 @@ public class MetricsHelper {
                     query,
                     hasFailure,
                     pendingConfigurations,
-                    experimentVariants,
-                    experimentId
+                    experimentVariants
                 );
             }
         }
@@ -365,8 +359,7 @@ public class MetricsHelper {
         String query,
         String searchPipeline,
         AtomicBoolean hasFailure,
-        AtomicInteger pendingConfigurations,
-        String experimentId
+        AtomicInteger pendingConfigurations
     ) {
         SearchRequest searchRequest = buildSearchRequest(index, query, queryText, searchPipeline, size);
         final String evaluationId = UUID.randomUUID().toString();
@@ -403,10 +396,7 @@ public class MetricsHelper {
                         queryText,
                         judgmentIds,
                         docIds,
-                        metrics,
-                        experimentId,
-                        null,
-                        null
+                        metrics
                     );
 
                     evaluationResultDao.putEvaluationResult(evaluationResult, ActionListener.wrap(success -> {
@@ -445,8 +435,7 @@ public class MetricsHelper {
         String query,
         AtomicBoolean hasFailure,
         AtomicInteger pendingConfigurations,
-        List<ExperimentVariant> experimentVariants,
-        String experimentId
+        List<ExperimentVariant> experimentVariants
     ) {
         if (Objects.isNull(experimentVariants) || experimentVariants.isEmpty()) {
             throw new IllegalArgumentException("experiment variant for hybrid search cannot be empty");
@@ -499,22 +488,19 @@ public class MetricsHelper {
                             queryText,
                             judgmentIds,
                             docIds,
-                            metrics,
-                            experimentId,
-                            experimentVariant.getId(),
-                            experimentVariant.getTextualParameters()
+                            metrics
                         );
 
                         evaluationResultDao.putEvaluationResult(evaluationResult, ActionListener.wrap(success -> {
-                                                    ExperimentVariant experimentVariantResult = new ExperimentVariant(
-                            experimentVariant.getId(),
-                            TimeUtils.getTimestamp(),
-                            experimentVariant.getType(),
-                            AsyncStatus.COMPLETED,
-                            experimentId,
-                            experimentVariant.getParameters(),
-                            Map.of("evaluationResultId", evaluationId)
-                        );
+                            ExperimentVariant experimentVariantResult = new ExperimentVariant(
+                                experimentVariant.getId(),
+                                TimeUtils.getTimestamp(),
+                                experimentVariant.getType(),
+                                AsyncStatus.COMPLETED,
+                                experimentVariant.getExperimentId(),
+                                experimentVariant.getParameters(),
+                                Map.of("evaluationResultId", evaluationId)
+                            );
                             StepListener<IndexResponse> voidStepListener = new StepListener<>();
                             experimentVariantDao.updateExperimentVariant(experimentVariantResult, voidStepListener);
                             voidStepListener.whenComplete(indexResponse -> {
@@ -561,7 +547,7 @@ public class MetricsHelper {
                         TimeUtils.getTimestamp(),
                         experimentVariant.getType(),
                         AsyncStatus.ERROR,
-                        experimentId,
+                        experimentVariant.getExperimentId(),
                         experimentVariant.getParameters(),
                         Map.of("evaluationResultId", evaluationId)
                     );
