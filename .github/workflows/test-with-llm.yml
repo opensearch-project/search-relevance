@@ -1,0 +1,204 @@
+name: Tests with LLM Support
+
+on:
+  push:
+    branches:
+      - "*"
+      - "feature/**"
+  pull_request:
+    branches:
+      - "*"
+      - "feature/**"
+  workflow_dispatch: # allow manual triggers
+
+jobs:
+  # Test with Ollama using native OpenAI API compatibility
+  test-with-ollama:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+
+    - name: Setup Ollama with Native OpenAI API
+      run: |
+        # Download and install Ollama
+        echo "Installing Ollama..."
+        curl -fsSL https://ollama.com/install.sh | sh
+
+        # Check Ollama version for OpenAI API compatibility
+        MINIMUM_VERSION="0.1.14"
+        OLLAMA_VERSION=$(ollama --version 2>/dev/null | grep -oE "v?[0-9]+\.[0-9]+\.[0-9]+" | head -1 | sed 's/^v//')
+
+        if [ ! -z "$OLLAMA_VERSION" ]; then
+          echo "Detected Ollama version: $OLLAMA_VERSION"
+
+          # Simple version comparison
+          if printf '%s\n%s\n' "$MINIMUM_VERSION" "$OLLAMA_VERSION" | sort -V | head -1 | grep -q "^$MINIMUM_VERSION$"; then
+            echo "Ollama $OLLAMA_VERSION supports native OpenAI API compatibility"
+          else
+            echo "Ollama $OLLAMA_VERSION may not support native OpenAI API compatibility"
+            echo "Required: >= $MINIMUM_VERSION"
+            echo "Continuing anyway - may need to update Ollama installation"
+          fi
+        else
+          echo "Could not determine Ollama version - continuing with setup"
+        fi
+
+        # Start Ollama service in background
+        echo "Starting Ollama service..."
+        ollama serve &
+        OLLAMA_PID=$!
+        echo "OLLAMA_PID=$OLLAMA_PID" >> $GITHUB_ENV
+
+        # Wait for Ollama to be ready
+        echo "Waiting for Ollama to start..."
+        for i in {1..30}; do
+          if curl -s http://localhost:11434/api/version > /dev/null; then
+            echo "Ollama service started successfully"
+            break
+          fi
+          if [ $i -eq 30 ]; then
+            echo "Ollama failed to start within 1 minute"
+            exit 1
+          fi
+          echo "Attempt $i/30: Still waiting..."
+          sleep 2
+        done
+
+        # Pull Phi-3 Mini model (better JSON generation than TinyLlama)
+        echo "Pulling Phi-3 Mini model (better for structured responses)..."
+        ollama pull phi3:mini
+
+        # Verify model is available
+        echo "Available models:"
+        ollama list
+
+    - name: Test Ollama Native OpenAI API
+      run: |
+        # Test Ollama's native OpenAI API compatibility
+        echo "Testing Ollama native OpenAI API endpoints..."
+
+        # Test 1: Models endpoint (OpenAI compatible)
+        echo "Testing /v1/models endpoint..."
+        curl -s http://localhost:11434/v1/models | jq . || echo "Models endpoint test failed"
+
+        # Test 2: Chat completions endpoint (OpenAI compatible)
+        echo "Testing /v1/chat/completions endpoint..."
+        curl -s -X POST http://localhost:11434/v1/chat/completions \
+          -H "Content-Type: application/json" \
+          -d '{
+            "model": "phi3:mini",
+            "messages": [{"role": "user", "content": "Hello! Test OpenAI API compatibility."}],
+            "max_tokens": 50,
+            "temperature": 0.1
+          }' | jq . || echo "Chat completions test failed"
+
+        # Test 3: Test ML-Commons compatible format
+        echo "Testing ML-Commons compatible request..."
+        curl -s -X POST http://localhost:11434/v1/chat/completions \
+          -H "Content-Type: application/json" \
+          -d '{
+            "model": "phi3:mini",
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are a search relevance judge. Rate search results."
+              },
+              {
+                "role": "user",
+                "content": "Query: wireless headphones\nDocument: Bluetooth headphones\nRate relevance 0.0-1.0:"
+              }
+            ],
+            "temperature": 0.0,
+            "max_tokens": 50
+          }' | jq . || echo "ML-Commons format test failed"
+
+        echo "Native OpenAI API compatibility confirmed"
+
+    - name: Set Environment Variables for Tests
+      run: |
+        # Set environment variables that integration test expects
+        echo "OLLAMA_API_BASE=http://localhost:11434/v1" >> $GITHUB_ENV
+        echo "OLLAMA_MODEL_NAME=phi3:mini" >> $GITHUB_ENV
+
+        # Also set backward compatibility variables
+        echo "LOCALAI_API_URL=http://localhost:11434" >> $GITHUB_ENV
+        echo "LLM_MODEL_NAME=phi3:mini" >> $GITHUB_ENV
+
+    - name: Run integration tests with Native Ollama
+      env:
+        # Primary environment variables (from native approach)
+        OLLAMA_API_BASE: http://localhost:11434/v1
+        OLLAMA_MODEL_NAME: phi3:mini
+        # Backward compatibility variables
+        LOCALAI_API_URL: http://localhost:11434
+        LLM_MODEL_NAME: phi3:mini
+      run: |
+        echo "Running integration tests with native Ollama OpenAI API..."
+        echo "Endpoint: http://localhost:11434/v1/chat/completions"
+        echo "Model: phi3:mini"
+        echo "API Format: Native OpenAI compatibility"
+
+        ./gradlew integTest --tests "*LLMJudgmentGenerationIT" -Dtests.cluster.llm.enabled=true
+
+    - name: Debug on failure
+      if: failure()
+      run: |
+        echo "=== Debugging LLM test failure ==="
+
+        # Check Ollama service status
+        if curl -s http://localhost:11434/api/version > /dev/null; then
+          echo "Ollama service is running"
+          echo "Version info:"
+          curl -s http://localhost:11434/api/version | jq .
+        else
+          echo "Ollama service is not responding"
+        fi
+
+        # Check available models
+        echo "Available models:"
+        ollama list || echo "Failed to list models"
+
+        # Test native OpenAI endpoints
+        echo "Testing native OpenAI endpoints:"
+        echo "Models endpoint:"
+        curl -v http://localhost:11434/v1/models || echo "Models endpoint failed"
+
+        echo "Chat completions endpoint:"
+        curl -v -X POST http://localhost:11434/v1/chat/completions \
+          -H "Content-Type: application/json" \
+          -d '{"model":"phi3:mini","messages":[{"role":"user","content":"test"}],"max_tokens":10}' \
+          || echo "Chat completions failed"
+
+        # Show environment variables
+        echo "Environment variables:"
+        env | grep -E "(OLLAMA|LLM|LOCALAI)" || echo "No LLM env vars found"
+
+        # Show process info
+        echo "Running processes:"
+        ps aux | grep -E "(ollama|java)" || echo "No relevant processes found"
+
+    - name: Stop Ollama Service
+      if: always()
+      run: |
+        if [ ! -z "$OLLAMA_PID" ]; then
+          echo "Stopping Ollama service (PID: $OLLAMA_PID)..."
+          kill $OLLAMA_PID || true
+
+          # Wait a moment for graceful shutdown
+          sleep 2
+
+          # Force kill if still running
+          kill -9 $OLLAMA_PID 2>/dev/null || true
+        fi
+
+        # Clean up any remaining Ollama processes
+        pkill -f "ollama serve" 2>/dev/null || true
+
+        echo "Ollama cleanup completed"

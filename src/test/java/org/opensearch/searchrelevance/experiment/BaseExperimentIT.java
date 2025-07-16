@@ -68,7 +68,7 @@ public abstract class BaseExperimentIT extends BaseSearchRelevanceIT {
     );
 
     protected static final String BASE_INDEX_NAME_ESCI = "ecommerce";
-    protected static final int MAX_POLL_RETRIES = 60;
+    protected static final int MAX_POLL_RETRIES = 100;
 
     protected String createJudgment() throws IOException, URISyntaxException, InterruptedException {
         String importJudgmentBody = Files.readString(Path.of(classLoader.getResource("data_esci/ImportJudgment.json").toURI()));

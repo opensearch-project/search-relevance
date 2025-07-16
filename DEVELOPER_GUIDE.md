@@ -174,6 +174,49 @@ GET localhost:9200/_remote/info
 #OPENSEARCH_HOSTS: ["http://opensearch_search_relevance:9200"]
 ```
 
+### Development and Testing Scripts
+
+The search-relevance project includes various scripts to help with local development and testing. These scripts are located in `src/test/scripts/` and are designed to make development workflows more efficient.
+
+#### Available Scripts
+
+1. **Demo and Experimentation Scripts**
+   - `demo.sh` - Demonstrates full search relevance workflow with sample data
+   - `demo_hybrid_optimizer.sh` - Runs the hybrid search optimization demo
+   - `create_*.sh` - Various scripts for creating test data and configurations
+
+2. **LLM Testing Scripts** (for testing LLM-based judgment generation)
+   - `setup-local-ollama.sh` - Sets up local Ollama LLM server for testing
+   - `test-ollama-native.sh` - Runs LLM integration tests locally
+   - `stop-local-ollama.sh` - Stops the local Ollama server
+
+#### Example: Testing LLM Integration Locally
+
+Instead of relying on CI/CD, you can test LLM features locally:
+
+```bash
+# 1. Start local LLM server (Ollama)
+./src/test/scripts/setup-local-ollama.sh
+
+# 2. Run LLM integration tests (choose one):
+
+# Option A: Use the convenient test script
+./src/test/scripts/test-ollama-native.sh
+
+# Option B: Run specific test with Gradle
+./gradlew integTest --tests "*LLMJudgmentGenerationIT" -Dtests.cluster.llm.enabled=true
+
+# Option C: Run all integration tests with LLM enabled
+./gradlew integTest -Dtests.cluster.llm.enabled=true
+
+# 3. Stop LLM server when done
+./src/test/scripts/stop-local-ollama.sh
+```
+
+**Important**: The `-Dtests.cluster.llm.enabled=true` flag is required to run LLM tests. Without this flag, the LLMJudgmentGenerationIT test will be skipped.
+
+For detailed information about LLM testing, see [LOCAL_LLM_TESTING.md](LOCAL_LLM_TESTING.md).
+
 ### Debugging
 
 Sometimes it is useful to attach a debugger to either the OpenSearch cluster or the integration test runner to see what's going on. For running unit tests, hit **Debug** from the IDE's gutter to debug the tests. For the OpenSearch cluster, first, make sure that the debugger is listening on port `5005`. Then, to debug the cluster code, run:

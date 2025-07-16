@@ -317,7 +317,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         List<String> docIds,
         ConcurrentMap<String, String> docIdToScore,
         boolean ignoreFailure
-    ) throws Exception {
+    ) {
         List<String> processedDocIds = Collections.synchronizedList(new ArrayList<>());
         AtomicBoolean hasFailure = new AtomicBoolean(false);
 
@@ -449,10 +449,29 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                         for (List<Map<String, Object>> ratings : combinedResponses.values()) {
                             for (Map<String, Object> rating : ratings) {
                                 String compositeKey = (String) rating.get("id");
-                                Double ratingScore = ((Number) rating.get("rating_score")).doubleValue();
-                                String docId = getDocIdFromCompositeKey(compositeKey);
-                                processedRatings.put(docId, ratingScore.toString());
-                                updateJudgmentCache(compositeKey, queryTextWithReference, contextFields, ratingScore.toString(), modelId);
+
+                                RatingFieldExtractor.ExtractionResult extractionResult = RatingFieldExtractor.extractRatingScore(rating);
+
+                                if (extractionResult.isSuccess()) {
+                                    String docId = getDocIdFromCompositeKey(compositeKey);
+                                    String ratingScoreStr = extractionResult.getRatingScore().toString();
+                                    processedRatings.put(docId, ratingScoreStr);
+                                    updateJudgmentCache(compositeKey, queryTextWithReference, contextFields, ratingScoreStr, modelId);
+
+                                    log.debug(
+                                        "Successfully extracted rating {} from field '{}' for composite key: {}",
+                                        extractionResult.getRatingScore(),
+                                        extractionResult.getFieldUsed(),
+                                        compositeKey
+                                    );
+                                } else {
+                                    log.warn(
+                                        "Failed to extract rating score for composite key: {}. Available fields: {}. Reason: {}",
+                                        compositeKey,
+                                        rating.keySet(),
+                                        extractionResult.getErrorMessage()
+                                    );
+                                }
                             }
                         }
 

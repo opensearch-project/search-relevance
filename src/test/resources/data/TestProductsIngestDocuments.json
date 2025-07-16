@@ -1,0 +1,40 @@
+{"index": {"_index": "{{index_name}}", "_id": "1"}}
+{"title": "iPhone 15 Pro Max", "description": "Latest smartphone with advanced camera system", "category": "Electronics", "price": 1199.99}
+{"index": {"_index": "{{index_name}}", "_id": "2"}}
+{"title": "Samsung Galaxy S24", "description": "Premium Android smartphone with AI features", "category": "Electronics", "price": 999.99}
+{"index": {"_index": "{{index_name}}", "_id": "3"}}
+{"title": "Apple MacBook Pro 16", "description": "Professional laptop with M3 chip and keyboard", "category": "Computers", "price": 2399.99}
+{"index": {"_index": "{{index_name}}", "_id": "4"}}
+{"title": "Dell XPS 13", "description": "Ultrabook with Intel processor and steel construction", "category": "Computers", "price": 1299.99}
+{"index": {"_index": "{{index_name}}", "_id": "5"}}
+{"title": "Sony WH-1000XM5 Headphones", "description": "Noise-canceling wireless headphones for phone calls", "category": "Audio", "price": 399.99}
+{"index": {"_index": "{{index_name}}", "_id": "6"}}
+{"title": "Gaming Keyboard RGB", "description": "Mechanical keyboard with RGB lighting for gaming", "category": "Accessories", "price": 149.99}
+{"index": {"_index": "{{index_name}}", "_id": "7"}}
+{"title": "Steel Water Bottle", "description": "Insulated steel bottle for beverages", "category": "Kitchen", "price": 29.99}
+{"index": {"_index": "{{index_name}}", "_id": "8"}}
+{"title": "Wireless Phone Charger", "description": "Fast wireless charging pad for smartphones", "category": "Electronics", "price": 49.99}
+{"index": {"_index": "{{index_name}}", "_id": "9"}}
+{"title": "Google Pixel 8 Pro", "description": "Android phone with amazing camera and smart features", "category": "Electronics", "price": 899.99}
+{"index": {"_index": "{{index_name}}", "_id": "10"}}
+{"title": "Phone Case with Button Protection", "description": "Protective case for mobile phone with reinforced button covers", "category": "Accessories", "price": 24.99}
+{"index": {"_index": "{{index_name}}", "_id": "11"}}
+{"title": "Bluetooth Phone Headset", "description": "Professional phone headset for business calls", "category": "Audio", "price": 89.99}
+{"index": {"_index": "{{index_name}}", "_id": "12"}}
+{"title": "Gaming Phone with Metal Frame", "description": "High-performance gaming smartphone with aluminum metal frame design", "category": "Electronics", "price": 799.99}
+{"index": {"_index": "{{index_name}}", "_id": "13"}}
+{"title": "Mechanical Keyboard with Button Switches", "description": "Professional mechanical keyboard with custom button switches and steel frame", "category": "Accessories", "price": 189.99}
+{"index": {"_index": "{{index_name}}", "_id": "14"}}
+{"title": "Steel Frame Laptop Stand", "description": "Adjustable laptop stand with durable steel frame construction", "category": "Accessories", "price": 79.99}
+{"index": {"_index": "{{index_name}}", "_id": "15"}}
+{"title": "Phone Mount with Metal Frame", "description": "Car phone mount with sturdy metal frame for secure phone positioning", "category": "Accessories", "price": 34.99}
+{"index": {"_index": "{{index_name}}", "_id": "16"}}
+{"title": "Wireless Gaming Controller", "description": "Gaming controller with responsive buttons and steel construction", "category": "Gaming", "price": 69.99}
+{"index": {"_index": "{{index_name}}", "_id": "17"}}
+{"title": "iPhone 14 with Steel Case", "description": "Previous generation iPhone smartphone with protective steel case", "category": "Electronics", "price": 999.99}
+{"index": {"_index": "{{index_name}}", "_id": "18"}}
+{"title": "Stainless Steel Phone Stand", "description": "Premium phone stand made from stainless steel material", "category": "Accessories", "price": 45.99}
+{"index": {"_index": "{{index_name}}", "_id": "19"}}
+{"title": "Compact Phone with Button Interface", "description": "Simple phone with physical button interface and steel body", "category": "Electronics", "price": 149.99}
+{"index": {"_index": "{{index_name}}", "_id": "20"}}
+{"title": "Gaming Keyboard with Metal Frame", "description": "Professional gaming keyboard featuring metal frame construction and programmable buttons", "category": "Gaming", "price": 229.99}
