@@ -82,7 +82,7 @@ public class RestPutJudgmentAction extends BaseRestHandler {
         Map<String, Object> source = parser.map();
 
         String name = (String) source.get(NAME);
-        TextValidationUtil.ValidationResult nameValidation = TextValidationUtil.validateText(name);
+        TextValidationUtil.ValidationResult nameValidation = TextValidationUtil.validateName(name);
         if (!nameValidation.isValid()) {
             return channel -> channel.sendResponse(
                 new BytesRestResponse(RestStatus.BAD_REQUEST, "Invalid name: " + nameValidation.getErrorMessage())
@@ -90,7 +90,7 @@ public class RestPutJudgmentAction extends BaseRestHandler {
         }
         String description = (String) source.get(DESCRIPTION);
         if (description != null) {
-            TextValidationUtil.ValidationResult descriptionValidation = TextValidationUtil.validateText(description);
+            TextValidationUtil.ValidationResult descriptionValidation = TextValidationUtil.validateDescription(description);
             if (!descriptionValidation.isValid()) {
                 return channel -> channel.sendResponse(
                     new BytesRestResponse(RestStatus.BAD_REQUEST, "Invalid description: " + descriptionValidation.getErrorMessage())

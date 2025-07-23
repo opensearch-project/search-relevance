@@ -36,6 +36,33 @@ public class RestPutQuerySetActionTests extends SearchRelevanceRestTestCase {
         + "]"
         + "}";
 
+    private static final String TEST_CONTENT_WITH_REFERENCE = "{"
+        + "\"name\": \"test_name\","
+        + "\"description\": \"test_description\","
+        + "\"sampling\": \"manual\","
+        + "\"querySetQueries\": ["
+        + "  {\"queryText\": \"test\", \"referenceAnswer\": \"reference answer\"}"
+        + "]"
+        + "}";
+
+    private static final String TEST_CONTENT_INVALID_QUERY_TEXT = "{"
+        + "\"name\": \"test_name\","
+        + "\"description\": \"test_description\","
+        + "\"sampling\": \"manual\","
+        + "\"querySetQueries\": ["
+        + "  {\"queryText\": \"test\\\"\", \"referenceAnswer\": \"reference answer\"}"
+        + "]"
+        + "}";
+
+    private static final String TEST_CONTENT_INVALID_REFERENCE_ANSWER = "{"
+        + "\"name\": \"test_name\","
+        + "\"description\": \"test_description\","
+        + "\"sampling\": \"manual\","
+        + "\"querySetQueries\": ["
+        + "  {\"queryText\": \"test\", \"referenceAnswer\": \"reference answer\\\"\"}"
+        + "]"
+        + "}";
+
     @Override
     public void setUp() throws Exception {
         super.setUp();
@@ -103,5 +130,65 @@ public class RestPutQuerySetActionTests extends SearchRelevanceRestTestCase {
         ArgumentCaptor<BytesRestResponse> responseCaptor = ArgumentCaptor.forClass(BytesRestResponse.class);
         verify(channel).sendResponse(responseCaptor.capture());
         assertEquals(RestStatus.INTERNAL_SERVER_ERROR, responseCaptor.getValue().status());
+    }
+
+    public void testPrepareRequest_WithReferenceAnswer() throws Exception {
+        // Setup
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        when(settingsAccessor.getMaxQuerySetAllowed()).thenReturn(1000);
+        RestRequest request = createPutRestRequestWithContent(TEST_CONTENT_WITH_REFERENCE, "query_sets");
+        when(channel.request()).thenReturn(request);
+        // Mock index response
+        IndexResponse mockIndexResponse = mock(IndexResponse.class);
+        when(mockIndexResponse.getId()).thenReturn("test_id");
+
+        doAnswer(invocation -> {
+            ActionListener<IndexResponse> listener = invocation.getArgument(2);
+            listener.onResponse(mockIndexResponse);
+            return null;
+        }).when(client).execute(eq(PutQuerySetAction.INSTANCE), any(PutQuerySetRequest.class), any());
+
+        // Execute
+        restPutQuerySetAction.handleRequest(request, channel, client);
+
+        // Verify
+        verify(client).execute(eq(PutQuerySetAction.INSTANCE), any(PutQuerySetRequest.class), any());
+        verify(channel).sendResponse(any(BytesRestResponse.class));
+    }
+
+    public void testPrepareRequest_InvalidQueryText() throws Exception {
+        // Setup
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        when(settingsAccessor.getMaxQuerySetAllowed()).thenReturn(1000);
+        RestRequest request = createPutRestRequestWithContent(TEST_CONTENT_INVALID_QUERY_TEXT, "query_sets");
+        when(channel.request()).thenReturn(request);
+
+        // Execute
+        restPutQuerySetAction.handleRequest(request, channel, client);
+
+        // Verify
+        ArgumentCaptor<BytesRestResponse> responseCaptor = ArgumentCaptor.forClass(BytesRestResponse.class);
+        verify(channel).sendResponse(responseCaptor.capture());
+        assertEquals(RestStatus.BAD_REQUEST, responseCaptor.getValue().status());
+        String response = responseCaptor.getValue().content().utf8ToString();
+        assertTrue("Response should contain 'Invalid queryText': " + response, response.contains("Invalid queryText"));
+    }
+
+    public void testPrepareRequest_InvalidReferenceAnswer() throws Exception {
+        // Setup
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        when(settingsAccessor.getMaxQuerySetAllowed()).thenReturn(1000);
+        RestRequest request = createPutRestRequestWithContent(TEST_CONTENT_INVALID_REFERENCE_ANSWER, "query_sets");
+        when(channel.request()).thenReturn(request);
+
+        // Execute
+        restPutQuerySetAction.handleRequest(request, channel, client);
+
+        // Verify
+        ArgumentCaptor<BytesRestResponse> responseCaptor = ArgumentCaptor.forClass(BytesRestResponse.class);
+        verify(channel).sendResponse(responseCaptor.capture());
+        assertEquals(RestStatus.BAD_REQUEST, responseCaptor.getValue().status());
+        String response = responseCaptor.getValue().content().utf8ToString();
+        assertTrue("Response should contain 'Invalid referenceAnswer': " + response, response.contains("Invalid referenceAnswer"));
     }
 }

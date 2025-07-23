@@ -70,19 +70,16 @@ public class RestPutQuerySetAction extends BaseRestHandler {
         Map<String, Object> source = parser.map();
 
         String name = (String) source.get(NAME);
-        TextValidationUtil.ValidationResult nameValidation = TextValidationUtil.validateText(name);
-        if (!nameValidation.isValid()) {
-            return channel -> channel.sendResponse(
-                new BytesRestResponse(RestStatus.BAD_REQUEST, "Invalid name: " + nameValidation.getErrorMessage())
-            );
+        RestChannelConsumer errorResponse = validateField(name, "name");
+        if (errorResponse != null) {
+            return errorResponse;
         }
+
         String description = (String) source.get(DESCRIPTION);
         if (description != null) {
-            TextValidationUtil.ValidationResult descriptionValidation = TextValidationUtil.validateText(description);
-            if (!descriptionValidation.isValid()) {
-                return channel -> channel.sendResponse(
-                    new BytesRestResponse(RestStatus.BAD_REQUEST, "Invalid description: " + descriptionValidation.getErrorMessage())
-                );
+            errorResponse = validateField(description, "description");
+            if (errorResponse != null) {
+                return errorResponse;
             }
         }
         // Default values for sampling as manual
@@ -94,15 +91,41 @@ public class RestPutQuerySetAction extends BaseRestHandler {
             if (rawQueries.size() > settingsAccessor.getMaxQuerySetAllowed()) {
                 return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.FORBIDDEN, "Query Set Limit Exceeded."));
             }
-            querySetQueries = rawQueries.stream().map(obj -> {
-                Map<String, String> queryMap = (Map<String, String>) obj;
-                return new QueryWithReference(queryMap.get("queryText"), queryMap.getOrDefault("referenceAnswer", ""));
-            }).collect(Collectors.toList());
+            try {
+                querySetQueries = rawQueries.stream().map(obj -> {
+                    Map<String, String> queryMap = (Map<String, String>) obj;
+                    String queryText = queryMap.get("queryText");
+                    String referenceAnswer = queryMap.getOrDefault("referenceAnswer", "");
+
+                    // Validate queryText
+                    TextValidationUtil.ValidationResult queryTextValidation = TextValidationUtil.validateText(queryText);
+                    if (!queryTextValidation.isValid()) {
+                        throw new IllegalArgumentException("Invalid queryText: " + queryTextValidation.getErrorMessage());
+                    }
+
+                    // Validate referenceAnswer if it's not empty
+                    if (!referenceAnswer.isEmpty()) {
+                        TextValidationUtil.ValidationResult referenceAnswerValidation = TextValidationUtil.validateText(referenceAnswer);
+                        if (!referenceAnswerValidation.isValid()) {
+                            throw new IllegalArgumentException("Invalid referenceAnswer: " + referenceAnswerValidation.getErrorMessage());
+                        }
+                    }
+
+                    return new QueryWithReference(queryText, referenceAnswer);
+                }).collect(Collectors.toList());
+            } catch (IllegalArgumentException e) {
+                return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.BAD_REQUEST, e.getMessage()));
+            }
         } else {
             querySetQueries = Collections.emptyList();
         }
 
-        PutQuerySetRequest putRequest = new PutQuerySetRequest(name, description, sampling, querySetQueries);
+        PutQuerySetRequest putRequest;
+        try {
+            putRequest = new PutQuerySetRequest(name, description, sampling, querySetQueries);
+        } catch (IllegalArgumentException e) {
+            return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.BAD_REQUEST, e.getMessage()));
+        }
 
         return channel -> client.execute(PutQuerySetAction.INSTANCE, putRequest, new ActionListener<IndexResponse>() {
             @Override
@@ -129,4 +152,31 @@ public class RestPutQuerySetAction extends BaseRestHandler {
             }
         });
     }
+
+    /**
+     * Validates a field using TextValidationUtil and returns an error response if invalid
+     *
+     * @param fieldValue The value to validate
+     * @param fieldName The name of the field for error messages
+     * @return RestChannelConsumer with error response if invalid, null if valid
+     */
+    private RestChannelConsumer validateField(String fieldValue, String fieldName) {
+        TextValidationUtil.ValidationResult validation;
+
+        if ("name".equals(fieldName)) {
+            validation = TextValidationUtil.validateName(fieldValue);
+        } else if ("description".equals(fieldName)) {
+            validation = TextValidationUtil.validateDescription(fieldValue);
+        } else {
+            validation = TextValidationUtil.validateText(fieldValue);
+        }
+
+        if (!validation.isValid()) {
+            return channel -> channel.sendResponse(
+                new BytesRestResponse(RestStatus.BAD_REQUEST, "Invalid " + fieldName + ": " + validation.getErrorMessage())
+            );
+        }
+        return null;
+    }
+
 }

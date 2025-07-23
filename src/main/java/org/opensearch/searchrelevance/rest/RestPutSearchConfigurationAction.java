@@ -66,7 +66,7 @@ public class RestPutSearchConfigurationAction extends BaseRestHandler {
         Map<String, Object> source = parser.map();
 
         String name = (String) source.get(NAME);
-        TextValidationUtil.ValidationResult nameValidation = TextValidationUtil.validateText(name);
+        TextValidationUtil.ValidationResult nameValidation = TextValidationUtil.validateName(name);
         if (!nameValidation.isValid()) {
             return channel -> channel.sendResponse(
                 new BytesRestResponse(RestStatus.BAD_REQUEST, "Invalid name: " + nameValidation.getErrorMessage())

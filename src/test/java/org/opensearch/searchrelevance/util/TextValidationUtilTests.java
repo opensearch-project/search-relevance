@@ -9,31 +9,31 @@ package org.opensearch.searchrelevance.util;
 
 import java.util.List;
 
+import org.opensearch.searchrelevance.plugin.SearchRelevanceRestTestCase;
 import org.opensearch.searchrelevance.utils.TextValidationUtil;
-import org.opensearch.test.OpenSearchTestCase;
 
-class TextValidationUtilTest extends OpenSearchTestCase {
+public class TextValidationUtilTests extends SearchRelevanceRestTestCase {
 
-    void testNullText() {
+    public void testNullText() {
         TextValidationUtil.ValidationResult result = TextValidationUtil.validateText(null);
         assertFalse(result.isValid());
         assertEquals("Text cannot be null", result.getErrorMessage());
     }
 
-    void testEmptyText() {
+    public void testEmptyText() {
         TextValidationUtil.ValidationResult result = TextValidationUtil.validateText("");
         assertFalse(result.isValid());
         assertEquals("Text cannot be empty", result.getErrorMessage());
     }
 
-    void testTextTooLong() {
-        String longText = "a".repeat(1001);
+    public void testTextTooLong() {
+        String longText = "a".repeat(2001);
         TextValidationUtil.ValidationResult result = TextValidationUtil.validateText(longText);
         assertFalse(result.isValid());
-        assertEquals("Text exceeds maximum length of 1000 characters", result.getErrorMessage());
+        assertEquals("Text exceeds maximum length of 2000 characters", result.getErrorMessage());
     }
 
-    void testValidText() {
+    public void testValidText() {
         List<String> inputs = List.of(
             "Hello, World!",
             "Test_123",
@@ -60,7 +60,7 @@ class TextValidationUtilTest extends OpenSearchTestCase {
         }
     }
 
-    void testInvalidCharacters() {
+    public void testInvalidCharacters() {
         List<String> inputs = List.of(
             "Invalid\"quote",
             "Invalid\\backslash",
@@ -72,17 +72,49 @@ class TextValidationUtilTest extends OpenSearchTestCase {
         for (String input : inputs) {
             TextValidationUtil.ValidationResult result = TextValidationUtil.validateText(input);
             assertFalse(result.isValid());
-            assertEquals(
-                "Text contains invalid characters. Only letters, numbers, and basic punctuation allowed",
-                result.getErrorMessage()
-            );
+            assertEquals("Text contains invalid characters (quotes, backslashes, or HTML tags are not allowed)", result.getErrorMessage());
         }
     }
 
-    void testMaximumLengthText() {
-        String maxLengthText = "a".repeat(1000);
+    public void testMaximumLengthText() {
+        String maxLengthText = "a".repeat(2000);
         TextValidationUtil.ValidationResult result = TextValidationUtil.validateText(maxLengthText);
         assertTrue(result.isValid());
         assertNull(result.getErrorMessage());
+    }
+
+    public void testValidateWithCustomLength() {
+        String text = "a".repeat(100);
+        TextValidationUtil.ValidationResult result = TextValidationUtil.validateText(text, 50);
+        assertFalse(result.isValid());
+        assertEquals("Text exceeds maximum length of 50 characters", result.getErrorMessage());
+
+        result = TextValidationUtil.validateText(text, 200);
+        assertTrue(result.isValid());
+        assertNull(result.getErrorMessage());
+    }
+
+    public void testValidateName() {
+        String validName = "a".repeat(50);
+        TextValidationUtil.ValidationResult result = TextValidationUtil.validateName(validName);
+        assertTrue(result.isValid());
+        assertNull(result.getErrorMessage());
+
+        String invalidName = "a".repeat(51);
+        result = TextValidationUtil.validateName(invalidName);
+        assertFalse(result.isValid());
+        assertEquals("Text exceeds maximum length of 50 characters", result.getErrorMessage());
+    }
+
+    public void testValidateDescription() {
+        String validDesc = "a".repeat(250);
+        TextValidationUtil.ValidationResult result = TextValidationUtil.validateDescription(validDesc);
+        assertTrue(result.isValid());
+        assertNull(result.getErrorMessage());
+
+        String invalidDesc = "a".repeat(251);
+        result = TextValidationUtil.validateDescription(invalidDesc);
+        assertFalse(result.isValid());
+        assertEquals("Text exceeds maximum length of 250 characters", result.getErrorMessage());
     }
 }
