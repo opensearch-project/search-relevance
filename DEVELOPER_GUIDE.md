@@ -202,3 +202,21 @@ Additionally, it is possible to attach one debugger to the cluster JVM and anoth
 ```
 ./gradlew :integTest -Dtest.debug=1 -Dcluster.debug=1
 ```
+
+## Design Documentation
+
+For new features or significant changes, contributors should document their designs using the [Technical Design Template](docs/DESIGN_TEMPLATE.md). This template ensures comprehensive documentation of:
+
+- Architecture and design decisions
+- Security considerations and threat modeling
+- Performance implications and benchmarking
+- Testing strategies and approaches
+- Backward compatibility analysis
+
+The template is particularly valuable for:
+- New API implementations
+- Performance or architectural improvements
+- Cross-component integrations
+- Changes affecting security or backward compatibility
+
+Refer to the [design documentation guide](docs/README.md) for detailed instructions, examples, and best practices on using the template effectively.
