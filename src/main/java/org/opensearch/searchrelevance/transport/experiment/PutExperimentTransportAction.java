@@ -131,6 +131,13 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
                     .map(e -> e.queryText())
                     .collect(Collectors.toList());
 
+                // Check if queryTexts is empty and complete experiment immediately
+                if (queryTextWithReferences.isEmpty()) {
+                    log.info("Experiment {} completed with 0 query texts", experimentId);
+                    updateFinalExperiment(experimentId, request, new ArrayList<>(), request.getJudgmentList());
+                    return;
+                }
+
                 // Then get SearchConfigurations asynchronously
                 fetchSearchConfigurationsAsync(experimentId, request, queryTextWithReferences);
             } catch (Exception e) {
