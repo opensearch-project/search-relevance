@@ -97,6 +97,46 @@ public class PostExperimentRequest extends ActionRequest {
 
     @Override
     public ActionRequestValidationException validate() {
-        return null;
+        ActionRequestValidationException validationException = null;
+
+        // Note: type, querySetId, searchConfigurationList, judgmentList, and evaluationResultList
+        // are already validated as non-null by @NonNull annotations
+
+        if (querySetId.isEmpty()) {
+            if (validationException == null) {
+                validationException = new ActionRequestValidationException();
+            }
+            validationException.addValidationError("querySetId cannot be empty");
+        }
+
+        if (searchConfigurationList.isEmpty()) {
+            if (validationException == null) {
+                validationException = new ActionRequestValidationException();
+            }
+            validationException.addValidationError("searchConfigurationList cannot be empty");
+        }
+
+        if (judgmentList.isEmpty()) {
+            if (validationException == null) {
+                validationException = new ActionRequestValidationException();
+            }
+            validationException.addValidationError("judgmentList cannot be empty");
+        }
+
+        if (size <= 0) {
+            if (validationException == null) {
+                validationException = new ActionRequestValidationException();
+            }
+            validationException.addValidationError("size must be greater than 0");
+        }
+
+        if (evaluationResultList != null && evaluationResultList.isEmpty()) {
+            if (validationException == null) {
+                validationException = new ActionRequestValidationException();
+            }
+            validationException.addValidationError("evaluationResultList cannot be empty");
+        }
+
+        return validationException;
     }
 }
