@@ -154,10 +154,9 @@ public class PostExperimentTransportAction extends HandledTransportAction<PostEx
 
     private void processExperiment(String experimentId, PostExperimentRequest request, String searchConfigurationId) {
         List<Map<String, Object>> finalResults = Collections.synchronizedList(new ArrayList<>());
-        AtomicInteger pendingQueries = new AtomicInteger(request.getEvaluationResultList().size());
         AtomicBoolean hasFailure = new AtomicBoolean(false);
 
-        importExperiment(experimentId, request, searchConfigurationId, finalResults, pendingQueries, hasFailure);
+        importExperiment(experimentId, request, searchConfigurationId, finalResults, hasFailure);
     }
 
     private void importExperiment(
@@ -165,7 +164,6 @@ public class PostExperimentTransportAction extends HandledTransportAction<PostEx
         PostExperimentRequest request,
         String searchConfigurationId,
         List<Map<String, Object>> finalResults,
-        AtomicInteger pendingQueries,
         AtomicBoolean hasFailure
     ) {
         if (request.getType() == ExperimentType.POINTWISE_EVALUATION) {
@@ -175,8 +173,8 @@ public class PostExperimentTransportAction extends HandledTransportAction<PostEx
             int maxLimit = settingsAccessor.getMaxQuerySetAllowed();
             int processCount = Math.min(evaluationResultList.size(), maxLimit);
 
-            // Update pending queries count to reflect the actual number we'll process
-            pendingQueries.set(processCount);
+            // Track both completed operations (success + failure) to know when all processing is done
+            AtomicInteger completedOperations = new AtomicInteger(0);
 
             for (int i = 0; i < processCount; i++) {
                 Map<String, Object> evalResultMap = evaluationResultList.get(i);
@@ -197,18 +195,25 @@ public class PostExperimentTransportAction extends HandledTransportAction<PostEx
                 );
 
                 evaluationResultDao.putEvaluationResult(evaluationResult, ActionListener.wrap(success -> {
+                    // Add successful result to final results
                     Map<String, Object> evalResults = Collections.synchronizedMap(new HashMap<>());
                     evalResults.put(POINTWISE_FIELD_NAME_SEARCH_CONFIGURATION_ID, searchConfigurationId);
                     evalResults.put(POINTWISE_FIELD_NAME_EVALUATION_ID, evaluationId);
                     evalResults.put(PAIRWISE_FIELD_NAME_QUERY_TEXT, queryText);
                     finalResults.add(evalResults);
 
-                    if (pendingQueries.decrementAndGet() == 0) {
-                        updateFinalExperiment(experimentId, request, finalResults, judgmentList);
+                    // Check if all operations (success + failure) are complete
+                    if (completedOperations.incrementAndGet() == processCount) {
+                        updateFinalExperiment(experimentId, request, finalResults, judgmentList, hasFailure.get());
                     }
                 }, error -> {
                     hasFailure.set(true);
-                    handleFailure(error, hasFailure, experimentId, request);
+                    LOGGER.error("Failed to store evaluation result for experiment: " + experimentId, error);
+
+                    // Check if all operations (success + failure) are complete
+                    if (completedOperations.incrementAndGet() == processCount) {
+                        updateFinalExperiment(experimentId, request, finalResults, judgmentList, hasFailure.get());
+                    }
                 }));
             }
 
@@ -227,12 +232,6 @@ public class PostExperimentTransportAction extends HandledTransportAction<PostEx
                 "Importing experimentType" + request.getType() + " is not supported",
                 RestStatus.BAD_REQUEST
             );
-        }
-    }
-
-    private void handleFailure(Exception error, AtomicBoolean hasFailure, String experimentId, PostExperimentRequest request) {
-        if (hasFailure.compareAndSet(false, true)) {
-            handleAsyncFailure(experimentId, request, "Failed to process metrics", error);
         }
     }
 
@@ -264,13 +263,17 @@ public class PostExperimentTransportAction extends HandledTransportAction<PostEx
         String experimentId,
         PostExperimentRequest request,
         List<Map<String, Object>> finalResults,
-        List<String> judgmentList
+        List<String> judgmentList,
+        boolean hasFailure
     ) {
+        // Set status based on whether any failures occurred
+        AsyncStatus finalStatus = hasFailure ? AsyncStatus.ERROR : AsyncStatus.COMPLETED;
+
         Experiment finalExperiment = new Experiment(
             experimentId,
             TimeUtils.getTimestamp(),
             request.getType(),
-            AsyncStatus.COMPLETED,
+            finalStatus,
             request.getQuerySetId(),
             request.getSearchConfigurationList(),
             judgmentList,
@@ -278,13 +281,17 @@ public class PostExperimentTransportAction extends HandledTransportAction<PostEx
             finalResults
         );
 
-        experimentDao.updateExperiment(
-            finalExperiment,
-            ActionListener.wrap(
-                response -> LOGGER.debug("Updated final experiment: {}", experimentId),
-                error -> handleAsyncFailure(experimentId, request, "Failed to update final experiment", error)
-            )
-        );
+        experimentDao.updateExperiment(finalExperiment, ActionListener.wrap(response -> {
+            if (hasFailure) {
+                LOGGER.info(
+                    "Updated experiment {} status to ERROR with {} successful evaluation results",
+                    experimentId,
+                    finalResults.size()
+                );
+            } else {
+                LOGGER.debug("Updated final experiment: {}", experimentId);
+            }
+        }, error -> handleAsyncFailure(experimentId, request, "Failed to update final experiment", error)));
     }
 
     private void handleAsyncFailure(String experimentId, PostExperimentRequest request, String message, Exception error) {
