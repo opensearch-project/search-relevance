@@ -7,9 +7,9 @@
  */
 package org.opensearch.searchrelevance.transport.experiment;
 
-import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_QUERY_TEXT;
 import static org.opensearch.searchrelevance.common.MetricsConstants.POINTWISE_FIELD_NAME_EVALUATION_ID;
 import static org.opensearch.searchrelevance.common.MetricsConstants.POINTWISE_FIELD_NAME_SEARCH_CONFIGURATION_ID;
+import static org.opensearch.searchrelevance.common.MetricsConstants.QUERY_TEXT;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -199,7 +199,7 @@ public class PostExperimentTransportAction extends HandledTransportAction<PostEx
                     Map<String, Object> evalResults = Collections.synchronizedMap(new HashMap<>());
                     evalResults.put(POINTWISE_FIELD_NAME_SEARCH_CONFIGURATION_ID, searchConfigurationId);
                     evalResults.put(POINTWISE_FIELD_NAME_EVALUATION_ID, evaluationId);
-                    evalResults.put(PAIRWISE_FIELD_NAME_QUERY_TEXT, queryText);
+                    evalResults.put(QUERY_TEXT, queryText);
                     finalResults.add(evalResults);
 
                     // Check if all operations (success + failure) are complete
