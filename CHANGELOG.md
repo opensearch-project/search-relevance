@@ -7,7 +7,6 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 ### Breaking Changes
 
 ### Features
-- [Enhancement] Add Import Capability for externally run Search Evaluation ([#46](https://github.com/opensearch-project/search-relevance/issues/46))
 
 ### Removed
 
@@ -16,6 +15,7 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 * Added fields to experiment results to facilitate Dashboard visualization ([#174](https://github.com/opensearch-project/search-relevance/pull/174))
 * Added tasks scheduling and management mechanism for hybrid optimizer experiments ([#139](https://github.com/opensearch-project/search-relevance/pull/139))
 * Enabled tasks scheduling for pointwise experiments ([#167](https://github.com/opensearch-project/search-relevance/pull/167))
+* Add Import Capability for externally run Search Evaluation ([#46](https://github.com/opensearch-project/search-relevance/issues/46))
 
 ### Bug Fixes
 * Bug fix on rest APIs error status for creations ([#176](https://github.com/opensearch-project/search-relevance/pull/176))
