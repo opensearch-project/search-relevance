@@ -3,11 +3,11 @@
 # This script quickly sets up a local Search Relevance Workbench from scratch with:
 # * User Behavior Insights sample data
 # * An "ecommerce" style sample data
-# You can now exercise the Single Query comparison, Query Set Comparison and Search Evaluation experiments of SRW!  
-# 
-# This assumes you started OpenSearch from the root via 
+# You can now exercise the Single Query comparison, Query Set Comparison and Search Evaluation experiments of SRW!
+#
+# This assumes you started OpenSearch from the root via
 # ./gradlew run --preserve-data --debug-jvm which faciliates debugging
-# 
+#
 # It will clear out any existing indexes, except ecommerce index if you pass --skip-ecommerce as a parameter.
 
 # Helper script
@@ -45,40 +45,40 @@ if [ "$SKIP_ECOMMERCE" = false ]; then
   # do 250 products
   #head -n 500 ../esci_us/esci_us_opensearch.json | curl -s -X POST "http://localhost:9200/index-name/_bulk" \
   #  -H 'Content-Type: application/x-ndjson' --data-binary @-
-  # 
+  #
   #  echo Populating ecommerce index
-   
+
   # Get total line count of the file
   TOTAL_LINES=$(wc -l < "$ECOMMERCE_DATA_FILE")
   echo "Total lines in file: $TOTAL_LINES"
-  
+
   # Calculate number of chunks (50000 lines per chunk)
   CHUNK_SIZE=50000
   CHUNKS=$(( (TOTAL_LINES + CHUNK_SIZE - 1) / CHUNK_SIZE ))
   echo "Will process file in $CHUNKS chunks of $CHUNK_SIZE lines each"
-  
+
   # Process file in chunks
   for (( i=0; i<CHUNKS; i++ )); do
     START_LINE=$(( i * CHUNK_SIZE + 1 ))
     END_LINE=$(( (i + 1) * CHUNK_SIZE ))
-    
+
     # Ensure we don't go past the end of the file
     if [ $END_LINE -gt $TOTAL_LINES ]; then
       END_LINE=$TOTAL_LINES
     fi
-    
+
     LINES_TO_PROCESS=$(( END_LINE - START_LINE + 1 ))
     echo "Processing chunk $((i+1))/$CHUNKS: lines $START_LINE-$END_LINE ($LINES_TO_PROCESS lines)"
-    
+
     # Use sed to extract the chunk and pipe to curl for indexing
     sed -n "${START_LINE},${END_LINE}p" "$ECOMMERCE_DATA_FILE" | \
       curl -s -o /dev/null -w "%{http_code}" -X POST "http://localhost:9200/ecommerce/_bulk" \
-      -H 'Content-Type: application/x-ndjson' --data-binary @- 
-    
+      -H 'Content-Type: application/x-ndjson' --data-binary @-
+
     # Give OpenSearch a moment to process the chunk
     sleep 1
   done
-  
+
   echo "All data indexed successfully"
 fi
 
@@ -113,7 +113,7 @@ NUMBER_OF_QUERIES=$(curl -s -XGET "http://localhost:9200/ubi_queries/_search" \
 NUMBER_OF_EVENTS=$(curl -s -XGET "http://localhost:9200/ubi_events/_search" \
   -H "Content-Type: application/json" \
   -d "${QUERY_BODY}" | jq -r '.hits.total.value')
-  
+
 echo
 echo "Indexed UBI data: $NUMBER_OF_QUERIES queries and $NUMBER_OF_EVENTS events"
 
@@ -144,7 +144,7 @@ exe curl -s -X PUT "http://localhost:9200/_plugins/_search_relevance/search_conf
 -H "Content-type: application/json" \
 -d'{
       "name": "baseline",
-      "query": "{\"query\":{\"multi_match\":{\"query\":\"%SearchText%\",\"fields\":[\"id\",\"title\",\"bullet_points\",\"description\",\"Brand\",\"Color\"]}}}",
+      "query": "{\"query\":{\"multi_match\":{\"query\":\"%SearchText%\",\"fields\":[\"id\",\"title\",\"category\",\"bullet_points\",\"description\",\"brand\",\"color\"]}}}",
       "index": "ecommerce"
 }'
 
@@ -154,7 +154,7 @@ exe curl -s -X PUT "http://localhost:9200/_plugins/_search_relevance/search_conf
 -H "Content-type: application/json" \
 -d'{
       "name": "baseline with title weight",
-      "query": "{\"query\":{\"multi_match\":{\"query\":\"%SearchText%\",\"fields\":[\"id\",\"title^25\",\"bullet_points\",\"description\",\"Brand\",\"Color\"]}}}",
+      "query": "{\"query\":{\"multi_match\":{\"query\":\"%SearchText%\",\"fields\":[\"id\",\"title^25\",\"category\",\"bullet_points\",\"description\",\"brand\",\"color\"]}}}",
       "index": "ecommerce"
 }'
 
@@ -193,7 +193,7 @@ QUERY_SET_UBI=`jq -r '.query_set_id' < RES`
 sleep 2
 
 echo
-echo Upload Manually Curated Query Set 
+echo Upload Manually Curated Query Set
 
 exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/query_sets" \
 -H "Content-type: application/json" \
@@ -210,7 +210,7 @@ exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/query_sets" \
 QUERY_SET_MANUAL=`jq -r '.query_set_id' < RES`
 
 echo
-echo Upload ESCI Query Set 
+echo Upload ESCI Query Set
 
 exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/query_sets" \
 -H "Content-type: application/json" \
@@ -244,7 +244,7 @@ exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/judgments" \
    	"name": "Implicit Judgements",
    	"type": "UBI_JUDGMENT"
   }'
-  
+
 UBI_JUDGMENT_LIST_ID=`jq -r '.judgment_id' < RES`
 
 # wait for judgments to be created in the background
@@ -315,7 +315,7 @@ exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/judgments" \
 IMPORTED_JUDGMENT_LIST_ID=`jq -r '.judgment_id' < RES`
 
 echo
-echo Upload ESCI Judgments 
+echo Upload ESCI Judgments
 
 exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/judgments" \
 -H "Content-type: application/json" \
@@ -335,7 +335,7 @@ exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/experiments" \
    	\"size\": 10,
    	\"type\": \"PAIRWISE_COMPARISON\"
    }"
-   
+
 
 EX_PAIRWISE=`jq -r '.experiment_id' < RES`
 
@@ -381,7 +381,7 @@ exe curl -s -X GET "http://localhost:9200/_plugins/_search_relevance/experiments
      "size": 3
    }'
 
-   
+
 ## BEGIN HYBRID OPTIMIZER DEMO ##
 echo
 echo
