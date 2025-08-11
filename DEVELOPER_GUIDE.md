@@ -138,7 +138,7 @@ src/test/scripts/demo_hybrid_optimizer.sh
 ```
 
 ### Run remote clusters with search-relevance
-1. Create a `docker-compse.yml` file with two OpenSearch clusters, for example
+1. Create a `docker-compose.yml` file with two OpenSearch clusters, for example
 ```
 services:
   opensearch_search_relevance:
@@ -198,7 +198,7 @@ volumes:
 networks:
   opensearch-net:
 ```
-2. run command `docker compse up` to spin up the containers
+2. run command `docker compose up` to spin up the containers
 3. run `docker ps` to make sure all containers are up
 ```
 // example
