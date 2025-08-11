@@ -118,13 +118,87 @@ curl localhost:9200
 }
 ```
 ### Run SRW in Demo Mode
-1. run command `docker compose build` to create an image that has the UBI plugin installed.
-2. run command `docker compose up` to spin up the containers.
-3. Run the script `src/test/scripts/demo.sh` to see the full process of creating new UBI indexes loaded with sample data as well as the "sample" ecommerce index.
+1. Run OpenSearch search-relevance using `gradlew run`.
+```shell script
+./gradlew run
+```
+2. Run the script `src/test/scripts/demo.sh` to see the full process of creating new UBI indexes loaded with sample data as well as the "sample" ecommerce index.
+```shell script
+src/test/scripts/demo.sh
+```
+
+### Run SRW in Hybrid Search Optimizer Demo Mode
+1. Run OpenSearch search-relevance using `gradlew run`.
+```shell script
+./gradlew run
+```
+2. Run the script `src/test/scripts/demo_hybrid_optimizer.sh` to see the full process of setting up OpenSearch and indexing data with embeddings to run not only keyword but also hybrid search queries with the "sample" ecommerce index.
+```shell script
+src/test/scripts/demo_hybrid_optimizer.sh
+```
 
 ### Run remote clusters with search-relevance
-1. update `docker-compse.yml` with your remote clusters
-2. run command `docker compse up` to spin up the containers
+1. Create a `docker-compose.yml` file with two OpenSearch clusters, for example
+```
+services:
+  opensearch_search_relevance:
+    image: opensearch/opensearch:3.1.0
+    container_name: opensearch_search_relevance
+    environment:
+      discovery.type: single-node
+      node.name: opensearch
+      cluster.name: opensearch_search_relevance
+      bootstrap.memory_lock: true
+      DISABLE_INSTALL_DEMO_CONFIG: true
+      DISABLE_SECURITY_PLUGIN: true # disable security plugin only for demo
+      OPENSEARCH_JAVA_OPTS: "-Xms1g -Xmx4g"
+
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    ports:
+      - 9200:9200
+      - 9600:9600 # required for Performance Analyzer
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    networks:
+      - opensearch-net
+
+  opensearch-ccs-node:
+    image: opensearch/opensearch:3.1.0
+    container_name: opensearch-ccs-node
+    environment:
+      - cluster.name=opensearch-ccs-cluster
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - DISABLE_INSTALL_DEMO_CONFIG=true
+      - DISABLE_SECURITY_PLUGIN=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - opensearch-css-data:/usr/share/opensearch/data
+    ports:
+      - 9250:9200
+      - 9800:9600 # required for Performance Analyzer
+    networks:
+      - opensearch-net
+
+volumes:
+  opensearch-data:
+  opensearch-css-data:
+
+networks:
+  opensearch-net:
+```
+2. run command `docker compose up` to spin up the containers
 3. run `docker ps` to make sure all containers are up
 ```
 // example
