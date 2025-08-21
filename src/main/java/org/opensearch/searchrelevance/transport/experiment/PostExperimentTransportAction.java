@@ -137,14 +137,7 @@ public class PostExperimentTransportAction extends HandledTransportAction<PostEx
                 .map(id -> searchConfigurationDao.getSearchConfigurationSync(id))
                 .collect(Collectors.toList());
 
-            if (searchConfigurations.size() != 1) {
-                throw new Exception("Must have exactly one search configuration. Had " + searchConfigurations.size() + " size.");
-            }
             String searchConfigurationId = searchConfigurations.get(0).id();
-
-            if (request.getJudgmentList().size() != 1) {
-                throw new Exception("Must have exactly one judgment list. Had " + request.getJudgmentList().size() + " size.");
-            }
 
             processExperiment(experimentId, request, searchConfigurationId);
         } catch (Exception e) {

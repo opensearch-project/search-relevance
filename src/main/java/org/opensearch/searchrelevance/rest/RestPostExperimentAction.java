@@ -62,9 +62,16 @@ public class RestPostExperimentAction extends BaseRestHandler {
 
         String querySetId = (String) source.get("querySetId");
         List<String> searchConfigurationList = ParserUtils.convertObjToList(source, "searchConfigurationList");
+        if (searchConfigurationList.size() != 1) {
+            throw new IOException("Must have exactly one search configuration. Had " + searchConfigurationList.size() + " size.");
+        }
         Integer sizeObj = (Integer) source.get("size");
         int size = sizeObj != null ? sizeObj.intValue() : 10; // Default size to 10 if not provided
+
         List<String> judgmentList = ParserUtils.convertObjToList(source, "judgmentList");
+        if (judgmentList.size() != 1) {
+            throw new IOException("Must have exactly one judgment list. Had " + judgmentList.size() + " size.");
+        }
 
         List<Map<String, Object>> evaluationResultList = ParserUtils.convertObjToListOfMaps(source, "evaluationResultList");
         String typeString = (String) source.get("type");
