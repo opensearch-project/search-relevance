@@ -1,6 +1,11 @@
-# Example of a large dataset!
-# You must update the values in it first to match
-# what is in SRW already. 
+# Example of importing an externally run evaluation into SRW
+# 
+# You must update the values below to match entities in SRW already: 
+# 
+# querySetId should be ESCI Queries
+# searchConfigurationList should point to a "External Search Configuration", leave placeholders for required values
+# judgmentList should be ESCI Judgements.  Do a find and replace as it shows up multiple levels.
+# 
 # curl -s -X POST "localhost:9200/_plugins/_search_relevance/experiments" \
 # -H "Content-type: application/json" \
 # -d @../data-esci/esci_us_external_experiment.json
