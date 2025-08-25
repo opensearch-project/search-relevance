@@ -18,7 +18,7 @@ for item in movie_data.get("queries", []):
         doc_id = doc.get("doc_id", "")
         rating = {
           "docId": doc.get("doc_id", ""),
-          "rating": doc.get("rating", 0)
+          "rating": str(doc.get("rating", 0))
         }
         
         ratings.append(rating)
