@@ -67,7 +67,7 @@ public class ImportJudgmentsProcessor implements BaseJudgmentsProcessor {
             // Process each document's rating
             for (Map<String, Object> ratingInfo : ratingsList) {
                 String docId = (String) ratingInfo.get("docId");
-                String rating = (String) ratingInfo.get("rating");
+                String rating = String.valueOf(ratingInfo.get("rating"));
 
                 if (docId == null || docId.isEmpty()) {
                     listener.onFailure(
