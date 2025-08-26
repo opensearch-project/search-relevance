@@ -59,10 +59,11 @@ public class ImportJudgmentsProcessor implements BaseJudgmentsProcessor {
                 return;
             }
 
-            Map<String, String> docRatings = new HashMap<>();
-
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> ratingsList = (List<Map<String, Object>>) ratingData;
+
+            // Create a list to store document ratings in the original order
+            List<Map<String, String>> docIdRatings = new ArrayList<>();
 
             // Process each document's rating
             for (Map<String, Object> ratingInfo : ratingsList) {
@@ -96,16 +97,13 @@ public class ImportJudgmentsProcessor implements BaseJudgmentsProcessor {
                     return;
                 }
 
-                docRatings.put(docId, rating);
+                // Add the rating directly to the list in the original order
+                docIdRatings.add(Map.of("docId", docId, "rating", rating));
             }
 
             // Add the formatted ratings for this query
             Map<String, Object> queryRatings = new HashMap<>();
             queryRatings.put("query", queryText);
-            List<Map<String, String>> docIdRatings = docRatings.entrySet()
-                .stream()
-                .map(entry -> Map.of("docId", entry.getKey(), "rating", entry.getValue()))
-                .toList();
             queryRatings.put("ratings", docIdRatings);
             formattedRatings.add(queryRatings);
         }
