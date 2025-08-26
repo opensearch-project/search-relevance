@@ -68,7 +68,7 @@ public class ImportJudgmentsProcessor implements BaseJudgmentsProcessor {
             // Process each document's rating
             for (Map<String, Object> ratingInfo : ratingsList) {
                 String docId = (String) ratingInfo.get("docId");
-                String rating = String.valueOf(ratingInfo.get("rating"));
+                Object ratingObj = ratingInfo.get("rating");
 
                 if (docId == null || docId.isEmpty()) {
                     listener.onFailure(
@@ -79,12 +79,14 @@ public class ImportJudgmentsProcessor implements BaseJudgmentsProcessor {
                     );
                     return;
                 }
-                if (rating == null) {
+                if (ratingObj == null) {
                     listener.onFailure(
                         new SearchRelevanceException("rating for queryText " + queryText + " must not be null", RestStatus.BAD_REQUEST)
                     );
                     return;
                 }
+
+                String rating = String.valueOf(ratingObj);
                 try {
                     Float.parseFloat(rating);
                 } catch (NumberFormatException e) {
