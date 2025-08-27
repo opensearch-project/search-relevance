@@ -10,7 +10,8 @@ package org.opensearch.searchrelevance.rest;
 import static java.util.Collections.singletonList;
 import static org.opensearch.rest.RestRequest.Method.DELETE;
 import static org.opensearch.searchrelevance.common.PluginConstants.DOCUMENT_ID;
-import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_EXPERIMENT_URL;
+import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_EXPERIMENT_URL_PREFIX;
+import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_EXPERIMENT_URL_SUFFIX;
 
 import java.io.IOException;
 import java.util.List;
@@ -52,7 +53,12 @@ public class RestDeleteScheduledExperimentAction extends BaseRestHandler {
 
     @Override
     public List<Route> routes() {
-        return singletonList(new Route(DELETE, String.format(Locale.ROOT, "%s/{%s}", SCHEDULED_EXPERIMENT_URL, DOCUMENT_ID)));
+        return singletonList(
+            new Route(
+                DELETE,
+                String.format(Locale.ROOT, "%s/{%s}%s", SCHEDULED_EXPERIMENT_URL_PREFIX, DOCUMENT_ID, SCHEDULED_EXPERIMENT_URL_SUFFIX)
+            )
+        );
     }
 
     @Override

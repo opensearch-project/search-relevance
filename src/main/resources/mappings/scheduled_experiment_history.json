@@ -1,0 +1,21 @@
+{
+  "properties": {
+    "id": { "type": "keyword" },
+    "experimentId": { "type": "keyword" },
+    "jobId": {
+      "type": "keyword"
+    },
+    "jobIndexName": {
+      "type": "keyword"
+    },
+    "startTime": {
+      "type": "date",
+      "format": "strict_date_time"
+    },
+    "endTime": {
+      "type": "date",
+      "format": "strict_date_time"
+    },
+    "results": { "type": "object", "dynamic": false }
+  }
+}

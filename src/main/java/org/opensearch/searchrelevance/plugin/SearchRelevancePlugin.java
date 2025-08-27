@@ -57,6 +57,7 @@ import org.opensearch.searchrelevance.dao.ExperimentVariantDao;
 import org.opensearch.searchrelevance.dao.JudgmentCacheDao;
 import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
+import org.opensearch.searchrelevance.dao.ScheduledExperimentHistoryDao;
 import org.opensearch.searchrelevance.dao.ScheduledJobsDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
 import org.opensearch.searchrelevance.executors.ExperimentTaskManager;
@@ -147,6 +148,7 @@ public class SearchRelevancePlugin extends Plugin
     private EvaluationResultDao evaluationResultDao;
     private JudgmentCacheDao judgmentCacheDao;
     private ScheduledJobsDao scheduledJobsDao;
+    private ScheduledExperimentHistoryDao scheduledExperimentHistoryDao;
     private MLAccessor mlAccessor;
     private MetricsHelper metricsHelper;
     private SearchRelevanceSettingsAccessor settingsAccessor;
@@ -186,6 +188,7 @@ public class SearchRelevancePlugin extends Plugin
         this.evaluationResultDao = new EvaluationResultDao(searchRelevanceIndicesManager);
         this.judgmentCacheDao = new JudgmentCacheDao(searchRelevanceIndicesManager);
         this.scheduledJobsDao = new ScheduledJobsDao(searchRelevanceIndicesManager);
+        this.scheduledExperimentHistoryDao = new ScheduledExperimentHistoryDao(searchRelevanceIndicesManager);
         MachineLearningNodeClient mlClient = new MachineLearningNodeClient(client);
         this.mlAccessor = new MLAccessor(mlClient);
         SearchRelevanceExecutor.initialize(threadPool);
@@ -206,6 +209,7 @@ public class SearchRelevancePlugin extends Plugin
         jobRunner.setExperimentDao(experimentDao);
         jobRunner.setQuerySetDao(querySetDao);
         jobRunner.setSearchConfigurationDao(searchConfigurationDao);
+        jobRunner.setScheduledExperimentHistoryDao(scheduledExperimentHistoryDao);
         jobRunner.setMetricsHelper(metricsHelper);
         jobRunner.setHybridOptimizerExperimentProcessor(new HybridOptimizerExperimentProcessor(judgmentDao, experimentTaskManager));
         jobRunner.setPointwiseExperimentProcessor(new PointwiseExperimentProcessor(judgmentDao, experimentTaskManager));
@@ -220,6 +224,7 @@ public class SearchRelevancePlugin extends Plugin
             evaluationResultDao,
             judgmentCacheDao,
             scheduledJobsDao,
+            scheduledExperimentHistoryDao,
             mlAccessor,
             metricsHelper,
             infoStatsManager,

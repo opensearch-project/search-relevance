@@ -29,6 +29,7 @@ import org.opensearch.jobscheduler.spi.ScheduledJobRunner;
 import org.opensearch.jobscheduler.spi.utils.LockService;
 import org.opensearch.searchrelevance.dao.ExperimentDao;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
+import org.opensearch.searchrelevance.dao.ScheduledExperimentHistoryDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.experiment.HybridOptimizerExperimentProcessor;
@@ -67,6 +68,7 @@ public class SearchRelevanceJobRunner implements ScheduledJobRunner {
     private ExperimentDao experimentDao;
     private QuerySetDao querySetDao;
     private SearchConfigurationDao searchConfigurationDao;
+    private ScheduledExperimentHistoryDao scheduledExperimentHistoryDao;
     private MetricsHelper metricsHelper;
     private HybridOptimizerExperimentProcessor hybridOptimizerExperimentProcessor;
     private PointwiseExperimentProcessor pointwiseExperimentProcessor;
@@ -93,6 +95,10 @@ public class SearchRelevanceJobRunner implements ScheduledJobRunner {
 
     public void setSearchConfigurationDao(SearchConfigurationDao searchConfigurationDao) {
         this.searchConfigurationDao = searchConfigurationDao;
+    }
+
+    public void setScheduledExperimentHistoryDao(ScheduledExperimentHistoryDao scheduledExperimentHistoryDao) {
+        this.scheduledExperimentHistoryDao = scheduledExperimentHistoryDao;
     }
 
     public void setMetricsHelper(MetricsHelper metricsHelper) {
@@ -151,6 +157,9 @@ public class SearchRelevanceJobRunner implements ScheduledJobRunner {
                         experimentDao.getExperiment(experimentId, ActionListener.wrap(experimentResponse -> {
                             try {
                                 Experiment experiment = convertToExperiment(experimentResponse);
+                                String startTime = TimeUtils.getTimestamp();
+                                // What I will do here is add a new request parameter to replace the Experiment object so I can store the id of the running experiment to record the end time when finished.
+                                
                                 // First, get QuerySet asynchronously
                                 querySetDao.getQuerySet(experiment.querySetId(), ActionListener.wrap(querySetResponse -> {
                                     try {

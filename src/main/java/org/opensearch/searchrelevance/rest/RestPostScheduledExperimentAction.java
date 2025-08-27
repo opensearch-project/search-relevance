@@ -11,7 +11,8 @@ import static java.util.Collections.singletonList;
 import static org.opensearch.rest.RestRequest.Method.POST;
 import static org.opensearch.searchrelevance.common.PluginConstants.CRON_EXPRESSION;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_ID;
-import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_EXPERIMENT_URL;
+import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_EXPERIMENT_URL_PREFIX;
+import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_EXPERIMENT_URL_SUFFIX;
 
 import java.io.IOException;
 import java.util.List;
@@ -50,7 +51,7 @@ public class RestPostScheduledExperimentAction extends BaseRestHandler {
 
     @Override
     public List<Route> routes() {
-        return singletonList(new Route(POST, SCHEDULED_EXPERIMENT_URL));
+        return singletonList(new Route(POST, SCHEDULED_EXPERIMENT_URL_PREFIX + SCHEDULED_EXPERIMENT_URL_SUFFIX));
     }
 
     @Override
