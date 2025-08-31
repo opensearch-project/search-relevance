@@ -8,7 +8,6 @@
 package org.opensearch.searchrelevance.transport.scheduledJob;
 
 import java.time.ZoneId;
-import java.util.UUID;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -56,7 +55,7 @@ public class PostScheduledExperimentTransportAction extends HandledTransportActi
             String experimentId = request.getExperimentId();
             String cronExpression = request.getCronExpression();
             Schedule schedule = new CronSchedule(cronExpression, ZoneId.systemDefault());
-            String id = UUID.randomUUID().toString();
+            String id = experimentId; // Since there is at most 1 scheduled job per experiment, the ids could be the same.
             SearchRelevanceJobParameters jobParameter = new SearchRelevanceJobParameters(
                 id,
                 "experiment-parameters",

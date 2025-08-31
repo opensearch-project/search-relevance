@@ -8,14 +8,11 @@
     "jobIndexName": {
       "type": "keyword"
     },
-    "startTime": {
+    "timestamp": {
       "type": "date",
       "format": "strict_date_time"
     },
-    "endTime": {
-      "type": "date",
-      "format": "strict_date_time"
-    },
-    "results": { "type": "object", "dynamic": false }
+    "status": { "type": "keyword" },
+    "results": { "type": "object"}
   }
 }

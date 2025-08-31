@@ -47,11 +47,14 @@ import org.opensearch.searchrelevance.dao.ExperimentVariantDao;
 import org.opensearch.searchrelevance.dao.JudgmentCacheDao;
 import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
+import org.opensearch.searchrelevance.dao.ScheduledExperimentHistoryDao;
+import org.opensearch.searchrelevance.dao.ScheduledJobsDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
 import org.opensearch.searchrelevance.executors.ExperimentTaskManager;
 import org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager;
 import org.opensearch.searchrelevance.metrics.MetricsHelper;
 import org.opensearch.searchrelevance.ml.MLAccessor;
+import org.opensearch.searchrelevance.scheduler.SearchRelevanceJobRunner;
 import org.opensearch.searchrelevance.stats.info.InfoStatsManager;
 import org.opensearch.searchrelevance.transport.experiment.DeleteExperimentAction;
 import org.opensearch.searchrelevance.transport.experiment.GetExperimentAction;
@@ -106,10 +109,13 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
         JudgmentDao.class,
         EvaluationResultDao.class,
         JudgmentCacheDao.class,
+        ScheduledJobsDao.class,
+        ScheduledExperimentHistoryDao.class,
         MLAccessor.class,
         MetricsHelper.class,
         InfoStatsManager.class,
-        ExperimentTaskManager.class
+        ExperimentTaskManager.class,
+        SearchRelevanceJobRunner.class
     );
 
     @Override
@@ -182,7 +188,7 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
     }
 
     public void testTotalRestHandlers() {
-        assertEquals(14, plugin.getRestHandlers(Settings.EMPTY, null, null, null, null, null, null).size());
+        assertEquals(17, plugin.getRestHandlers(Settings.EMPTY, null, null, null, null, null, null).size());
     }
 
     public void testQuerySetTransportIsAdded() {

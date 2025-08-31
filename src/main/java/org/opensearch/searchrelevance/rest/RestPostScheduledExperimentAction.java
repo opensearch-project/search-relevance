@@ -30,6 +30,8 @@ import org.opensearch.rest.RestRequest;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.searchrelevance.transport.scheduledJob.PostScheduledExperimentAction;
 import org.opensearch.searchrelevance.transport.scheduledJob.PostScheduledExperimentRequest;
+import org.opensearch.searchrelevance.utils.CronUtils;
+import org.opensearch.searchrelevance.utils.CronUtils.CronValidationResult;
 import org.opensearch.transport.client.node.NodeClient;
 
 import lombok.AllArgsConstructor;
@@ -64,6 +66,16 @@ public class RestPostScheduledExperimentAction extends BaseRestHandler {
 
         String experimentId = (String) source.get(EXPERIMENT_ID);
         String cronExpression = (String) source.get(CRON_EXPRESSION);
+
+        if (experimentId == null || experimentId.equals("")) {
+            throw new IllegalArgumentException("Invalid or missing experiment Id");
+        }
+
+        CronValidationResult validationResult = CronUtils.validateCron(cronExpression);
+
+        if (validationResult.isValid() == false) {
+            throw new IllegalArgumentException(validationResult.getErrorMessage());
+        }
 
         PostScheduledExperimentRequest createRequest = new PostScheduledExperimentRequest(experimentId, cronExpression);
         return channel -> client.execute(PostScheduledExperimentAction.INSTANCE, createRequest, new ActionListener<IndexResponse>() {

@@ -1,3 +1,10 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The OpenSearch Contributors require contributions made to
+ * this file be licensed under the Apache-2.0 license or a
+ * compatible open source license.
+ */
 package org.opensearch.searchrelevance.model;
 
 import java.io.IOException;
@@ -17,16 +24,16 @@ public class ScheduledExperimentResult implements ToXContentObject {
     public static final String EXPERIMENT_ID_FIELD = "experimentId";
     public static final String JOB_ID_FIELD = "jobId";
     public static final String JOB_INDEX_NAME_FIELD = "jobIndexName";
-    public static final String START_TIME_FIELD = "startTime";
-    public static final String END_TIME_FIELD = "endTime";
-    public static final String RESULTS_FIELD = "indexNameToWatch";
+    public static final String TIMESTAMP_FIELD = "timestamp";
+    public static final String STATUS = "status";
+    public static final String RESULTS_FIELD = "results";
 
     private final String id;
     private final String experimentId;
     private final String jobId;
     private final String jobIndexName;
-    private final String startTime;
-    private final String endTime;
+    private final String timestamp;
+    private final AsyncStatus status;
     private final List<Map<String, Object>> results;
 
     @Override
@@ -34,14 +41,11 @@ public class ScheduledExperimentResult implements ToXContentObject {
         builder.startObject();
         builder.field(ID_FIELD, this.id)
             .field(EXPERIMENT_ID_FIELD, this.experimentId)
-            .field(JOB_ID_FIELD, this.jobId);
-        if (this.startTime != null) {
-            builder.field(START_TIME_FIELD, this.startTime);
-        }
-        if (this.endTime != null) {
-            builder.field(END_TIME_FIELD, this.endTime);
-        }
-        builder.field(RESULTS_FIELD, this.results);
+            .field(JOB_ID_FIELD, this.jobId)
+            .field(JOB_INDEX_NAME_FIELD, this.jobIndexName)
+            .field(TIMESTAMP_FIELD, this.timestamp)
+            .field(STATUS, this.status.name())
+            .field(RESULTS_FIELD, this.results);
         builder.endObject();
         return builder;
     }

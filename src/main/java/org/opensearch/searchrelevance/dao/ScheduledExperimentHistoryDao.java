@@ -1,3 +1,10 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The OpenSearch Contributors require contributions made to
+ * this file be licensed under the Apache-2.0 license or a
+ * compatible open source license.
+ */
 package org.opensearch.searchrelevance.dao;
 
 import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.SCHEDULED_EXPERIMENT_HISTORY;
@@ -90,7 +97,9 @@ public class ScheduledExperimentHistoryDao {
      */
     public SearchResponse getScheduledExperimentResult(String scheduledExperimentResultId, ActionListener<SearchResponse> listener) {
         if (scheduledExperimentResultId == null || scheduledExperimentResultId.isEmpty()) {
-            listener.onFailure(new SearchRelevanceException("scheduledExperimentResultId must not be null or empty", RestStatus.BAD_REQUEST));
+            listener.onFailure(
+                new SearchRelevanceException("scheduledExperimentResultId must not be null or empty", RestStatus.BAD_REQUEST)
+            );
             return null;
         }
         return searchRelevanceIndicesManager.getDocByDocId(scheduledExperimentResultId, SCHEDULED_EXPERIMENT_HISTORY, listener);

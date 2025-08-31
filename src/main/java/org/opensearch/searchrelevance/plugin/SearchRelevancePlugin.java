@@ -77,6 +77,7 @@ import org.opensearch.searchrelevance.rest.RestDeleteSearchConfigurationAction;
 import org.opensearch.searchrelevance.rest.RestGetExperimentAction;
 import org.opensearch.searchrelevance.rest.RestGetJudgmentAction;
 import org.opensearch.searchrelevance.rest.RestGetQuerySetAction;
+import org.opensearch.searchrelevance.rest.RestGetScheduledExperimentAction;
 import org.opensearch.searchrelevance.rest.RestGetSearchConfigurationAction;
 import org.opensearch.searchrelevance.rest.RestPostScheduledExperimentAction;
 import org.opensearch.searchrelevance.rest.RestPutExperimentAction;
@@ -259,7 +260,8 @@ public class SearchRelevancePlugin extends Plugin
             new RestDeleteExperimentAction(settingsAccessor),
             new RestSearchRelevanceStatsAction(settingsAccessor, clusterUtil),
             new RestPostScheduledExperimentAction(settingsAccessor),
-            new RestDeleteScheduledExperimentAction(settingsAccessor)
+            new RestDeleteScheduledExperimentAction(settingsAccessor),
+            new RestGetScheduledExperimentAction(settingsAccessor)
         );
     }
 

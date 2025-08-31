@@ -14,6 +14,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
@@ -39,6 +40,7 @@ import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.Experiment;
 import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.model.QuerySet;
+import org.opensearch.searchrelevance.model.ScheduledExperimentResult;
 import org.opensearch.searchrelevance.model.SearchConfiguration;
 import org.opensearch.searchrelevance.model.SearchConfigurationDetails;
 import org.opensearch.searchrelevance.utils.TimeUtils;
@@ -129,6 +131,18 @@ public class SearchRelevanceJobRunner implements ScheduledJobRunner {
             throw new IllegalStateException("Experiment dao is not initialized.");
         }
 
+        if (this.querySetDao == null) {
+            throw new IllegalStateException("Query set dao is not initialized.");
+        }
+
+        if (this.searchConfigurationDao == null) {
+            throw new IllegalStateException("Search configurations dao is not initialized.");
+        }
+
+        if (this.scheduledExperimentHistoryDao == null) {
+            throw new IllegalStateException("Scheduled experiment dao is not initialized.");
+        }
+
         if (this.metricsHelper == null) {
             throw new IllegalStateException("Metrics helper is not initialized.");
         }
@@ -143,6 +157,9 @@ public class SearchRelevanceJobRunner implements ScheduledJobRunner {
 
         final LockService lockService = context.getLockService();
 
+        // TODO: A lot of the logic here is reused from PutTransportExperiment.
+        // Eventually we have to abstract it in another class to reduce complexity.
+
         Runnable runnable = () -> {
             if (jobParameter.getLockDurationSeconds() != null) {
                 lockService.acquireLock(jobParameter, context, ActionListener.wrap(lock -> {
@@ -150,34 +167,58 @@ public class SearchRelevanceJobRunner implements ScheduledJobRunner {
                         return;
                     }
                     SearchRelevanceJobParameters parameter = (SearchRelevanceJobParameters) jobParameter;
-                    log.info(parameter.getExperimentId());
                     String experimentId = parameter.getExperimentId();
                     try {
                         // Retrieve experiment
                         experimentDao.getExperiment(experimentId, ActionListener.wrap(experimentResponse -> {
                             try {
                                 Experiment experiment = convertToExperiment(experimentResponse);
-                                String startTime = TimeUtils.getTimestamp();
-                                // What I will do here is add a new request parameter to replace the Experiment object so I can store the id of the running experiment to record the end time when finished.
-                                
-                                // First, get QuerySet asynchronously
-                                querySetDao.getQuerySet(experiment.querySetId(), ActionListener.wrap(querySetResponse -> {
-                                    try {
-                                        QuerySet querySet = convertToQuerySet(querySetResponse);
-                                        List<String> queryTextWithReferences = querySet.querySetQueries()
-                                            .stream()
-                                            .map(e -> e.queryText())
-                                            .collect(Collectors.toList());
+                                String timestamp = TimeUtils.getTimestamp();
+                                String scheduledExperimentResultId = UUID.randomUUID().toString();
+                                // What I will do here is add a new request parameter to replace the Experiment object so I can store the id
+                                // of the running experiment to record the end time when finished.
+                                ScheduledExperimentResult scheduledExperimentResult = new ScheduledExperimentResult(
+                                    scheduledExperimentResultId,
+                                    experimentId,
+                                    experimentId,
+                                    parameter.getIndexToWatch(),
+                                    timestamp,
+                                    AsyncStatus.PROCESSING,
+                                    null
+                                );
+                                PutScheduledExperimentRequest request = new PutScheduledExperimentRequest(
+                                    experiment.type(),
+                                    parameter.getIndexToWatch(),
+                                    experiment.querySetId(),
+                                    scheduledExperimentResultId,
+                                    experiment.searchConfigurationList(),
+                                    experiment.judgmentList(),
+                                    experiment.size()
+                                );
+                                scheduledExperimentHistoryDao.putScheduledExperimentResult(
+                                    scheduledExperimentResult,
+                                    ActionListener.wrap(response -> {
+                                        // First, get QuerySet asynchronously
+                                        querySetDao.getQuerySet(experiment.querySetId(), ActionListener.wrap(querySetResponse -> {
+                                            try {
+                                                QuerySet querySet = convertToQuerySet(querySetResponse);
+                                                List<String> queryTextWithReferences = querySet.querySetQueries()
+                                                    .stream()
+                                                    .map(e -> e.queryText())
+                                                    .collect(Collectors.toList());
 
-                                        // Then get SearchConfigurations asynchronously
-                                        fetchSearchConfigurationsAsync(experimentId, experiment, queryTextWithReferences);
-                                    } catch (Exception e) {
-                                        handleAsyncFailure(experimentId, experiment, "Failed to process QuerySet", e);
-                                    }
-                                }, e -> { handleAsyncFailure(experimentId, experiment, "Failed to fetch QuerySet", e); }));
-
-                            } catch (Exception e) {}
-                        }, e -> {}));
+                                                // Then get SearchConfigurations asynchronously
+                                                fetchSearchConfigurationsAsync(experimentId, request, queryTextWithReferences);
+                                            } catch (Exception e) {
+                                                handleAsyncFailure(experimentId, request, "Failed to process QuerySet", e);
+                                            }
+                                        }, e -> { handleAsyncFailure(experimentId, request, "Failed to fetch QuerySet", e); }));
+                                    }, e -> { handleAsyncFailure(experimentId, request, "Failed to put ScheduledExperimentResult", e); })
+                                );
+                            } catch (Exception e) {
+                                log.error("Scheduled experiment result for: {} cannot be added.", experimentId);
+                            }
+                        }, e -> { log.error("Experiment id: {} is not found.", experimentId); }));
                     } catch (Exception e) {
                         throw new IllegalStateException("Experiment not found.");
                     }
@@ -194,12 +235,16 @@ public class SearchRelevanceJobRunner implements ScheduledJobRunner {
         threadPool.generic().submit(runnable);
     }
 
-    private void fetchSearchConfigurationsAsync(String experimentId, Experiment experiment, List<String> queryTextWithReferences) {
+    private void fetchSearchConfigurationsAsync(
+        String experimentId,
+        PutScheduledExperimentRequest request,
+        List<String> queryTextWithReferences
+    ) {
         Map<String, SearchConfigurationDetails> searchConfigurations = new HashMap<>();
-        AtomicInteger pendingConfigs = new AtomicInteger(experiment.searchConfigurationList().size());
+        AtomicInteger pendingConfigs = new AtomicInteger(request.getSearchConfigurationList().size());
         AtomicBoolean hasFailure = new AtomicBoolean(false);
 
-        for (String configId : experiment.searchConfigurationList()) {
+        for (String configId : request.getSearchConfigurationList()) {
             searchConfigurationDao.getSearchConfiguration(configId, ActionListener.wrap(searchConfigResponse -> {
                 try {
                     if (hasFailure.get()) return;
@@ -227,23 +272,23 @@ public class SearchRelevanceJobRunner implements ScheduledJobRunner {
 
                         executeExperimentEvaluation(
                             experimentId,
-                            experiment,
+                            request,
                             searchConfigurations,
                             queryTextWithReferences,
                             finalResults,
                             pendingQueries,
                             hasFailure,
-                            experiment.judgmentList()
+                            request.getJudgmentList()
                         );
                     }
                 } catch (Exception e) {
                     if (hasFailure.compareAndSet(false, true)) {
-                        handleAsyncFailure(experimentId, experiment, "Failed to process SearchConfiguration", e);
+                        handleAsyncFailure(experimentId, request, "Failed to process SearchConfiguration", e);
                     }
                 }
             }, e -> {
                 if (hasFailure.compareAndSet(false, true)) {
-                    handleAsyncFailure(experimentId, experiment, "Failed to fetch SearchConfiguration: " + configId, e);
+                    handleAsyncFailure(experimentId, request, "Failed to fetch SearchConfiguration: " + configId, e);
                 }
             }));
         }
@@ -251,7 +296,7 @@ public class SearchRelevanceJobRunner implements ScheduledJobRunner {
 
     private void executeExperimentEvaluation(
         String experimentId,
-        Experiment experiment,
+        PutScheduledExperimentRequest request,
         Map<String, SearchConfigurationDetails> searchConfigurations,
         List<String> queryTexts,
         List<Map<String, Object>> finalResults,
@@ -264,11 +309,11 @@ public class SearchRelevanceJobRunner implements ScheduledJobRunner {
                 return;
             }
 
-            if (experiment.type() == ExperimentType.PAIRWISE_COMPARISON) {
+            if (request.getType() == ExperimentType.PAIRWISE_COMPARISON) {
                 metricsHelper.processPairwiseMetrics(
                     queryText,
                     searchConfigurations,
-                    experiment.size(),
+                    request.getSize(),
                     ActionListener.wrap(
                         queryResults -> handleQueryResults(
                             queryText,
@@ -276,21 +321,21 @@ public class SearchRelevanceJobRunner implements ScheduledJobRunner {
                             finalResults,
                             pendingQueries,
                             experimentId,
-                            experiment,
+                            request,
                             hasFailure,
                             judgmentList
                         ),
-                        error -> handleFailure(error, hasFailure, experimentId, experiment)
+                        error -> handleFailure(error, hasFailure, experimentId, request)
                     )
                 );
-            } else if (experiment.type() == ExperimentType.HYBRID_OPTIMIZER) {
+            } else if (request.getType() == ExperimentType.HYBRID_OPTIMIZER) {
                 // Use our task manager implementation for hybrid optimizer
                 hybridOptimizerExperimentProcessor.processHybridOptimizerExperiment(
                     experimentId,
                     queryText,
                     searchConfigurations,
                     judgmentList,
-                    experiment.size(),
+                    request.getSize(),
                     hasFailure,
                     ActionListener.wrap(
                         queryResults -> handleQueryResults(
@@ -299,20 +344,20 @@ public class SearchRelevanceJobRunner implements ScheduledJobRunner {
                             finalResults,
                             pendingQueries,
                             experimentId,
-                            experiment,
+                            request,
                             hasFailure,
                             judgmentList
                         ),
-                        error -> handleFailure(error, hasFailure, experimentId, experiment)
+                        error -> handleFailure(error, hasFailure, experimentId, request)
                     )
                 );
-            } else if (experiment.type() == ExperimentType.POINTWISE_EVALUATION) {
+            } else if (request.getType() == ExperimentType.POINTWISE_EVALUATION) {
                 pointwiseExperimentProcessor.processPointwiseExperiment(
                     experimentId,
                     queryText,
                     searchConfigurations,
                     judgmentList,
-                    experiment.size(),
+                    request.getSize(),
                     hasFailure,
                     ActionListener.wrap(
                         queryResults -> handleQueryResults(
@@ -321,15 +366,15 @@ public class SearchRelevanceJobRunner implements ScheduledJobRunner {
                             finalResults,
                             pendingQueries,
                             experimentId,
-                            experiment,
+                            request,
                             hasFailure,
                             judgmentList
                         ),
-                        error -> handleFailure(error, hasFailure, experimentId, experiment)
+                        error -> handleFailure(error, hasFailure, experimentId, request)
                     )
                 );
             } else {
-                throw new SearchRelevanceException("Unknown experimentType" + experiment.type(), RestStatus.BAD_REQUEST);
+                throw new SearchRelevanceException("Unknown experimentType" + request.getType(), RestStatus.BAD_REQUEST);
             }
         }
     }
@@ -340,7 +385,7 @@ public class SearchRelevanceJobRunner implements ScheduledJobRunner {
         List<Map<String, Object>> finalResults,
         AtomicInteger pendingQueries,
         String experimentId,
-        Experiment experiment,
+        PutScheduledExperimentRequest request,
         AtomicBoolean hasFailure,
         List<String> judgmentList
     ) {
@@ -349,7 +394,7 @@ public class SearchRelevanceJobRunner implements ScheduledJobRunner {
         try {
             synchronized (finalResults) {
                 // Handle different response formats based on experiment type
-                if (experiment.type() == ExperimentType.HYBRID_OPTIMIZER) {
+                if (request.getType() == ExperimentType.HYBRID_OPTIMIZER) {
                     // For HYBRID_OPTIMIZER, the response contains searchConfigurationResults
                     List<Map<String, Object>> searchConfigResults = (List<Map<String, Object>>) queryResults.get(
                         "searchConfigurationResults"
@@ -361,7 +406,7 @@ public class SearchRelevanceJobRunner implements ScheduledJobRunner {
                             finalResults.add(resultWithQuery);
                         }
                     }
-                } else if (experiment.type() == ExperimentType.POINTWISE_EVALUATION) {
+                } else if (request.getType() == ExperimentType.POINTWISE_EVALUATION) {
                     // For POINTWISE_EVALUATION, the response contains results array
                     List<Map<String, Object>> pointwiseResults = (List<Map<String, Object>>) queryResults.get("results");
                     if (pointwiseResults != null) {
@@ -373,10 +418,39 @@ public class SearchRelevanceJobRunner implements ScheduledJobRunner {
                     queryResults.put(QUERY_TEXT, queryText);
                     finalResults.add(queryResults);
                 }
+
+                if (pendingQueries.decrementAndGet() == 0) {
+                    updateFinalExperiment(experimentId, request, finalResults, judgmentList);
+                }
             }
         } catch (Exception e) {
-            handleFailure(e, hasFailure, experimentId, experiment);
+            handleFailure(e, hasFailure, experimentId, request);
         }
+    }
+
+    private void updateFinalExperiment(
+        String experimentId,
+        PutScheduledExperimentRequest request,
+        List<Map<String, Object>> finalResults,
+        List<String> judgmentList
+    ) {
+        ScheduledExperimentResult finalExperiment = new ScheduledExperimentResult(
+            request.getScheduledExperimentResultId(),
+            experimentId,
+            experimentId,
+            request.getJobIndexName(),
+            TimeUtils.getTimestamp(),
+            AsyncStatus.COMPLETED,
+            finalResults
+        );
+
+        scheduledExperimentHistoryDao.updateScheduledExperimentResult(
+            finalExperiment,
+            ActionListener.wrap(
+                response -> log.debug("Updated completed scheduled experiment: {}", experimentId),
+                error -> handleAsyncFailure(experimentId, request, "Failed to update final experiment", error)
+            )
+        );
     }
 
     private Experiment convertToExperiment(SearchResponse response) {
@@ -446,32 +520,30 @@ public class SearchRelevanceJobRunner implements ScheduledJobRunner {
         );
     }
 
-    private void handleFailure(Exception error, AtomicBoolean hasFailure, String experimentId, Experiment experiment) {
+    private void handleFailure(Exception error, AtomicBoolean hasFailure, String experimentId, PutScheduledExperimentRequest request) {
         if (hasFailure.compareAndSet(false, true)) {
-            handleAsyncFailure(experimentId, experiment, "Failed to process metrics", error);
+            handleAsyncFailure(experimentId, request, "Failed to process metrics", error);
         }
     }
 
-    private void handleAsyncFailure(String experimentId, Experiment experiment, String message, Exception error) {
-        log.error(message + " for experiment: " + experimentId, error);
+    private void handleAsyncFailure(String experimentId, PutScheduledExperimentRequest request, String message, Exception error) {
+        log.error(message + " for scheduled experiment: " + experimentId, error);
 
-        Experiment errorExperiment = new Experiment(
+        ScheduledExperimentResult finalExperiment = new ScheduledExperimentResult(
+            request.getScheduledExperimentResultId(),
             experimentId,
+            experimentId,
+            request.getJobIndexName(),
             TimeUtils.getTimestamp(),
-            experiment.type(),
             AsyncStatus.ERROR,
-            experiment.querySetId(),
-            experiment.searchConfigurationList(),
-            experiment.judgmentList(),
-            experiment.size(),
-            List.of(Map.of("error", error.getMessage()))
+            null
         );
 
-        experimentDao.updateExperiment(
-            errorExperiment,
+        scheduledExperimentHistoryDao.updateScheduledExperimentResult(
+            finalExperiment,
             ActionListener.wrap(
-                response -> log.info("Updated experiment {} status to ERROR", experimentId),
-                e -> log.error("Failed to update error status for experiment: " + experimentId, e)
+                response -> log.info("Updated scheduled experiment {} status to ERROR", experimentId),
+                e -> log.error("Failed to update error status for scheduled experiment: " + experimentId, e)
             )
         );
     }
