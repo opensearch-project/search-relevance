@@ -13,6 +13,7 @@ import org.opensearch.action.ActionRequest;
 import org.opensearch.action.ActionRequestValidationException;
 import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.core.common.io.stream.StreamOutput;
+import org.opensearch.searchrelevance.utils.CronUtils;
 
 import reactor.util.annotation.NonNull;
 
@@ -33,6 +34,12 @@ public class PostScheduledExperimentRequest extends ActionRequest {
 
     @Override
     public ActionRequestValidationException validate() {
+        if ((experimentId == null) || (experimentId.equals(""))) {
+            return new ActionRequestValidationException();
+        }
+        if (CronUtils.validateCron(cronExpression).isValid() == false) {
+            return new ActionRequestValidationException();
+        }
         return null;
     }
 

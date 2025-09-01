@@ -112,6 +112,8 @@ import org.opensearch.searchrelevance.transport.queryset.PutQuerySetAction;
 import org.opensearch.searchrelevance.transport.queryset.PutQuerySetTransportAction;
 import org.opensearch.searchrelevance.transport.scheduledJob.DeleteScheduledExperimentAction;
 import org.opensearch.searchrelevance.transport.scheduledJob.DeleteScheduledExperimentTransportAction;
+import org.opensearch.searchrelevance.transport.scheduledJob.GetScheduledExperimentAction;
+import org.opensearch.searchrelevance.transport.scheduledJob.GetScheduledExperimentTransportAction;
 import org.opensearch.searchrelevance.transport.scheduledJob.PostScheduledExperimentAction;
 import org.opensearch.searchrelevance.transport.scheduledJob.PostScheduledExperimentTransportAction;
 import org.opensearch.searchrelevance.transport.searchConfiguration.DeleteSearchConfigurationAction;
@@ -283,7 +285,8 @@ public class SearchRelevancePlugin extends Plugin
             new ActionHandler<>(GetExperimentAction.INSTANCE, GetExperimentTransportAction.class),
             new ActionHandler<>(SearchRelevanceStatsAction.INSTANCE, SearchRelevanceStatsTransportAction.class),
             new ActionHandler<>(PostScheduledExperimentAction.INSTANCE, PostScheduledExperimentTransportAction.class),
-            new ActionHandler<>(DeleteScheduledExperimentAction.INSTANCE, DeleteScheduledExperimentTransportAction.class)
+            new ActionHandler<>(DeleteScheduledExperimentAction.INSTANCE, DeleteScheduledExperimentTransportAction.class),
+            new ActionHandler<>(GetScheduledExperimentAction.INSTANCE, GetScheduledExperimentTransportAction.class)
         );
     }
 
