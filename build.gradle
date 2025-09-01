@@ -306,6 +306,7 @@ ext.resolvePluginFile = { pluginId ->
         }
     }
 }
+def jobSchedulerFile = resolvePluginFile("opensearch-job-scheduler")
 def securityPluginFile = resolvePluginFile("opensearch-security")
 
 // === Setup security test ===
@@ -353,6 +354,7 @@ testClusters.integTest {
     if (securityEnabled) {
         plugin(provider(securityPluginFile))
     }
+    plugin(provider(jobSchedulerFile))
 
     nodes.each { node ->
 //        def plugins = node.plugins

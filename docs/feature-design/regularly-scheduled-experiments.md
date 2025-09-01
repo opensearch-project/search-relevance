@@ -1,4 +1,4 @@
-# Technical Design Template
+# Regularly Scheduled Experiments Feature Design
 
 ## Introduction
 
@@ -10,6 +10,7 @@ Currently, there is not a clean way to rerun search evaluations, given that the 
 
 **Key Problems:**
 - Users would have to rerun experiments manually to detect changes in the search quality
+- Experiment results might noe be consistent because the search algorithms and data can change and affect search quality.
 
 **Impact of Not Implementing:**
 - Users would not be able to automate a schedule for running evaluations
@@ -18,6 +19,8 @@ Currently, there is not a clean way to rerun search evaluations, given that the 
 **Primary Stakeholders**
 - Teams trying to track search quality overtime
 - Users tracking critical search metrics and ensuring they stay above a threshold
+- Teams trying to compare the impact of using one search algorithm over another
+- Users comparing metrics when migrating from a different search engine
 
 ## Use Cases
 
@@ -121,19 +124,19 @@ There should be 3 new APIS, GET, POST, DELETE. Additionally, the job runner and 
     "enabled": {
       "type": "boolean"
     },
-    "enabled_time": {
+    "enabledTime": {
       "type": "long"
     },
-    "experiment_id": {
+    "experimentId": {
       "type": "keyword"
     },
-    "index_name_to_watch": {
+    "indexNameToWatch": {
       "type": "keyword"
     },
-    "last_update_time": {
+    "lastUpdateTime": {
       "type": "long"
     },
-    "lock_duration_seconds": {
+    "lockDurationSeconds": {
       "type": "long"
     },
     "name": {
@@ -157,6 +160,29 @@ There should be 3 new APIS, GET, POST, DELETE. Additionally, the job runner and 
 }
 ```
 
+**New index for scheduled experiment results**
+
+```json
+{
+  "properties": {
+    "id": { "type": "keyword" },
+    "experimentId": { "type": "keyword" },
+    "jobId": {
+      "type": "keyword"
+    },
+    "jobIndexName": {
+      "type": "keyword"
+    },
+    "timestamp": {
+      "type": "date",
+      "format": "strict_date_time"
+    },
+    "status": { "type": "keyword" },
+    "results": { "type": "object"}
+  }
+}
+```
+
 **Job parameters schema**
 
 ```
@@ -174,29 +200,30 @@ private String experimentId;
 ### API Specification
 
 ```http
-POST /_plugins/_search_relevance/experiment/2bb07ecb-082a-4bab-b9c0-dc225e5c35ae/schedule
+POST /_plugins/_search_relevance/experiment/schedule
 Content-Type: application/json
 {
-    "cron_expression": "* * * * *"
+    "experimentId": "2bb07ecb-082a-4bab-b9c0-dc225e5c35ae"
+    "cronExpression": "* * * * *"
 }
 ```
 
 **Response:**
 ```json
 {
-  "job_id": "b79c4dbc-8a93-486f-bff9-d0b3648612a4",
+  "job_id": "2bb07ecb-082a-4bab-b9c0-dc225e5c35ae",
   "job_result": "CREATED"
 }
 ```
 
 ```http
-GET /_plugins/_search_relevance/experiment/schedule/b79c4dbc-8a93-486f-bff9-d0b3648612a4
+GET /_plugins/_search_relevance/experiment/2bb07ecb-082a-4bab-b9c0-dc225e5c35ae/schedule
 ```
 
 **Response:**
 ```json
 {
-  "id": "b79c4dbc-8a93-486f-bff9-d0b3648612a4",
+  "id": "2bb07ecb-082a-4bab-b9c0-dc225e5c35ae",
   "enabled": true,
   "enabled_time": 1755642736969,
   "experiment_id": "2bb07ecb-082a-4bab-b9c0-dc225e5c35ae",
@@ -214,14 +241,14 @@ GET /_plugins/_search_relevance/experiment/schedule/b79c4dbc-8a93-486f-bff9-d0b3
 ```
 
 ```http
-DELETE /_plugins/_search_relevance/experiment/b79c4dbc-8a93-486f-bff9-d0b3648612a4/schedule
+DELETE /_plugins/_search_relevance/experiment/2bb07ecb-082a-4bab-b9c0-dc225e5c35ae/schedule
 ```
 
 **Response**
 ```json
 {
   "_index": ".scheduled-jobs",
-  "_id": "b79c4dbc-8a93-486f-bff9-d0b3648612a4",
+  "_id": "2bb07ecb-082a-4bab-b9c0-dc225e5c35ae",
   "_version": 2,
   "result": "deleted",
   "forced_refresh": true,
