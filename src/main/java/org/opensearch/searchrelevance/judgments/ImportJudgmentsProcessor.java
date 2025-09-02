@@ -59,15 +59,16 @@ public class ImportJudgmentsProcessor implements BaseJudgmentsProcessor {
                 return;
             }
 
-            Map<String, String> docRatings = new HashMap<>();
-
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> ratingsList = (List<Map<String, Object>>) ratingData;
+
+            // Create a list to store document ratings in the original order
+            List<Map<String, String>> docIdRatings = new ArrayList<>();
 
             // Process each document's rating
             for (Map<String, Object> ratingInfo : ratingsList) {
                 String docId = (String) ratingInfo.get("docId");
-                String rating = (String) ratingInfo.get("rating");
+                Object ratingObj = ratingInfo.get("rating");
 
                 if (docId == null || docId.isEmpty()) {
                     listener.onFailure(
@@ -78,12 +79,14 @@ public class ImportJudgmentsProcessor implements BaseJudgmentsProcessor {
                     );
                     return;
                 }
-                if (rating == null) {
+                if (ratingObj == null) {
                     listener.onFailure(
                         new SearchRelevanceException("rating for queryText " + queryText + " must not be null", RestStatus.BAD_REQUEST)
                     );
                     return;
                 }
+
+                String rating = String.valueOf(ratingObj);
                 try {
                     Float.parseFloat(rating);
                 } catch (NumberFormatException e) {
@@ -96,16 +99,13 @@ public class ImportJudgmentsProcessor implements BaseJudgmentsProcessor {
                     return;
                 }
 
-                docRatings.put(docId, rating);
+                // Add the rating directly to the list in the original order
+                docIdRatings.add(Map.of("docId", docId, "rating", rating));
             }
 
             // Add the formatted ratings for this query
             Map<String, Object> queryRatings = new HashMap<>();
             queryRatings.put("query", queryText);
-            List<Map<String, String>> docIdRatings = docRatings.entrySet()
-                .stream()
-                .map(entry -> Map.of("docId", entry.getKey(), "rating", entry.getValue()))
-                .toList();
             queryRatings.put("ratings", docIdRatings);
             formattedRatings.add(queryRatings);
         }
