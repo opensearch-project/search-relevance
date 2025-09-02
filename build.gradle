@@ -307,6 +307,7 @@ ext.resolvePluginFile = { pluginId ->
     }
 }
 def securityPluginFile = resolvePluginFile("opensearch-security")
+def jobSchedulerFile = resolvePluginFile("opensearch-job-scheduler")
 
 // === Setup security test ===
 // This flag indicates the existence of security plugin
@@ -388,25 +389,7 @@ testClusters.integTest {
 
 // Set up integration test clusters, installs all zipArchive dependencies and Flow Framework
 testClusters.yamlRestTest {
-    // Installs all registered zipArchive dependencies on integTest cluster nodes except security
-    configurations.zipArchive.asFileTree.each {
-        plugin(provider(new Callable<RegularFile>(){
-            @Override
-            RegularFile call() throws Exception {
-                return new RegularFile() {
-                    @Override
-                    File getAsFile() {
-                        return it
-                    }
-                }
-            }
-        })
-        )
-
-    }
-
-     // Install Flow Framework Plugin on integTest cluster nodes
-    plugin(project.tasks.bundlePlugin.archiveFile)
+    plugin(provider(jobSchedulerFile))
 }
 
 // Re-write WaitForHttpResource with updated code to support security plugin use case

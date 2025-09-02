@@ -5,4 +5,4 @@
         h: component
 
   - match:
-      $body: /^opensearch-search-relevance\n$/
+      $body: /^opensearch-job-scheduler\nopensearch-search-relevance\n$/
