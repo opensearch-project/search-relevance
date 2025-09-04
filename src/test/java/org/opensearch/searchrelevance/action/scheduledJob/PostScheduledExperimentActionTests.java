@@ -24,15 +24,4 @@ public class PostScheduledExperimentActionTests extends OpenSearchTestCase {
         assertEquals("test_experiment_id", serialized.getExperimentId());
         assertEquals("12 * * * *", serialized.getCronExpression());
     }
-
-    public void testRequestValidation() {
-        PostScheduledExperimentRequest request = new PostScheduledExperimentRequest("test_experiment_id", "12 * * * *");
-        assertNull(request.validate());
-
-        request = new PostScheduledExperimentRequest("", "* * * * *");
-        assertNotNull(request.validate());
-
-        request = new PostScheduledExperimentRequest("", "162 * * * *");
-        assertNotNull(request.validate());
-    }
 }

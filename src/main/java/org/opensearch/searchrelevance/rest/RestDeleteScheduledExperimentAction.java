@@ -66,6 +66,9 @@ public class RestDeleteScheduledExperimentAction extends BaseRestHandler {
         if (!settingsAccessor.isWorkbenchEnabled()) {
             return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.FORBIDDEN, "Search Relevance Workbench is disabled"));
         }
+        if (!settingsAccessor.isScheduledExperimentsEnabled()) {
+            return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.FORBIDDEN, "Scheduled experiments is disabled"));
+        }
 
         // delete job parameter doc from index
         String jobId = request.param(DOCUMENT_ID);

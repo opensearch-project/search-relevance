@@ -11,6 +11,10 @@ import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_I
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_CACHE_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_JOBS_INDEX;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT;
+import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_CAPACITY;
+import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_ENABLED;
+import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_MINIMUM_INTERVAL;
+import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_TIMEOUT;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_STATS_ENABLED;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_WORKBENCH_ENABLED;
 
@@ -125,6 +129,7 @@ import org.opensearch.searchrelevance.transport.searchConfiguration.PutSearchCon
 import org.opensearch.searchrelevance.transport.stats.SearchRelevanceStatsAction;
 import org.opensearch.searchrelevance.transport.stats.SearchRelevanceStatsTransportAction;
 import org.opensearch.searchrelevance.utils.ClusterUtil;
+import org.opensearch.searchrelevance.utils.CronUtil;
 import org.opensearch.threadpool.ExecutorBuilder;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.client.Client;
@@ -156,6 +161,7 @@ public class SearchRelevancePlugin extends Plugin
     private MetricsHelper metricsHelper;
     private SearchRelevanceSettingsAccessor settingsAccessor;
     private ClusterUtil clusterUtil;
+    private CronUtil cronUtil;
     private InfoStatsManager infoStatsManager;
 
     @Override
@@ -204,9 +210,10 @@ public class SearchRelevancePlugin extends Plugin
         this.metricsHelper = new MetricsHelper(clusterService, client, judgmentDao, evaluationResultDao, experimentVariantDao);
         this.settingsAccessor = new SearchRelevanceSettingsAccessor(clusterService, environment.settings());
         this.clusterUtil = new ClusterUtil(clusterService);
+        this.cronUtil = new CronUtil(settingsAccessor);
         this.infoStatsManager = new InfoStatsManager(settingsAccessor);
         EventStatsManager.instance().initialize(settingsAccessor);
-        SearchRelevanceJobRunner jobRunner = SearchRelevanceJobRunner.getJobRunnerInstance();
+        SearchRelevanceJobRunner jobRunner = SearchRelevanceJobRunner.INSTANCE;
         jobRunner.setThreadPool(threadPool);
         jobRunner.setClient(client);
         jobRunner.setExperimentDao(experimentDao);
@@ -261,7 +268,7 @@ public class SearchRelevancePlugin extends Plugin
             new RestGetExperimentAction(settingsAccessor),
             new RestDeleteExperimentAction(settingsAccessor),
             new RestSearchRelevanceStatsAction(settingsAccessor, clusterUtil),
-            new RestPostScheduledExperimentAction(settingsAccessor),
+            new RestPostScheduledExperimentAction(settingsAccessor, cronUtil),
             new RestDeleteScheduledExperimentAction(settingsAccessor),
             new RestGetScheduledExperimentAction(settingsAccessor)
         );
@@ -302,7 +309,7 @@ public class SearchRelevancePlugin extends Plugin
 
     @Override
     public ScheduledJobRunner getJobRunner() {
-        return SearchRelevanceJobRunner.getJobRunnerInstance();
+        return SearchRelevanceJobRunner.INSTANCE;
     }
 
     @Override
@@ -365,7 +372,15 @@ public class SearchRelevancePlugin extends Plugin
 
     @Override
     public List<Setting<?>> getSettings() {
-        return List.of(SEARCH_RELEVANCE_WORKBENCH_ENABLED, SEARCH_RELEVANCE_STATS_ENABLED, SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT);
+        return List.of(
+            SEARCH_RELEVANCE_WORKBENCH_ENABLED,
+            SEARCH_RELEVANCE_STATS_ENABLED,
+            SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT,
+            SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_ENABLED,
+            SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_TIMEOUT,
+            SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_MINIMUM_INTERVAL,
+            SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_CAPACITY
+        );
     }
 
     @Override

@@ -43,30 +43,18 @@ import org.opensearch.searchrelevance.model.QuerySet;
 import org.opensearch.searchrelevance.model.ScheduledExperimentResult;
 import org.opensearch.searchrelevance.model.SearchConfiguration;
 import org.opensearch.searchrelevance.model.SearchConfigurationDetails;
+import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.client.Client;
 
-public class SearchRelevanceJobRunner implements ScheduledJobRunner {
+public enum SearchRelevanceJobRunner implements ScheduledJobRunner {
+    INSTANCE;
+
     private static final Logger log = LogManager.getLogger(ScheduledJobRunner.class);
-
-    private static SearchRelevanceJobRunner INSTANCE;
-
-    public static SearchRelevanceJobRunner getJobRunnerInstance() {
-        if (INSTANCE != null) {
-            return INSTANCE;
-        }
-        synchronized (SearchRelevanceJobRunner.class) {
-            if (INSTANCE != null) {
-                return INSTANCE;
-            }
-            INSTANCE = new SearchRelevanceJobRunner();
-            return INSTANCE;
-        }
-    }
-
     private ThreadPool threadPool;
     private Client client;
+    private SearchRelevanceSettingsAccessor settingsAccessor;
     private ExperimentDao experimentDao;
     private QuerySetDao querySetDao;
     private SearchConfigurationDao searchConfigurationDao;
@@ -74,10 +62,6 @@ public class SearchRelevanceJobRunner implements ScheduledJobRunner {
     private MetricsHelper metricsHelper;
     private HybridOptimizerExperimentProcessor hybridOptimizerExperimentProcessor;
     private PointwiseExperimentProcessor pointwiseExperimentProcessor;
-
-    private SearchRelevanceJobRunner() {
-        // Singleton class, use getJobRunner method instead of constructor
-    }
 
     public void setThreadPool(ThreadPool threadPool) {
         this.threadPool = threadPool;

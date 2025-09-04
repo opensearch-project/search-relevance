@@ -30,8 +30,8 @@ import org.opensearch.rest.RestRequest;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.searchrelevance.transport.scheduledJob.PostScheduledExperimentAction;
 import org.opensearch.searchrelevance.transport.scheduledJob.PostScheduledExperimentRequest;
-import org.opensearch.searchrelevance.utils.CronUtils;
-import org.opensearch.searchrelevance.utils.CronUtils.CronValidationResult;
+import org.opensearch.searchrelevance.utils.CronUtil;
+import org.opensearch.searchrelevance.utils.CronUtil.CronValidationResult;
 import org.opensearch.transport.client.node.NodeClient;
 
 import lombok.AllArgsConstructor;
@@ -45,6 +45,7 @@ import lombok.extern.log4j.Log4j2;
 public class RestPostScheduledExperimentAction extends BaseRestHandler {
     private static final String POST_SCHEDULED_EXPERIMENT_ACTION = "post_scheduled_experiment_action";
     private SearchRelevanceSettingsAccessor settingsAccessor;
+    private CronUtil cronUtil;
 
     @Override
     public String getName() {
@@ -61,6 +62,9 @@ public class RestPostScheduledExperimentAction extends BaseRestHandler {
         if (!settingsAccessor.isWorkbenchEnabled()) {
             return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.FORBIDDEN, "Search Relevance Workbench is disabled"));
         }
+        if (!settingsAccessor.isScheduledExperimentsEnabled()) {
+            return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.FORBIDDEN, "Scheduled experiments is disabled"));
+        }
         XContentParser parser = request.contentParser();
         Map<String, Object> source = parser.map();
 
@@ -71,7 +75,7 @@ public class RestPostScheduledExperimentAction extends BaseRestHandler {
             throw new IllegalArgumentException("Invalid or missing experiment Id");
         }
 
-        CronValidationResult validationResult = CronUtils.validateCron(cronExpression);
+        CronValidationResult validationResult = cronUtil.validateCron(cronExpression);
 
         if (validationResult.isValid() == false) {
             throw new IllegalArgumentException(validationResult.getErrorMessage());

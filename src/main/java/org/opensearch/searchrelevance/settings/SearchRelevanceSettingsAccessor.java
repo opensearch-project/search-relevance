@@ -10,6 +10,7 @@ package org.opensearch.searchrelevance.settings;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.common.settings.Settings;
+import org.opensearch.common.unit.TimeValue;
 import org.opensearch.searchrelevance.stats.events.EventStatsManager;
 
 import lombok.Getter;
@@ -24,6 +25,14 @@ public class SearchRelevanceSettingsAccessor {
     private volatile boolean isStatsEnabled;
     @Getter
     private volatile int maxQuerySetAllowed;
+    @Getter
+    private volatile boolean isScheduledExperimentsEnabled;
+    @Getter
+    private volatile TimeValue scheduledExperimentsTimeout;
+    @Getter
+    private volatile TimeValue scheduledExperimentsMinimumInterval;
+    @Getter
+    private volatile int scheduledExperimentsCapacity;
 
     /**
      * Constructor, registers callbacks to update settings
@@ -35,6 +44,10 @@ public class SearchRelevanceSettingsAccessor {
         isWorkbenchEnabled = SearchRelevanceSettings.SEARCH_RELEVANCE_WORKBENCH_ENABLED.get(settings);
         isStatsEnabled = SearchRelevanceSettings.SEARCH_RELEVANCE_STATS_ENABLED.get(settings);
         maxQuerySetAllowed = SearchRelevanceSettings.SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT.get(settings);
+        isScheduledExperimentsEnabled = SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_ENABLED.get(settings);
+        scheduledExperimentsTimeout = SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_TIMEOUT.get(settings);
+        scheduledExperimentsMinimumInterval = SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_MINIMUM_INTERVAL.get(settings);
+        scheduledExperimentsCapacity = SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_CAPACITY.get(settings);
         registerSettingsCallbacks(clusterService);
     }
 
@@ -54,6 +67,21 @@ public class SearchRelevanceSettingsAccessor {
         clusterService.getClusterSettings()
             .addSettingsUpdateConsumer(SearchRelevanceSettings.SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT, value -> {
                 maxQuerySetAllowed = value;
+            });
+
+        clusterService.getClusterSettings()
+            .addSettingsUpdateConsumer(SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_ENABLED, value -> {
+                isScheduledExperimentsEnabled = value;
+            });
+
+        clusterService.getClusterSettings()
+            .addSettingsUpdateConsumer(SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_TIMEOUT, value -> {
+                scheduledExperimentsTimeout = value;
+            });
+
+        clusterService.getClusterSettings()
+            .addSettingsUpdateConsumer(SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_MINIMUM_INTERVAL, value -> {
+                scheduledExperimentsMinimumInterval = value;
             });
     }
 }
