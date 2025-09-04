@@ -14,7 +14,13 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
@@ -141,9 +147,6 @@ public enum SearchRelevanceJobRunner implements ScheduledJobRunner {
 
         final LockService lockService = context.getLockService();
 
-        // TODO: A lot of the logic here is reused from PutTransportExperiment.
-        // Eventually we have to abstract it in another class to reduce complexity.
-
         Runnable runnable = () -> {
             if (jobParameter.getLockDurationSeconds() != null) {
                 lockService.acquireLock(jobParameter, context, ActionListener.wrap(lock -> {
@@ -216,7 +219,18 @@ public enum SearchRelevanceJobRunner implements ScheduledJobRunner {
             }
         };
 
-        threadPool.generic().submit(runnable);
+        Future<?> searchEvaluationTask = threadPool.generic().submit(runnable);
+        
+        try {
+            // Attempt to get the result with a timeout of 2 seconds
+            searchEvaluationTask.get(settingsAccessor.getScheduledExperimentsTimeout().getSeconds(), TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            log.error("timeout for scheduled experiment has occured!");
+            searchEvaluationTask.cancel(true); // Attempt to interrupt the running task
+        } catch (InterruptedException | ExecutionException e) {
+            log.error(" for scheduled experiment has occured!");
+        } finally {
+        }
     }
 
     private void fetchSearchConfigurationsAsync(
@@ -225,9 +239,52 @@ public enum SearchRelevanceJobRunner implements ScheduledJobRunner {
         List<String> queryTextWithReferences
     ) {
         Map<String, SearchConfigurationDetails> searchConfigurations = new HashMap<>();
-        AtomicInteger pendingConfigs = new AtomicInteger(request.getSearchConfigurationList().size());
         AtomicBoolean hasFailure = new AtomicBoolean(false);
+        List<CompletableFuture<Entry<String, Object>>> configFutures = new ArrayList<>();
 
+        for (String configId : request.getSearchConfigurationList()) {
+            configFutures.add(fetchSingleSearchConfigurationAsync(experimentId, request, queryTextWithReferences, hasFailure, configId));
+        }
+
+        // Wait for all configurations to complete
+        // If any of the futures fails, the exception would be handled
+        // in the logic of that future. Therefore, no action for failure
+        // is necessary here.
+        CompletableFuture.allOf(configFutures.toArray(new CompletableFuture[0])).join();
+
+        for (CompletableFuture<Entry<String, Object>> configFuture : configFutures) {
+            Entry<String, Object> configEntry;
+            try {
+                configEntry = configFuture.get();
+            } catch (InterruptedException e) {
+                handleAsyncFailure(experimentId, request, "Failed to fetch SearchConfiguration", e);
+                return;
+            } catch (ExecutionException e) {
+                handleAsyncFailure(experimentId, request, "Failed to fetch SearchConfiguration", e);
+                return;
+            }
+            searchConfigurations.put(configEntry.getKey(), (SearchConfigurationDetails) configEntry.getValue());
+        }
+
+        if (queryTextWithReferences == null || searchConfigurations == null) {
+            throw new IllegalStateException("Missing required data for metrics calculation");
+        }
+
+        List<Map<String, Object>> finalResults = Collections.synchronizedList(new ArrayList<>());
+        AtomicInteger pendingQueries = new AtomicInteger(queryTextWithReferences.size());
+
+        executeExperimentEvaluation(
+            experimentId,
+            request,
+            searchConfigurations,
+            queryTextWithReferences,
+            finalResults,
+            pendingQueries,
+            hasFailure,
+            request.getJudgmentList()
+        );
+
+        /*AtomicInteger pendingConfigs = new AtomicInteger(request.getSearchConfigurationList().size());
         for (String configId : request.getSearchConfigurationList()) {
             searchConfigurationDao.getSearchConfiguration(configId, ActionListener.wrap(searchConfigResponse -> {
                 try {
@@ -275,7 +332,49 @@ public enum SearchRelevanceJobRunner implements ScheduledJobRunner {
                     handleAsyncFailure(experimentId, request, "Failed to fetch SearchConfiguration: " + configId, e);
                 }
             }));
-        }
+        }*/
+    }
+
+    private CompletableFuture<Entry<String, Object>> fetchSingleSearchConfigurationAsync(
+        String experimentId,
+        PutScheduledExperimentRequest request,
+        List<String> queryTextWithReferences,
+        AtomicBoolean hasFailure,
+        String configId
+    ) {
+        CompletableFuture<Entry<String, Object>> future = new CompletableFuture<>();
+        searchConfigurationDao.getSearchConfiguration(configId, ActionListener.wrap(searchConfigResponse -> {
+            try {
+                if (hasFailure.get()) {
+                    future.complete(null);
+                    return;
+                }
+
+                SearchConfiguration config = convertToSearchConfiguration(searchConfigResponse);
+
+                future.complete(
+                    Map.entry(
+                        config.id(),
+                        SearchConfigurationDetails.builder()
+                            .index(config.index())
+                            .query(config.query())
+                            .pipeline(config.searchPipeline())
+                            .build()
+                    )
+                );
+            } catch (Exception e) {
+                future.completeExceptionally(e);
+                if (hasFailure.compareAndSet(false, true)) {
+                    handleAsyncFailure(experimentId, request, "Failed to process SearchConfiguration", e);
+                }
+            }
+        }, e -> {
+            future.completeExceptionally(e);
+            if (hasFailure.compareAndSet(false, true)) {
+                handleAsyncFailure(experimentId, request, "Failed to fetch SearchConfiguration: " + configId, e);
+            }
+        }));
+        return future;
     }
 
     private void executeExperimentEvaluation(
