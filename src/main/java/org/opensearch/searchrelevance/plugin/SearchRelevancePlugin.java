@@ -11,7 +11,6 @@ import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_I
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_CACHE_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_JOBS_INDEX;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT;
-import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_CAPACITY;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_ENABLED;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_MINIMUM_INTERVAL;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_TIMEOUT;
@@ -89,6 +88,7 @@ import org.opensearch.searchrelevance.rest.RestPutJudgmentAction;
 import org.opensearch.searchrelevance.rest.RestPutQuerySetAction;
 import org.opensearch.searchrelevance.rest.RestPutSearchConfigurationAction;
 import org.opensearch.searchrelevance.rest.RestSearchRelevanceStatsAction;
+import org.opensearch.searchrelevance.scheduler.ScheduledExperimentRunnerManager;
 import org.opensearch.searchrelevance.scheduler.SearchRelevanceJobParameters;
 import org.opensearch.searchrelevance.scheduler.SearchRelevanceJobRunner;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
@@ -214,15 +214,18 @@ public class SearchRelevancePlugin extends Plugin
         this.infoStatsManager = new InfoStatsManager(settingsAccessor);
         EventStatsManager.instance().initialize(settingsAccessor);
         SearchRelevanceJobRunner jobRunner = SearchRelevanceJobRunner.INSTANCE;
+        ScheduledExperimentRunnerManager manager = ScheduledExperimentRunnerManager.INSTANCE;
+        manager.setExperimentDao(experimentDao);
+        manager.setQuerySetDao(querySetDao);
+        manager.setSearchConfigurationDao(searchConfigurationDao);
+        manager.setScheduledExperimentHistoryDao(scheduledExperimentHistoryDao);
+        manager.setMetricsHelper(metricsHelper);
+        manager.setHybridOptimizerExperimentProcessor(new HybridOptimizerExperimentProcessor(judgmentDao, experimentTaskManager));
+        manager.setPointwiseExperimentProcessor(new PointwiseExperimentProcessor(judgmentDao, experimentTaskManager));
         jobRunner.setThreadPool(threadPool);
         jobRunner.setClient(client);
-        jobRunner.setExperimentDao(experimentDao);
-        jobRunner.setQuerySetDao(querySetDao);
-        jobRunner.setSearchConfigurationDao(searchConfigurationDao);
-        jobRunner.setScheduledExperimentHistoryDao(scheduledExperimentHistoryDao);
-        jobRunner.setMetricsHelper(metricsHelper);
-        jobRunner.setHybridOptimizerExperimentProcessor(new HybridOptimizerExperimentProcessor(judgmentDao, experimentTaskManager));
-        jobRunner.setPointwiseExperimentProcessor(new PointwiseExperimentProcessor(judgmentDao, experimentTaskManager));
+        jobRunner.setSettingsAccessor(settingsAccessor);
+        jobRunner.setManager(manager);
 
         return List.of(
             searchRelevanceIndicesManager,
@@ -323,9 +326,7 @@ public class SearchRelevancePlugin extends Plugin
                 parser.nextToken();
                 switch (fieldName) {
                     case ScheduledJob.ID:
-                        break;
-                    case SearchRelevanceJobParameters.NAME_FIELD:
-                        jobParameter.setJobName(parser.text());
+                        jobParameter.setExperimentId(parser.text());
                         break;
                     case SearchRelevanceJobParameters.ENABLED_FILED:
                         jobParameter.setEnabled(parser.booleanValue());
@@ -339,22 +340,14 @@ public class SearchRelevancePlugin extends Plugin
                     case SearchRelevanceJobParameters.SCHEDULE_FIELD:
                         jobParameter.setSchedule(ScheduleParser.parse(parser));
                         break;
-                    case SearchRelevanceJobParameters.INDEX_NAME_FIELD:
-                        jobParameter.setIndexToWatch(parser.text());
-                        break;
-                    case SearchRelevanceJobParameters.LOCK_DURATION_SECONDS:
-                        jobParameter.setLockDurationSeconds(parser.longValue());
-                        break;
-                    case SearchRelevanceJobParameters.JITTER:
-                        jobParameter.setJitter(parser.doubleValue());
-                        break;
-                    case SearchRelevanceJobParameters.EXPERIMENT_ID:
-                        jobParameter.setExperimentId(parser.text());
-                        break;
                     default:
                         XContentParserUtils.throwUnknownToken(parser.currentToken(), parser.getTokenLocation());
                 }
             }
+            jobParameter.setLockDurationSeconds(20L);
+            jobParameter.setIndexToWatch("index");
+            jobParameter.setJobName("job");
+
             return jobParameter;
         };
     }
@@ -378,8 +371,7 @@ public class SearchRelevancePlugin extends Plugin
             SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT,
             SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_ENABLED,
             SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_TIMEOUT,
-            SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_MINIMUM_INTERVAL,
-            SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_CAPACITY
+            SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_MINIMUM_INTERVAL
         );
     }
 

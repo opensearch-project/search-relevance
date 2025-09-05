@@ -31,4 +31,5 @@ public class VariantTaskParameters {
     private final List<String> judgmentIds;
     private final Map<String, String> docIdToScores;
     private final ExperimentTaskContext taskContext;
+    private final String scheduledExperimentId;
 }

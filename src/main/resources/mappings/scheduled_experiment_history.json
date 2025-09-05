@@ -2,12 +2,6 @@
   "properties": {
     "id": { "type": "keyword" },
     "experimentId": { "type": "keyword" },
-    "jobId": {
-      "type": "keyword"
-    },
-    "jobIndexName": {
-      "type": "keyword"
-    },
     "timestamp": {
       "type": "date",
       "format": "strict_date_time"

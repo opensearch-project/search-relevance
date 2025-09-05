@@ -7,6 +7,7 @@
  */
 package org.opensearch.searchrelevance.transport.scheduledJob;
 
+import java.time.Instant;
 import java.time.ZoneId;
 
 import org.apache.logging.log4j.LogManager;
@@ -23,7 +24,6 @@ import org.opensearch.jobscheduler.spi.schedule.Schedule;
 import org.opensearch.searchrelevance.dao.ScheduledJobsDao;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.model.ScheduledJob;
-import org.opensearch.searchrelevance.scheduler.SearchRelevanceJobParameters;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
 
@@ -56,29 +56,10 @@ public class PostScheduledExperimentTransportAction extends HandledTransportActi
             String cronExpression = request.getCronExpression();
             Schedule schedule = new CronSchedule(cronExpression, ZoneId.systemDefault());
             String id = experimentId; // Since there is at most 1 scheduled job per experiment, the ids could be the same.
-            SearchRelevanceJobParameters jobParameter = new SearchRelevanceJobParameters(
-                id,
-                "experiment-parameters",
-                "index",
-                schedule,
-                20L,
-                null,
-                experimentId
-            );
-            jobParameter.setEnabled(true);
 
-            ScheduledJob job = new ScheduledJob(
-                id,
-                jobParameter.getName(),
-                jobParameter.getLastUpdateTime(),
-                jobParameter.getEnabledTime(),
-                jobParameter.isEnabled(),
-                schedule,
-                jobParameter.getIndexToWatch(),
-                jobParameter.getLockDurationSeconds(),
-                jobParameter.getJitter(),
-                experimentId
-            );
+            Instant now = Instant.now();
+
+            ScheduledJob job = new ScheduledJob(id, now, now, true, schedule);
 
             scheduledJobsDao.putScheduledJob(job, ActionListener.wrap(response -> {
                 // Return response immediately

@@ -31,8 +31,6 @@ public class SearchRelevanceSettingsAccessor {
     private volatile TimeValue scheduledExperimentsTimeout;
     @Getter
     private volatile TimeValue scheduledExperimentsMinimumInterval;
-    @Getter
-    private volatile int scheduledExperimentsCapacity;
 
     /**
      * Constructor, registers callbacks to update settings
@@ -47,7 +45,6 @@ public class SearchRelevanceSettingsAccessor {
         isScheduledExperimentsEnabled = SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_ENABLED.get(settings);
         scheduledExperimentsTimeout = SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_TIMEOUT.get(settings);
         scheduledExperimentsMinimumInterval = SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_MINIMUM_INTERVAL.get(settings);
-        scheduledExperimentsCapacity = SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_CAPACITY.get(settings);
         registerSettingsCallbacks(clusterService);
     }
 

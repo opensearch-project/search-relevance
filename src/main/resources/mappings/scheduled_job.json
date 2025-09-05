@@ -7,20 +7,8 @@
     "enabledTime": {
       "type": "long"
     },
-    "experimentId": {
-      "type": "keyword"
-    },
-    "indexNameToWatch": {
-      "type": "keyword"
-    },
     "lastUpdateTime": {
       "type": "long"
-    },
-    "lockDurationSeconds": {
-      "type": "long"
-    },
-    "name": {
-      "type": "keyword"
     },
     "schedule": {
       "properties": {

@@ -29,7 +29,7 @@ public class PluginConstants {
     /** The URI for this plugin's scheduled experiments rest actions. For retrieving/deleting individual
      * experiments, the experimentId is specified as a path parameter in between the prefix and suffix.
     */
-    public static final String SCHEDULED_EXPERIMENT_URL_PREFIX = SEARCH_RELEVANCE_BASE_URI + "/experiment";
+    public static final String SCHEDULED_EXPERIMENT_URL_PREFIX = EXPERIMENTS_URI;
     public static final String SCHEDULED_EXPERIMENT_URL_SUFFIX = "/schedule";
     /** The URI for initializing the UBI indices */
     public static final String INITIALIZE_URL = "/_plugins/ubi/initialize";
@@ -58,7 +58,7 @@ public class PluginConstants {
     public static final String JUDGMENT_CACHE_INDEX_MAPPING = "mappings/judgment_cache.json";
     public static final String EXPERIMENT_VARIANT_INDEX = "search-relevance-experiment-variant";
     public static final String EXPERIMENT_VARIANT_INDEX_MAPPING = "mappings/experiment_variant.json";
-    public static final String SCHEDULED_JOBS_INDEX = ".scheduled-jobs";
+    public static final String SCHEDULED_JOBS_INDEX = ".search-relevance-scheduled-experiment-jobs";
     public static final String SCHEDULED_JOBS_INDEX_MAPPING = "mappings/scheduled_job.json";
     public static final String SCHEDULED_EXPERIMENT_HISTORY_INDEX = "search-relevance-scheduled-experiment-history";
     public static final String SCHEDULED_EXPERIMENT_HISTORY_INDEX_MAPPING = "mappings/scheduled_experiment_history.json";

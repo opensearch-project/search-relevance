@@ -201,12 +201,12 @@ private String experimentId;
 
 ```http
 POST /_plugins/_search_relevance/experiment/schedule
-Content-Type: application/json
 {
-    "experimentId": "2bb07ecb-082a-4bab-b9c0-dc225e5c35ae"
+    "experimentId": "2bb07ecb-082a-4bab-b9c0-dc225e5c35ae",
     "cronExpression": "* * * * *"
 }
 ```
+{% include copy-curl.html %}
 
 **Response:**
 ```json
@@ -243,11 +243,12 @@ GET /_plugins/_search_relevance/experiment/2bb07ecb-082a-4bab-b9c0-dc225e5c35ae/
 ```http
 DELETE /_plugins/_search_relevance/experiment/2bb07ecb-082a-4bab-b9c0-dc225e5c35ae/schedule
 ```
+{% include copy-curl.html %}
 
 **Response**
 ```json
 {
-  "_index": ".scheduled-jobs",
+  "_index": ".search-relevance-scheduled-experiment-jobs",
   "_id": "2bb07ecb-082a-4bab-b9c0-dc225e5c35ae",
   "_version": 2,
   "result": "deleted",

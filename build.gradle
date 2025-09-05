@@ -25,26 +25,16 @@ buildscript {
         // 2.2.0-SNAPSHOT -> 2.2.0.0-SNAPSHOT
         version_tokens = opensearch_version.tokenize('-')
         opensearch_build = version_tokens[0] + '.0'
-        job_scheduler_no_snapshot = opensearch_build
         plugin_no_snapshot = opensearch_build
         if (buildVersionQualifier) {
             opensearch_build += "-${buildVersionQualifier}"
-            job_scheduler_no_snapshot += "-${buildVersionQualifier}"
             plugin_no_snapshot += "-${buildVersionQualifier}"
         }
         if (isSnapshot) {
             opensearch_build += "-SNAPSHOT"
         }
-        opensearch_no_snapshot = opensearch_version.replace("-SNAPSHOT", "")
-
         opensearch_group = "org.opensearch"
         common_utils_version = System.getProperty("common_utils.version", opensearch_build)
-
-        job_scheduler_resource_folder = "src/test/resources/job-scheduler"
-        job_scheduler_version = System.getProperty("job_scheduler_version.version", opensearch_build)
-        job_scheduler_build_download = 'https://ci.opensearch.org/ci/dbc/distribution-build-opensearch/' + opensearch_no_snapshot +
-                '/latest/linux/x64/tar/builds/opensearch/plugins/opensearch-job-scheduler-' + job_scheduler_no_snapshot + '.zip'
-
     }
 
     repositories {

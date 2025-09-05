@@ -91,13 +91,4 @@ public class SearchRelevanceSettings {
         Setting.Property.NodeScope,
         Setting.Property.Dynamic
     );
-
-    /**
-     * The maximum amount of scheduled experiments that can be active at a given point in time
-     */
-    public static final Setting<Integer> SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_CAPACITY = Setting.intSetting(
-        "plugins.search_relevance.scheduled_experiments_capacity",
-        3,
-        Setting.Property.NodeScope
-    );
 }

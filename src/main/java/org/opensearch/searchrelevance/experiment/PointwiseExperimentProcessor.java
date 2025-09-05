@@ -75,6 +75,7 @@ public class PointwiseExperimentProcessor {
         List<String> judgmentList,
         int size,
         AtomicBoolean hasFailure,
+        String scheduledExperimentId,
         ActionListener<Map<String, Object>> listener
     ) {
         log.info(
@@ -95,6 +96,7 @@ public class PointwiseExperimentProcessor {
                 size,
                 docIdToScores,
                 hasFailure,
+                scheduledExperimentId,
                 listener
             );
         }).exceptionally(e -> {
@@ -189,6 +191,7 @@ public class PointwiseExperimentProcessor {
         int size,
         Map<String, String> docIdToScores,
         AtomicBoolean hasFailure,
+        String scheduledExperimentId,
         ActionListener<Map<String, Object>> listener
     ) {
         // Create simple variants
@@ -223,7 +226,8 @@ public class PointwiseExperimentProcessor {
                 judgmentList,
                 docIdToScores,
                 configToExperimentVariants,
-                hasFailure
+                hasFailure,
+                scheduledExperimentId
             );
 
             // Transform results

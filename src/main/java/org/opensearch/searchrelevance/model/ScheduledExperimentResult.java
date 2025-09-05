@@ -22,16 +22,12 @@ import lombok.Getter;
 public class ScheduledExperimentResult implements ToXContentObject {
     public static final String ID_FIELD = "id";
     public static final String EXPERIMENT_ID_FIELD = "experimentId";
-    public static final String JOB_ID_FIELD = "jobId";
-    public static final String JOB_INDEX_NAME_FIELD = "jobIndexName";
     public static final String TIMESTAMP_FIELD = "timestamp";
     public static final String STATUS = "status";
     public static final String RESULTS_FIELD = "results";
 
     private final String id;
     private final String experimentId;
-    private final String jobId;
-    private final String jobIndexName;
     private final String timestamp;
     private final AsyncStatus status;
     private final List<Map<String, Object>> results;
@@ -41,8 +37,6 @@ public class ScheduledExperimentResult implements ToXContentObject {
         builder.startObject();
         builder.field(ID_FIELD, this.id)
             .field(EXPERIMENT_ID_FIELD, this.experimentId)
-            .field(JOB_ID_FIELD, this.jobId)
-            .field(JOB_INDEX_NAME_FIELD, this.jobIndexName)
             .field(TIMESTAMP_FIELD, this.timestamp)
             .field(STATUS, this.status.name())
             .field(RESULTS_FIELD, this.results);
