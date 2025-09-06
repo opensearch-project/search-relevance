@@ -81,6 +81,7 @@ public class PutExperimentTransportActionTests extends OpenSearchTestCase {
     public void testEmptyQueryTextsCompletesExperimentImmediately() {
         PutExperimentRequest request = new PutExperimentRequest(
             ExperimentType.PAIRWISE_COMPARISON,
+            null,
             "test-queryset-id",
             List.of("config1"),
             List.of("judgment1"),
@@ -138,6 +139,7 @@ public class PutExperimentTransportActionTests extends OpenSearchTestCase {
     public void testQuerySetNotFoundHandlesError() {
         PutExperimentRequest request = new PutExperimentRequest(
             ExperimentType.PAIRWISE_COMPARISON,
+            null,
             "nonexistent-queryset",
             List.of("config1"),
             List.of("judgment1"),
@@ -172,6 +174,7 @@ public class PutExperimentTransportActionTests extends OpenSearchTestCase {
     public void testExperimentCreationFailure() {
         PutExperimentRequest request = new PutExperimentRequest(
             ExperimentType.PAIRWISE_COMPARISON,
+            null,
             "test-queryset-id",
             List.of("config1"),
             List.of("judgment1"),

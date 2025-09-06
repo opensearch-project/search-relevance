@@ -25,6 +25,7 @@ import org.opensearch.rest.RestRequest;
 import org.opensearch.searchrelevance.plugin.SearchRelevanceRestTestCase;
 import org.opensearch.searchrelevance.transport.scheduledJob.PostScheduledExperimentAction;
 import org.opensearch.searchrelevance.transport.scheduledJob.PostScheduledExperimentRequest;
+import org.opensearch.searchrelevance.utils.CronUtil;
 
 public class RestPostScheduledExperimentActionTests extends SearchRelevanceRestTestCase {
 
@@ -37,7 +38,8 @@ public class RestPostScheduledExperimentActionTests extends SearchRelevanceRestT
     @Override
     public void setUp() throws Exception {
         super.setUp();
-        restPostScheduledExperimentAction = new RestPostScheduledExperimentAction(settingsAccessor);
+        CronUtil cronUtil = new CronUtil(settingsAccessor);
+        restPostScheduledExperimentAction = new RestPostScheduledExperimentAction(settingsAccessor, cronUtil);
         // Setup channel mock
         when(channel.newBuilder()).thenReturn(JsonXContent.contentBuilder());
         when(channel.newErrorBuilder()).thenReturn(JsonXContent.contentBuilder());

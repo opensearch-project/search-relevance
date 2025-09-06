@@ -32,19 +32,19 @@ public enum SearchRelevanceJobRunner implements ScheduledJobRunner {
     private SearchRelevanceSettingsAccessor settingsAccessor;
     private ScheduledExperimentRunnerManager manager;
 
-    public void setThreadPool(ThreadPool threadPool) {
+    public synchronized void setThreadPool(ThreadPool threadPool) {
         this.threadPool = threadPool;
     }
 
-    public void setClient(Client client) {
+    public synchronized void setClient(Client client) {
         this.client = client;
     }
 
-    public void setSettingsAccessor(SearchRelevanceSettingsAccessor settingsAccessor) {
+    public synchronized void setSettingsAccessor(SearchRelevanceSettingsAccessor settingsAccessor) {
         this.settingsAccessor = settingsAccessor;
     }
 
-    public void setManager(ScheduledExperimentRunnerManager manager) {
+    public synchronized void setManager(ScheduledExperimentRunnerManager manager) {
         this.manager = manager;
     }
 

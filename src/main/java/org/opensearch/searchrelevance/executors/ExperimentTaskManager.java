@@ -107,7 +107,7 @@ public class ExperimentTaskManager {
         Map<String, String> docIdToScores,
         Map<String, Object> configToExperimentVariants,
         AtomicBoolean hasFailure,
-        String scheduledExperimentId
+        String scheduledRunId
     ) {
         // Create a CompletableFuture to track the overall completion
         CompletableFuture<Map<String, Object>> resultFuture = new CompletableFuture<>();
@@ -152,7 +152,7 @@ public class ExperimentTaskManager {
                 judgmentIds,
                 docIdToScores,
                 taskContext,
-                scheduledExperimentId
+                scheduledRunId
             );
 
             return scheduleVariantTaskAsync(params);
@@ -182,7 +182,7 @@ public class ExperimentTaskManager {
         List<String> judgmentIds,
         Map<String, String> docIdToScores,
         ExperimentTaskContext taskContext,
-        String scheduledExperimentId
+        String scheduledRunId
     ) {
         if (experimentType == ExperimentType.POINTWISE_EVALUATION) {
             return PointwiseTaskParameters.builder()
@@ -197,7 +197,7 @@ public class ExperimentTaskManager {
                 .docIdToScores(docIdToScores)
                 .taskContext(taskContext)
                 .searchPipeline(getSearchPipelineFromVariant(variant))
-                .scheduledExperimentId(scheduledExperimentId)
+                .scheduledRunId(scheduledRunId)
                 .build();
         } else {
             // Default to hybrid optimizer parameters
@@ -212,7 +212,7 @@ public class ExperimentTaskManager {
                 .judgmentIds(judgmentIds)
                 .docIdToScores(docIdToScores)
                 .taskContext(taskContext)
-                .scheduledExperimentId(scheduledExperimentId)
+                .scheduledRunId(scheduledRunId)
                 .build();
         }
     }
@@ -308,7 +308,7 @@ public class ExperimentTaskManager {
                         params.getDocIdToScores(),
                         evaluationId,
                         params.getTaskContext(),
-                        params.getScheduledExperimentId()
+                        params.getScheduledRunId()
                     );
                     searchFuture.complete(null);
                 } catch (Exception e) {

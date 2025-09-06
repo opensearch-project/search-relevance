@@ -97,7 +97,8 @@ public class PointwiseExperimentProcessorTests extends OpenSearchTestCase {
                 any(List.class),
                 any(Map.class),
                 any(Map.class),
-                any(AtomicBoolean.class)
+                any(AtomicBoolean.class),
+                anyString()
             )
         ).thenReturn(mockFuture);
 
@@ -119,7 +120,7 @@ public class PointwiseExperimentProcessorTests extends OpenSearchTestCase {
         };
 
         // Execute
-        processor.processPointwiseExperiment(experimentId, queryText, searchConfigurations, judgmentList, size, hasFailure, listener);
+        processor.processPointwiseExperiment(experimentId, queryText, searchConfigurations, judgmentList, size, hasFailure, null, listener);
 
         // Wait for async operation to complete
         assertTrue("Async operation should complete within timeout", latch.await(5, TimeUnit.SECONDS));
@@ -166,7 +167,7 @@ public class PointwiseExperimentProcessorTests extends OpenSearchTestCase {
         };
 
         // Execute
-        processor.processPointwiseExperiment(experimentId, queryText, searchConfigurations, judgmentList, size, hasFailure, listener);
+        processor.processPointwiseExperiment(experimentId, queryText, searchConfigurations, judgmentList, size, hasFailure, null, listener);
 
         // Wait for async operation to complete
         assertTrue("Async operation should complete within timeout", latch.await(5, TimeUnit.SECONDS));

@@ -63,6 +63,7 @@ import org.opensearch.searchrelevance.dao.QuerySetDao;
 import org.opensearch.searchrelevance.dao.ScheduledExperimentHistoryDao;
 import org.opensearch.searchrelevance.dao.ScheduledJobsDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
+import org.opensearch.searchrelevance.executors.ExperimentRunningManager;
 import org.opensearch.searchrelevance.executors.ExperimentTaskManager;
 import org.opensearch.searchrelevance.executors.SearchRelevanceExecutor;
 import org.opensearch.searchrelevance.experiment.HybridOptimizerExperimentProcessor;
@@ -216,12 +217,18 @@ public class SearchRelevancePlugin extends Plugin
         SearchRelevanceJobRunner jobRunner = SearchRelevanceJobRunner.INSTANCE;
         ScheduledExperimentRunnerManager manager = ScheduledExperimentRunnerManager.INSTANCE;
         manager.setExperimentDao(experimentDao);
-        manager.setQuerySetDao(querySetDao);
-        manager.setSearchConfigurationDao(searchConfigurationDao);
         manager.setScheduledExperimentHistoryDao(scheduledExperimentHistoryDao);
-        manager.setMetricsHelper(metricsHelper);
-        manager.setHybridOptimizerExperimentProcessor(new HybridOptimizerExperimentProcessor(judgmentDao, experimentTaskManager));
-        manager.setPointwiseExperimentProcessor(new PointwiseExperimentProcessor(judgmentDao, experimentTaskManager));
+        manager.setExperimentRunningManager(
+            new ExperimentRunningManager(
+                experimentDao,
+                querySetDao,
+                searchConfigurationDao,
+                scheduledExperimentHistoryDao,
+                metricsHelper,
+                new HybridOptimizerExperimentProcessor(judgmentDao, experimentTaskManager),
+                new PointwiseExperimentProcessor(judgmentDao, experimentTaskManager)
+            )
+        );
         jobRunner.setThreadPool(threadPool);
         jobRunner.setClient(client);
         jobRunner.setSettingsAccessor(settingsAccessor);

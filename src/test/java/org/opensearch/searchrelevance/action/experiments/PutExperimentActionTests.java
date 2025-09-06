@@ -21,6 +21,7 @@ public class PutExperimentActionTests extends OpenSearchTestCase {
     public void testStreams() throws IOException {
         PutExperimentRequest request = new PutExperimentRequest(
             ExperimentType.PAIRWISE_COMPARISON,
+            null,
             "1234",
             List.of("5678", "0000"),
             List.of("5678", "0000"),
@@ -38,6 +39,7 @@ public class PutExperimentActionTests extends OpenSearchTestCase {
     public void testRequestValidation() {
         PutExperimentRequest request = new PutExperimentRequest(
             ExperimentType.PAIRWISE_COMPARISON,
+            null,
             "1234",
             List.of("5678", "0000"),
             List.of("5678", "0000"),

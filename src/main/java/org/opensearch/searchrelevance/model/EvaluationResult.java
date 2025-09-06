@@ -29,7 +29,7 @@ public class EvaluationResult implements ToXContentObject {
     public static final String EXPERIMENT_ID = "experimentId";
     public static final String EXPERIMENT_VARIANT_ID = "experimentVariantId";
     public static final String EXPERIMENT_VARIANT_PARAMETERS = "experimentVariantParameters";
-    public static final String EXPERIMENT_HISTORY_ID = "scheduledExperimentId";
+    public static final String SCHEDULED_RUN_ID = "scheduledRunId";
 
     /**
      * Identifier of the system index
@@ -44,7 +44,7 @@ public class EvaluationResult implements ToXContentObject {
     private final String experimentId;
     private final String experimentVariantId;
     private final String experimentVariantParameters;
-    private final String scheduledExperimentId;
+    private final String scheduledRunId;
 
     public EvaluationResult(
         String id,
@@ -57,7 +57,7 @@ public class EvaluationResult implements ToXContentObject {
         String experimentId,
         String experimentVariantId,
         String experimentVariantParameters,
-        String scheduledExperimentId
+        String scheduledRunId
     ) {
         this.id = id;
         this.timestamp = timestamp;
@@ -69,7 +69,7 @@ public class EvaluationResult implements ToXContentObject {
         this.experimentId = experimentId;
         this.experimentVariantId = experimentVariantId;
         this.experimentVariantParameters = experimentVariantParameters;
-        this.scheduledExperimentId = scheduledExperimentId;
+        this.scheduledRunId = scheduledRunId;
     }
 
     public EvaluationResult(
@@ -119,9 +119,9 @@ public class EvaluationResult implements ToXContentObject {
         List<String> judgmentIds,
         List<String> documentIds,
         List<Map<String, Object>> metrics,
-        String scheduledExperimentId
+        String scheduledRunId
     ) {
-        this(id, timestamp, searchConfigurationId, searchText, judgmentIds, documentIds, metrics, null, null, null, scheduledExperimentId);
+        this(id, timestamp, searchConfigurationId, searchText, judgmentIds, documentIds, metrics, null, null, null, scheduledRunId);
     }
 
     @Override
@@ -143,8 +143,8 @@ public class EvaluationResult implements ToXContentObject {
         if (this.experimentVariantParameters != null) {
             xContentBuilder.field(EXPERIMENT_VARIANT_PARAMETERS, this.experimentVariantParameters);
         }
-        if (this.scheduledExperimentId != null) {
-            xContentBuilder.field(EXPERIMENT_HISTORY_ID, this.scheduledExperimentId);
+        if (this.scheduledRunId != null) {
+            xContentBuilder.field(SCHEDULED_RUN_ID, this.scheduledRunId);
         }
         return xContentBuilder.endObject();
     }
@@ -189,7 +189,7 @@ public class EvaluationResult implements ToXContentObject {
         return experimentVariantParameters;
     }
 
-    public String scheduledExperimentId() {
-        return scheduledExperimentId;
+    public String scheduledRunId() {
+        return scheduledRunId;
     }
 }

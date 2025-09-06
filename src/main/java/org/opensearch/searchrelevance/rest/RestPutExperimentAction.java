@@ -122,6 +122,7 @@ public class RestPutExperimentAction extends BaseRestHandler {
 
         PutExperimentRequest createRequest = new PutExperimentRequest(
             experimentType,
+            null,
             querySetId,
             searchConfigurationList,
             judgmentList,

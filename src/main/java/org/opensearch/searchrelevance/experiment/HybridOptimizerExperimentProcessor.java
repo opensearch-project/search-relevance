@@ -63,7 +63,7 @@ public class HybridOptimizerExperimentProcessor {
         List<String> judgmentList,
         int size,
         AtomicBoolean hasFailure,
-        String scheduledExperimentId,
+        String scheduledRunId,
         ActionListener<Map<String, Object>> listener
     ) {
         // Create parameter combinations for hybrid search
@@ -127,7 +127,7 @@ public class HybridOptimizerExperimentProcessor {
                 experimentVariants,
                 docIdToScores,
                 hasFailure,
-                scheduledExperimentId,
+                scheduledRunId,
                 listener
             );
         }).exceptionally(e -> {
@@ -209,7 +209,7 @@ public class HybridOptimizerExperimentProcessor {
         List<ExperimentVariant> experimentVariants,
         Map<String, String> docIdToScores,
         AtomicBoolean hasFailure,
-        String scheduledExperimentId,
+        String scheduledRunId,
         ActionListener<Map<String, Object>> finalListener
     ) {
         Map<String, Object> hydratedResults = new ConcurrentHashMap<>();
@@ -238,7 +238,7 @@ public class HybridOptimizerExperimentProcessor {
                 docIdToScores,
                 hydratedResults,
                 hasFailure,
-                scheduledExperimentId
+                scheduledRunId
             );
 
             // Transform the result for this search configuration

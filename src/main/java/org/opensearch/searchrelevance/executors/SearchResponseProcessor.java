@@ -7,6 +7,7 @@
  */
 package org.opensearch.searchrelevance.executors;
 
+import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_RUN_ID;
 import static org.opensearch.searchrelevance.metrics.EvaluationMetrics.calculateEvaluationMetrics;
 
 import java.util.Arrays;
@@ -51,7 +52,7 @@ public class SearchResponseProcessor {
         Map<String, String> docIdToScores,
         String evaluationId,
         ExperimentTaskContext taskContext,
-        String scheduledExperimentId
+        String scheduledRunId
     ) {
         if (taskContext.getHasFailure().get()) return;
 
@@ -71,6 +72,12 @@ public class SearchResponseProcessor {
                 ? experimentVariant.getTextualParameters()
                 : null;
 
+            // if scheduledRunId is not null, it should be replaced with a global flag
+            // to indicate that the EvaluationResult came from a scheduled experiment.
+            if (scheduledRunId != null) {
+                scheduledRunId = SCHEDULED_RUN_ID;
+            }
+
             EvaluationResult evaluationResult = new EvaluationResult(
                 evaluationId,
                 TimeUtils.getTimestamp(),
@@ -82,7 +89,7 @@ public class SearchResponseProcessor {
                 experimentId,
                 experimentVariant.getId(),
                 experimentVariantParameters,
-                scheduledExperimentId
+                scheduledRunId
             );
 
             evaluationResultDao.putEvaluationResultEfficient(

@@ -286,7 +286,8 @@ public class ExperimentTaskManagerTests extends OpenSearchTestCase {
             List.of("judgment-1"),
             Map.of("doc1", "5"),
             initialConfigMap,
-            new AtomicBoolean(false)
+            new AtomicBoolean(false),
+            null
         );
 
         // Assert

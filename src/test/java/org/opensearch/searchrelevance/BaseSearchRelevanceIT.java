@@ -90,6 +90,7 @@ public class BaseSearchRelevanceIT extends OpenSearchRestTestCase {
 
     protected void updateClusterSettings() {
         updateClusterSettings("plugins.search_relevance.workbench_enabled", true);
+        updateClusterSettings("plugins.search_relevance.scheduled_experiments_enabled", true);
     }
 
     public boolean isUpdateClusterSettings() {
