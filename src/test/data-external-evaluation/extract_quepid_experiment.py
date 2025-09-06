@@ -13,8 +13,8 @@ ratingsMap = {
   "Titanic":0.37
 }
 
-# Load the Movie_Search_Quepid_Demo_case.json file
-with open("Movie_Search_Quepid_Demo_case.json", "r") as f:
+# Load the Movie_Search_Quepid_1.json file
+with open("Movie_Search_Quepid_1.json", "r") as f:
     movie_data = json.load(f)
 
     

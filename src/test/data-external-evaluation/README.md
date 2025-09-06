@@ -1,6 +1,6 @@
 This directory contains an example of an externally run evaluation being imported into SRW.  The evaluation was run using the Quepid tool (https://github.com/o19s/quepid).
 
-1) Queries, Judgements, and Metrics sourced from a export from Quepid called  `Movie_Search_Quepid_Demo_case.json`. 
+1) Queries, Judgements, and Metrics sourced from a export from Quepid called  `Movie_Search_Quepid_1.json`. 
 
 1) The `movies_queryset.json` was hand extracted.
 

@@ -70,4 +70,4 @@ testfixtures_shared/
 # These are generated from .ci/jobs.t
 .ci/jobs/
 src/test/scripts/esci_us_opensearch-2025-06-06.json
-src/test/data-external-evaluation/movies_experiment_updated.json
+src/test/data-external-evaluation/movies_experiment_tmp.json

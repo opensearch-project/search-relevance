@@ -2,8 +2,8 @@ import json
 import os
 
 
-# Load the Movie_Search_Quepid_Demo_case.json file
-with open("Movie_Search_Quepid_Demo_case.json", "r") as f:
+# Load the Movie_Search_Quepid_1.json file
+with open("Movie_Search_Quepid_1.json", "r") as f:
     movie_data = json.load(f)
 
     
@@ -33,7 +33,7 @@ for item in movie_data.get("queries", []):
 # Create the final data structure with metadata
 output_data = {
     "name": "Movie Search Judgments",
-    "description": "Judgments sourced from Quepid Movie Search Case",
+    "description": "Judgments sourced from Quepid Movie Search Case 1",
     "type": "IMPORT_JUDGMENT",
     "judgmentRatings": judgmentRatings
 }
