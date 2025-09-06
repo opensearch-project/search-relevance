@@ -1,16 +1,8 @@
-# Example of importing an externally run evaluation into SRW
+# Example of importing an externally run evaluation into SRW.
 # 
-# You must update the values below to match entities in SRW already: 
+# It populates SRW with a externally created query set, judgments, and search configuration.
+# Then it plucks out those GUIDs and updates the import file with the correct values.
 # 
-# querySetId should be the one that is named 'TVs'.
-# searchConfigurationList should point to one you created, maybe called "External Search Configuration", 
-#   use placeholders for any required values.
-# judgmentList should be ESCI Judgements.  Do a find and replace as it shows up multiple levels.
-# 
-# 
-# curl -s -X POST "localhost:9200/_plugins/_search_relevance/experiments" \
-# -H "Content-type: application/json" \
-# -d @../data-esci/esci_us_external_experiment.json
 # Helper script
 exe() { (set -x ; "$@") | jq | tee RES; echo; }
 
