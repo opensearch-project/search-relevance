@@ -9,7 +9,13 @@ package org.opensearch.searchrelevance.rest;
 
 import static java.util.Collections.singletonList;
 import static org.opensearch.rest.RestRequest.Method.POST;
+import static org.opensearch.searchrelevance.common.PluginConstants.EVALUATION_RESULT_LIST;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENTS_URI;
+import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_LIST;
+import static org.opensearch.searchrelevance.common.PluginConstants.QUERYSET_ID;
+import static org.opensearch.searchrelevance.common.PluginConstants.RESULTS;
+import static org.opensearch.searchrelevance.common.PluginConstants.SEARCH_CONFIGURATION_LIST;
+import static org.opensearch.searchrelevance.common.PluginConstants.SIZE;
 
 import java.io.IOException;
 import java.util.List;
@@ -72,20 +78,20 @@ public class RestPostExperimentAction extends BaseRestHandler {
         }
 
         if (type == ExperimentType.POINTWISE_EVALUATION) {
-            String querySetId = (String) source.get("querySetId");
-            List<String> searchConfigurationList = ParserUtils.convertObjToList(source, "searchConfigurationList");
+            String querySetId = (String) source.get(QUERYSET_ID);
+            List<String> searchConfigurationList = ParserUtils.convertObjToList(source, SEARCH_CONFIGURATION_LIST);
             if (searchConfigurationList.size() != 1) {
                 throw new IOException("Must have exactly one search configuration. Had " + searchConfigurationList.size() + " size.");
             }
-            Integer sizeObj = (Integer) source.get("size");
+            Integer sizeObj = (Integer) source.get(SIZE);
             int size = sizeObj != null ? sizeObj.intValue() : 10; // Default size to 10 if not provided
 
-            List<String> judgmentList = ParserUtils.convertObjToList(source, "judgmentList");
+            List<String> judgmentList = ParserUtils.convertObjToList(source, JUDGMENT_LIST);
             if (judgmentList.size() != 1) {
                 throw new IOException("Must have exactly one judgment list. Had " + judgmentList.size() + " size.");
             }
 
-            List<Map<String, Object>> evaluationResultList = ParserUtils.convertObjToListOfMaps(source, "evaluationResultList");
+            List<Map<String, Object>> evaluationResultList = ParserUtils.convertObjToListOfMaps(source, EVALUATION_RESULT_LIST);
 
             createRequest = new PostExperimentRequest(
                 type,
@@ -97,15 +103,15 @@ public class RestPostExperimentAction extends BaseRestHandler {
                 null
             );
         } else if (type == ExperimentType.PAIRWISE_COMPARISON) {
-            String querySetId = (String) source.get("querySetId");
-            List<String> searchConfigurationList = ParserUtils.convertObjToList(source, "searchConfigurationList");
+            String querySetId = (String) source.get(QUERYSET_ID);
+            List<String> searchConfigurationList = ParserUtils.convertObjToList(source, SEARCH_CONFIGURATION_LIST);
             if (searchConfigurationList.size() != 2) {
                 throw new IOException("Must have exactly two search configurations. Had " + searchConfigurationList.size() + " size.");
             }
-            Integer sizeObj = (Integer) source.get("size");
+            Integer sizeObj = (Integer) source.get(SIZE);
             int size = sizeObj != null ? sizeObj.intValue() : 10; // Default size to 10 if not provided
 
-            List<Map<String, Object>> results = ParserUtils.convertObjToListOfMaps(source, "results");
+            List<Map<String, Object>> results = ParserUtils.convertObjToListOfMaps(source, RESULTS);
 
             createRequest = new PostExperimentRequest(type, querySetId, searchConfigurationList, List.of(), size, null, results);
         } else {
