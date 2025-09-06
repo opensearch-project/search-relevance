@@ -149,84 +149,85 @@ public class PostExperimentTransportAction extends HandledTransportAction<PostEx
         List<Map<String, Object>> finalResults = Collections.synchronizedList(new ArrayList<>());
         AtomicBoolean hasFailure = new AtomicBoolean(false);
 
-        importExperiment(experimentId, request, searchConfigurationId, finalResults, hasFailure);
-    }
-
-    private void importExperiment(
-        String experimentId,
-        PostExperimentRequest request,
-        String searchConfigurationId,
-        List<Map<String, Object>> finalResults,
-        AtomicBoolean hasFailure
-    ) {
         if (request.getType() == ExperimentType.POINTWISE_EVALUATION) {
-
-            List judgmentList = request.getJudgmentList();
-            List<Map<String, Object>> evaluationResultList = request.getEvaluationResultList();
-            int maxLimit = settingsAccessor.getMaxQuerySetAllowed();
-            int processCount = Math.min(evaluationResultList.size(), maxLimit);
-
-            // Track both completed operations (success + failure) to know when all processing is done
-            AtomicInteger completedOperations = new AtomicInteger(0);
-
-            for (int i = 0; i < processCount; i++) {
-                Map<String, Object> evalResultMap = evaluationResultList.get(i);
-                final String evaluationId = UUID.randomUUID().toString();
-
-                String queryText = (String) evalResultMap.get("searchText");
-                List metrics = (List) evalResultMap.get("metrics");
-                List documentIds = (List) evalResultMap.get("documentIds");
-
-                EvaluationResult evaluationResult = new EvaluationResult(
-                    evaluationId,
-                    TimeUtils.getTimestamp(),
-                    experimentId,
-                    searchConfigurationId,
-                    queryText,
-                    judgmentList,
-                    documentIds,
-                    metrics
-                );
-
-                evaluationResultDao.putEvaluationResult(evaluationResult, ActionListener.wrap(success -> {
-                    // Add successful result to final results
-                    Map<String, Object> evalResults = Collections.synchronizedMap(new HashMap<>());
-                    evalResults.put(POINTWISE_FIELD_NAME_SEARCH_CONFIGURATION_ID, searchConfigurationId);
-                    evalResults.put(POINTWISE_FIELD_NAME_EVALUATION_ID, evaluationId);
-                    evalResults.put(QUERY_TEXT, queryText);
-                    finalResults.add(evalResults);
-
-                    // Check if all operations (success + failure) are complete
-                    if (completedOperations.incrementAndGet() == processCount) {
-                        updateFinalExperiment(experimentId, request, finalResults, judgmentList, hasFailure.get());
-                    }
-                }, error -> {
-                    hasFailure.set(true);
-                    LOGGER.error("Failed to store evaluation result for experiment: " + experimentId, error);
-
-                    // Check if all operations (success + failure) are complete
-                    if (completedOperations.incrementAndGet() == processCount) {
-                        updateFinalExperiment(experimentId, request, finalResults, judgmentList, hasFailure.get());
-                    }
-                }));
-            }
-
-            // Log if we had to limit the results
-            if (evaluationResultList.size() > maxLimit) {
-                LOGGER.warn(
-                    "Experiment {} limited to {} evaluation results (requested: {}, max allowed: {})",
-                    experimentId,
-                    processCount,
-                    evaluationResultList.size(),
-                    maxLimit
-                );
-            }
+            importPointwiseExperiment(experimentId, request, searchConfigurationId, finalResults, hasFailure);
         } else {
             throw new SearchRelevanceException(
                 "Importing experimentType" + request.getType() + " is not supported",
                 RestStatus.BAD_REQUEST
             );
         }
+    }
+
+    private void importPointwiseExperiment(
+        String experimentId,
+        PostExperimentRequest request,
+        String searchConfigurationId,
+        List<Map<String, Object>> finalResults,
+        AtomicBoolean hasFailure
+    ) {
+
+        List judgmentList = request.getJudgmentList();
+        List<Map<String, Object>> evaluationResultList = request.getEvaluationResultList();
+        int maxLimit = settingsAccessor.getMaxQuerySetAllowed();
+        int processCount = Math.min(evaluationResultList.size(), maxLimit);
+
+        // Track both completed operations (success + failure) to know when all processing is done
+        AtomicInteger completedOperations = new AtomicInteger(0);
+
+        for (int i = 0; i < processCount; i++) {
+            Map<String, Object> evalResultMap = evaluationResultList.get(i);
+            final String evaluationId = UUID.randomUUID().toString();
+
+            String queryText = (String) evalResultMap.get("searchText");
+            List metrics = (List) evalResultMap.get("metrics");
+            List documentIds = (List) evalResultMap.get("documentIds");
+
+            EvaluationResult evaluationResult = new EvaluationResult(
+                evaluationId,
+                TimeUtils.getTimestamp(),
+                experimentId,
+                searchConfigurationId,
+                queryText,
+                judgmentList,
+                documentIds,
+                metrics
+            );
+
+            evaluationResultDao.putEvaluationResult(evaluationResult, ActionListener.wrap(success -> {
+                // Add successful result to final results
+                Map<String, Object> evalResults = Collections.synchronizedMap(new HashMap<>());
+                evalResults.put(POINTWISE_FIELD_NAME_SEARCH_CONFIGURATION_ID, searchConfigurationId);
+                evalResults.put(POINTWISE_FIELD_NAME_EVALUATION_ID, evaluationId);
+                evalResults.put(QUERY_TEXT, queryText);
+                finalResults.add(evalResults);
+
+                // Check if all operations (success + failure) are complete
+                if (completedOperations.incrementAndGet() == processCount) {
+                    updateFinalExperiment(experimentId, request, finalResults, judgmentList, hasFailure.get());
+                }
+            }, error -> {
+                hasFailure.set(true);
+                LOGGER.error("Failed to store evaluation result for experiment: " + experimentId, error);
+
+                // Check if all operations (success + failure) are complete
+                if (completedOperations.incrementAndGet() == processCount) {
+                    updateFinalExperiment(experimentId, request, finalResults, judgmentList, hasFailure.get());
+                }
+            }));
+        }
+
+        // Log if we had to limit the results
+        if (evaluationResultList.size() > maxLimit) {
+            LOGGER.warn(
+                "Experiment {} limited to {} evaluation results (requested: {}, max allowed: {})",
+                experimentId,
+                processCount,
+                evaluationResultList.size(),
+                maxLimit
+            );
+        }
+
     }
 
     private void handleAsyncFailure(String experimentId, PutExperimentRequest request, String message, Exception error) {
