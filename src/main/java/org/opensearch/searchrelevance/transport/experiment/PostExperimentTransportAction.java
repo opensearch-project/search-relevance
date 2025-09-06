@@ -180,6 +180,7 @@ public class PostExperimentTransportAction extends HandledTransportAction<PostEx
                 EvaluationResult evaluationResult = new EvaluationResult(
                     evaluationId,
                     TimeUtils.getTimestamp(),
+                    experimentId,
                     searchConfigurationId,
                     queryText,
                     judgmentList,
