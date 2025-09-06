@@ -1,9 +1,6 @@
 {
-  "querySetId": "cd18ed5f-9f89-4c17-b6f7-a1404893680d",
-  "searchConfigurationList": [
-    "217057d9-61b7-40bc-baf9-756573e4671b",
-    "41dbc471-2bfc-44c6-a0fc-43dcbd1e1baa"
-  ],
+  "querySetId": "fde4e3a3-6f97-4574-846e-761cc32b4041",
+  "searchConfigurationList": ["searchconfig-1-guid", "searchconfig-2-guid"],
   "type": "PAIRWISE_COMPARISON",
   "size": 10,
   "results": [

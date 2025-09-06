@@ -1,4 +1,4 @@
-# Example of importing an externally run evaluation into SRW.
+# Example of importing an externally run POINTWISE evaluation into SRW.
 # 
 # It populates SRW with a externally created query set, judgments, and search configuration.
 # Then it plucks out those GUIDs and updates the import file with the correct values.
@@ -31,7 +31,7 @@ exe curl -s -X PUT "http://localhost:9200/_plugins/_search_relevance/search_conf
 EXTERNAL_SEARCH_CONFIGURATION_ID=`jq -r '.search_configuration_id' < RES`
 
 
-# Update the movies_experiment_1.json file with the extracted IDs
+# Update the movies_experiment_pointwise.json file with the extracted IDs
 echo "Updating experiment file with the extracted IDs..."
 TEMP_FILE="../data-external-evaluation/movies_experiment_tmp.json"
 
@@ -40,7 +40,7 @@ jq --arg qid "$QUERY_SET_ID" \
    --arg sid "$EXTERNAL_SEARCH_CONFIGURATION_ID" \
    --arg jid "$JUDGMENTS_ID" \
    '.querySetId = $qid | .searchConfigurationList = [$sid] | .judgmentList = [$jid] | .evaluationResultList[].judgmentIds = [$jid]' \
-   ../data-external-evaluation/movies_experiment_1.json > "$TEMP_FILE"
+   ../data-external-evaluation/movies_experiment_pointwise.json > "$TEMP_FILE"
 
 if [ $? -eq 0 ]; then
     echo "Successfully updated experiment file with new IDs."    

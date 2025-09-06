@@ -137,20 +137,21 @@ public class PostExperimentTransportAction extends HandledTransportAction<PostEx
                 .map(id -> searchConfigurationDao.getSearchConfigurationSync(id))
                 .collect(Collectors.toList());
 
-            String searchConfigurationId = searchConfigurations.get(0).id();
-
-            processExperiment(experimentId, request, searchConfigurationId);
+            processExperiment(experimentId, request, searchConfigurations);
         } catch (Exception e) {
             handleAsyncFailure(experimentId, request, "Failed to start async processing", e);
         }
     }
 
-    private void processExperiment(String experimentId, PostExperimentRequest request, String searchConfigurationId) {
+    private void processExperiment(String experimentId, PostExperimentRequest request, List<SearchConfiguration> searchConfigurations) {
         List<Map<String, Object>> finalResults = Collections.synchronizedList(new ArrayList<>());
         AtomicBoolean hasFailure = new AtomicBoolean(false);
 
         if (request.getType() == ExperimentType.POINTWISE_EVALUATION) {
+            String searchConfigurationId = searchConfigurations.get(0).id();
             importPointwiseExperiment(experimentId, request, searchConfigurationId, finalResults, hasFailure);
+        } else if (request.getType() == ExperimentType.PAIRWISE_COMPARISON) {
+            importPairwiseExperiment(experimentId, request, searchConfigurations, finalResults, hasFailure);
         } else {
             throw new SearchRelevanceException(
                 "Importing experimentType" + request.getType() + " is not supported",
@@ -224,6 +225,47 @@ public class PostExperimentTransportAction extends HandledTransportAction<PostEx
                 experimentId,
                 processCount,
                 evaluationResultList.size(),
+                maxLimit
+            );
+        }
+
+    }
+
+    /**
+     * Doesn't have any of the async processing that importPointwiseExperiment does because we do not populate a
+     * separate index via a DAO.  Just a single document imported.
+     */
+    private void importPairwiseExperiment(
+        String experimentId,
+        PostExperimentRequest request,
+        List<SearchConfiguration> searchConfigurations,
+        List<Map<String, Object>> finalResults,
+        AtomicBoolean hasFailure
+    ) {
+
+        List judgmentList = List.of();
+        List<Map<String, Object>> results = request.getResults();
+
+        int maxLimit = settingsAccessor.getMaxQuerySetAllowed();
+        int processCount = Math.min(results.size(), maxLimit);
+
+        // Track both completed operations (success + failure) to know when all processing is done
+        AtomicInteger completedOperations = new AtomicInteger(0);
+
+        for (int i = 0; i < processCount; i++) {
+            Map<String, Object> resultMap = results.get(i);
+            finalResults.add(resultMap);
+        }
+
+        updateFinalExperiment(experimentId, request, finalResults, judgmentList, hasFailure.get());
+
+        // Log if we had to limit the results
+        if (results.size() > maxLimit) {
+            LOGGER.warn(
+                "Experiment {} limited to {} results stored (requested: {}, max allowed: {})",
+                experimentId,
+                processCount,
+                results.size(),
                 maxLimit
             );
         }

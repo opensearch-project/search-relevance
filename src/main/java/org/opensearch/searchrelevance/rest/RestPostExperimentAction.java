@@ -23,6 +23,7 @@ import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.rest.BaseRestHandler;
 import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestRequest;
+import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.searchrelevance.transport.experiment.PostExperimentAction;
@@ -57,23 +58,11 @@ public class RestPostExperimentAction extends BaseRestHandler {
         if (!settingsAccessor.isWorkbenchEnabled()) {
             return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.FORBIDDEN, "Search Relevance Workbench is disabled"));
         }
+
+        PostExperimentRequest createRequest = null;
         XContentParser parser = request.contentParser();
         Map<String, Object> source = parser.map();
 
-        String querySetId = (String) source.get("querySetId");
-        List<String> searchConfigurationList = ParserUtils.convertObjToList(source, "searchConfigurationList");
-        if (searchConfigurationList.size() != 1) {
-            throw new IOException("Must have exactly one search configuration. Had " + searchConfigurationList.size() + " size.");
-        }
-        Integer sizeObj = (Integer) source.get("size");
-        int size = sizeObj != null ? sizeObj.intValue() : 10; // Default size to 10 if not provided
-
-        List<String> judgmentList = ParserUtils.convertObjToList(source, "judgmentList");
-        if (judgmentList.size() != 1) {
-            throw new IOException("Must have exactly one judgment list. Had " + judgmentList.size() + " size.");
-        }
-
-        List<Map<String, Object>> evaluationResultList = ParserUtils.convertObjToListOfMaps(source, "evaluationResultList");
         String typeString = (String) source.get("type");
         ExperimentType type;
         try {
@@ -82,16 +71,49 @@ public class RestPostExperimentAction extends BaseRestHandler {
             throw new IllegalArgumentException("Invalid or missing experiment type", e);
         }
 
-        PostExperimentRequest createRequest = new PostExperimentRequest(
-            type,
-            querySetId,
-            searchConfigurationList,
-            judgmentList,
-            size,
-            evaluationResultList
-        );
+        if (type == ExperimentType.POINTWISE_EVALUATION) {
+            String querySetId = (String) source.get("querySetId");
+            List<String> searchConfigurationList = ParserUtils.convertObjToList(source, "searchConfigurationList");
+            if (searchConfigurationList.size() != 1) {
+                throw new IOException("Must have exactly one search configuration. Had " + searchConfigurationList.size() + " size.");
+            }
+            Integer sizeObj = (Integer) source.get("size");
+            int size = sizeObj != null ? sizeObj.intValue() : 10; // Default size to 10 if not provided
 
-        return channel -> client.execute(PostExperimentAction.INSTANCE, createRequest, new ActionListener<IndexResponse>() {
+            List<String> judgmentList = ParserUtils.convertObjToList(source, "judgmentList");
+            if (judgmentList.size() != 1) {
+                throw new IOException("Must have exactly one judgment list. Had " + judgmentList.size() + " size.");
+            }
+
+            List<Map<String, Object>> evaluationResultList = ParserUtils.convertObjToListOfMaps(source, "evaluationResultList");
+
+            createRequest = new PostExperimentRequest(
+                type,
+                querySetId,
+                searchConfigurationList,
+                judgmentList,
+                size,
+                evaluationResultList,
+                null
+            );
+        } else if (type == ExperimentType.PAIRWISE_COMPARISON) {
+            String querySetId = (String) source.get("querySetId");
+            List<String> searchConfigurationList = ParserUtils.convertObjToList(source, "searchConfigurationList");
+            if (searchConfigurationList.size() != 2) {
+                throw new IOException("Must have exactly two search configurations. Had " + searchConfigurationList.size() + " size.");
+            }
+            Integer sizeObj = (Integer) source.get("size");
+            int size = sizeObj != null ? sizeObj.intValue() : 10; // Default size to 10 if not provided
+
+            List<Map<String, Object>> results = ParserUtils.convertObjToListOfMaps(source, "results");
+
+            createRequest = new PostExperimentRequest(type, querySetId, searchConfigurationList, List.of(), size, null, results);
+        } else {
+            throw new SearchRelevanceException("Importing experimentType" + type + " is not supported", RestStatus.BAD_REQUEST);
+        }
+
+        PostExperimentRequest finalCreateRequest = createRequest;
+        return channel -> client.execute(PostExperimentAction.INSTANCE, finalCreateRequest, new ActionListener<IndexResponse>() {
             @Override
             public void onResponse(IndexResponse response) {
                 try {

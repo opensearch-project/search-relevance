@@ -24,8 +24,9 @@ public class PostExperimentRequest extends ActionRequest {
     private final String querySetId;
     private final List<String> searchConfigurationList;
     private final List<String> judgmentList;
-    private final List<Map<String, Object>> evaluationResultList;
     private final int size;
+    private final List<Map<String, Object>> evaluationResultList;
+    private final List<Map<String, Object>> results;
 
     public PostExperimentRequest(
         @NonNull ExperimentType type,
@@ -33,7 +34,8 @@ public class PostExperimentRequest extends ActionRequest {
         @NonNull List<String> searchConfigurationList,
         @NonNull List<String> judgmentList,
         @NonNull int size,
-        @NonNull List<Map<String, Object>> evaluationResultList
+        @NonNull List<Map<String, Object>> evaluationResultList,
+        @NonNull List<Map<String, Object>> results
 
     ) {
         this.type = type;
@@ -42,6 +44,7 @@ public class PostExperimentRequest extends ActionRequest {
         this.judgmentList = judgmentList;
         this.size = size;
         this.evaluationResultList = evaluationResultList;
+        this.results = results;
 
     }
 
@@ -53,6 +56,7 @@ public class PostExperimentRequest extends ActionRequest {
         this.judgmentList = in.readStringList();
         this.size = in.readInt();
         this.evaluationResultList = in.readBoolean() ? in.readList(StreamInput::readMap) : null;
+        this.results = in.readBoolean() ? in.readList(StreamInput::readMap) : null;
     }
 
     @Override
@@ -66,6 +70,12 @@ public class PostExperimentRequest extends ActionRequest {
         if (evaluationResultList != null) {
             out.writeBoolean(true);
             out.writeCollection(evaluationResultList, StreamOutput::writeMap);
+        } else {
+            out.writeBoolean(false);
+        }
+        if (results != null) {
+            out.writeBoolean(true);
+            out.writeCollection(results, StreamOutput::writeMap);
         } else {
             out.writeBoolean(false);
         }
@@ -95,14 +105,18 @@ public class PostExperimentRequest extends ActionRequest {
         return evaluationResultList;
     }
 
+    public List<Map<String, Object>> getResults() {
+        return results;
+    }
+
     @Override
     public ActionRequestValidationException validate() {
         ActionRequestValidationException validationException = null;
 
-        // Note: type, querySetId, searchConfigurationList, judgmentList, and evaluationResultList
+        // Note: type, querySetId, searchConfigurationList, judgmentList, evaluationResultList, and results
         // are already validated as non-null by @NonNull annotations
 
-        if (querySetId.isEmpty()) {
+        if (type == ExperimentType.POINTWISE_EVALUATION && querySetId.isEmpty()) {
             if (validationException == null) {
                 validationException = new ActionRequestValidationException();
             }
@@ -116,7 +130,7 @@ public class PostExperimentRequest extends ActionRequest {
             validationException.addValidationError("searchConfigurationList cannot be empty");
         }
 
-        if (judgmentList.isEmpty()) {
+        if (type == ExperimentType.POINTWISE_EVALUATION && judgmentList.isEmpty()) {
             if (validationException == null) {
                 validationException = new ActionRequestValidationException();
             }
@@ -130,11 +144,18 @@ public class PostExperimentRequest extends ActionRequest {
             validationException.addValidationError("size must be greater than 0");
         }
 
-        if (evaluationResultList != null && evaluationResultList.isEmpty()) {
+        if (type == ExperimentType.POINTWISE_EVALUATION && evaluationResultList != null && evaluationResultList.isEmpty()) {
             if (validationException == null) {
                 validationException = new ActionRequestValidationException();
             }
             validationException.addValidationError("evaluationResultList cannot be empty");
+        }
+
+        if (type == ExperimentType.PAIRWISE_COMPARISON && results != null && results.isEmpty()) {
+            if (validationException == null) {
+                validationException = new ActionRequestValidationException();
+            }
+            validationException.addValidationError("results cannot be empty");
         }
 
         return validationException;

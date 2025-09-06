@@ -40,7 +40,8 @@ public class PostExperimentActionTests extends OpenSearchTestCase {
             List.of("5678", "0000"),
             List.of("5678", "0000"),
             10,
-            evaluationResults
+            evaluationResults,
+            null
         );
 
         BytesStreamOutput output = new BytesStreamOutput();
@@ -69,6 +70,8 @@ public class PostExperimentActionTests extends OpenSearchTestCase {
         assertEquals(0.75, ndcg.get("value"));
 
         assertEquals(10, serialized.getSize());
+
+        assertNull(serialized.getResults());
     }
 
     public void testRequestValidation() {

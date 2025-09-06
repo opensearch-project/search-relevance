@@ -292,7 +292,8 @@ public class PostExperimentTransportActionTests extends OpenSearchTestCase {
             List.of("test-search-config-id"),
             List.of("test-judgment-id"),
             10,
-            evaluationResults
+            evaluationResults,
+            List.of()
         );
     }
 
