@@ -42,7 +42,7 @@ import lombok.extern.log4j.Log4j2;
 
 @Log4j2
 /**
- * Rest Action to facilitate requests to create a experiment.
+ * Rest Action to facilitate requests to create an experiment.
  */
 @AllArgsConstructor
 public class RestPutExperimentAction extends BaseRestHandler {
