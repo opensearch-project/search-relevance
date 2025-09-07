@@ -96,7 +96,7 @@ public class PostExperimentTransportAction extends HandledTransportAction<PostEx
 
         try {
             String id = UUID.randomUUID().toString();
-            LOGGER.warn("Experiment ID: " + id);
+            LOGGER.info("Experiment ID: " + id);
             Experiment initialExperiment = new Experiment(
                 id,
                 TimeUtils.getTimestamp(),
