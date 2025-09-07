@@ -11,10 +11,12 @@ import static org.opensearch.searchrelevance.common.PluginConstants.TRANSPORT_AC
 
 import org.opensearch.action.ActionType;
 import org.opensearch.action.search.SearchResponse;
+import org.opensearch.common.annotation.ExperimentalApi;
 
 /**
  * External Action for public facing RestGetScheduledExperimentAction
  */
+@ExperimentalApi
 public class GetScheduledExperimentAction extends ActionType<SearchResponse> {
     /** The name of this action */
     public static final String NAME = TRANSPORT_ACTION_NAME_PREFIX + "scheduledjob/get";

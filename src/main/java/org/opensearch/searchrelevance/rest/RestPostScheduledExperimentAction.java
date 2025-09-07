@@ -11,8 +11,7 @@ import static java.util.Collections.singletonList;
 import static org.opensearch.rest.RestRequest.Method.POST;
 import static org.opensearch.searchrelevance.common.PluginConstants.CRON_EXPRESSION;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_ID;
-import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_EXPERIMENT_URL_PREFIX;
-import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_EXPERIMENT_URL_SUFFIX;
+import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_EXPERIMENT_URL;
 
 import java.io.IOException;
 import java.util.List;
@@ -20,6 +19,7 @@ import java.util.Map;
 
 import org.opensearch.ExceptionsHelper;
 import org.opensearch.action.index.IndexResponse;
+import org.opensearch.common.annotation.ExperimentalApi;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.core.xcontent.XContentBuilder;
@@ -42,6 +42,7 @@ import lombok.extern.log4j.Log4j2;
  * Rest Action to facilitate requests to schedule running an experiment.
  */
 @AllArgsConstructor
+@ExperimentalApi
 public class RestPostScheduledExperimentAction extends BaseRestHandler {
     private static final String POST_SCHEDULED_EXPERIMENT_ACTION = "post_scheduled_experiment_action";
     private SearchRelevanceSettingsAccessor settingsAccessor;
@@ -54,7 +55,7 @@ public class RestPostScheduledExperimentAction extends BaseRestHandler {
 
     @Override
     public List<Route> routes() {
-        return singletonList(new Route(POST, SCHEDULED_EXPERIMENT_URL_PREFIX + SCHEDULED_EXPERIMENT_URL_SUFFIX));
+        return singletonList(new Route(POST, SCHEDULED_EXPERIMENT_URL));
     }
 
     @Override

@@ -9,8 +9,7 @@ package org.opensearch.searchrelevance.rest;
 
 import static org.opensearch.rest.RestRequest.Method.GET;
 import static org.opensearch.searchrelevance.common.PluginConstants.DOCUMENT_ID;
-import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_EXPERIMENT_URL_PREFIX;
-import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_EXPERIMENT_URL_SUFFIX;
+import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_EXPERIMENT_URL;
 
 import java.io.IOException;
 import java.util.List;
@@ -19,6 +18,7 @@ import java.util.Locale;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opensearch.action.search.SearchResponse;
+import org.opensearch.common.annotation.ExperimentalApi;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.core.xcontent.ToXContent;
@@ -41,6 +41,7 @@ import lombok.AllArgsConstructor;
  * Rest Action to facilitate requests to get/list scheduled job.
  */
 @AllArgsConstructor
+@ExperimentalApi
 public class RestGetScheduledExperimentAction extends BaseRestHandler {
     private static final Logger LOGGER = LogManager.getLogger(RestGetScheduledExperimentAction.class);
     private static final String GET_SCHEDULED_EXPERIMENT_ACTION = "get_scheduled_experiment_action";
@@ -54,11 +55,8 @@ public class RestGetScheduledExperimentAction extends BaseRestHandler {
     @Override
     public List<Route> routes() {
         return List.of(
-            new Route(
-                GET,
-                String.format(Locale.ROOT, "%s/{%s}%s", SCHEDULED_EXPERIMENT_URL_PREFIX, DOCUMENT_ID, SCHEDULED_EXPERIMENT_URL_SUFFIX)
-            ),
-            new Route(GET, SCHEDULED_EXPERIMENT_URL_PREFIX + SCHEDULED_EXPERIMENT_URL_SUFFIX)
+            new Route(GET, String.format(Locale.ROOT, "%s/{%s}", SCHEDULED_EXPERIMENT_URL, DOCUMENT_ID)),
+            new Route(GET, SCHEDULED_EXPERIMENT_URL)
         );
     }
 

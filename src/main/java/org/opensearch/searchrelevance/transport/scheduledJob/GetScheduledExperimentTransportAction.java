@@ -13,6 +13,7 @@ import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.HandledTransportAction;
 import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.common.annotation.ExperimentalApi;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
@@ -22,6 +23,7 @@ import org.opensearch.searchrelevance.transport.OpenSearchDocRequest;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
 
+@ExperimentalApi
 public class GetScheduledExperimentTransportAction extends HandledTransportAction<OpenSearchDocRequest, SearchResponse> {
     private static final Logger LOGGER = LogManager.getLogger(GetScheduledExperimentTransportAction.class);
     private final ClusterService clusterService;

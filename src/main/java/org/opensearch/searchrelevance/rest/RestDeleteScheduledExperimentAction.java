@@ -10,8 +10,7 @@ package org.opensearch.searchrelevance.rest;
 import static java.util.Collections.singletonList;
 import static org.opensearch.rest.RestRequest.Method.DELETE;
 import static org.opensearch.searchrelevance.common.PluginConstants.DOCUMENT_ID;
-import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_EXPERIMENT_URL_PREFIX;
-import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_EXPERIMENT_URL_SUFFIX;
+import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_EXPERIMENT_URL;
 
 import java.io.IOException;
 import java.util.List;
@@ -21,6 +20,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opensearch.action.DocWriteResponse;
 import org.opensearch.action.delete.DeleteResponse;
+import org.opensearch.common.annotation.ExperimentalApi;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.core.xcontent.XContentBuilder;
@@ -40,6 +40,7 @@ import lombok.extern.log4j.Log4j2;
 /**
  * Rest Action to facilitate requests to delete the scheduled running of an experiment```
  */
+@ExperimentalApi
 @AllArgsConstructor
 public class RestDeleteScheduledExperimentAction extends BaseRestHandler {
     private static final Logger LOGGER = LogManager.getLogger(RestDeleteScheduledExperimentAction.class);
@@ -53,12 +54,7 @@ public class RestDeleteScheduledExperimentAction extends BaseRestHandler {
 
     @Override
     public List<Route> routes() {
-        return singletonList(
-            new Route(
-                DELETE,
-                String.format(Locale.ROOT, "%s/{%s}%s", SCHEDULED_EXPERIMENT_URL_PREFIX, DOCUMENT_ID, SCHEDULED_EXPERIMENT_URL_SUFFIX)
-            )
-        );
+        return singletonList(new Route(DELETE, String.format(Locale.ROOT, "%s/{%s}", SCHEDULED_EXPERIMENT_URL, DOCUMENT_ID)));
     }
 
     @Override

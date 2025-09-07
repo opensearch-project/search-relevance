@@ -16,6 +16,7 @@ import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.HandledTransportAction;
 import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.common.annotation.ExperimentalApi;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
@@ -27,6 +28,7 @@ import org.opensearch.searchrelevance.model.ScheduledJob;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
 
+@ExperimentalApi
 public class PostScheduledExperimentTransportAction extends HandledTransportAction<PostScheduledExperimentRequest, IndexResponse> {
     private final ClusterService clusterService;
     private final ScheduledJobsDao scheduledJobsDao;

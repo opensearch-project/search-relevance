@@ -9,8 +9,7 @@ package org.opensearch.searchrelevance.action.scheduledJob;
 
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENTS_URI;
 import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_EXPERIMENT_HISTORY_INDEX;
-import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_EXPERIMENT_URL_PREFIX;
-import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_EXPERIMENT_URL_SUFFIX;
+import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_EXPERIMENT_URL;
 import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_JOBS_INDEX;
 
 import java.nio.file.Files;
@@ -80,7 +79,7 @@ public class ScheduledJobsIT extends BaseExperimentIT {
         assertNotNull(source);
         assertNotNull(source.get("id"));
         assertNotNull(source.get("schedule"));
-        assertEquals(experimentId, source.get("experimentId"));
+        assertEquals(experimentId, source.get("id"));
 
         // Here we have to wait until at last one
         Thread.sleep(CRON_JOB_COMPLETION_MS);
@@ -179,7 +178,7 @@ public class ScheduledJobsIT extends BaseExperimentIT {
         Response createScheduledExperimentResponse = makeRequest(
             client(),
             RestRequest.Method.POST.name(),
-            SCHEDULED_EXPERIMENT_URL_PREFIX + SCHEDULED_EXPERIMENT_URL_SUFFIX,
+            SCHEDULED_EXPERIMENT_URL,
             null,
             toHttpEntity(createScheduledExperimentBody),
             ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))

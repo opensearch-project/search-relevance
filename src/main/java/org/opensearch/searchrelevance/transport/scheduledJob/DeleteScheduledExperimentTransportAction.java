@@ -11,6 +11,7 @@ import org.opensearch.action.delete.DeleteResponse;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.HandledTransportAction;
 import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.common.annotation.ExperimentalApi;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
@@ -20,6 +21,7 @@ import org.opensearch.searchrelevance.transport.OpenSearchDocRequest;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
 
+@ExperimentalApi
 public class DeleteScheduledExperimentTransportAction extends HandledTransportAction<OpenSearchDocRequest, DeleteResponse> {
     private final ClusterService clusterService;
     private final ScheduledJobsDao scheduledJobsDao;

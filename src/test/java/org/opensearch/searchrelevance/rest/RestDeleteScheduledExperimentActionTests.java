@@ -42,6 +42,8 @@ public class RestDeleteScheduledExperimentActionTests extends SearchRelevanceRes
     public void setUp() throws Exception {
         super.setUp();
         restDeleteScheduledExperimentAction = new RestDeleteScheduledExperimentAction(settingsAccessor);
+        // Prepare some default settings
+        when(settingsAccessor.isScheduledExperimentsEnabled()).thenReturn(true);
         // Setup channel mock
         when(channel.newBuilder()).thenReturn(JsonXContent.contentBuilder());
         when(channel.newErrorBuilder()).thenReturn(JsonXContent.contentBuilder());
@@ -64,6 +66,22 @@ public class RestDeleteScheduledExperimentActionTests extends SearchRelevanceRes
     public void testPrepareRequest_WorkbenchDisabled() throws Exception {
         // Setup
         when(settingsAccessor.isWorkbenchEnabled()).thenReturn(false);
+        RestRequest request = createScheduledDeleteRestRequestWithParams(null);
+        when(channel.request()).thenReturn(request);
+
+        // Execute
+        restDeleteScheduledExperimentAction.handleRequest(request, channel, client);
+
+        // Verify
+        ArgumentCaptor<BytesRestResponse> responseCaptor = ArgumentCaptor.forClass(BytesRestResponse.class);
+        verify(channel).sendResponse(responseCaptor.capture());
+        assertEquals(RestStatus.FORBIDDEN, responseCaptor.getValue().status());
+    }
+
+    public void testPrepareRequest_JobSchedulerDisabled() throws Exception {
+        // Setup
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        when(settingsAccessor.isScheduledExperimentsEnabled()).thenReturn(false);
         RestRequest request = createScheduledDeleteRestRequestWithParams(null);
         when(channel.request()).thenReturn(request);
 

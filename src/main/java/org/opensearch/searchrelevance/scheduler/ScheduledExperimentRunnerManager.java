@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import org.opensearch.action.search.SearchResponse;
+import org.opensearch.common.annotation.ExperimentalApi;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.searchrelevance.dao.ExperimentDao;
@@ -28,6 +29,7 @@ import org.opensearch.searchrelevance.utils.TimeUtils;
 import lombok.extern.log4j.Log4j2;
 
 @Log4j2
+@ExperimentalApi
 public enum ScheduledExperimentRunnerManager {
     INSTANCE;
 

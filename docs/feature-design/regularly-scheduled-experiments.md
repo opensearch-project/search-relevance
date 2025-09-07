@@ -127,20 +127,8 @@ There should be 3 new APIS, GET, POST, DELETE. Additionally, the job runner and 
     "enabledTime": {
       "type": "long"
     },
-    "experimentId": {
-      "type": "keyword"
-    },
-    "indexNameToWatch": {
-      "type": "keyword"
-    },
     "lastUpdateTime": {
       "type": "long"
-    },
-    "lockDurationSeconds": {
-      "type": "long"
-    },
-    "name": {
-      "type": "keyword"
     },
     "schedule": {
       "properties": {
@@ -167,18 +155,38 @@ There should be 3 new APIS, GET, POST, DELETE. Additionally, the job runner and 
   "properties": {
     "id": { "type": "keyword" },
     "experimentId": { "type": "keyword" },
-    "jobId": {
-      "type": "keyword"
-    },
-    "jobIndexName": {
-      "type": "keyword"
-    },
     "timestamp": {
       "type": "date",
       "format": "strict_date_time"
     },
     "status": { "type": "keyword" },
     "results": { "type": "object"}
+  }
+}
+```
+
+**Updating index for evaluation results**
+
+```json
+{
+  "properties": {
+    "id": { "type": "keyword" },
+    "timestamp": { "type": "date", "format": "strict_date_time" },
+    "searchConfigurationId": { "type": "keyword" },
+    "experimentId": { "type": "keyword" },
+    "experimentVariantId": { "type": "keyword" },
+    "experimentVariantParameters": { "type": "keyword" },
+    "scheduledRunId": {"type": "keyword"},
+    "searchText": { "type": "keyword" },
+    "judgmentList": { "type": "keyword" },
+    "documentIds": { "type": "keyword" },
+    "metrics": {
+      "type": "nested",
+      "properties": {
+        "metric": { "type": "keyword" },
+        "value": { "type": "float" }
+      }
+    }
   }
 }
 ```
@@ -200,7 +208,7 @@ private String experimentId;
 ### API Specification
 
 ```http
-POST /_plugins/_search_relevance/experiment/schedule
+POST /_plugins/_search_relevance/experiments/schedule
 {
     "experimentId": "2bb07ecb-082a-4bab-b9c0-dc225e5c35ae",
     "cronExpression": "* * * * *"
@@ -217,7 +225,7 @@ POST /_plugins/_search_relevance/experiment/schedule
 ```
 
 ```http
-GET /_plugins/_search_relevance/experiment/2bb07ecb-082a-4bab-b9c0-dc225e5c35ae/schedule
+GET /_plugins/_search_relevance/experiments/schedule/2bb07ecb-082a-4bab-b9c0-dc225e5c35ae
 ```
 
 **Response:**
@@ -241,7 +249,7 @@ GET /_plugins/_search_relevance/experiment/2bb07ecb-082a-4bab-b9c0-dc225e5c35ae/
 ```
 
 ```http
-DELETE /_plugins/_search_relevance/experiment/2bb07ecb-082a-4bab-b9c0-dc225e5c35ae/schedule
+DELETE /_plugins/_search_relevance/experiments/schedule/2bb07ecb-082a-4bab-b9c0-dc225e5c35ae
 ```
 {% include copy-curl.html %}
 
@@ -311,11 +319,17 @@ flowchart LR
 
 ## Backward Compatibility
 
-- For any of the previous indices, there are no changes
 - New APIs are added which means that the specification should be updated.
+- The index `search-relevance-evaluation-result` is updated so that there is an additional field to indicate whether the result was from a scheduled or non-scheduled experiment
+- Mapping strategy: As a new mapping update strategy, there should be a version manager for tracking the schema changes of an index mapping over time. However, this will be worked on in a future issue for all search relevant indices. 
 
 
 ## Security Considerations
+
+### Attack Vectors
+
+- At the moment, job scheduler has a feature to use [role injections](https://github.com/opensearch-project/common-utils/blob/main/src/main/java/org/opensearch/commons/InjectSecurity.java#L170-L188) where the access settings of the user are copied into the job scheduler at runtime, preventing the job scheduler from accessing resources outside of the user's permission level. 
+- Currently jobs are not authenticated as well as API requests, but there is work to create a [token-based authentication](https://github.com/opensearch-project/security/issues/5052) system which grants only the permissions needed for the job to run. 
 
 ### Additional Considerations
 - **Input validations:** Make sure that the inputs for the requests are formatted properly
