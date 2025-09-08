@@ -304,12 +304,12 @@ The diagram below shows how the scheduled experiment API interacts with the `.se
 ```mermaid
 sequenceDiagram
     PostScheduledExperimentTransportAction->>+.search-relevance-scheduled-experiment-jobs: puts schedule and experiment_id and other metadata into index
-    .search-relevance-scheduled-experiment-jobs->>+IndexOperationListener:The index operation listener activates the scheduler in the job scheduler plugin which submits the experiment to the job runner 
+    .search-relevance-scheduled-experiment-jobs->>+IndexOperationListener:The index operation listener activates the scheduler in the job scheduler plugin which submits the experiment to the job runner
 ```
 
-The results of these runs are also stored in its own index called `.search-relevance-scheduled-experiment-history`. This helps track the status of the experiment, the results, and the id of the experiment that the scheduled run is based on. 
+The results of these runs are also stored in its own index called `.search-relevance-scheduled-experiment-history`. This helps track the status of the experiment, the results, and the id of the experiment that the scheduled run is based on.
 
-The diagram below shows the code flow behind how the data is stored into this index. 
+The diagram below shows the code flow behind how the data is stored into this index.
 
 ```mermaid
 sequenceDiagram
@@ -318,7 +318,7 @@ sequenceDiagram
     ScheduledExperimentRunnerManager->>+search-relevance-scheduled-experiment-history: Submits result of that scheduled experiment
 ```
 
-The evaluation results index `search-relevance-evaluation-result` will also be updated for viewing the scheduled experiment results in Search Relevance Dashboards. One nuance is that there will be an additional marker to indicate that the evaluation result was based on a scheduled experiment. 
+The evaluation results index `search-relevance-evaluation-result` will also be updated for viewing the scheduled experiment results in Search Relevance Dashboards. One nuance is that there will be an additional marker to indicate that the evaluation result was based on a scheduled experiment.
 
 Below is a diagram to show how evaluation results are submitted.
 

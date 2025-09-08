@@ -15,6 +15,7 @@ import java.util.concurrent.TimeoutException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opensearch.common.annotation.ExperimentalApi;
+import org.opensearch.common.util.concurrent.FutureUtils;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.jobscheduler.spi.JobExecutionContext;
 import org.opensearch.jobscheduler.spi.ScheduledJobParameter;
@@ -86,10 +87,10 @@ public enum SearchRelevanceJobRunner implements ScheduledJobRunner {
             // Attempt to get the result with a timeout seconds
             searchEvaluationTask.get(settingsAccessor.getScheduledExperimentsTimeout().getSeconds(), TimeUnit.SECONDS);
         } catch (TimeoutException e) {
-            log.error("timeout for scheduled experiment has occured!");
-            searchEvaluationTask.cancel(true); // Attempt to interrupt the running task
+            log.error("Timeout for scheduled experiment has occured!");
+            FutureUtils.cancel(searchEvaluationTask); // Attempt to interrupt the running task
         } catch (InterruptedException | ExecutionException e) {
-            log.error(" for scheduled experiment has occured!");
+            log.error("Interrupt for scheduled experiment has occured!");
         } finally {}
     }
 
