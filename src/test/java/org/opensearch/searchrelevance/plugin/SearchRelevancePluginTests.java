@@ -34,6 +34,7 @@ import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.settings.ClusterSettings;
 import org.opensearch.common.settings.Setting;
 import org.opensearch.common.settings.Settings;
+import org.opensearch.common.unit.TimeValue;
 import org.opensearch.core.action.ActionResponse;
 import org.opensearch.core.common.io.stream.NamedWriteableRegistry;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
@@ -246,10 +247,10 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
 
         Setting<?> setting4 = settings.get(4);
         assertEquals("plugins.search_relevance.scheduled_experiments_timeout", setting4.getKey());
-        assertEquals(true, setting4.get(Settings.EMPTY));
+        assertEquals(TimeValue.timeValueSeconds(30), setting4.get(Settings.EMPTY));
 
         Setting<?> setting5 = settings.get(5);
         assertEquals("plugins.search_relevance.scheduled_experiments_minimum_interval", setting5.getKey());
-        assertEquals(1000, setting5.get(Settings.EMPTY));
+        assertEquals(TimeValue.timeValueSeconds(1), setting5.get(Settings.EMPTY));
     }
 }

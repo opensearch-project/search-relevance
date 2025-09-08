@@ -9,6 +9,7 @@ package org.opensearch.searchrelevance.experiment;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -98,7 +99,7 @@ public class PointwiseExperimentProcessorTests extends OpenSearchTestCase {
                 any(Map.class),
                 any(Map.class),
                 any(AtomicBoolean.class),
-                anyString()
+                isNull()
             )
         ).thenReturn(mockFuture);
 
