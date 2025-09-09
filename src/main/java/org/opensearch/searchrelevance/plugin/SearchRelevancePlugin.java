@@ -226,7 +226,9 @@ public class SearchRelevancePlugin extends Plugin
                 scheduledExperimentHistoryDao,
                 metricsHelper,
                 new HybridOptimizerExperimentProcessor(judgmentDao, experimentTaskManager),
-                new PointwiseExperimentProcessor(judgmentDao, experimentTaskManager)
+                new PointwiseExperimentProcessor(judgmentDao, experimentTaskManager),
+                threadPool,
+                settingsAccessor
             )
         );
         jobRunner.setThreadPool(threadPool);

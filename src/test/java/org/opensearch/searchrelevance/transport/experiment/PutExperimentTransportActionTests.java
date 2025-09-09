@@ -39,7 +39,9 @@ import org.opensearch.searchrelevance.metrics.MetricsHelper;
 import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.Experiment;
 import org.opensearch.searchrelevance.model.ExperimentType;
+import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.test.OpenSearchTestCase;
+import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.TransportService;
 
 public class PutExperimentTransportActionTests extends OpenSearchTestCase {
@@ -60,6 +62,10 @@ public class PutExperimentTransportActionTests extends OpenSearchTestCase {
     private JudgmentDao judgmentDao;
     @Mock
     private ExperimentTaskManager experimentTaskManager;
+    @Mock
+    private ThreadPool threadPool;
+    @Mock
+    private SearchRelevanceSettingsAccessor settingsAccessor;
 
     private PutExperimentTransportAction transportAction;
 
@@ -74,7 +80,9 @@ public class PutExperimentTransportActionTests extends OpenSearchTestCase {
             searchConfigurationDao,
             metricsHelper,
             judgmentDao,
-            experimentTaskManager
+            experimentTaskManager,
+            threadPool,
+            settingsAccessor
         );
     }
 

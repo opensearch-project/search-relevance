@@ -7,10 +7,10 @@
  */
 package org.opensearch.searchrelevance.scheduler;
 
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.UUID;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -22,6 +22,7 @@ import org.opensearch.jobscheduler.spi.ScheduledJobParameter;
 import org.opensearch.jobscheduler.spi.ScheduledJobRunner;
 import org.opensearch.jobscheduler.spi.utils.LockService;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
+import org.opensearch.searchrelevance.utils.ConcurrencyUtil;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.client.Client;
 
@@ -62,6 +63,9 @@ public enum SearchRelevanceJobRunner implements ScheduledJobRunner {
         checkComponents();
 
         final LockService lockService = context.getLockService();
+        AtomicBoolean hasStarted = new AtomicBoolean(false);
+        String scheduledExperimentResultId = UUID.randomUUID().toString();
+        SearchRelevanceJobParameters parameter = (SearchRelevanceJobParameters) jobParameter;
 
         Runnable runnable = () -> {
             if (jobParameter.getLockDurationSeconds() != null) {
@@ -69,8 +73,7 @@ public enum SearchRelevanceJobRunner implements ScheduledJobRunner {
                     if (lock == null) {
                         return;
                     }
-                    SearchRelevanceJobParameters parameter = (SearchRelevanceJobParameters) jobParameter;
-                    manager.runScheduledExperiment(parameter);
+                    manager.runScheduledExperiment(parameter, hasStarted, scheduledExperimentResultId);
                     lockService.release(
                         lock,
                         ActionListener.wrap(released -> { log.info("Released lock for job {}", jobParameter.getName()); }, exception -> {
@@ -81,17 +84,22 @@ public enum SearchRelevanceJobRunner implements ScheduledJobRunner {
             }
         };
 
-        Future<?> searchEvaluationTask = threadPool.generic().submit(runnable);
-
+        CompletableFuture<Void> searchEvaluationTask = null;
         try {
-            // Attempt to get the result with a timeout seconds
-            searchEvaluationTask.get(settingsAccessor.getScheduledExperimentsTimeout().getSeconds(), TimeUnit.SECONDS);
-        } catch (TimeoutException e) {
+            // Schedule the experiment to run with a timeout.
+            searchEvaluationTask = ConcurrencyUtil.withTimeout(
+                CompletableFuture.runAsync(runnable, threadPool.generic()),
+                settingsAccessor.getScheduledExperimentsTimeout().getSeconds(),
+                threadPool
+            );
+        } catch (CancellationException e) {
             log.error("Timeout for scheduled experiment has occured!");
-            FutureUtils.cancel(searchEvaluationTask); // Attempt to interrupt the running task
-        } catch (InterruptedException | ExecutionException e) {
-            log.error("Interrupt for scheduled experiment has occured!");
-        } finally {}
+        } finally {
+            if (searchEvaluationTask != null && !searchEvaluationTask.isDone()) {
+                FutureUtils.cancel(searchEvaluationTask);
+            }
+            manager.cleanupResources(parameter.getExperimentId(), scheduledExperimentResultId, hasStarted);
+        }
     }
 
     private void checkComponents() {

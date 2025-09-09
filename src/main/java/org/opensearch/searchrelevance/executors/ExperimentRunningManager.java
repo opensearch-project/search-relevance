@@ -39,8 +39,11 @@ import org.opensearch.searchrelevance.model.QuerySet;
 import org.opensearch.searchrelevance.model.ScheduledExperimentResult;
 import org.opensearch.searchrelevance.model.SearchConfiguration;
 import org.opensearch.searchrelevance.model.SearchConfigurationDetails;
+import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.searchrelevance.transport.experiment.PutExperimentRequest;
+import org.opensearch.searchrelevance.utils.ConcurrencyUtil;
 import org.opensearch.searchrelevance.utils.TimeUtils;
+import org.opensearch.threadpool.ThreadPool;
 
 import lombok.AllArgsConstructor;
 import lombok.extern.log4j.Log4j2;
@@ -59,6 +62,8 @@ public class ExperimentRunningManager {
     private MetricsHelper metricsHelper;
     private HybridOptimizerExperimentProcessor hybridOptimizerExperimentProcessor;
     private PointwiseExperimentProcessor pointwiseExperimentProcessor;
+    private ThreadPool threadPool;
+    private SearchRelevanceSettingsAccessor settingsAccessor;
 
     public void startExperimentRun(String experimentId, PutExperimentRequest request) {
         // First, get QuerySet asynchronously
@@ -91,7 +96,13 @@ public class ExperimentRunningManager {
         List<CompletableFuture<Entry<String, Object>>> configFutures = new ArrayList<>();
 
         for (String configId : request.getSearchConfigurationList()) {
-            configFutures.add(fetchSingleSearchConfigurationAsync(experimentId, request, queryTextWithReferences, hasFailure, configId));
+            configFutures.add(
+                ConcurrencyUtil.withTimeout(
+                    fetchSingleSearchConfigurationAsync(experimentId, request, queryTextWithReferences, hasFailure, configId),
+                    settingsAccessor.getScheduledExperimentsTimeout().getSeconds(),
+                    threadPool
+                )
+            );
         }
 
         // Wait for all configurations to complete

@@ -9,7 +9,7 @@ package org.opensearch.searchrelevance.scheduler;
 
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.common.annotation.ExperimentalApi;
@@ -49,14 +49,17 @@ public enum ScheduledExperimentRunnerManager {
         this.experimentRunningManager = experimentRunningManager;
     }
 
-    public void runScheduledExperiment(SearchRelevanceJobParameters parameter) {
+    public void runScheduledExperiment(
+        SearchRelevanceJobParameters parameter,
+        AtomicBoolean hasStarted,
+        String scheduledExperimentResultId
+    ) {
         String experimentId = parameter.getExperimentId();
         try {
             experimentDao.getExperiment(experimentId, ActionListener.wrap(experimentResponse -> {
                 try {
                     Experiment experiment = convertToExperiment(experimentResponse);
                     String timestamp = TimeUtils.getTimestamp();
-                    String scheduledExperimentResultId = UUID.randomUUID().toString();
                     // What I will do here is add a new request parameter to replace the Experiment object so I can store the id
                     // of the running experiment to record the end time when finished.
                     ScheduledExperimentResult scheduledExperimentResult = new ScheduledExperimentResult(
@@ -75,6 +78,7 @@ public enum ScheduledExperimentRunnerManager {
                         experiment.size()
                     );
                     scheduledExperimentHistoryDao.putScheduledExperimentResult(scheduledExperimentResult, ActionListener.wrap(response -> {
+                        hasStarted.compareAndSet(false, true);
                         experimentRunningManager.startExperimentRun(experimentId, request);
                     }, e -> { handleAsyncFailure(experimentId, request, "Failed to put ScheduledExperimentResult", e); }));
                 } catch (Exception e) {
@@ -120,9 +124,46 @@ public enum ScheduledExperimentRunnerManager {
         scheduledExperimentHistoryDao.updateScheduledExperimentResult(
             finalExperiment,
             ActionListener.wrap(
-                response -> log.info("Updated scheduled experiment {} status to ERROR", experimentId),
-                e -> log.error("Failed to update error status for scheduled experiment: " + experimentId, e)
+                response -> log.info("Updated scheduled experiment {} status to ERROR", request.getScheduledExperimentResultId()),
+                e -> log.error("Failed to update error status for scheduled experiment: " + request.getScheduledExperimentResultId(), e)
             )
         );
+    }
+
+    public void cleanupResources(String experimentId, String scheduledExperimentResultId, AtomicBoolean hasStarted) {
+        ScheduledExperimentResult finalExperiment;
+        if (hasStarted.get() == false) {
+            log.info("While the experiment has not been added to the index, it will still be marked as TIMEOUT.");
+            finalExperiment = new ScheduledExperimentResult(
+                scheduledExperimentResultId,
+                experimentId,
+                TimeUtils.getTimestamp(),
+                AsyncStatus.TIMEOUT,
+                null
+            );
+            scheduledExperimentHistoryDao.putScheduledExperimentResult(
+                finalExperiment,
+                ActionListener.wrap(
+                    response -> log.info("Updated scheduled experiment {} status to TIMEOUT", scheduledExperimentResultId),
+                    e -> log.error("Failed to update error status for scheduled experiment: " + scheduledExperimentResultId, e)
+                )
+            );
+        } else {
+            finalExperiment = new ScheduledExperimentResult(
+                scheduledExperimentResultId,
+                experimentId,
+                TimeUtils.getTimestamp(),
+                AsyncStatus.TIMEOUT,
+                null
+            );
+
+            scheduledExperimentHistoryDao.updateScheduledExperimentResult(
+                finalExperiment,
+                ActionListener.wrap(
+                    response -> log.info("Updated scheduled experiment {} status to TIMEOUT", scheduledExperimentResultId),
+                    e -> log.error("Failed to update error status for scheduled experiment: " + scheduledExperimentResultId, e)
+                )
+            );
+        }
     }
 }

@@ -28,8 +28,10 @@ import org.opensearch.searchrelevance.experiment.PointwiseExperimentProcessor;
 import org.opensearch.searchrelevance.metrics.MetricsHelper;
 import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.Experiment;
+import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.tasks.Task;
+import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.TransportService;
 
 import lombok.extern.log4j.Log4j2;
@@ -57,7 +59,9 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
         SearchConfigurationDao searchConfigurationDao,
         MetricsHelper metricsHelper,
         JudgmentDao judgmentDao,
-        ExperimentTaskManager experimentTaskManager
+        ExperimentTaskManager experimentTaskManager,
+        ThreadPool threadPool,
+        SearchRelevanceSettingsAccessor settingsAccessor
     ) {
         super(PutExperimentAction.NAME, transportService, actionFilters, PutExperimentRequest::new);
         this.experimentDao = experimentDao;
@@ -73,7 +77,9 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
             null,
             metricsHelper,
             hybridOptimizerExperimentProcessor,
-            pointwiseExperimentProcessor
+            pointwiseExperimentProcessor,
+            threadPool,
+            settingsAccessor
         );
     }
 
