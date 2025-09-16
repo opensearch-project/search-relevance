@@ -10,12 +10,12 @@ package org.opensearch.searchrelevance.scheduler;
 import java.util.UUID;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.CountDownLatch;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opensearch.common.annotation.ExperimentalApi;
-import org.opensearch.common.util.concurrent.FutureUtils;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.jobscheduler.spi.JobExecutionContext;
 import org.opensearch.jobscheduler.spi.ScheduledJobParameter;
@@ -63,17 +63,21 @@ public enum SearchRelevanceJobRunner implements ScheduledJobRunner {
         checkComponents();
 
         final LockService lockService = context.getLockService();
-        AtomicBoolean hasStarted = new AtomicBoolean(false);
+        // Helps track whether the experiment has started or not and applied to how cleanups
+        // should be handled.
         String scheduledExperimentResultId = UUID.randomUUID().toString();
         SearchRelevanceJobParameters parameter = (SearchRelevanceJobParameters) jobParameter;
 
-        Runnable runnable = () -> {
+        ExperimentCancellationToken cancellationToken = new ExperimentCancellationToken(scheduledExperimentResultId);
+        CountDownLatch actuallyFinished = new CountDownLatch(1);
+
+        Runnable jobRunTask = () -> {
             if (jobParameter.getLockDurationSeconds() != null) {
                 lockService.acquireLock(jobParameter, context, ActionListener.wrap(lock -> {
                     if (lock == null) {
                         return;
                     }
-                    manager.runScheduledExperiment(parameter, hasStarted, scheduledExperimentResultId);
+                    manager.runScheduledExperiment(parameter, scheduledExperimentResultId, cancellationToken, actuallyFinished);
                     lockService.release(
                         lock,
                         ActionListener.wrap(released -> { log.info("Released lock for job {}", jobParameter.getName()); }, exception -> {
@@ -86,19 +90,29 @@ public enum SearchRelevanceJobRunner implements ScheduledJobRunner {
 
         CompletableFuture<Void> searchEvaluationTask = null;
         try {
-            // Schedule the experiment to run with a timeout.
+            // Schedule the experiment to run then also schedule a timeout to cancel experiment after some time.
+            long timeoutAmount = settingsAccessor.getScheduledExperimentsTimeout().getSeconds();
             searchEvaluationTask = ConcurrencyUtil.withTimeout(
-                CompletableFuture.runAsync(runnable, threadPool.generic()),
-                settingsAccessor.getScheduledExperimentsTimeout().getSeconds(),
+                CompletableFuture.runAsync(jobRunTask, threadPool.generic()),
+                timeoutAmount,
+                cancellationToken,
+                actuallyFinished,
                 threadPool
             );
+
+            // Wait until all asynchronous operations or timeout complete before cleanup
+            searchEvaluationTask.join();
         } catch (CancellationException e) {
             log.error("Timeout for scheduled experiment has occured!");
+        } catch (CompletionException e) {
+            log.error("Scheduled experiment has timed out. Moving onto cleanup");
         } finally {
-            if (searchEvaluationTask != null && !searchEvaluationTask.isDone()) {
-                FutureUtils.cancel(searchEvaluationTask);
-            }
-            manager.cleanupResources(parameter.getExperimentId(), scheduledExperimentResultId, hasStarted);
+            log.info("Has the thing been cancelled yet??");
+            log.info(cancellationToken.isCancelled());
+            log.info(actuallyFinished.getCount());
+            manager.cleanupResources(parameter.getExperimentId(), scheduledExperimentResultId, cancellationToken);
+            // This will clean up the future map in ExperimentRunningManager
+            cancellationToken.cancel();
         }
     }
 

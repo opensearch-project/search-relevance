@@ -110,7 +110,7 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
                 listener.onResponse((IndexResponse) response);
 
                 // Start experiment with async processing
-                experimentRunningManager.startExperimentRun(id, request);
+                experimentRunningManager.startExperimentRun(id, request, null, null);
             }, e -> {
                 log.error("Failed to create initial experiment", e);
                 listener.onFailure(

@@ -20,6 +20,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.opensearch.action.search.SearchResponse;
@@ -30,7 +32,10 @@ import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.model.ExperimentVariant;
 import org.opensearch.searchrelevance.model.SearchConfigurationDetails;
+import org.opensearch.searchrelevance.scheduler.ExperimentCancellationToken;
 import org.opensearch.searchrelevance.utils.TimeUtils;
+
+import com.google.common.annotations.VisibleForTesting;
 
 import lombok.AllArgsConstructor;
 import lombok.extern.log4j.Log4j2;
@@ -64,6 +69,8 @@ public class HybridOptimizerExperimentProcessor {
         int size,
         AtomicBoolean hasFailure,
         String scheduledRunId,
+        ExperimentCancellationToken cancellationToken,
+        Map<String, List<Future<?>>> runningFutures,
         ActionListener<Map<String, Object>> listener
     ) {
         // Create parameter combinations for hybrid search
@@ -128,6 +135,8 @@ public class HybridOptimizerExperimentProcessor {
                 docIdToScores,
                 hasFailure,
                 scheduledRunId,
+                cancellationToken,
+                runningFutures,
                 listener
             );
         }).exceptionally(e -> {
@@ -197,10 +206,18 @@ public class HybridOptimizerExperimentProcessor {
         }
     }
 
+    private boolean checkIfCancelled(ExperimentCancellationToken cancellationToken) {
+        if (cancellationToken != null && cancellationToken.isCancelled()) {
+            return true;
+        }
+        return false;
+    }
+
     /**
      * Process search configurations using optimized task manager
      */
-    private void processSearchConfigurationsAsync(
+    @VisibleForTesting
+    void processSearchConfigurationsAsync(
         String experimentId,
         String queryText,
         Map<String, SearchConfigurationDetails> searchConfigurations,
@@ -210,6 +227,8 @@ public class HybridOptimizerExperimentProcessor {
         Map<String, String> docIdToScores,
         AtomicBoolean hasFailure,
         String scheduledRunId,
+        ExperimentCancellationToken cancellationToken,
+        Map<String, List<Future<?>>> runningFutures,
         ActionListener<Map<String, Object>> finalListener
     ) {
         Map<String, Object> hydratedResults = new ConcurrentHashMap<>();
@@ -219,6 +238,18 @@ public class HybridOptimizerExperimentProcessor {
         List<CompletableFuture<Map<String, Object>>> configFutures = new ArrayList<>();
 
         for (Map.Entry<String, SearchConfigurationDetails> entry : searchConfigurations.entrySet()) {
+            // If the task is cancelled, we will stop scheduling more configurations, add a failed future,
+            // and signal that there has been a failure to the task scheduler.
+            if (checkIfCancelled(cancellationToken)) {
+                CompletableFuture<Map<String, Object>> futureToFail = new CompletableFuture<>();
+                configFutures.add(futureToFail);
+                futureToFail.completeExceptionally(new TimeoutException("Timed out when processing search configurations"));
+                if (hasFailure.compareAndSet(false, true)) {
+                    finalListener.onFailure(new TimeoutException("Timed out when processing search configurations"));
+                }
+                log.info("When processing search configurations in HybridOptimizerExperimentProcessor, a timeout cancellation occured");
+                break;
+            }
             String searchConfigId = entry.getKey();
             SearchConfigurationDetails configDetails = entry.getValue();
             String index = configDetails.getIndex();
@@ -238,7 +269,9 @@ public class HybridOptimizerExperimentProcessor {
                 docIdToScores,
                 hydratedResults,
                 hasFailure,
-                scheduledRunId
+                scheduledRunId,
+                runningFutures,
+                cancellationToken
             );
 
             // Transform the result for this search configuration

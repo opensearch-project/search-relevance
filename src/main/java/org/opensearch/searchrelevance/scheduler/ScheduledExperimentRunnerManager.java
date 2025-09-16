@@ -9,7 +9,7 @@ package org.opensearch.searchrelevance.scheduler;
 
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.CountDownLatch;
 
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.common.annotation.ExperimentalApi;
@@ -49,10 +49,19 @@ public enum ScheduledExperimentRunnerManager {
         this.experimentRunningManager = experimentRunningManager;
     }
 
+    /**
+     * Manager for fetching the experiment that is scheduled then running the experiment.
+     * Additionally, this class puts the incomplete {@link ScheduledExperimentResult}
+     * into its index.
+     *
+     * @param parameter Parameters for running the scheduled job
+     * @param scheduledExperimentResultId The id in the {@link ScheduledExperimentResult} index for this experiment
+     */
     public void runScheduledExperiment(
         SearchRelevanceJobParameters parameter,
-        AtomicBoolean hasStarted,
-        String scheduledExperimentResultId
+        String scheduledExperimentResultId,
+        ExperimentCancellationToken cancellationToken,
+        CountDownLatch actuallyFinished
     ) {
         String experimentId = parameter.getExperimentId();
         try {
@@ -77,9 +86,18 @@ public enum ScheduledExperimentRunnerManager {
                         experiment.judgmentList(),
                         experiment.size()
                     );
+                    if (checkIfCancelled(cancellationToken)) {
+                        log.info("Scheduled experiment timed out before placing scheduled experiment into index.");
+                        actuallyFinished.countDown();
+                        return;
+                    }
                     scheduledExperimentHistoryDao.putScheduledExperimentResult(scheduledExperimentResult, ActionListener.wrap(response -> {
-                        hasStarted.compareAndSet(false, true);
-                        experimentRunningManager.startExperimentRun(experimentId, request);
+                        if (checkIfCancelled(cancellationToken)) {
+                            log.info("Scheduled experiment timed out after placing scheduled experiment into index.");
+                            actuallyFinished.countDown();
+                            return;
+                        }
+                        experimentRunningManager.startExperimentRun(experimentId, request, cancellationToken, actuallyFinished);
                     }, e -> { handleAsyncFailure(experimentId, request, "Failed to put ScheduledExperimentResult", e); }));
                 } catch (Exception e) {
                     log.error("Scheduled experiment result for: {} cannot be added.", experimentId);
@@ -88,6 +106,13 @@ public enum ScheduledExperimentRunnerManager {
         } catch (Exception e) {
             throw new IllegalStateException("Experiment not found.");
         }
+    }
+
+    private boolean checkIfCancelled(ExperimentCancellationToken cancellationToken) {
+        if (cancellationToken != null && cancellationToken.isCancelled()) {
+            return true;
+        }
+        return false;
     }
 
     private Experiment convertToExperiment(SearchResponse response) {
@@ -130,33 +155,16 @@ public enum ScheduledExperimentRunnerManager {
         );
     }
 
-    public void cleanupResources(String experimentId, String scheduledExperimentResultId, AtomicBoolean hasStarted) {
-        ScheduledExperimentResult finalExperiment;
-        if (hasStarted.get() == false) {
-            log.info("While the experiment has not been added to the index, it will still be marked as TIMEOUT.");
-            finalExperiment = new ScheduledExperimentResult(
-                scheduledExperimentResultId,
-                experimentId,
-                TimeUtils.getTimestamp(),
-                AsyncStatus.TIMEOUT,
-                null
-            );
-            scheduledExperimentHistoryDao.putScheduledExperimentResult(
-                finalExperiment,
-                ActionListener.wrap(
-                    response -> log.info("Updated scheduled experiment {} status to TIMEOUT", scheduledExperimentResultId),
-                    e -> log.error("Failed to update error status for scheduled experiment: " + scheduledExperimentResultId, e)
-                )
-            );
-        } else {
-            finalExperiment = new ScheduledExperimentResult(
-                scheduledExperimentResultId,
-                experimentId,
-                TimeUtils.getTimestamp(),
-                AsyncStatus.TIMEOUT,
-                null
-            );
+    public void cleanupResources(String experimentId, String scheduledExperimentResultId, ExperimentCancellationToken cancellationToken) {
+        ScheduledExperimentResult finalExperiment = new ScheduledExperimentResult(
+            scheduledExperimentResultId,
+            experimentId,
+            TimeUtils.getTimestamp(),
+            AsyncStatus.TIMEOUT,
+            null
+        );
 
+        if (cancellationToken.isCancelled()) {
             scheduledExperimentHistoryDao.updateScheduledExperimentResult(
                 finalExperiment,
                 ActionListener.wrap(

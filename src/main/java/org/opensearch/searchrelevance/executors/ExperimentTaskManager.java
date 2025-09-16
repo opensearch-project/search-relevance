@@ -14,9 +14,11 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.LongAdder;
 
@@ -34,6 +36,7 @@ import org.opensearch.searchrelevance.experiment.QuerySourceUtil;
 import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.model.ExperimentVariant;
 import org.opensearch.searchrelevance.model.builder.SearchRequestBuilder;
+import org.opensearch.searchrelevance.scheduler.ExperimentCancellationToken;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.client.Client;
 
@@ -107,7 +110,9 @@ public class ExperimentTaskManager {
         Map<String, String> docIdToScores,
         Map<String, Object> configToExperimentVariants,
         AtomicBoolean hasFailure,
-        String scheduledRunId
+        String scheduledRunId,
+        Map<String, List<Future<?>>> runningFutures,
+        ExperimentCancellationToken cancellationToken
     ) {
         // Create a CompletableFuture to track the overall completion
         CompletableFuture<Map<String, Object>> resultFuture = new CompletableFuture<>();
@@ -152,7 +157,9 @@ public class ExperimentTaskManager {
                 judgmentIds,
                 docIdToScores,
                 taskContext,
-                scheduledRunId
+                scheduledRunId,
+                cancellationToken,
+                runningFutures
             );
 
             return scheduleVariantTaskAsync(params);
@@ -182,7 +189,9 @@ public class ExperimentTaskManager {
         List<String> judgmentIds,
         Map<String, String> docIdToScores,
         ExperimentTaskContext taskContext,
-        String scheduledRunId
+        String scheduledRunId,
+        ExperimentCancellationToken cancellationToken,
+        Map<String, List<Future<?>>> runningFutures
     ) {
         if (experimentType == ExperimentType.POINTWISE_EVALUATION) {
             return PointwiseTaskParameters.builder()
@@ -198,6 +207,8 @@ public class ExperimentTaskManager {
                 .taskContext(taskContext)
                 .searchPipeline(getSearchPipelineFromVariant(variant))
                 .scheduledRunId(scheduledRunId)
+                .cancellationToken(cancellationToken)
+                .runningFutures(runningFutures)
                 .build();
         } else {
             // Default to hybrid optimizer parameters
@@ -213,6 +224,8 @@ public class ExperimentTaskManager {
                 .docIdToScores(docIdToScores)
                 .taskContext(taskContext)
                 .scheduledRunId(scheduledRunId)
+                .cancellationToken(cancellationToken)
+                .runningFutures(runningFutures)
                 .build();
         }
     }
@@ -224,6 +237,13 @@ public class ExperimentTaskManager {
         return (String) variant.getParameters().get("searchPipeline");
     }
 
+    private boolean checkIfCancelled(ExperimentCancellationToken cancellationToken) {
+        if (cancellationToken != null && cancellationToken.isCancelled()) {
+            return true;
+        }
+        return false;
+    }
+
     /**
      * Schedule a single variant task asynchronously
      */
@@ -232,6 +252,13 @@ public class ExperimentTaskManager {
 
         if (params.getTaskContext().getHasFailure().get()) {
             future.complete(null);
+            return future;
+        }
+        if (checkIfCancelled(params.getCancellationToken())) {
+            log.info("Cancelled when scheduling variant task");
+            TimeoutException exception = new TimeoutException("Timed out at variant task async");
+            params.getTaskContext().getResultFuture().completeExceptionally(exception);
+            future.completeExceptionally(exception);
             return future;
         }
 
@@ -261,7 +288,17 @@ public class ExperimentTaskManager {
 
     private void submitTaskToThreadPool(VariantTaskParameters params, CompletableFuture<Void> future) {
         try {
-            threadPool.executor(SEARCH_RELEVANCE_EXEC_THREAD_POOL_NAME).execute(new OptimizedVariantTaskRunnable(params, future));
+            if (checkIfCancelled(params.getCancellationToken())) {
+                throw new RejectedExecutionException("Task timed out");
+            }
+            Future<?> variantTaskFuture = threadPool.executor(SEARCH_RELEVANCE_EXEC_THREAD_POOL_NAME)
+                .submit(new OptimizedVariantTaskRunnable(params, future));
+            // This should only be used if the experiment is one that is scheduled to run.
+            if (params.getScheduledRunId() != null
+                && params.getRunningFutures() != null
+                && checkIfCancelled(params.getCancellationToken()) == false) {
+                params.getRunningFutures().get(params.getScheduledRunId()).add(variantTaskFuture);
+            }
         } catch (RejectedExecutionException e) {
             concurrencyControl.release();
             activeTasks.decrement();
@@ -284,6 +321,15 @@ public class ExperimentTaskManager {
             concurrencyControl.release();
             activeTasks.decrement();
             future.complete(null);
+            return;
+        }
+        if (checkIfCancelled(params.getCancellationToken())) {
+            log.info("Cancelled when executing variant task async");
+            concurrencyControl.release();
+            activeTasks.decrement();
+            TimeoutException exception = new TimeoutException("Timed out at variant task async");
+            params.getTaskContext().getResultFuture().completeExceptionally(exception);
+            future.completeExceptionally(exception);
             return;
         }
 

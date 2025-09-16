@@ -14,7 +14,7 @@ import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.core.common.io.stream.StreamOutput;
 import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.jobscheduler.spi.ScheduledJobParameter;
-import org.opensearch.jobscheduler.spi.schedule.IntervalSchedule;
+import org.opensearch.jobscheduler.spi.schedule.CronSchedule;
 import org.opensearch.jobscheduler.spi.schedule.Schedule;
 
 public class SearchRelevanceJobParameters implements ScheduledJobParameter {
@@ -67,7 +67,7 @@ public class SearchRelevanceJobParameters implements ScheduledJobParameter {
     public SearchRelevanceJobParameters(StreamInput in) throws IOException {
         this.jobName = in.readString();
         this.indexToWatch = in.readString();
-        this.schedule = new IntervalSchedule(in);
+        this.schedule = new CronSchedule(in);
         this.isEnabled = in.readBoolean();
         this.enabledTime = in.readInstant();
         this.lastUpdateTime = in.readInstant();
