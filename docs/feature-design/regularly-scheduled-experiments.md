@@ -66,7 +66,6 @@ Currently, the Search Relevance Workbench currently has a feature to submit `POI
 
 ## Solution Overview
 
-**TODO**: Summarize your proposed solution:
 The solution will implement a custom job runner, job parameters, actions, rest handlers, and extend the `job-scheduler` plugin. 
 
 **Key technologies and dependencies**

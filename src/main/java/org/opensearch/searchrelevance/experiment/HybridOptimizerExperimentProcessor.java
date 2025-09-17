@@ -59,6 +59,9 @@ public class HybridOptimizerExperimentProcessor {
      * @param judgmentList List of judgment IDs
      * @param size Result size
      * @param hasFailure Failure flag
+     * @param scheduledRunId id for the experiment to be scheduled
+     * @param cancellationToken token to indicate whether the task has been cancelled
+     * @param runningFutures futures set to be cancelled when the token is cancelled
      * @param listener Listener to notify when processing is complete
      */
     public void processHybridOptimizerExperiment(

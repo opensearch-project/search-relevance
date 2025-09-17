@@ -56,6 +56,8 @@ public enum ScheduledExperimentRunnerManager {
      *
      * @param parameter Parameters for running the scheduled job
      * @param scheduledExperimentResultId The id in the {@link ScheduledExperimentResult} index for this experiment
+     * @param cancellationToken The token to indicate whether this scheduled experiment run has been cancelled
+     * @param actuallyFinished A countdown latch to indicate whether all asynchronous operations for a scheduled experiment run is complete
      */
     public void runScheduledExperiment(
         SearchRelevanceJobParameters parameter,
@@ -155,6 +157,12 @@ public enum ScheduledExperimentRunnerManager {
         );
     }
 
+    /**
+     *
+     * @param experimentId Id of experiment that is scheduled to run
+     * @param scheduledExperimentResultId Id of scheduled experiment result
+     * @param cancellationToken The token to indicate whether this scheduled experiment run has been cancelled
+     */
     public void cleanupResources(String experimentId, String scheduledExperimentResultId, ExperimentCancellationToken cancellationToken) {
         ScheduledExperimentResult finalExperiment = new ScheduledExperimentResult(
             scheduledExperimentResultId,

@@ -59,6 +59,7 @@ public class PointwiseTaskParameters extends VariantTaskParameters {
             .docIdToScores(docIdToScores)
             .taskContext(taskContext)
             .searchPipeline(searchPipeline)
+            .cancellationToken(cancellationToken)
             .build();
     }
 }

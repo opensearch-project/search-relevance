@@ -315,7 +315,7 @@ The diagram below shows the code flow behind how the data is stored into this in
 sequenceDiagram
     SearchRelevanceJobRunner->>+ThreadPoolExecutor: Submits a scheduled experiment to be run into the threadpool executor
     ThreadPoolExecutor->>+ScheduledExperimentRunnerManager:Runs the tasks which will invoke ScheduledExperimentRunnerManager to run the experiment
-    ScheduledExperimentRunnerManager->>+search-relevance-scheduled-experiment-history: Submits result of that scheduled experiment
+    ScheduledExperimentRunnerManager->>+.search-relevance-scheduled-experiment-history: Submits result of that scheduled experiment
 ```
 
 The evaluation results index `search-relevance-evaluation-result` will also be updated for viewing the scheduled experiment results in Search Relevance Dashboards. One nuance is that there will be an additional marker to indicate that the evaluation result was based on a scheduled experiment.

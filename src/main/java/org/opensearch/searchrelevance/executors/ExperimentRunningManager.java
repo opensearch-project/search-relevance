@@ -79,6 +79,13 @@ public class ExperimentRunningManager {
     private SearchRelevanceSettingsAccessor settingsAccessor;
     private final Map<String, List<Future<?>>> runningFutures = new ConcurrentHashMap<>();
 
+    /**
+     * Starts the experiment by setting up cancellation callback for the cancellation token and also retrieves the queryset
+     * @param experimentId - the id of the experiment to be run
+     * @param request - required parameters for placing a request to start an experiment
+     * @param cancellationToken - reference to cancellation state of scheduled experiment and cancels all futures tied to it
+     * @param actuallyFinished - tracks when the task and all asynchronous processes are completed
+     */
     public void startExperimentRun(
         String experimentId,
         PutExperimentRequest request,

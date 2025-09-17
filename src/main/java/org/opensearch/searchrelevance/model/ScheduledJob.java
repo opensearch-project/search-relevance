@@ -21,7 +21,7 @@ import lombok.Getter;
 @AllArgsConstructor
 public class ScheduledJob implements ToXContentObject {
     public static final String ID = "id";
-    public static final String ENABLED_FILED = "enabled";
+    public static final String ENABLED_FIELD = "enabled";
     public static final String LAST_UPDATE_TIME_FIELD = "lastUpdateTime";
     public static final String LAST_UPDATE_TIME_FIELD_READABLE = "lastUpdateTimeField";
     public static final String SCHEDULE_FIELD = "schedule";
@@ -37,7 +37,7 @@ public class ScheduledJob implements ToXContentObject {
     @Override
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
         builder.startObject();
-        builder.field(ID, this.id).field(ENABLED_FILED, this.isEnabled).field(SCHEDULE_FIELD, this.schedule);
+        builder.field(ID, this.id).field(ENABLED_FIELD, this.isEnabled).field(SCHEDULE_FIELD, this.schedule);
         if (this.enabledTime != null) {
             builder.timeField(ENABLED_TIME_FIELD, ENABLED_TIME_FIELD_READABLE, this.enabledTime.toEpochMilli());
         }
