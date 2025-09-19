@@ -11,12 +11,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 
+import org.opensearch.action.delete.DeleteResponse;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.common.annotation.ExperimentalApi;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.searchrelevance.dao.ExperimentDao;
 import org.opensearch.searchrelevance.dao.ScheduledExperimentHistoryDao;
+import org.opensearch.searchrelevance.dao.ScheduledJobsDao;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.executors.ExperimentRunningManager;
 import org.opensearch.searchrelevance.model.AsyncStatus;
@@ -36,6 +38,7 @@ public enum ScheduledExperimentRunnerManager {
     private ExperimentDao experimentDao;
     private ScheduledExperimentHistoryDao scheduledExperimentHistoryDao;
     private ExperimentRunningManager experimentRunningManager;
+    private ScheduledJobsDao scheduledJobsDao;
 
     public void setExperimentDao(ExperimentDao experimentDao) {
         this.experimentDao = experimentDao;
@@ -43,6 +46,10 @@ public enum ScheduledExperimentRunnerManager {
 
     public void setScheduledExperimentHistoryDao(ScheduledExperimentHistoryDao scheduledExperimentHistoryDao) {
         this.scheduledExperimentHistoryDao = scheduledExperimentHistoryDao;
+    }
+
+    public void setScheduledJobsDao(ScheduledJobsDao scheduledJobsDao) {
+        this.scheduledJobsDao = scheduledJobsDao;
     }
 
     public void setExperimentRunningManager(ExperimentRunningManager experimentRunningManager) {
@@ -104,7 +111,20 @@ public enum ScheduledExperimentRunnerManager {
                 } catch (Exception e) {
                     log.error("Scheduled experiment result for: {} cannot be added.", experimentId);
                 }
-            }, e -> { log.error("Experiment id: {} is not found.", experimentId); }));
+            }, e -> {
+                log.error("Experiment id: {} is not found.", experimentId);
+                scheduledJobsDao.deleteScheduledJob(experimentId, new ActionListener<DeleteResponse>() {
+                    @Override
+                    public void onResponse(DeleteResponse deleteResponse) {
+                        log.info("Non existent experiment. Deleting scheduled job {}", experimentId);
+                    }
+
+                    @Override
+                    public void onFailure(Exception e) {
+                        log.error("Somehow scheduled experiment job was deleted while experiment was in scheduling queue.");
+                    }
+                });
+            }));
         } catch (Exception e) {
             throw new IllegalStateException("Experiment not found.");
         }

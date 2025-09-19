@@ -218,6 +218,7 @@ public class SearchRelevancePlugin extends Plugin
         ScheduledExperimentRunnerManager manager = ScheduledExperimentRunnerManager.INSTANCE;
         manager.setExperimentDao(experimentDao);
         manager.setScheduledExperimentHistoryDao(scheduledExperimentHistoryDao);
+        manager.setScheduledJobsDao(scheduledJobsDao);
         manager.setExperimentRunningManager(
             new ExperimentRunningManager(
                 experimentDao,
