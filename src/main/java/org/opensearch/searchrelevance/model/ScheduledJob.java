@@ -27,12 +27,14 @@ public class ScheduledJob implements ToXContentObject {
     public static final String SCHEDULE_FIELD = "schedule";
     public static final String ENABLED_TIME_FIELD = "enabledTime";
     public static final String ENABLED_TIME_FIELD_READABLE = "enabledTimeField";
+    public static final String TIME_STAMP = "timestamp";
 
     private final String id;
     private final Instant lastUpdateTime;
     private final Instant enabledTime;
     private final boolean isEnabled;
     private final Schedule schedule;
+    private final String timestamp;
 
     @Override
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
@@ -44,6 +46,7 @@ public class ScheduledJob implements ToXContentObject {
         if (this.lastUpdateTime != null) {
             builder.timeField(LAST_UPDATE_TIME_FIELD, LAST_UPDATE_TIME_FIELD_READABLE, this.lastUpdateTime.toEpochMilli());
         }
+        builder.field(TIME_STAMP, timestamp);
         builder.endObject();
         return builder;
     }

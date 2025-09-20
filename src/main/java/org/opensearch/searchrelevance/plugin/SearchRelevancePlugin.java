@@ -338,6 +338,8 @@ public class SearchRelevancePlugin extends Plugin
                     case ScheduledJob.ID:
                         jobParameter.setExperimentId(parser.text());
                         break;
+                    case ScheduledJob.TIME_STAMP:
+                        break;
                     case SearchRelevanceJobParameters.ENABLED_FIELD:
                         jobParameter.setEnabled(parser.booleanValue());
                         break;

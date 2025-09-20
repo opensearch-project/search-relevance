@@ -8,6 +8,7 @@
     "searchConfigurationList": { "type": "keyword" },
     "judgmentList": { "type": "keyword" },
     "size": {"type":  "keyword"},
+    "isScheduled": {"type":  "keyword"},
     "results": { "type": "object", "dynamic": false }
   }
 }
