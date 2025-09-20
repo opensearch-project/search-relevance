@@ -51,7 +51,7 @@ public class ConcurrencyUtil {
             } catch (Exception e) {
 
             }
-            timeout.cancel(false); // Cancel timeout task
+            FutureUtils.cancel(timeout); // Cancel timeout task
             if (throwable == null) {
                 timeoutFuture.complete(result);
             } else {

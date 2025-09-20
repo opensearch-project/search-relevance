@@ -107,9 +107,11 @@ public enum SearchRelevanceJobRunner implements ScheduledJobRunner {
         } catch (CompletionException e) {
             log.error("Scheduled experiment has timed out. Moving onto cleanup");
         } finally {
-            log.info("Has the thing been cancelled yet??");
-            log.info(cancellationToken.isCancelled());
-            log.info(actuallyFinished.getCount());
+            if (cancellationToken.isCancelled()) {
+                log.info("Search evaluation task has concluded through cancellation.");
+            } else {
+                log.info("Search evaluation task has concluded without cancellation");
+            }
             manager.cleanupResources(parameter.getExperimentId(), scheduledExperimentResultId, cancellationToken);
             // This will clean up the future map in ExperimentRunningManager
             cancellationToken.cancel();
