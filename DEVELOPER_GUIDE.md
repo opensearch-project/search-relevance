@@ -295,9 +295,9 @@ The template is particularly valuable for:
 
 Refer to the [design documentation guide](docs/README.md) for detailed instructions, examples, and best practices on using the template effectively.
 
-## Explanation on Scheduled Experient Indices
+## Explanation on Scheduled Experiment Indices
 
-When running a scheduled experiment, the data is stored a little bit differently compared to running an individual experiment. The information of the job that runs the experiment is stored in a separate index called, `.search-relevance-scheduled-experiment-jobs`. A couple of important information stored are the schedule (in the cron job format) and whether the job is actually running or not.
+When running a scheduled experiment, the data is stored a little bit differently compared to running an individual experiment. The information of the job that runs the experiment is stored in a separate index called, `.search-relevance-scheduled-experiment-jobs`. The information stored is the schedule (in the cron job format) and whether the job is actually running or not.
 
 The diagram below shows how the scheduled experiment API interacts with the `.search-relevance-scheduled-experiment-jobs` index.
 
