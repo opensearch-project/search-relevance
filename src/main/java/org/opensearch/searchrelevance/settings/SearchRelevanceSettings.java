@@ -74,7 +74,7 @@ public class SearchRelevanceSettings {
      */
     public static final Setting<TimeValue> SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_TIMEOUT = Setting.positiveTimeSetting(
         "plugins.search_relevance.scheduled_experiments_timeout",
-        TimeValue.timeValueSeconds(30),
+        TimeValue.timeValueMinutes(60),
         Setting.Property.NodeScope,
         Setting.Property.Dynamic
     );
