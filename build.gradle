@@ -19,7 +19,7 @@ import java.util.stream.Collectors
 
 buildscript {
     ext {
-        opensearch_version = System.getProperty("opensearch.version", "3.2.0-SNAPSHOT")
+        opensearch_version = System.getProperty("opensearch.version", "3.3.0-SNAPSHOT")
         isSnapshot = "true" == System.getProperty("build.snapshot", "true")
         buildVersionQualifier = System.getProperty("build.version_qualifier", "")
         // 2.2.0-SNAPSHOT -> 2.2.0.0-SNAPSHOT
@@ -40,7 +40,6 @@ buildscript {
     repositories {
         mavenLocal()
         maven { url "https://central.sonatype.com/repository/maven-snapshots/" }
-        maven { url "https://aws.oss.sonatype.org/content/repositories/snapshots" }
         mavenCentral()
         maven { url "https://plugins.gradle.org/m2/" }
         maven { url 'https://jitpack.io' }
@@ -48,9 +47,9 @@ buildscript {
 
     dependencies {
         classpath "org.opensearch.gradle:build-tools:${opensearch_version}"
-        classpath "com.diffplug.spotless:spotless-plugin-gradle:7.2.0"
+        classpath "com.diffplug.spotless:spotless-plugin-gradle:7.2.1"
         classpath "com.github.form-com.diff-coverage-gradle:diff-coverage:0.9.5"
-        classpath "io.freefair.gradle:lombok-plugin:8.14"
+        classpath "io.freefair.gradle:lombok-plugin:8.14.2"
     }
 }
 
@@ -211,7 +210,7 @@ dependencies {
     runtimeOnly group: 'org.reflections', name: 'reflections', version: '0.9.12'  // Note the version change
     runtimeOnly group: 'org.javassist', name: 'javassist', version: '3.30.2-GA'
     runtimeOnly group: 'org.opensearch', name: 'common-utils', version: "${opensearch_build}"
-    runtimeOnly group: 'org.apache.commons', name: 'commons-text', version: '1.13.1'
+    runtimeOnly group: 'org.apache.commons', name: 'commons-text', version: '1.14.0'
     runtimeOnly group: 'com.google.code.gson', name: 'gson', version: '2.13.1'
     runtimeOnly group: 'org.json', name: 'json', version: '20250517'
     // json-path 2.9.0 depends on slf4j 2.0.11, which conflicts with the version used by OpenSearch core.
@@ -237,6 +236,7 @@ dependencies {
     configurations.all {
         resolutionStrategy {
             force("com.google.guava:guava:33.4.8-jre") // CVE for 31.1
+            force("com.google.errorprone:error_prone_annotations:2.41.0") // Fix version conflict
         }
     }
 }
