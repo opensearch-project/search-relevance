@@ -247,7 +247,7 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
 
         Setting<?> setting4 = settings.get(4);
         assertEquals("plugins.search_relevance.scheduled_experiments_timeout", setting4.getKey());
-        assertEquals(TimeValue.timeValueSeconds(30), setting4.get(Settings.EMPTY));
+        assertEquals(TimeValue.timeValueMinutes(60), setting4.get(Settings.EMPTY));
 
         Setting<?> setting5 = settings.get(5);
         assertEquals("plugins.search_relevance.scheduled_experiments_minimum_interval", setting5.getKey());
