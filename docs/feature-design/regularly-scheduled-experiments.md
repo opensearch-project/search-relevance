@@ -10,14 +10,14 @@ Currently, there is not a clean way to rerun search evaluations, given that the 
 
 **Key Problems:**
 - Users would have to rerun experiments manually to detect changes in the search quality
-- Experiment results might noe be consistent because the search algorithms and data can change and affect search quality.
+- Experiment results might not be consistent because the search algorithms and data can change and affect search quality.
 
 **Impact of Not Implementing:**
 - Users would not be able to automate a schedule for running evaluations
 - An alerting or notification system would not be possible to implement without automated evaluation runs
 
 **Primary Stakeholders**
-- Teams trying to track search quality overtime
+- Teams trying to track search quality over time
 - Users tracking critical search metrics and ensuring they stay above a threshold
 - Teams trying to compare the impact of using one search algorithm over another
 - Users comparing metrics when migrating from a different search engine

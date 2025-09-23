@@ -376,7 +376,7 @@ testClusters.integTest {
     }
 }
 
-// Set up integration test clusters, installs all zipArchive dependencies and Flow Framework
+// Set up integration test clusters, installs all zipArchive dependencies
 testClusters.yamlRestTest {
     plugin(provider(jobSchedulerFile))
 }
