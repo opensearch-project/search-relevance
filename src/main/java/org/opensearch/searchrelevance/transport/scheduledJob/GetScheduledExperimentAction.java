@@ -19,7 +19,7 @@ import org.opensearch.common.annotation.ExperimentalApi;
 @ExperimentalApi
 public class GetScheduledExperimentAction extends ActionType<SearchResponse> {
     /** The name of this action */
-    public static final String NAME = TRANSPORT_ACTION_NAME_PREFIX + "scheduledjob/get";
+    public static final String NAME = TRANSPORT_ACTION_NAME_PREFIX + "scheduledexperiment/get";
 
     /** An instance of this action */
     public static final GetScheduledExperimentAction INSTANCE = new GetScheduledExperimentAction();
