@@ -7,7 +7,6 @@
  */
 package org.opensearch.searchrelevance.executors;
 
-import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_RUN_ID;
 import static org.opensearch.searchrelevance.metrics.EvaluationMetrics.calculateEvaluationMetrics;
 
 import java.util.Arrays;

@@ -38,9 +38,6 @@ public class PluginConstants {
     /** Use %SearchText% to represent wildcard in queryBody and also refer to the text in the search bar */
     public static final String WILDCARD_QUERY_TEXT = "%SearchText%";
 
-    /** Placeholder for global constants */
-    public static final String SCHEDULED_RUN_ID = "scheduled-run_id";
-
     /**
      * Indices constants
      */
