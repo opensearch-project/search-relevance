@@ -72,12 +72,6 @@ public class SearchResponseProcessor {
                 ? experimentVariant.getTextualParameters()
                 : null;
 
-            // if scheduledRunId is not null, it should be replaced with a global flag
-            // to indicate that the EvaluationResult came from a scheduled experiment.
-            if (scheduledRunId != null) {
-                scheduledRunId = SCHEDULED_RUN_ID;
-            }
-
             EvaluationResult evaluationResult = new EvaluationResult(
                 evaluationId,
                 TimeUtils.getTimestamp(),
