@@ -44,7 +44,7 @@ public class SearchRelevanceSettings {
 
     /**
      * Gates the maximum limit of search relevance query set size
-     * By defaulted, we set the value as 150
+     * The defaultValue is 1,000
      */
     public static final String SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT_KEY = "plugins.search_relevance.query_set.maximum";
     public static final Setting<Integer> SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT = Setting.intSetting(
