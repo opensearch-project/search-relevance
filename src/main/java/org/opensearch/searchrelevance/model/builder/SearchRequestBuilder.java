@@ -11,6 +11,8 @@ import static org.opensearch.searchrelevance.common.PluginConstants.WILDCARD_QUE
 import static org.opensearch.searchrelevance.experiment.QuerySourceUtil.validateHybridQuery;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
@@ -67,6 +69,49 @@ public class SearchRequestBuilder {
                 processedQuery
             );
             Map<String, Object> fullQueryMap = parser.map();
+            // Preprocess rescore_query to wrap unknown queries (e.g., LTR/sltr) using wrapper query to avoid NamedXContent parsing issues
+            try {
+                Object rescore = fullQueryMap.get("rescore");
+                if (rescore instanceof Map) {
+                    Map<String, Object> rescoreEntry = (Map<String, Object>) rescore;
+                    Object queryObjInner = rescoreEntry.get("query");
+                    if (queryObjInner instanceof Map) {
+                        Map<String, Object> queryMap = (Map<String, Object>) queryObjInner;
+                        Object rescoreQuery = queryMap.get("rescore_query");
+                        if (rescoreQuery != null && (rescoreQuery instanceof Map) && !((Map<?, ?>) rescoreQuery).containsKey("wrapper")) {
+                            XContentBuilder tmpBuilder = JsonXContent.contentBuilder();
+                            tmpBuilder.value(rescoreQuery);
+                            String raw = tmpBuilder.toString();
+                            String base64 = Base64.getEncoder().encodeToString(raw.getBytes(StandardCharsets.UTF_8));
+                            Map<String, Object> wrapper = Map.of("wrapper", Map.of("query", base64));
+                            queryMap.put("rescore_query", wrapper);
+                        }
+                    }
+                } else if (rescore instanceof java.util.List) {
+                    for (Object entry : (java.util.List<?>) rescore) {
+                        if (entry instanceof Map) {
+                            Map<String, Object> rescoreEntry = (Map<String, Object>) entry;
+                            Object queryObjInner = rescoreEntry.get("query");
+                            if (queryObjInner instanceof Map) {
+                                Map<String, Object> queryMap = (Map<String, Object>) queryObjInner;
+                                Object rescoreQuery = queryMap.get("rescore_query");
+                                if (rescoreQuery != null
+                                    && (rescoreQuery instanceof Map)
+                                    && !((Map<?, ?>) rescoreQuery).containsKey("wrapper")) {
+                                    XContentBuilder tmpBuilder = JsonXContent.contentBuilder();
+                                    tmpBuilder.value(rescoreQuery);
+                                    String raw = tmpBuilder.toString();
+                                    String base64 = Base64.getEncoder().encodeToString(raw.getBytes(StandardCharsets.UTF_8));
+                                    Map<String, Object> wrapper = Map.of("wrapper", Map.of("query", base64));
+                                    queryMap.put("rescore_query", wrapper);
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                log.debug("Skipping rescore_query wrapper preprocessing: {}", e.getMessage());
+            }
 
             // This implementation handles the 'query' field separately from other fields because:
             // 1. Custom query types (like hybrid, neural) are not registered in the default QueryBuilders
@@ -141,6 +186,49 @@ public class SearchRequestBuilder {
                 processedQuery
             );
             Map<String, Object> fullQueryMap = parser.map();
+            // Preprocess rescore_query to wrap unknown queries (e.g., LTR/sltr) using wrapper query to avoid NamedXContent parsing issues
+            try {
+                Object rescore = fullQueryMap.get("rescore");
+                if (rescore instanceof Map) {
+                    Map<String, Object> rescoreEntry = (Map<String, Object>) rescore;
+                    Object queryObjInner = rescoreEntry.get("query");
+                    if (queryObjInner instanceof Map) {
+                        Map<String, Object> queryMap = (Map<String, Object>) queryObjInner;
+                        Object rescoreQuery = queryMap.get("rescore_query");
+                        if (rescoreQuery != null && (rescoreQuery instanceof Map) && !((Map<?, ?>) rescoreQuery).containsKey("wrapper")) {
+                            XContentBuilder tmpBuilder = JsonXContent.contentBuilder();
+                            tmpBuilder.value(rescoreQuery);
+                            String raw = tmpBuilder.toString();
+                            String base64 = Base64.getEncoder().encodeToString(raw.getBytes(StandardCharsets.UTF_8));
+                            Map<String, Object> wrapper = Map.of("wrapper", Map.of("query", base64));
+                            queryMap.put("rescore_query", wrapper);
+                        }
+                    }
+                } else if (rescore instanceof java.util.List) {
+                    for (Object entry : (java.util.List<?>) rescore) {
+                        if (entry instanceof Map) {
+                            Map<String, Object> rescoreEntry = (Map<String, Object>) entry;
+                            Object queryObjInner = rescoreEntry.get("query");
+                            if (queryObjInner instanceof Map) {
+                                Map<String, Object> queryMap = (Map<String, Object>) queryObjInner;
+                                Object rescoreQuery = queryMap.get("rescore_query");
+                                if (rescoreQuery != null
+                                    && (rescoreQuery instanceof Map)
+                                    && !((Map<?, ?>) rescoreQuery).containsKey("wrapper")) {
+                                    XContentBuilder tmpBuilder = JsonXContent.contentBuilder();
+                                    tmpBuilder.value(rescoreQuery);
+                                    String raw = tmpBuilder.toString();
+                                    String base64 = Base64.getEncoder().encodeToString(raw.getBytes(StandardCharsets.UTF_8));
+                                    Map<String, Object> wrapper = Map.of("wrapper", Map.of("query", base64));
+                                    queryMap.put("rescore_query", wrapper);
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                log.debug("Skipping rescore_query wrapper preprocessing: {}", e.getMessage());
+            }
 
             validateHybridQuery(fullQueryMap);
 
