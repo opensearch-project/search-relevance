@@ -288,7 +288,7 @@ public class ExperimentTaskManager {
         // Instrumentation: log final serialized search request body for debugging (e.g., LTR rescore_query)
         try {
             String source = searchRequest.source() != null ? searchRequest.source().toString() : null;
-            log.info(
+            log.debug(
                 "Experiment search request body (experimentId={}, variantId={}, evaluationId={}): {}",
                 params.getExperimentId(),
                 params.getExperimentVariant().getId(),

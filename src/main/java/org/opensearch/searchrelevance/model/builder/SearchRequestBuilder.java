@@ -78,7 +78,7 @@ public class SearchRequestBuilder {
                     if (queryObjInner instanceof Map) {
                         Map<String, Object> queryMap = (Map<String, Object>) queryObjInner;
                         Object rescoreQuery = queryMap.get("rescore_query");
-                        if (rescoreQuery != null && (rescoreQuery instanceof Map) && !((Map<?, ?>) rescoreQuery).containsKey("wrapper")) {
+                        if ((rescoreQuery instanceof Map) && !((Map<?, ?>) rescoreQuery).containsKey("wrapper")) {
                             XContentBuilder tmpBuilder = JsonXContent.contentBuilder();
                             tmpBuilder.value(rescoreQuery);
                             String raw = tmpBuilder.toString();
@@ -95,9 +95,7 @@ public class SearchRequestBuilder {
                             if (queryObjInner instanceof Map) {
                                 Map<String, Object> queryMap = (Map<String, Object>) queryObjInner;
                                 Object rescoreQuery = queryMap.get("rescore_query");
-                                if (rescoreQuery != null
-                                    && (rescoreQuery instanceof Map)
-                                    && !((Map<?, ?>) rescoreQuery).containsKey("wrapper")) {
+                                if ((rescoreQuery instanceof Map) && !((Map<?, ?>) rescoreQuery).containsKey("wrapper")) {
                                     XContentBuilder tmpBuilder = JsonXContent.contentBuilder();
                                     tmpBuilder.value(rescoreQuery);
                                     String raw = tmpBuilder.toString();
@@ -195,7 +193,7 @@ public class SearchRequestBuilder {
                     if (queryObjInner instanceof Map) {
                         Map<String, Object> queryMap = (Map<String, Object>) queryObjInner;
                         Object rescoreQuery = queryMap.get("rescore_query");
-                        if (rescoreQuery != null && (rescoreQuery instanceof Map) && !((Map<?, ?>) rescoreQuery).containsKey("wrapper")) {
+                        if ((rescoreQuery instanceof Map) && !((Map<?, ?>) rescoreQuery).containsKey("wrapper")) {
                             XContentBuilder tmpBuilder = JsonXContent.contentBuilder();
                             tmpBuilder.value(rescoreQuery);
                             String raw = tmpBuilder.toString();
@@ -212,9 +210,7 @@ public class SearchRequestBuilder {
                             if (queryObjInner instanceof Map) {
                                 Map<String, Object> queryMap = (Map<String, Object>) queryObjInner;
                                 Object rescoreQuery = queryMap.get("rescore_query");
-                                if (rescoreQuery != null
-                                    && (rescoreQuery instanceof Map)
-                                    && !((Map<?, ?>) rescoreQuery).containsKey("wrapper")) {
+                                if ((rescoreQuery instanceof Map) && !((Map<?, ?>) rescoreQuery).containsKey("wrapper")) {
                                     XContentBuilder tmpBuilder = JsonXContent.contentBuilder();
                                     tmpBuilder.value(rescoreQuery);
                                     String raw = tmpBuilder.toString();
