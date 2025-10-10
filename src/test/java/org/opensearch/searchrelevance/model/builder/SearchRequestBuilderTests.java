@@ -9,13 +9,15 @@ package org.opensearch.searchrelevance.model.builder;
 
 import static org.opensearch.searchrelevance.common.PluginConstants.WILDCARD_QUERY_TEXT;
 
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.junit.Before;
 import org.opensearch.action.search.SearchRequest;
+import org.opensearch.common.settings.Settings;
+import org.opensearch.core.xcontent.NamedXContentRegistry;
+import org.opensearch.search.SearchModule;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.test.OpenSearchTestCase;
 
@@ -23,6 +25,14 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class SearchRequestBuilderTests extends OpenSearchTestCase {
+
+    @Before
+    public void setup() {
+        NamedXContentRegistry reg = new NamedXContentRegistry(
+            new SearchModule(Settings.EMPTY, java.util.Collections.emptyList()).getNamedXContents()
+        );
+        SearchRequestBuilder.initialize(reg);
+    }
 
     private static final String TEST_INDEX = "test_index";
     private static final String TEST_QUERY_TEXT = "test_query";
@@ -194,16 +204,12 @@ public class SearchRequestBuilderTests extends OpenSearchTestCase {
         assertEquals("invalid hybrid query: expected exactly [2] sub-queries but found [1]", exception.getMessage());
     }
 
-    // -------------------------
-    // Contract tests for rescore.rescore_query wrapper preprocessing
-    // -------------------------
-
     public void testBuildSearchRequest_whenRescoreQueryIsObject_thenWrappedWithBase64() throws Exception {
         String query = "{"
             + "\"query\":{\"match\":{\"title\":\""
             + WILDCARD_QUERY_TEXT
             + "\"}},"
-            + "\"rescore\":{\"query\":{\"rescore_query\":{\"sltr\":{\"model\":\"m1\",\"params\":{\"keywords\":\"abc\"}}}}}"
+            + "\"rescore\":{\"query\":{\"rescore_query\":{\"match\":{\"title\":\"abc\"}}}}"
             + "}";
 
         SearchRequest searchRequest = SearchRequestBuilder.buildSearchRequest(TEST_INDEX, query, TEST_QUERY_TEXT, null, TEST_SIZE);
@@ -212,15 +218,19 @@ public class SearchRequestBuilderTests extends OpenSearchTestCase {
         assertNotNull(sourceBuilder);
 
         Map<String, Object> sourceMap = parseJsonToMap(sourceBuilder.toString());
-        String base64 = extractWrappedRescoreQueryBase64(sourceMap);
-        assertNotNull("rescore.rescore_query should be wrapped with base64 payload", base64);
-
-        String decoded = new String(Base64.getDecoder().decode(base64), StandardCharsets.UTF_8);
-        Map<String, Object> decodedMap = parseJsonToMap(decoded);
-        assertTrue("Decoded rescore_query should contain sltr", decodedMap.containsKey("sltr"));
+        Object rescoreObj = sourceMap.get("rescore");
         @SuppressWarnings("unchecked")
-        Map<String, Object> sltr = (Map<String, Object>) decodedMap.get("sltr");
-        assertEquals("m1", sltr.get("model"));
+        Map<String, Object> rescoreMap = (rescoreObj instanceof java.util.List)
+            ? (Map<String, Object>) ((java.util.List<?>) rescoreObj).get(0)
+            : (Map<String, Object>) rescoreObj;
+        assertNotNull(rescoreMap);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> queryObj = (Map<String, Object>) rescoreMap.get("query");
+        assertNotNull(queryObj);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> rescoreQuery = (Map<String, Object>) queryObj.get("rescore_query");
+        assertNotNull(rescoreQuery);
+        assertTrue(rescoreQuery.containsKey("match"));
     }
 
     public void testBuildSearchRequest_whenRescoreIsArray_thenFirstEntryRescoreQueryWrapped() throws Exception {
@@ -228,7 +238,7 @@ public class SearchRequestBuilderTests extends OpenSearchTestCase {
             + "\"query\":{\"match\":{\"title\":\""
             + WILDCARD_QUERY_TEXT
             + "\"}},"
-            + "\"rescore\":[{\"query\":{\"rescore_query\":{\"sltr\":{\"model\":\"m2\",\"params\":{\"keywords\":\"xyz\"}}}}}]"
+            + "\"rescore\":[{\"query\":{\"rescore_query\":{\"match\":{\"title\":\"xyz\"}}}}]"
             + "}";
 
         SearchRequest searchRequest = SearchRequestBuilder.buildSearchRequest(TEST_INDEX, query, TEST_QUERY_TEXT, null, TEST_SIZE);
@@ -237,19 +247,21 @@ public class SearchRequestBuilderTests extends OpenSearchTestCase {
         assertNotNull(sourceBuilder);
 
         Map<String, Object> sourceMap = parseJsonToMap(sourceBuilder.toString());
-        String base64 = extractWrappedRescoreQueryBase64(sourceMap);
-        assertNotNull("rescore[0].rescore_query should be wrapped with base64 payload", base64);
-
-        String decoded = new String(Base64.getDecoder().decode(base64), StandardCharsets.UTF_8);
-        Map<String, Object> decodedMap = parseJsonToMap(decoded);
-        assertTrue(decodedMap.containsKey("sltr"));
         @SuppressWarnings("unchecked")
-        Map<String, Object> sltr = (Map<String, Object>) decodedMap.get("sltr");
-        assertEquals("m2", sltr.get("model"));
+        java.util.List<Object> rescoreList = (java.util.List<Object>) sourceMap.get("rescore");
+        assertNotNull(rescoreList);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> first = (Map<String, Object>) rescoreList.get(0);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> q = (Map<String, Object>) first.get("query");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> rq = (Map<String, Object>) q.get("rescore_query");
+        assertNotNull(rq);
+        assertTrue(rq.containsKey("match"));
     }
 
-    public void testBuildRequestForHybridSearch_whenRescoreQueryPresent_thenWrappedWithBase64() throws Exception {
-        // Minimal valid hybrid query (2 sub-queries) plus rescore with sltr
+    public void testBuildRequestForHybridSearch_whenRescoreQueryPresent() throws Exception {
+        // Minimal valid hybrid query (2 sub-queries) plus rescore with a standard query
         String hybridQuery = "{"
             + "\"_source\":{\"exclude\":[\"passage_embedding\"]},"
             + "\"query\":{\"hybrid\":{\"queries\":["
@@ -260,7 +272,7 @@ public class SearchRequestBuilderTests extends OpenSearchTestCase {
             + WILDCARD_QUERY_TEXT
             + "\"}}}"
             + "]}},"
-            + "\"rescore\":{\"query\":{\"rescore_query\":{\"sltr\":{\"model\":\"m3\",\"params\":{\"keywords\":\"hyb\"}}}}}"
+            + "\"rescore\":{\"query\":{\"rescore_query\":{\"match\":{\"name\":\"hyb\"}}}}"
             + "}";
 
         Map<String, Object> temporarySearchPipeline = Map.of(); // allowed empty
@@ -276,14 +288,18 @@ public class SearchRequestBuilderTests extends OpenSearchTestCase {
         assertNotNull(sourceBuilder);
 
         Map<String, Object> sourceMap = parseJsonToMap(sourceBuilder.toString());
-        String base64 = extractWrappedRescoreQueryBase64(sourceMap);
-        assertNotNull("hybrid path should wrap rescore.rescore_query with base64 payload", base64);
-
-        String decoded = new String(Base64.getDecoder().decode(base64), StandardCharsets.UTF_8);
-        Map<String, Object> decodedMap = parseJsonToMap(decoded);
-        assertTrue(decodedMap.containsKey("sltr"));
+        Object rescoreObj = sourceMap.get("rescore");
         @SuppressWarnings("unchecked")
-        Map<String, Object> sltr = (Map<String, Object>) decodedMap.get("sltr");
-        assertEquals("m3", sltr.get("model"));
+        Map<String, Object> rescoreMap = (rescoreObj instanceof java.util.List)
+            ? (Map<String, Object>) ((java.util.List<?>) rescoreObj).get(0)
+            : (Map<String, Object>) rescoreObj;
+        assertNotNull(rescoreMap);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> queryObj = (Map<String, Object>) rescoreMap.get("query");
+        assertNotNull(queryObj);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> rescoreQuery = (Map<String, Object>) queryObj.get("rescore_query");
+        assertNotNull(rescoreQuery);
+        assertTrue(rescoreQuery.containsKey("match"));
     }
 }

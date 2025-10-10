@@ -54,6 +54,7 @@ import org.opensearch.searchrelevance.executors.SearchRelevanceExecutor;
 import org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager;
 import org.opensearch.searchrelevance.metrics.MetricsHelper;
 import org.opensearch.searchrelevance.ml.MLAccessor;
+import org.opensearch.searchrelevance.model.builder.SearchRequestBuilder;
 import org.opensearch.searchrelevance.rest.RestCreateQuerySetAction;
 import org.opensearch.searchrelevance.rest.RestDeleteExperimentAction;
 import org.opensearch.searchrelevance.rest.RestDeleteJudgmentAction;
@@ -172,6 +173,8 @@ public class SearchRelevancePlugin extends Plugin implements ActionPlugin, Syste
         this.clusterUtil = new ClusterUtil(clusterService);
         this.infoStatsManager = new InfoStatsManager(settingsAccessor);
         EventStatsManager.instance().initialize(settingsAccessor);
+        // Initialize SearchRequestBuilder with the real NamedXContentRegistry so it can parse all plugin-registered queries
+        SearchRequestBuilder.initialize(xContentRegistry);
 
         return List.of(
             searchRelevanceIndicesManager,
