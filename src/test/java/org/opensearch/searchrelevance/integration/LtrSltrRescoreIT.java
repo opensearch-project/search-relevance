@@ -7,8 +7,9 @@
  */
 package org.opensearch.searchrelevance.integration;
 
+import java.util.Locale;
+
 import org.apache.hc.core5.http.io.entity.EntityUtils;
-import org.junit.Test;
 import org.opensearch.client.Request;
 import org.opensearch.client.Response;
 import org.opensearch.client.ResponseException;
@@ -26,7 +27,6 @@ import org.opensearch.searchrelevance.BaseSearchRelevanceIT;
  */
 public class LtrSltrRescoreIT extends BaseSearchRelevanceIT {
 
-    @Test
     public void testRescoreParsingWithSltr() throws Exception {
         final String index = "ltr-sltr-it";
 
@@ -85,7 +85,9 @@ public class LtrSltrRescoreIT extends BaseSearchRelevanceIT {
             // Accept any response; the important part is that the error is NOT "unknown [sltr]".
             assertTrue("Expected an HTTP status (>=200). Got: " + code, code >= 200 && code < 600);
             final String msg = EntityUtils.toString(r.getEntity());
-            final boolean unknownSltr = msg != null && msg.toLowerCase().contains("unknown") && msg.toLowerCase().contains("sltr");
+            final boolean unknownSltr = msg != null
+                && msg.toLowerCase(Locale.ROOT).contains("unknown")
+                && msg.toLowerCase(Locale.ROOT).contains("sltr");
             assertFalse("Cluster did not recognize 'sltr' rescore; LTR module may not be loaded. Message: " + msg, unknownSltr);
         }
     }
