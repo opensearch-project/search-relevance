@@ -204,7 +204,7 @@ public class SearchRequestBuilderTests extends OpenSearchTestCase {
         assertEquals("invalid hybrid query: expected exactly [2] sub-queries but found [1]", exception.getMessage());
     }
 
-    public void testBuildSearchRequest_whenRescoreQueryIsObject_thenWrappedWithBase64() throws Exception {
+    public void testParseRescoreQuery_whenRescoreIsObject() throws Exception {
         String query = "{"
             + "\"query\":{\"match\":{\"title\":\""
             + WILDCARD_QUERY_TEXT
@@ -233,7 +233,7 @@ public class SearchRequestBuilderTests extends OpenSearchTestCase {
         assertTrue(rescoreQuery.containsKey("match"));
     }
 
-    public void testBuildSearchRequest_whenRescoreIsArray_thenFirstEntryRescoreQueryWrapped() throws Exception {
+    public void testParseRescoreQuery_whenRescoreIsArrayFirstEntry() throws Exception {
         String query = "{"
             + "\"query\":{\"match\":{\"title\":\""
             + WILDCARD_QUERY_TEXT
@@ -260,7 +260,7 @@ public class SearchRequestBuilderTests extends OpenSearchTestCase {
         assertTrue(rq.containsKey("match"));
     }
 
-    public void testBuildRequestForHybridSearch_whenRescoreQueryPresent() throws Exception {
+    public void testParseRescoreQuery_inHybridRequest() throws Exception {
         // Minimal valid hybrid query (2 sub-queries) plus rescore with a standard query
         String hybridQuery = "{"
             + "\"_source\":{\"exclude\":[\"passage_embedding\"]},"
