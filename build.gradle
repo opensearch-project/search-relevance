@@ -49,7 +49,7 @@ buildscript {
         classpath "org.opensearch.gradle:build-tools:${opensearch_version}"
         classpath "com.diffplug.spotless:spotless-plugin-gradle:7.2.1"
         classpath "com.github.form-com.diff-coverage-gradle:diff-coverage:0.9.5"
-        classpath "io.freefair.gradle:lombok-plugin:8.14.2"
+        classpath "io.freefair.gradle:lombok-plugin:9.0.0"
     }
 }
 
