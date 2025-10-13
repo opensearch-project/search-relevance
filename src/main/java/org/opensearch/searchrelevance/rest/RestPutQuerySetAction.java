@@ -18,6 +18,7 @@ import static org.opensearch.searchrelevance.common.PluginConstants.SAMPLING;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -95,7 +96,11 @@ public class RestPutQuerySetAction extends BaseRestHandler {
                 querySetQueries = rawQueries.stream().map(obj -> {
                     Map<String, String> queryMap = (Map<String, String>) obj;
                     String queryText = queryMap.get("queryText");
-                    String referenceAnswer = queryMap.getOrDefault("referenceAnswer", "");
+
+                    // Create customizedKeyValueMap with all entries except queryText
+                    // This now includes referenceAnswer if present
+                    Map<String, String> customizedKeyValueMap = new HashMap<>(queryMap);
+                    customizedKeyValueMap.remove("queryText");
 
                     // Validate queryText
                     TextValidationUtil.ValidationResult queryTextValidation = TextValidationUtil.validateText(queryText);
@@ -103,15 +108,17 @@ public class RestPutQuerySetAction extends BaseRestHandler {
                         throw new IllegalArgumentException("Invalid queryText: " + queryTextValidation.getErrorMessage());
                     }
 
-                    // Validate referenceAnswer if it's not empty
-                    if (!referenceAnswer.isEmpty()) {
-                        TextValidationUtil.ValidationResult referenceAnswerValidation = TextValidationUtil.validateText(referenceAnswer);
-                        if (!referenceAnswerValidation.isValid()) {
-                            throw new IllegalArgumentException("Invalid referenceAnswer: " + referenceAnswerValidation.getErrorMessage());
+                    // Validate all values in customizedKeyValueMap (including referenceAnswer)
+                    for (Map.Entry<String, String> entry : customizedKeyValueMap.entrySet()) {
+                        if (entry.getValue() != null && !entry.getValue().isEmpty()) {
+                            TextValidationUtil.ValidationResult validation = TextValidationUtil.validateText(entry.getValue());
+                            if (!validation.isValid()) {
+                                throw new IllegalArgumentException("Invalid " + entry.getKey() + ": " + validation.getErrorMessage());
+                            }
                         }
                     }
 
-                    return new QueryWithReference(queryText, referenceAnswer);
+                    return new QueryWithReference(queryText, customizedKeyValueMap);
                 }).collect(Collectors.toList());
             } catch (IllegalArgumentException e) {
                 return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.BAD_REQUEST, e.getMessage()));

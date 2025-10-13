@@ -15,6 +15,7 @@ import java.util.concurrent.TimeUnit;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.ml.client.MachineLearningNodeClient;
 import org.opensearch.ml.common.input.MLInput;
+import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
 
 import lombok.extern.log4j.Log4j2;
 
@@ -40,9 +41,11 @@ public class MLAccessor {
         String searchText,
         String reference,
         Map<String, String> hits,
+        String promptTemplate,
+        LLMJudgmentRatingType ratingType,
         ActionListener<ChunkResult> progressListener
     ) {
-        List<MLInput> mlInputs = transformer.createMLInputs(tokenLimit, searchText, reference, hits);
+        List<MLInput> mlInputs = transformer.createMLInputs(tokenLimit, searchText, reference, hits, promptTemplate, ratingType);
         log.info("Number of chunks: {}", mlInputs.size());
 
         ChunkProcessingContext context = new ChunkProcessingContext(mlInputs.size(), progressListener);

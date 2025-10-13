@@ -27,6 +27,9 @@ public class Judgment implements ToXContentObject {
     public static final String TYPE = "type";
     public static final String METADATA = "metadata";
     public static final String JUDGMENT_RATINGS = "judgmentRatings";
+    public static final String PROMPT_TEMPLATE = "promptTemplate"; // a completed prompt includes prefilled part + freetext part. Or create
+                                                                   // a prompt_template_id and store here
+    public static final Boolean OVERWRITE_CACHE = false;
 
     /**
      * Identifier of the system index

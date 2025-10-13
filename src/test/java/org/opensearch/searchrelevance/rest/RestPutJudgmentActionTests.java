@@ -43,6 +43,22 @@ public class RestPutJudgmentActionTests extends SearchRelevanceRestTestCase {
         + "\"ignoreFailure\": false"
         + "}";
 
+    private static final String LLM_JUDGMENT_CONTENT_WITH_NEW_FIELDS = "{"
+        + "\"name\": \"test_name\","
+        + "\"description\": \"test_description\","
+        + "\"type\": \"LLM_JUDGMENT\","
+        + "\"modelId\": \"test_model_id\","
+        + "\"querySetId\": \"test_query_set_id\","
+        + "\"searchConfigurationList\": [\"config1\", \"config2\"],"
+        + "\"size\": 10,"
+        + "\"tokenLimit\": 1000,"
+        + "\"contextFields\": [\"field1\", \"field2\"],"
+        + "\"ignoreFailure\": false,"
+        + "\"promptTemplate\": \"test_prompt_template\","
+        + "\"llmJudgmentRatingType\": \"SCORE1_5\","
+        + "\"overwriteCache\": true"
+        + "}";
+
     private static final String UBI_JUDGMENT_CONTENT = "{"
         + "\"name\": \"test_name\","
         + "\"description\": \"test_description\","
@@ -232,5 +248,39 @@ public class RestPutJudgmentActionTests extends SearchRelevanceRestTestCase {
         ArgumentCaptor<BytesRestResponse> responseCaptor = ArgumentCaptor.forClass(BytesRestResponse.class);
         verify(channel).sendResponse(responseCaptor.capture());
         assertEquals(RestStatus.INTERNAL_SERVER_ERROR, responseCaptor.getValue().status());
+    }
+
+    public void testPutLlmJudgment_WithNewFields_Success() throws Exception {
+        // Setup
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        RestRequest request = createPutRestRequestWithContent(LLM_JUDGMENT_CONTENT_WITH_NEW_FIELDS, "judgment");
+        when(channel.request()).thenReturn(request);
+
+        // Mock index response
+        IndexResponse mockIndexResponse = mock(IndexResponse.class);
+        when(mockIndexResponse.getId()).thenReturn("test_id");
+
+        // Capture the request to verify new fields
+        ArgumentCaptor<PutLlmJudgmentRequest> requestCaptor = ArgumentCaptor.forClass(PutLlmJudgmentRequest.class);
+
+        doAnswer(invocation -> {
+            ActionListener<IndexResponse> listener = invocation.getArgument(2);
+            listener.onResponse(mockIndexResponse);
+            return null;
+        }).when(client).execute(eq(PutJudgmentAction.INSTANCE), requestCaptor.capture(), any());
+
+        // Execute
+        restPutJudgmentAction.handleRequest(request, channel, client);
+
+        // Verify response
+        ArgumentCaptor<BytesRestResponse> responseCaptor = ArgumentCaptor.forClass(BytesRestResponse.class);
+        verify(channel).sendResponse(responseCaptor.capture());
+        assertEquals(RestStatus.OK, responseCaptor.getValue().status());
+
+        // Verify new fields in the captured request
+        PutLlmJudgmentRequest capturedRequest = requestCaptor.getValue();
+        assertEquals("test_prompt_template", capturedRequest.getPromptTemplate());
+        assertEquals("SCORE1_5", capturedRequest.getLlmJudgmentRatingType().name());
+        assertEquals(true, capturedRequest.isOverwriteCache());
     }
 }

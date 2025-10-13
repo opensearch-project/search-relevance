@@ -24,7 +24,7 @@ public class JudgmentTaskContextTests extends OpenSearchTestCase {
 
     public void testTaskContextInitialization() {
         // Arrange
-        String queryTextWithReference = "laptop#Professional laptop for business";
+        String queryTextWithCustomInput = "laptop#Professional laptop for business";
         String modelId = "test-model-id";
         List<String> contextFields = List.of("name", "description");
         List<SearchConfiguration> searchConfigurations = List.of(mock(SearchConfiguration.class));
@@ -33,7 +33,7 @@ public class JudgmentTaskContextTests extends OpenSearchTestCase {
 
         // Act
         JudgmentTaskContext context = new JudgmentTaskContext(
-            queryTextWithReference,
+            queryTextWithCustomInput,
             modelId,
             contextFields,
             searchConfigurations,
@@ -42,7 +42,7 @@ public class JudgmentTaskContextTests extends OpenSearchTestCase {
         );
 
         // Assert
-        assertEquals(queryTextWithReference, context.getQueryTextWithReference());
+        assertEquals(queryTextWithCustomInput, context.getQueryTextWithCustomInput());
         assertEquals(modelId, context.getModelId());
         assertEquals(contextFields, context.getContextFields());
         assertEquals(searchConfigurations, context.getSearchConfigurations());

@@ -10,6 +10,7 @@ package org.opensearch.searchrelevance.transport.queryset;
 import static org.opensearch.searchrelevance.model.QueryWithReference.DELIMITER;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -72,24 +73,34 @@ public class PutQuerySetTransportAction extends HandledTransportAction<PutQueryS
     }
 
     /**
-     * Query set input is a list of queryText and referenceAnswer pair.
+     * Query set input is a list of queryText and customizedKeyValueMap pair.
+     * Converts to format: "queryText#\nkey1: value1\nkey2: value2\n..."
      * e.g:
+     * Input:
      * {
      *     "queryText": "What is OpenSearch?",
      *     "referenceAnswer": "OpenSearch is a community-driven, open source search and analytics suite"
      * }
-     * @param queryWithReferenceList - list of queryText and referenceAnswer pair
+     * Output: "What is OpenSearch?#\nreferenceAnswer: OpenSearch is a community-driven, open source search and analytics suite"
+     *
+     * @param queryWithReferenceList - list of queryText and customizedKeyValueMap pair
      * @return - querySetQueries as a list of QuerySetEntry objects
      */
     private List<QuerySetEntry> convertQuerySetQueriesList(List<QueryWithReference> queryWithReferenceList) {
         return queryWithReferenceList.stream().map(queryWithReference -> {
-            String queryText;
-            if (queryWithReference.getReferenceAnswer() != null && !queryWithReference.getReferenceAnswer().isEmpty()) {
-                queryText = String.join(DELIMITER, queryWithReference.getQueryText(), queryWithReference.getReferenceAnswer());
-            } else {
-                queryText = queryWithReference.getQueryText();
+            StringBuilder queryTextBuilder = new StringBuilder(queryWithReference.getQueryText());
+
+            // Append all key-value pairs from customizedKeyValueMap in "key: value" format
+            if (queryWithReference.getCustomizedKeyValueMap() != null && !queryWithReference.getCustomizedKeyValueMap().isEmpty()) {
+                queryTextBuilder.append(DELIMITER);
+                for (Map.Entry<String, String> entry : queryWithReference.getCustomizedKeyValueMap().entrySet()) {
+                    if (entry.getValue() != null && !entry.getValue().isEmpty()) {
+                        queryTextBuilder.append("\n").append(entry.getKey()).append(": ").append(entry.getValue());
+                    }
+                }
             }
-            return QuerySetEntry.Builder.builder().queryText(queryText).build();
+
+            return QuerySetEntry.Builder.builder().queryText(queryTextBuilder.toString()).build();
         }).collect(Collectors.toList());
     }
 }

@@ -103,6 +103,9 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
                 metadata.put("tokenLimit", llmRequest.getTokenLimit());
                 metadata.put("contextFields", llmRequest.getContextFields());
                 metadata.put("ignoreFailure", llmRequest.isIgnoreFailure());
+                metadata.put("promptTemplate", llmRequest.getPromptTemplate());
+                metadata.put("llmJudgmentRatingType", llmRequest.getLlmJudgmentRatingType());
+                metadata.put("overwriteCache", llmRequest.isOverwriteCache());
             }
             case UBI_JUDGMENT -> {
                 if (!checkUbiIndicesExist(clusterService)) {
