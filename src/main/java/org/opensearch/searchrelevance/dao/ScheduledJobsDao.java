@@ -106,7 +106,7 @@ public class ScheduledJobsDao {
     /**
      * List scheduled jobs by source builder
      * @param sourceBuilder - source builder to be searched
-     * @param listener - action lister for async operation
+     * @param listener - action listener for async operation
      */
     public SearchResponse listScheduledJob(SearchSourceBuilder sourceBuilder, ActionListener<SearchResponse> listener) {
         // Apply default values if not set
