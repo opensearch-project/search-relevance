@@ -1,0 +1,16 @@
+{
+  "name": "LLM Judgment Test Query Set",
+  "description": "Query set for testing LLM judgment with custom fields",
+  "querySetQueries": [
+    {
+      "queryText": "laptop",
+      "category": "electronics",
+      "referenceAnswer": "A portable computer for professionals"
+    },
+    {
+      "queryText": "coffee maker",
+      "category": "kitchen",
+      "referenceAnswer": "An appliance for brewing coffee at home"
+    }
+  ]
+}
