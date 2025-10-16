@@ -5,3 +5,32 @@ grant {
     permission java.lang.reflect.ReflectPermission "suppressAccessChecks";
     permission java.lang.RuntimePermission "setContextClassLoader";
 };
+
+// Grant network permissions to all protection domains for remote search functionality
+grant {
+    permission java.net.SocketPermission "*:*", "connect,resolve";
+    permission java.net.URLPermission "http://*", "*:*";
+    permission java.net.URLPermission "https://*", "*:*";
+    permission java.lang.RuntimePermission "accessClassInPackage.jdk.internal.net.http";
+    permission java.lang.RuntimePermission "accessClassInPackage.jdk.internal.net.http.common";
+    permission java.lang.RuntimePermission "modifyThread";
+    permission java.lang.RuntimePermission "modifyThreadGroup";
+};
+
+// Grant specific permissions to java.net.http module
+grant codeBase "jrt:/java.net.http" {
+    permission java.net.SocketPermission "*:*", "connect,resolve";
+    permission java.net.URLPermission "http://*", "*:*";
+    permission java.net.URLPermission "https://*", "*:*";
+    permission java.lang.RuntimePermission "accessClassInPackage.jdk.internal.net.http";
+    permission java.lang.RuntimePermission "accessClassInPackage.jdk.internal.net.http.common";
+    permission java.lang.RuntimePermission "modifyThread";
+    permission java.lang.RuntimePermission "modifyThreadGroup";
+};
+
+// Grant permissions to java.base module for networking
+grant codeBase "jrt:/java.base" {
+    permission java.net.SocketPermission "*:*", "connect,resolve";
+    permission java.lang.RuntimePermission "modifyThread";
+    permission java.lang.RuntimePermission "modifyThreadGroup";
+};

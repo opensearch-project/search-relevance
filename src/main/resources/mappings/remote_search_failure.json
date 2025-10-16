@@ -1,0 +1,41 @@
+{
+  "mappings": {
+    "properties": {
+      "id": {
+        "type": "keyword"
+      },
+      "remoteConfigId": {
+        "type": "keyword"
+      },
+      "experimentId": {
+        "type": "keyword"
+      },
+      "query": {
+        "type": "text",
+        "index": false
+      },
+      "queryText": {
+        "type": "keyword"
+      },
+      "errorType": {
+        "type": "keyword"
+      },
+      "errorMessage": {
+        "type": "text"
+      },
+      "timestamp": {
+        "type": "date",
+        "format": "strict_date_optional_time||epoch_millis"
+      },
+      "status": {
+        "type": "keyword"
+      }
+    }
+  },
+  "settings": {
+    "index": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0
+    }
+  }
+}

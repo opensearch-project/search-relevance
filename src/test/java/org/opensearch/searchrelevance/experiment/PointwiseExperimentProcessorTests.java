@@ -23,7 +23,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.junit.Before;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.opensearch.action.search.SearchResponse;
@@ -49,9 +48,10 @@ public class PointwiseExperimentProcessorTests extends OpenSearchTestCase {
 
     private PointwiseExperimentProcessor processor;
 
-    @Before
+    // @Before
     @SneakyThrows
-    public void setUp() {
+    public void setUp() throws Exception {
+        super.setUp();
         super.setUp();
         MockitoAnnotations.openMocks(this);
         processor = new PointwiseExperimentProcessor(judgmentDao, taskManager);

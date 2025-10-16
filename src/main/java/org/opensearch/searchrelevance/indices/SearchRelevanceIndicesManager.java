@@ -73,6 +73,17 @@ public class SearchRelevanceIndicesManager {
         }
 
         final CreateIndexRequest createIndexRequest = new CreateIndexRequest(indexName).mapping(mapping);
+
+        // Apply default settings for remote search cache index
+        if (index == SearchRelevanceIndices.REMOTE_SEARCH_CACHE) {
+            createIndexRequest.settings(
+                org.opensearch.common.settings.Settings.builder()
+                    .put("index.number_of_shards", 1)
+                    .put("index.number_of_replicas", 0)
+                    .build()
+            );
+        }
+
         StashedThreadContext.run(client, () -> client.admin().indices().create(createIndexRequest, new ActionListener<>() {
             @Override
             public void onResponse(final CreateIndexResponse createIndexResponse) {
@@ -106,6 +117,17 @@ public class SearchRelevanceIndicesManager {
             return;
         }
         final CreateIndexRequest createIndexRequest = new CreateIndexRequest(indexName).mapping(mapping);
+
+        // Apply default settings for remote search cache index
+        if (index == SearchRelevanceIndices.REMOTE_SEARCH_CACHE) {
+            createIndexRequest.settings(
+                org.opensearch.common.settings.Settings.builder()
+                    .put("index.number_of_shards", 1)
+                    .put("index.number_of_replicas", 0)
+                    .build()
+            );
+        }
+
         StashedThreadContext.run(client, () -> client.admin().indices().create(createIndexRequest));
     }
 
@@ -327,9 +349,19 @@ public class SearchRelevanceIndicesManager {
 
                         @Override
                         public void onFailure(Exception e) {
-                            actionListener.onFailure(
-                                new SearchRelevanceException("Failed to get document", e, RestStatus.INTERNAL_SERVER_ERROR)
-                            );
+                            if (e instanceof IndexNotFoundException) {
+                                // If index doesn't exist, treat it as document not found
+                                typedListener.onFailure(
+                                    new ResourceNotFoundException(
+                                        "Document not found: " + searchOperationContextArg.getDocumentId(),
+                                        RestStatus.NOT_FOUND
+                                    )
+                                );
+                            } else {
+                                actionListener.onFailure(
+                                    new SearchRelevanceException("Failed to get document", e, RestStatus.INTERNAL_SERVER_ERROR)
+                                );
+                            }
                         }
                     });
                 } catch (Exception e) {

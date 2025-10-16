@@ -1,0 +1,33 @@
+{
+  "properties": {
+    "cacheKey": {
+      "type": "keyword"
+    },
+    "remoteConfigId": {
+      "type": "keyword"
+    },
+    "query": {
+      "type": "text",
+      "index": false
+    },
+    "queryText": {
+      "type": "keyword"
+    },
+    "cachedResponse": {
+      "type": "text",
+      "index": false
+    },
+    "mappedResponse": {
+      "type": "text",
+      "index": false
+    },
+    "cacheTimestamp": {
+      "type": "date",
+      "format": "epoch_millis"
+    },
+    "expirationTimestamp": {
+      "type": "date",
+      "format": "epoch_millis"
+    }
+  }
+}

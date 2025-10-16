@@ -28,6 +28,9 @@ import org.opensearch.common.util.concurrent.OpenSearchExecutors;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.searchrelevance.dao.EvaluationResultDao;
 import org.opensearch.searchrelevance.dao.ExperimentVariantDao;
+import org.opensearch.searchrelevance.dao.RemoteSearchCacheDao;
+import org.opensearch.searchrelevance.dao.RemoteSearchConfigurationDao;
+import org.opensearch.searchrelevance.dao.RemoteSearchFailureDao;
 import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.model.ExperimentVariant;
@@ -44,6 +47,9 @@ public class ExperimentTaskManagerTests extends OpenSearchTestCase {
     private ClusterService clusterService;
     private EvaluationResultDao evaluationResultDao;
     private ExperimentVariantDao experimentVariantDao;
+    private RemoteSearchConfigurationDao remoteSearchConfigurationDao;
+    private RemoteSearchCacheDao remoteSearchCacheDao;
+    private RemoteSearchFailureDao remoteSearchFailureDao;
     private ThreadPool threadPool;
     private ExecutorService immediateExecutor;
 
@@ -54,6 +60,9 @@ public class ExperimentTaskManagerTests extends OpenSearchTestCase {
         clusterService = mock(ClusterService.class);
         evaluationResultDao = mock(EvaluationResultDao.class);
         experimentVariantDao = mock(ExperimentVariantDao.class);
+        remoteSearchConfigurationDao = mock(RemoteSearchConfigurationDao.class);
+        remoteSearchCacheDao = mock(RemoteSearchCacheDao.class);
+        remoteSearchFailureDao = mock(RemoteSearchFailureDao.class);
         threadPool = mock(ThreadPool.class);
 
         // Create an immediate executor
@@ -163,7 +172,15 @@ public class ExperimentTaskManagerTests extends OpenSearchTestCase {
 
     public void testDynamicConcurrencyControlInitialization() {
         // Test that ExperimentTaskManager initializes with dynamic concurrency limits
-        ExperimentTaskManager taskManager = new ExperimentTaskManager(client, evaluationResultDao, experimentVariantDao, threadPool);
+        ExperimentTaskManager taskManager = new ExperimentTaskManager(
+            client,
+            evaluationResultDao,
+            experimentVariantDao,
+            threadPool,
+            remoteSearchConfigurationDao,
+            remoteSearchCacheDao,
+            remoteSearchFailureDao
+        );
 
         Map<String, Object> metrics = taskManager.getConcurrencyMetrics();
 
@@ -189,7 +206,15 @@ public class ExperimentTaskManagerTests extends OpenSearchTestCase {
 
     public void testConcurrencyLimitCalculationLogic() {
         // Test the actual concurrency calculation logic with current system
-        ExperimentTaskManager taskManager = new ExperimentTaskManager(client, evaluationResultDao, experimentVariantDao, threadPool);
+        ExperimentTaskManager taskManager = new ExperimentTaskManager(
+            client,
+            evaluationResultDao,
+            experimentVariantDao,
+            threadPool,
+            remoteSearchConfigurationDao,
+            remoteSearchCacheDao,
+            remoteSearchFailureDao
+        );
 
         Map<String, Object> metrics = taskManager.getConcurrencyMetrics();
         int maxConcurrentTasks = (Integer) metrics.get("max_concurrent_tasks");
@@ -203,7 +228,15 @@ public class ExperimentTaskManagerTests extends OpenSearchTestCase {
 
     public void testConcurrencyMetricsConsistency() {
         // Test that metrics are consistent and make sense
-        ExperimentTaskManager taskManager = new ExperimentTaskManager(client, evaluationResultDao, experimentVariantDao, threadPool);
+        ExperimentTaskManager taskManager = new ExperimentTaskManager(
+            client,
+            evaluationResultDao,
+            experimentVariantDao,
+            threadPool,
+            remoteSearchConfigurationDao,
+            remoteSearchCacheDao,
+            remoteSearchFailureDao
+        );
 
         Map<String, Object> metrics = taskManager.getConcurrencyMetrics();
 
@@ -224,7 +257,15 @@ public class ExperimentTaskManagerTests extends OpenSearchTestCase {
 
     public void testConcurrencyLimitBoundaries() {
         // Test that the concurrency calculation respects minimum and maximum bounds
-        ExperimentTaskManager taskManager = new ExperimentTaskManager(client, evaluationResultDao, experimentVariantDao, threadPool);
+        ExperimentTaskManager taskManager = new ExperimentTaskManager(
+            client,
+            evaluationResultDao,
+            experimentVariantDao,
+            threadPool,
+            remoteSearchConfigurationDao,
+            remoteSearchCacheDao,
+            remoteSearchFailureDao
+        );
 
         Map<String, Object> metrics = taskManager.getConcurrencyMetrics();
         int maxConcurrentTasks = (Integer) metrics.get("max_concurrent_tasks");
@@ -245,7 +286,15 @@ public class ExperimentTaskManagerTests extends OpenSearchTestCase {
 
     public void testDynamicConcurrencyScaling() {
         // Test that dynamic concurrency scales appropriately with processor count
-        ExperimentTaskManager taskManager = new ExperimentTaskManager(client, evaluationResultDao, experimentVariantDao, threadPool);
+        ExperimentTaskManager taskManager = new ExperimentTaskManager(
+            client,
+            evaluationResultDao,
+            experimentVariantDao,
+            threadPool,
+            remoteSearchConfigurationDao,
+            remoteSearchCacheDao,
+            remoteSearchFailureDao
+        );
 
         Map<String, Object> metrics = taskManager.getConcurrencyMetrics();
         int maxConcurrentTasks = (Integer) metrics.get("max_concurrent_tasks");
@@ -267,7 +316,15 @@ public class ExperimentTaskManagerTests extends OpenSearchTestCase {
 
     public void testConfigMapInitialization() throws Exception {
         // Arrange
-        ExperimentTaskManager taskManager = new ExperimentTaskManager(client, evaluationResultDao, experimentVariantDao, threadPool);
+        ExperimentTaskManager taskManager = new ExperimentTaskManager(
+            client,
+            evaluationResultDao,
+            experimentVariantDao,
+            threadPool,
+            remoteSearchConfigurationDao,
+            remoteSearchCacheDao,
+            remoteSearchFailureDao
+        );
         String experimentId = "test-experiment";
         String searchConfigId = "test-config";
         Map<String, Object> initialConfigMap = new HashMap<>();

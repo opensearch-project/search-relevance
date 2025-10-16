@@ -20,7 +20,6 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.junit.Before;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
@@ -59,8 +58,9 @@ public class RestSearchRelevanceStatsActionTests extends SearchRelevanceRestTest
     @Mock
     private ClusterUtil clusterUtil;
 
-    @Before
-    public void setup() {
+    @Override
+    public void setUp() throws Exception {
+        super.setUp();
         MockitoAnnotations.openMocks(this);
 
         threadPool = new TestThreadPool(this.getClass().getSimpleName() + "ThreadPool");
@@ -79,8 +79,12 @@ public class RestSearchRelevanceStatsActionTests extends SearchRelevanceRestTest
     @Override
     public void tearDown() throws Exception {
         super.tearDown();
-        threadPool.shutdown();
-        client.close();
+        if (threadPool != null) {
+            threadPool.shutdown();
+        }
+        if (client != null) {
+            client.close();
+        }
     }
 
     public void test_execute() throws Exception {

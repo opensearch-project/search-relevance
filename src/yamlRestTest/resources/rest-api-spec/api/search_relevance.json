@@ -1,0 +1,19 @@
+{
+  "search_relevance": {
+    "stability": "experimental",
+    "documentation": {
+      "url": "",
+      "description": "Placeholder root API for Search Relevance REST spec; required to satisfy filename-to-API name constraint"
+    },
+    "url": {
+      "paths": [
+        {
+          "path": "/_plugins/_search_relevance/_noop",
+          "methods": ["GET"],
+          "parts": {}
+        }
+      ]
+    },
+    "params": {}
+  }
+}

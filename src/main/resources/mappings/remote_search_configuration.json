@@ -1,0 +1,57 @@
+{
+  "properties": {
+    "id": {
+      "type": "keyword"
+    },
+    "name": {
+      "type": "text",
+      "fields": {
+        "keyword": {
+          "type": "keyword",
+          "ignore_above": 256
+        }
+      }
+    },
+    "description": {
+      "type": "text"
+    },
+    "connectionUrl": {
+      "type": "keyword"
+    },
+    "username": {
+      "type": "keyword"
+    },
+    "password": {
+      "type": "keyword",
+      "index": false
+    },
+    "queryTemplate": {
+      "type": "text",
+      "index": false
+    },
+    "responseTemplate": {
+      "type": "text",
+      "index": false
+    },
+    "maxRequestsPerSecond": {
+      "type": "integer"
+    },
+    "maxConcurrentRequests": {
+      "type": "integer"
+    },
+    "cacheDurationMinutes": {
+      "type": "long"
+    },
+    "refreshCache": {
+      "type": "boolean"
+    },
+    "metadata": {
+      "type": "object",
+      "enabled": false
+    },
+    "timestamp": {
+      "type": "date",
+      "format": "strict_date_optional_time||epoch_millis"
+    }
+  }
+}

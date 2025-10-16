@@ -1,0 +1,25 @@
+{
+  "search_relevance.get_remote_search_configuration": {
+    "stability": "experimental",
+    "documentation": {
+      "url": "",
+      "description": "Get a remote search configuration by id"
+    },
+    "url": {
+      "paths": [
+        {
+          "path": "/_plugins/_search_relevance/remote_search_configurations/{id}",
+          "methods": ["GET"],
+          "parts": {
+            "id": {
+              "type": "string",
+              "required": true,
+              "description": "Remote search configuration id"
+            }
+          }
+        }
+      ]
+    },
+    "params": {}
+  }
+}

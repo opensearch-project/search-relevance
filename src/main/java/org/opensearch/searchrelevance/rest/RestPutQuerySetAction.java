@@ -88,6 +88,11 @@ public class RestPutQuerySetAction extends BaseRestHandler {
         List<QueryWithReference> querySetQueries;
         if (sampling.equals(MANUAL)) {
             List<Object> rawQueries = (List<Object>) source.get(QUERY_SET_QUERIES);
+            if (rawQueries == null) {
+                return channel -> channel.sendResponse(
+                    new BytesRestResponse(RestStatus.BAD_REQUEST, "Missing required field: " + QUERY_SET_QUERIES)
+                );
+            }
             if (rawQueries.size() > settingsAccessor.getMaxQuerySetAllowed()) {
                 return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.FORBIDDEN, "Query Set Limit Exceeded."));
             }

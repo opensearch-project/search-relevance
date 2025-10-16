@@ -61,6 +61,10 @@ public class EventStatsManager {
      * @param eventStatName The name of the event stat to increment
      */
     public void inc(EventStatName eventStatName) {
+        // Treat as NOOP if settings accessor is not initialized or stats are disabled
+        if (settingsAccessor == null) {
+            return;
+        }
         if (settingsAccessor.isStatsEnabled()) {
             eventStatName.getEventStat().increment();
         }

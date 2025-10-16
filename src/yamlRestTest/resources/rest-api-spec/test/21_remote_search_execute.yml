@@ -1,0 +1,42 @@
+"Remote Search Execute validation and gating":
+  # Enable Workbench to test validation behavior
+  - do:
+      cluster.put_settings:
+        body:
+          persistent:
+            plugins.search_relevance.workbench_enabled: true
+
+  # Missing remoteConfigId should be a bad request
+  - do:
+      catch: bad_request
+      search_relevance.remote_search_execute:
+        body:
+          queryText: "test"
+          size: 3
+          query: "{}"
+
+  # Non-existent remoteConfigId should be a bad request
+  - do:
+      catch: missing
+      search_relevance.remote_search_execute:
+        body:
+          remoteConfigId: "no_such_config_id"
+          queryText: "test"
+          size: 3
+          query: "{}"
+
+  # Disable Workbench to verify gating returns 403
+  - do:
+      cluster.put_settings:
+        body:
+          persistent:
+            plugins.search_relevance.workbench_enabled: false
+
+  - do:
+      catch: forbidden
+      search_relevance.remote_search_execute:
+        body:
+          remoteConfigId: "any"
+          queryText: "test"
+          size: 1
+          query: "{}"

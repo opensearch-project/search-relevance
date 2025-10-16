@@ -12,21 +12,21 @@ import static org.mockito.Mockito.spy;
 
 import java.util.concurrent.TimeUnit;
 
-import org.junit.Before;
-import org.mockito.Spy;
+import org.mockito.MockitoAnnotations;
 import org.opensearch.test.OpenSearchTestCase;
 
 public class TimestampedEventStatTests extends OpenSearchTestCase {
     private static final long BUCKET_INTERVAL_MS = 60 * 1000; // 60 seconds
     private static final EventStatName STAT_NAME = EventStatName.LLM_JUDGMENT_RATING_GENERATIONS;
 
-    @Spy
     private TimestampedEventStat stat;
 
     private long currentTime;
 
-    @Before
-    public void setup() {
+    @Override
+    public void setUp() throws Exception {
+        super.setUp();
+        MockitoAnnotations.openMocks(this);
         stat = spy(new TimestampedEventStat(STAT_NAME));
         currentTime = System.currentTimeMillis();
         doAnswer(inv -> currentTime).when(stat).getCurrentTimeInMillis();

@@ -1,0 +1,19 @@
+{
+  "search_relevance.list_remote_search_configurations": {
+    "stability": "experimental",
+    "documentation": {
+      "url": "",
+      "description": "List remote search configurations"
+    },
+    "url": {
+      "paths": [
+        {
+          "path": "/_plugins/_search_relevance/remote_search_configurations",
+          "methods": ["GET"],
+          "parts": {}
+        }
+      ]
+    },
+    "params": {}
+  }
+}

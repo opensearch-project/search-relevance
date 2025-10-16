@@ -11,7 +11,6 @@ import java.util.EnumSet;
 import java.util.Map;
 import java.util.Set;
 
-import org.junit.Before;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
@@ -24,8 +23,9 @@ public class InfoStatsManagerTests extends OpenSearchTestCase {
 
     private InfoStatsManager infoStatsManager;
 
-    @Before
-    public void setup() {
+    @Override
+    public void setUp() throws Exception {
+        super.setUp();
         MockitoAnnotations.openMocks(this);
         infoStatsManager = new InfoStatsManager(mockSettingsAccessor);
     }

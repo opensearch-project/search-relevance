@@ -1,0 +1,25 @@
+{
+  "search_relevance.delete_remote_search_configuration": {
+    "stability": "experimental",
+    "documentation": {
+      "url": "",
+      "description": "Delete a remote search configuration by id"
+    },
+    "url": {
+      "paths": [
+        {
+          "path": "/_plugins/_search_relevance/remote_search_configurations/{id}",
+          "methods": ["DELETE"],
+          "parts": {
+            "id": {
+              "type": "string",
+              "required": true,
+              "description": "Remote search configuration id"
+            }
+          }
+        }
+      ]
+    },
+    "params": {}
+  }
+}

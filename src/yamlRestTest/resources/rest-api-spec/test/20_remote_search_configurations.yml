@@ -1,0 +1,100 @@
+"Remote Search Configurations CRUD, validation, and gating":
+  # Enable Workbench for positive/validation tests
+  - do:
+      cluster.put_settings:
+        body:
+          persistent:
+            plugins.search_relevance.workbench_enabled: true
+
+  # Create configuration (POST) - minimal valid body plus optional fields
+  - do:
+      search_relevance.put_remote_search_configuration:
+        body:
+          id: "test-remote-1"
+          name: "Test Remote"
+          description: "YAML REST test config"
+          connectionUrl: "https://example.com/api"
+          username: "user"
+          password: "pass"
+          queryTemplate: '{"q":"{{queryText}}","size":{{size}}}'
+          responseTemplate: ""
+          maxRequestsPerSecond: 2
+          maxConcurrentRequests: 1
+          cacheDurationMinutes: 5
+          refreshCache: false
+          metadata:
+            env: "test"
+  - match: { id: "test-remote-1" }
+
+  # Get configuration by id (GET)
+  - do:
+      search_relevance.get_remote_search_configuration:
+        id: test-remote-1
+  - match: { id: "test-remote-1" }
+  - match: { name: "Test Remote" }
+
+  # Update same configuration (POST with same id) - change name and refreshCache
+  - do:
+      search_relevance.put_remote_search_configuration:
+        body:
+          id: "test-remote-1"
+          name: "Test Remote (updated)"
+          description: "YAML REST test config"
+          connectionUrl: "https://example.com/api"
+          username: "user"
+          password: "pass"
+          queryTemplate: '{"q":"{{queryText}}","size":{{size}}}'
+          responseTemplate: ""
+          maxRequestsPerSecond: 2
+          maxConcurrentRequests: 1
+          cacheDurationMinutes: 5
+          refreshCache: true
+          metadata:
+            env: "test"
+  - match: { id: "test-remote-1" }
+
+  # Get configuration by id (verify updated name)
+  - do:
+      search_relevance.get_remote_search_configuration:
+        id: test-remote-1
+  - match: { id: "test-remote-1" }
+  - match: { name: "Test Remote (updated)" }
+
+  # Missing id should be a bad request (POST)
+  - do:
+      catch: bad_request
+      search_relevance.put_remote_search_configuration:
+        body:
+          name: "Missing ID"
+          connectionUrl: "https://example.com/api"
+
+  # Delete configuration by id (DELETE)
+  - do:
+      search_relevance.delete_remote_search_configuration:
+        id: test-remote-1
+
+  # Delete again should return not_found
+  - do:
+      catch: missing
+      search_relevance.delete_remote_search_configuration:
+        id: test-remote-1
+
+  # Disable Workbench to verify gating returns 403 for list/put/get
+  - do:
+      cluster.put_settings:
+        body:
+          persistent:
+            plugins.search_relevance.workbench_enabled: false
+
+  # List (GET) should be forbidden
+  - do:
+      catch: forbidden
+      search_relevance.list_remote_search_configurations: {}
+
+  # Put (POST) should be forbidden
+  - do:
+      catch: forbidden
+      search_relevance.put_remote_search_configuration:
+        body:
+          id: "test-remote-2"
+          connectionUrl: "https://example.com/api"

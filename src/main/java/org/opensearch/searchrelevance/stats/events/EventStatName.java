@@ -58,7 +58,18 @@ public enum EventStatName implements StatName {
         "experiments",
         EventStatType.TIMESTAMPED_EVENT_COUNTER,
         Version.V_3_1_0
-    ),;
+    ),
+    REMOTE_SEARCH_REQUESTS("remote_search_requests", "remote_search", EventStatType.TIMESTAMPED_EVENT_COUNTER, Version.CURRENT),
+    REMOTE_SEARCH_SUCCESSES("remote_search_successes", "remote_search", EventStatType.TIMESTAMPED_EVENT_COUNTER, Version.CURRENT),
+    REMOTE_SEARCH_FAILURES("remote_search_failures", "remote_search", EventStatType.TIMESTAMPED_EVENT_COUNTER, Version.CURRENT),
+    REMOTE_SEARCH_RATE_LIMIT_HITS(
+        "remote_search_rate_limit_hits",
+        "remote_search",
+        EventStatType.TIMESTAMPED_EVENT_COUNTER,
+        Version.CURRENT
+    ),
+    REMOTE_SEARCH_CACHE_HITS("remote_search_cache_hits", "remote_search", EventStatType.TIMESTAMPED_EVENT_COUNTER, Version.CURRENT),
+    REMOTE_SEARCH_CACHE_MISSES("remote_search_cache_misses", "remote_search", EventStatType.TIMESTAMPED_EVENT_COUNTER, Version.CURRENT),;
 
     private final String nameString;
     private final String path;

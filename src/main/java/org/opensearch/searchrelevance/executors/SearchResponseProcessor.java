@@ -95,6 +95,60 @@ public class SearchResponseProcessor {
         }
     }
 
+    /**
+     * Process pre-collected document IDs (e.g., from a remote engine mapped response)
+     */
+    public void processDocIds(
+        java.util.List<String> docIds,
+        ExperimentVariant experimentVariant,
+        String experimentId,
+        String searchConfigId,
+        String queryText,
+        int size,
+        java.util.List<String> judgmentIds,
+        java.util.Map<String, String> docIdToScores,
+        String evaluationId,
+        ExperimentTaskContext taskContext
+    ) {
+        if (taskContext.getHasFailure().get()) return;
+
+        try {
+            if (docIds == null || docIds.isEmpty()) {
+                handleNoHits(experimentVariant, experimentId, searchConfigId, evaluationId, taskContext);
+                return;
+            }
+
+            java.util.List<java.util.Map<String, Object>> metrics = calculateEvaluationMetrics(docIds, docIdToScores, size);
+
+            String experimentVariantParameters = experimentVariant.getType() == ExperimentType.HYBRID_OPTIMIZER
+                ? experimentVariant.getTextualParameters()
+                : null;
+
+            EvaluationResult evaluationResult = new EvaluationResult(
+                evaluationId,
+                TimeUtils.getTimestamp(),
+                searchConfigId,
+                queryText,
+                judgmentIds,
+                docIds,
+                metrics,
+                experimentId,
+                experimentVariant.getId(),
+                experimentVariantParameters
+            );
+
+            evaluationResultDao.putEvaluationResultEfficient(
+                evaluationResult,
+                ActionListener.wrap(
+                    success -> updateExperimentVariant(experimentVariant, experimentId, searchConfigId, evaluationId, taskContext),
+                    error -> handleTaskFailure(experimentVariant, error, taskContext)
+                )
+            );
+        } catch (Exception e) {
+            handleTaskFailure(experimentVariant, e, taskContext);
+        }
+    }
+
     private void handleNoHits(
         ExperimentVariant experimentVariant,
         String experimentId,

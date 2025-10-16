@@ -1,0 +1,20 @@
+{
+  "search_relevance.remote_search_execute": {
+    "stability": "experimental",
+    "documentation": {
+      "url": "",
+      "description": "Execute a remote search using a configured remote search configuration"
+    },
+    "url": {
+      "paths": [
+        {
+          "path": "/_plugins/_search_relevance/remote_search/execute",
+          "methods": ["POST"],
+          "parts": {}
+        }
+      ]
+    },
+    "params": {},
+    "body": { "required": true }
+  }
+}

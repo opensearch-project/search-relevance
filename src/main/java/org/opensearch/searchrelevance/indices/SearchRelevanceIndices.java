@@ -19,6 +19,12 @@ import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_IND
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_INDEX_MAPPING;
 import static org.opensearch.searchrelevance.common.PluginConstants.QUERY_SET_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.QUERY_SET_INDEX_MAPPING;
+import static org.opensearch.searchrelevance.common.PluginConstants.REMOTE_SEARCH_CACHE_INDEX;
+import static org.opensearch.searchrelevance.common.PluginConstants.REMOTE_SEARCH_CACHE_INDEX_MAPPING;
+import static org.opensearch.searchrelevance.common.PluginConstants.REMOTE_SEARCH_CONFIG_INDEX;
+import static org.opensearch.searchrelevance.common.PluginConstants.REMOTE_SEARCH_CONFIG_INDEX_MAPPING;
+import static org.opensearch.searchrelevance.common.PluginConstants.REMOTE_SEARCH_FAILURE_INDEX;
+import static org.opensearch.searchrelevance.common.PluginConstants.REMOTE_SEARCH_FAILURE_INDEX_MAPPING;
 import static org.opensearch.searchrelevance.common.PluginConstants.SEARCH_CONFIGURATION_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.SEARCH_CONFIGURATION_INDEX_MAPPING;
 import static org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager.getIndexMappings;
@@ -66,7 +72,22 @@ public enum SearchRelevanceIndices {
     /**
      * Experiment Variant Index
      */
-    EXPERIMENT_VARIANT(EXPERIMENT_VARIANT_INDEX, EXPERIMENT_VARIANT_INDEX_MAPPING, false);
+    EXPERIMENT_VARIANT(EXPERIMENT_VARIANT_INDEX, EXPERIMENT_VARIANT_INDEX_MAPPING, false),
+
+    /**
+     * Remote Search Configuration Index
+     */
+    REMOTE_SEARCH_CONFIGURATION(REMOTE_SEARCH_CONFIG_INDEX, REMOTE_SEARCH_CONFIG_INDEX_MAPPING, false),
+
+    /**
+     * Remote Search Cache Index
+     */
+    REMOTE_SEARCH_CACHE(REMOTE_SEARCH_CACHE_INDEX, REMOTE_SEARCH_CACHE_INDEX_MAPPING, false),
+
+    /**
+     * Remote Search Failure Index
+     */
+    REMOTE_SEARCH_FAILURE(REMOTE_SEARCH_FAILURE_INDEX, REMOTE_SEARCH_FAILURE_INDEX_MAPPING, false);
 
     private final String indexName;
     private final String mapping;

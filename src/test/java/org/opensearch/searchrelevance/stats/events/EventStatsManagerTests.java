@@ -12,7 +12,6 @@ import static org.mockito.Mockito.when;
 import java.util.EnumSet;
 import java.util.Map;
 
-import org.junit.Before;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
@@ -29,8 +28,9 @@ public class EventStatsManagerTests extends OpenSearchTestCase {
 
     private EventStatsManager eventStatsManager;
 
-    @Before
-    public void setup() {
+    @Override
+    public void setUp() throws Exception {
+        super.setUp();
         MockitoAnnotations.openMocks(this);
         eventStatsManager = new EventStatsManager();
         eventStatsManager.initialize(mockSettingsAccessor);

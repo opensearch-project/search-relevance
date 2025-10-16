@@ -34,6 +34,7 @@ import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.executors.ExperimentTaskManager;
 import org.opensearch.searchrelevance.experiment.HybridOptimizerExperimentProcessor;
 import org.opensearch.searchrelevance.experiment.PointwiseExperimentProcessor;
+import org.opensearch.searchrelevance.experiment.RemoteSearchExperimentProcessor;
 import org.opensearch.searchrelevance.metrics.MetricsHelper;
 import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.Experiment;
@@ -59,6 +60,7 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
     private final MetricsHelper metricsHelper;
     private final HybridOptimizerExperimentProcessor hybridOptimizerExperimentProcessor;
     private final PointwiseExperimentProcessor pointwiseExperimentProcessor;
+    private final RemoteSearchExperimentProcessor remoteSearchExperimentProcessor;
 
     @Inject
     public PutExperimentTransportAction(
@@ -78,6 +80,7 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
         this.metricsHelper = metricsHelper;
         this.hybridOptimizerExperimentProcessor = new HybridOptimizerExperimentProcessor(judgmentDao, experimentTaskManager);
         this.pointwiseExperimentProcessor = new PointwiseExperimentProcessor(judgmentDao, experimentTaskManager);
+        this.remoteSearchExperimentProcessor = new RemoteSearchExperimentProcessor(judgmentDao, experimentTaskManager);
     }
 
     @Override
@@ -138,8 +141,16 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
                     return;
                 }
 
-                // Then get SearchConfigurations asynchronously
-                fetchSearchConfigurationsAsync(experimentId, request, queryTextWithReferences);
+                if (request.getType() == ExperimentType.REMOTE_SEARCH_EVALUATION) {
+                    // Skip fetching local SearchConfigurations for remote experiments
+                    // For REMOTE_SEARCH_EVALUATION, the searchConfigurationList contains remote configuration IDs,
+                    // not local SearchConfiguration IDs. Proceed directly to metrics processing with an empty map.
+                    calculateMetricsAsync(experimentId, request, new HashMap<>(), queryTextWithReferences);
+                } else {
+                    // Then get SearchConfigurations asynchronously
+                    fetchSearchConfigurationsAsync(experimentId, request, queryTextWithReferences);
+                }
+
             } catch (Exception e) {
                 handleAsyncFailure(experimentId, request, "Failed to process QuerySet", e);
             }
@@ -346,6 +357,29 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
                         error -> handleFailure(error, hasFailure, experimentId, request)
                     )
                 );
+            } else if (request.getType() == ExperimentType.REMOTE_SEARCH_EVALUATION) {
+                // Treat searchConfigurationList as list of remote configuration IDs
+                remoteSearchExperimentProcessor.processRemoteExperiment(
+                    experimentId,
+                    queryText,
+                    request.getSearchConfigurationList(),
+                    judgmentList,
+                    request.getSize(),
+                    hasFailure,
+                    ActionListener.wrap(
+                        queryResults -> handleQueryResults(
+                            queryText,
+                            queryResults,
+                            finalResults,
+                            pendingQueries,
+                            experimentId,
+                            request,
+                            hasFailure,
+                            judgmentList
+                        ),
+                        error -> handleFailure(error, hasFailure, experimentId, request)
+                    )
+                );
             } else {
                 throw new SearchRelevanceException("Unknown experimentType" + request.getType(), RestStatus.BAD_REQUEST);
             }
@@ -385,6 +419,12 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
                     if (pointwiseResults != null) {
                         // Results already contain the proper format with evaluationId, searchConfigurationId, queryText
                         finalResults.addAll(pointwiseResults);
+                    }
+                } else if (request.getType() == ExperimentType.REMOTE_SEARCH_EVALUATION) {
+                    // For REMOTE_SEARCH_EVALUATION, reuse the same 'results' structure
+                    List<Map<String, Object>> remoteResults = (List<Map<String, Object>>) queryResults.get("results");
+                    if (remoteResults != null) {
+                        finalResults.addAll(remoteResults);
                     }
                 } else {
                     // For other experiment types, use generic format

@@ -26,6 +26,11 @@ public class PluginConstants {
     public static final String JUDGMENTS_URL = SEARCH_RELEVANCE_BASE_URI + "/judgments";
     /** The URI for this plugin's search configurations rest actions */
     public static final String SEARCH_CONFIGURATIONS_URL = SEARCH_RELEVANCE_BASE_URI + "/search_configurations";
+    /** The URI for this plugin's remote search configuration rest actions */
+    public static final String REMOTE_SEARCH_CONFIGURATIONS_URL = SEARCH_RELEVANCE_BASE_URI + "/remote_search_configurations";
+    /** The URI for this plugin's remote search execute rest action */
+    public static final String REMOTE_SEARCH_EXECUTE_URL = SEARCH_RELEVANCE_BASE_URI + "/remote_search/execute";
+
     /** The URI for initializing the UBI indices */
     public static final String INITIALIZE_URL = "/_plugins/ubi/initialize";
 
@@ -53,6 +58,12 @@ public class PluginConstants {
     public static final String JUDGMENT_CACHE_INDEX_MAPPING = "mappings/judgment_cache.json";
     public static final String EXPERIMENT_VARIANT_INDEX = "search-relevance-experiment-variant";
     public static final String EXPERIMENT_VARIANT_INDEX_MAPPING = "mappings/experiment_variant.json";
+    public static final String REMOTE_SEARCH_CONFIG_INDEX = "search-relevance-remote-search-config";
+    public static final String REMOTE_SEARCH_CONFIG_INDEX_MAPPING = "mappings/remote_search_configuration.json";
+    public static final String REMOTE_SEARCH_CACHE_INDEX = "search-relevance-remote-search-cache";
+    public static final String REMOTE_SEARCH_CACHE_INDEX_MAPPING = "mappings/remote_search_cache.json";
+    public static final String REMOTE_SEARCH_FAILURE_INDEX = "search-relevance-remote-search-failure";
+    public static final String REMOTE_SEARCH_FAILURE_INDEX_MAPPING = "mappings/remote_search_failure.json";
 
     /**
      * UBI

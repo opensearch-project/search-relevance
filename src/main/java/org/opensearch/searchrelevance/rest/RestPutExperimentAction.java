@@ -116,6 +116,15 @@ public class RestPutExperimentAction extends BaseRestHandler {
                 }
                 break;
 
+            case REMOTE_SEARCH_EVALUATION:
+                if (searchConfigurationList == null || searchConfigurationList.isEmpty()) {
+                    throw new SearchRelevanceException(
+                        "REMOTE_SEARCH_EVALUATION requires at least 1 remote configuration",
+                        RestStatus.BAD_REQUEST
+                    );
+                }
+                break;
+
             default:
                 throw new IllegalArgumentException("Unsupported experiment type: " + experimentType);
         }

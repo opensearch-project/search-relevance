@@ -1,0 +1,20 @@
+{
+  "search_relevance.put_remote_search_configuration": {
+    "stability": "experimental",
+    "documentation": {
+      "url": "",
+      "description": "Create or update a remote search configuration"
+    },
+    "url": {
+      "paths": [
+        {
+          "path": "/_plugins/_search_relevance/remote_search_configurations",
+          "methods": ["POST"],
+          "parts": {}
+        }
+      ]
+    },
+    "params": {},
+    "body": { "required": true }
+  }
+}
