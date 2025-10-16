@@ -26,6 +26,10 @@ import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager;
 import org.opensearch.searchrelevance.model.ScheduledJob;
 
+/**
+ * Data access object layer for index storing schedules 
+ * of experiment runs.
+ */
 public class ScheduledJobsDao {
     private static final Logger LOGGER = LogManager.getLogger(ScheduledJobsDao.class);
     private final SearchRelevanceIndicesManager searchRelevanceIndicesManager;

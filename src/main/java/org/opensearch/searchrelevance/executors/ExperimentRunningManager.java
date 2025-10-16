@@ -55,8 +55,8 @@ import lombok.AllArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 
 /**
- * ExperimentRunningManager helps isolate the logic for running the logic in
- * PutExperimentTransportAction and ScheduledExperimentRunnerManager.
+ * ExperimentRunningManager helps isolate the logic for running the steps that was
+ *  in PutExperimentTransportAction and ScheduledExperimentRunnerManager.
  *
  * <p>
  * When running an experiment, we need a {@link QuerySet} and a
