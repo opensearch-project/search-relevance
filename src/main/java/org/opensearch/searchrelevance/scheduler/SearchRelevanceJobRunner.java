@@ -88,34 +88,37 @@ public enum SearchRelevanceJobRunner implements ScheduledJobRunner {
             }
         };
 
-        CompletableFuture<Void> searchEvaluationTask = null;
-        try {
-            // Schedule the experiment to run then also schedule a timeout to cancel experiment after some time.
-            long timeoutAmount = settingsAccessor.getScheduledExperimentsTimeout().getSeconds();
-            searchEvaluationTask = ConcurrencyUtil.withTimeout(
-                CompletableFuture.runAsync(jobRunTask, threadPool.generic()),
-                timeoutAmount,
-                cancellationToken,
-                actuallyFinished,
-                threadPool
-            );
+        Runnable timeoutJobWithCleanup = () -> {
+            CompletableFuture<Void> searchEvaluationTask = null;
+            try {
+                // Schedule the experiment to run then also schedule a timeout to cancel experiment after some time.
+                long timeoutAmount = settingsAccessor.getScheduledExperimentsTimeout().getSeconds();
+                searchEvaluationTask = ConcurrencyUtil.withTimeout(
+                    CompletableFuture.runAsync(jobRunTask, threadPool.generic()),
+                    timeoutAmount,
+                    cancellationToken,
+                    actuallyFinished,
+                    threadPool
+                );
 
-            // Wait until all asynchronous operations or timeout complete before cleanup
-            searchEvaluationTask.join();
-        } catch (CancellationException e) {
-            log.error("Timeout for scheduled experiment has occured!");
-        } catch (CompletionException e) {
-            log.error("Scheduled experiment has timed out. Moving onto cleanup");
-        } finally {
-            if (cancellationToken.isCancelled()) {
-                log.info("Search evaluation task has concluded through cancellation.");
-            } else {
-                log.info("Search evaluation task has concluded without cancellation");
+                // Wait until all asynchronous operations or timeout complete before cleanup
+                searchEvaluationTask.join();
+            } catch (CancellationException e) {
+                log.error("Timeout for scheduled experiment has occured!");
+            } catch (CompletionException e) {
+                log.error("Scheduled experiment has timed out. Moving onto cleanup");
+            } finally {
+                if (cancellationToken.isCancelled()) {
+                    log.info("Search evaluation task has concluded through cancellation.");
+                } else {
+                    log.info("Search evaluation task has concluded without cancellation");
+                }
+                manager.cleanupResources(parameter.getExperimentId(), scheduledExperimentResultId, cancellationToken);
+                // This will clean up the future map in ExperimentRunningManager
+                cancellationToken.cancel();
             }
-            manager.cleanupResources(parameter.getExperimentId(), scheduledExperimentResultId, cancellationToken);
-            // This will clean up the future map in ExperimentRunningManager
-            cancellationToken.cancel();
-        }
+        };
+        threadPool.generic().execute(timeoutJobWithCleanup);
     }
 
     private void checkComponents() {

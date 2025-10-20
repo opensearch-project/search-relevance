@@ -188,6 +188,7 @@ public enum ScheduledExperimentRunnerManager {
      * @param cancellationToken The token to indicate whether this scheduled experiment run has been cancelled
      */
     public void cleanupResources(String experimentId, String scheduledExperimentResultId, ExperimentCancellationToken cancellationToken) {
+        log.info("Cleaning up all resources for {}", experimentId);
         ScheduledExperimentResult finalExperiment = new ScheduledExperimentResult(
             scheduledExperimentResultId,
             experimentId,
