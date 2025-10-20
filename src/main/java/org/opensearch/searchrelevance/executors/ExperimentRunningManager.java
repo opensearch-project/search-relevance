@@ -44,8 +44,10 @@ import org.opensearch.searchrelevance.model.ScheduledExperimentResult;
 import org.opensearch.searchrelevance.model.SearchConfiguration;
 import org.opensearch.searchrelevance.model.SearchConfigurationDetails;
 import org.opensearch.searchrelevance.scheduler.ExperimentCancellationToken;
+import org.opensearch.searchrelevance.scheduler.ScheduledExperimentRunnerManager;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.searchrelevance.transport.experiment.PutExperimentRequest;
+import org.opensearch.searchrelevance.transport.experiment.PutExperimentTransportAction;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.threadpool.ThreadPool;
 
@@ -56,7 +58,10 @@ import lombok.extern.log4j.Log4j2;
 
 /**
  * ExperimentRunningManager helps isolate the logic for running the steps that was
- *  in PutExperimentTransportAction and ScheduledExperimentRunnerManager.
+ * in PutExperimentTransportAction and ScheduledExperimentRunnerManager. There are
+ * 2 paths where the code will use {@link ExperimentRunningManager}: The experiment
+ * was scheduled to run, or the user manually triggered through
+ * {@link PutExperimentTransportAction}.
  *
  * <p>
  * When running an experiment, we need a {@link QuerySet} and a
@@ -77,6 +82,13 @@ public class ExperimentRunningManager {
     private PointwiseExperimentProcessor pointwiseExperimentProcessor;
     private ThreadPool threadPool;
     private SearchRelevanceSettingsAccessor settingsAccessor;
+    /**
+     * There is only one instance of {@link ScheduledExperimentRunnerManager}.
+     * While there may be multiple instances of {@link ExperimentRunningManager}
+     * since this is also used for {@link PutExperimentTransportAction},
+     * the only time runningFutures is used is when this class is run through
+     * the unique instance of {@link ScheduledExperimentRunnerManager}.
+     */
     private final Map<String, List<Future<?>>> runningFutures = new ConcurrentHashMap<>();
 
     /**
@@ -94,11 +106,14 @@ public class ExperimentRunningManager {
     ) {
         List<Future<?>> futures = new ArrayList<>();
         if (request.getScheduledExperimentResultId() != null) {
-            runningFutures.put(request.getScheduledExperimentResultId(), futures);
+            runningFutures.compute(request.getScheduledExperimentResultId(), (key, existingList) -> {
+                List<Future<?>> list = existingList != null ? existingList : Collections.synchronizedList(new ArrayList<>());
+                return list;
+            });
 
             // register cancellation callback
             cancellationToken.onCancel(() -> {
-                futures.forEach(f -> FutureUtils.cancel(f));
+                runningFutures.get(request.getScheduledExperimentResultId()).forEach(f -> FutureUtils.cancel(f));
                 runningFutures.remove(request.getScheduledExperimentResultId());
             });
         }
@@ -150,6 +165,7 @@ public class ExperimentRunningManager {
             );
             // We will have to set futures to be cancelled in case of timeout.
             if (request.getScheduledExperimentResultId() != null && checkIfCancelled(cancellationToken) == false) {
+                // This should be syncronized.
                 runningFutures.get(request.getScheduledExperimentResultId()).add(singleSearchConfigurationFuture);
             }
             configFutures.add(singleSearchConfigurationFuture);
@@ -178,6 +194,7 @@ public class ExperimentRunningManager {
         }
 
         List<Map<String, Object>> finalResults = Collections.synchronizedList(new ArrayList<>());
+        log.info("Total Memory: {}, Free Memory: {}", Runtime.getRuntime().totalMemory(), Runtime.getRuntime().freeMemory());
         AtomicInteger pendingQueries = new AtomicInteger(queryTextWithReferences.size());
 
         executeExperimentEvaluation(
@@ -214,7 +231,7 @@ public class ExperimentRunningManager {
         searchConfigurationDao.getSearchConfiguration(configId, ActionListener.wrap(searchConfigResponse -> {
             try {
                 if (hasFailure.get() || checkIfCancelled(cancellationToken)) {
-                    log.info("Experiment has been timed out while search configuration fetching");
+                    log.info("Experiment {} has been timed out while search configuration fetching id {}", experimentId, configId);
                     future.complete(null);
                     return;
                 }
@@ -343,14 +360,30 @@ public class ExperimentRunningManager {
         ExperimentCancellationToken cancellationToken,
         CountDownLatch actuallyFinished
     ) {
+        int completedQueries = 0;
+        int totalQueries = queryTexts.size();
         for (String queryText : queryTexts) {
             // We need to process metrics for every query text, therefore, we have to keep track of
             // Any previous failures or tiimeout cancellations.
+            log.info(
+                "Total Memory: {}, Free Memory: {} before executing experiment {} with query text  {}",
+                Runtime.getRuntime().totalMemory(),
+                Runtime.getRuntime().freeMemory(),
+                experimentId,
+                queryText
+            );
             if (hasFailure.get()) {
                 return;
             }
             if (checkIfCancelled(cancellationToken)) {
-                log.info("Experiment has been timed out while executing experiments for each queryText");
+                log.info(
+                    "Scheduled experiment based on underlying experiment {} has been timed out while executing experiments for each queryText on queryText, {}. Completed {} queries out of {} queries",
+                    experimentId,
+                    queryText,
+                    completedQueries,
+                    totalQueries
+                );
+
                 return;
             }
 
@@ -432,6 +465,7 @@ public class ExperimentRunningManager {
             } else {
                 throw new SearchRelevanceException("Unknown experimentType" + request.getType(), RestStatus.BAD_REQUEST);
             }
+            completedQueries++;
         }
     }
 
@@ -448,7 +482,10 @@ public class ExperimentRunningManager {
         CountDownLatch actuallyFinished
     ) {
         if (hasFailure.get() || checkIfCancelled(cancellationToken)) {
-            log.info("Experiment has been timed out or failed before handling query results, therefore we should not update results");
+            log.info(
+                "Experiment with underlying id {} has been timed out or failed before handling query results, therefore we should not update results",
+                experimentId
+            );
             return;
         }
 

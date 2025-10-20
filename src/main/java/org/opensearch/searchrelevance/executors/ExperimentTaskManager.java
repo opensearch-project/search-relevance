@@ -255,7 +255,7 @@ public class ExperimentTaskManager {
             return future;
         }
         if (checkIfCancelled(params.getCancellationToken())) {
-            log.info("Cancelled when scheduling variant task");
+            log.info("Cancelled when scheduling variant task for experiment id {}", params.getExperimentId());
             TimeoutException exception = new TimeoutException("Timed out at variant task async");
             params.getTaskContext().getResultFuture().completeExceptionally(exception);
             future.completeExceptionally(exception);
@@ -324,7 +324,10 @@ public class ExperimentTaskManager {
             return;
         }
         if (checkIfCancelled(params.getCancellationToken())) {
-            log.info("Cancelled when executing variant task async");
+            log.info(
+                "Cancelled scheduled experiment with underlying experiment id {} when executing variant task async",
+                params.getExperimentId()
+            );
             concurrencyControl.release();
             activeTasks.decrement();
             TimeoutException exception = new TimeoutException("Timed out at variant task async");

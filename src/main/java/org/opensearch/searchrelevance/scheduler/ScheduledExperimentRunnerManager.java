@@ -96,13 +96,13 @@ public enum ScheduledExperimentRunnerManager {
                         experiment.size()
                     );
                     if (checkIfCancelled(cancellationToken)) {
-                        log.info("Scheduled experiment timed out before placing scheduled experiment into index.");
+                        log.info("Scheduled experiment for {} timed out before placing scheduled experiment into index.", experimentId);
                         actuallyFinished.countDown();
                         return;
                     }
                     scheduledExperimentHistoryDao.putScheduledExperimentResult(scheduledExperimentResult, ActionListener.wrap(response -> {
                         if (checkIfCancelled(cancellationToken)) {
-                            log.info("Scheduled experiment timed out after placing scheduled experiment into index.");
+                            log.info("Scheduled experiment for {} timed out after placing scheduled experiment into index.", experimentId);
                             actuallyFinished.countDown();
                             return;
                         }
@@ -112,6 +112,7 @@ public enum ScheduledExperimentRunnerManager {
                     log.error("Scheduled experiment result for: {} cannot be added.", experimentId);
                 }
             }, e -> {
+                // There will always be an attempt to retrieve the underlying experimentId.
                 log.error("Experiment id: {} is not found.", experimentId);
                 scheduledJobsDao.deleteScheduledJob(experimentId, new ActionListener<DeleteResponse>() {
                     @Override
@@ -121,7 +122,10 @@ public enum ScheduledExperimentRunnerManager {
 
                     @Override
                     public void onFailure(Exception e) {
-                        log.error("Somehow scheduled experiment job was deleted while experiment was in scheduling queue.");
+                        log.error(
+                            "Somehow scheduled experiment job was deleted while experiment {} was in scheduling queue.",
+                            experimentId
+                        );
                     }
                 });
             }));
@@ -172,7 +176,7 @@ public enum ScheduledExperimentRunnerManager {
             finalExperiment,
             ActionListener.wrap(
                 response -> log.info("Updated scheduled experiment {} status to ERROR", request.getScheduledExperimentResultId()),
-                e -> log.error("Failed to update error status for scheduled experiment: " + request.getScheduledExperimentResultId(), e)
+                e -> log.error("Failed to update error status for scheduled experiment: {}", request.getScheduledExperimentResultId(), e)
             )
         );
     }
@@ -197,7 +201,7 @@ public enum ScheduledExperimentRunnerManager {
                 finalExperiment,
                 ActionListener.wrap(
                     response -> log.info("Updated scheduled experiment {} status to TIMEOUT", scheduledExperimentResultId),
-                    e -> log.error("Failed to update error status for scheduled experiment: " + scheduledExperimentResultId, e)
+                    e -> log.error("Failed to update error status for scheduled experiment: {}", scheduledExperimentResultId, e)
                 )
             );
         }

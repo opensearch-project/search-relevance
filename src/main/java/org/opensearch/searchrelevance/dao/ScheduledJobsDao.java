@@ -27,7 +27,7 @@ import org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager;
 import org.opensearch.searchrelevance.model.ScheduledJob;
 
 /**
- * Data access object layer for index storing schedules 
+ * Data access object layer for index storing schedules
  * of experiment runs.
  */
 public class ScheduledJobsDao {
