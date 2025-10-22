@@ -39,13 +39,13 @@ public class MLAccessor {
         String modelId,
         int tokenLimit,
         String searchText,
-        String reference,
+        Map<String, String> referenceData,
         Map<String, String> hits,
         String promptTemplate,
         LLMJudgmentRatingType ratingType,
         ActionListener<ChunkResult> progressListener
     ) {
-        List<MLInput> mlInputs = transformer.createMLInputs(tokenLimit, searchText, reference, hits, promptTemplate, ratingType);
+        List<MLInput> mlInputs = transformer.createMLInputs(tokenLimit, searchText, referenceData, hits, promptTemplate, ratingType);
         log.info("Number of chunks: {}", mlInputs.size());
 
         ChunkProcessingContext context = new ChunkProcessingContext(mlInputs.size(), progressListener);

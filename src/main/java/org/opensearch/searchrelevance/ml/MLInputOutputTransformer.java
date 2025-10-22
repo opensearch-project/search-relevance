@@ -7,8 +7,6 @@
  */
 package org.opensearch.searchrelevance.ml;
 
-import static org.opensearch.searchrelevance.common.MLConstants.INPUT_FORMAT_SEARCH;
-import static org.opensearch.searchrelevance.common.MLConstants.INPUT_FORMAT_SEARCH_WITH_REFERENCE;
 import static org.opensearch.searchrelevance.common.MLConstants.PARAM_MESSAGES_FIELD;
 import static org.opensearch.searchrelevance.common.MLConstants.PROMPT_JSON_MESSAGES_SHELL;
 import static org.opensearch.searchrelevance.common.MLConstants.PROMPT_SEARCH_RELEVANCE_SCORE_0_1_START;
@@ -26,7 +24,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 
 import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.core.common.util.CollectionUtils;
@@ -51,7 +48,7 @@ public class MLInputOutputTransformer {
     public List<MLInput> createMLInputs(
         int tokenLimit,
         String searchText,
-        String reference,
+        Map<String, String> referenceData,
         Map<String, String> hits,
         String promptTemplate,
         LLMJudgmentRatingType ratingType
@@ -63,14 +60,14 @@ public class MLInputOutputTransformer {
             Map<String, String> tempChunk = new HashMap<>(currentChunk);
             tempChunk.put(entry.getKey(), entry.getValue());
 
-            String messages = formatMessages(searchText, reference, tempChunk, promptTemplate, ratingType);
+            String messages = formatMessages(searchText, referenceData, tempChunk, promptTemplate, ratingType);
             int totalTokens = TokenizerUtil.countTokens(messages);
 
             if (totalTokens > tokenLimit) {
                 if (currentChunk.isEmpty()) {
-                    mlInputs.add(handleOversizedEntry(entry, searchText, reference, tokenLimit, promptTemplate, ratingType));
+                    mlInputs.add(handleOversizedEntry(entry, searchText, referenceData, tokenLimit, promptTemplate, ratingType));
                 } else {
-                    mlInputs.add(createMLInput(searchText, reference, currentChunk, promptTemplate, ratingType));
+                    mlInputs.add(createMLInput(searchText, referenceData, currentChunk, promptTemplate, ratingType));
                     currentChunk = new HashMap<>();
                     currentChunk.put(entry.getKey(), entry.getValue());
                 }
@@ -80,7 +77,7 @@ public class MLInputOutputTransformer {
         }
 
         if (!currentChunk.isEmpty()) {
-            mlInputs.add(createMLInput(searchText, reference, currentChunk, promptTemplate, ratingType));
+            mlInputs.add(createMLInput(searchText, referenceData, currentChunk, promptTemplate, ratingType));
         }
 
         return mlInputs;
@@ -89,7 +86,7 @@ public class MLInputOutputTransformer {
     private MLInput handleOversizedEntry(
         Map.Entry<String, String> entry,
         String searchText,
-        String reference,
+        Map<String, String> referenceData,
         int tokenLimit,
         String promptTemplate,
         LLMJudgmentRatingType ratingType
@@ -97,39 +94,39 @@ public class MLInputOutputTransformer {
         log.warn("Entry with key {} causes total tokens to exceed limit of {}", entry.getKey(), tokenLimit);
 
         Map<String, String> testChunk = Map.of(entry.getKey(), entry.getValue());
-        String testMessages = formatMessages(searchText, reference, testChunk, promptTemplate, ratingType);
+        String testMessages = formatMessages(searchText, referenceData, testChunk, promptTemplate, ratingType);
         int excessTokens = TokenizerUtil.countTokens(testMessages) - tokenLimit;
 
         int currentTokens = TokenizerUtil.countTokens(entry.getValue());
         String truncatedValue = TokenizerUtil.truncateString(entry.getValue(), Math.max(1, currentTokens - excessTokens));
 
         Map<String, String> singleEntryChunk = Map.of(entry.getKey(), truncatedValue);
-        return createMLInput(searchText, reference, singleEntryChunk, promptTemplate, ratingType);
+        return createMLInput(searchText, referenceData, singleEntryChunk, promptTemplate, ratingType);
     }
 
     public MLInput createMLInput(
         String searchText,
-        String reference,
+        Map<String, String> referenceData,
         Map<String, String> hits,
         String promptTemplate,
         LLMJudgmentRatingType ratingType
     ) {
         Map<String, String> parameters = new HashMap<>();
-        parameters.put(PARAM_MESSAGES_FIELD, formatMessages(searchText, reference, hits, promptTemplate, ratingType));
+        parameters.put(PARAM_MESSAGES_FIELD, formatMessages(searchText, referenceData, hits, promptTemplate, ratingType));
         return MLInput.builder().algorithm(FunctionName.REMOTE).inputDataset(new RemoteInferenceInputDataSet(parameters)).build();
     }
 
     public String formatMessages(
         String searchText,
-        String reference,
+        Map<String, String> referenceData,
         Map<String, String> hits,
         String promptTemplate,
         LLMJudgmentRatingType ratingType
     ) {
         try {
             String hitsJson = buildHitsJson(hits);
-            String userContent = buildUserContent(searchText, reference, hitsJson);
-            String systemPrompt = getSystemPrompt(promptTemplate, ratingType);
+            String userContent = UserPromptFactory.buildUserContent(searchText, referenceData, hitsJson, promptTemplate);
+            String systemPrompt = getSystemPrompt(ratingType);
             return String.format(Locale.ROOT, PROMPT_JSON_MESSAGES_SHELL, systemPrompt, escapeJson(userContent));
         } catch (IOException e) {
             log.error("Error converting hits to JSON string", e);
@@ -137,7 +134,7 @@ public class MLInputOutputTransformer {
         }
     }
 
-    private static String getSystemPrompt(String promptTemplate, LLMJudgmentRatingType ratingType) {
+    private static String getSystemPrompt(LLMJudgmentRatingType ratingType) {
         String systemPromptStart;
         String systemPromptEnd = PROMPT_SEARCH_RELEVANCE_SCORE_END;
         switch (ratingType) {
@@ -150,8 +147,7 @@ public class MLInputOutputTransformer {
             default:
                 systemPromptStart = PROMPT_SEARCH_RELEVANCE_SCORE_BINARY;
         }
-        String systemPrompt = systemPromptStart + promptTemplate + systemPromptEnd;
-        return systemPrompt;
+        return systemPromptStart + systemPromptEnd;
     }
 
     private String buildHitsJson(Map<String, String> hits) throws IOException {
@@ -165,14 +161,6 @@ public class MLInputOutputTransformer {
             }
             builder.endArray();
             return builder.toString();
-        }
-    }
-
-    private String buildUserContent(String searchText, String reference, String hitsJson) {
-        if (Objects.isNull(reference) || reference.isEmpty()) {
-            return String.format(Locale.ROOT, INPUT_FORMAT_SEARCH, searchText, hitsJson);
-        } else {
-            return String.format(Locale.ROOT, INPUT_FORMAT_SEARCH_WITH_REFERENCE, searchText, reference, hitsJson);
         }
     }
 

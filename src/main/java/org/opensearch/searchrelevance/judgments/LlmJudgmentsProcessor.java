@@ -488,9 +488,10 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
             return;
         }
 
-        String[] queryTextRefArr = queryTextWithCustomInput.split(DELIMITER, 2);
-        String queryText = queryTextRefArr[0];
-        String referenceData = queryTextRefArr.length > 1 ? queryTextRefArr[1] : null;
+        // Parse queryTextWithCustomInput to extract query and reference data
+        Map<String, String> parsedData = parseQueryTextWithCustomInput(queryTextWithCustomInput);
+        String queryText = parsedData.remove("queryText");
+        Map<String, String> referenceData = parsedData; // Remaining entries are reference data
 
         ConcurrentMap<String, String> processedRatings = new ConcurrentHashMap<>(docIdToRating);
         ConcurrentMap<Integer, List<Map<String, Object>>> combinedResponses = new ConcurrentHashMap<>();
@@ -655,5 +656,50 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
             log.error("Failed to process context source for hit: {}", hit.getId(), e);
             throw new RuntimeException("Failed to process context source", e);
         }
+    }
+
+    /**
+     * Parse query text with custom input to extract query and reference data.
+     * Supports both legacy and new formats:
+     * - Legacy format: "queryText#referenceAnswer"
+     * - New format: "queryText#\nkey1: value1\nkey2: value2\n..."
+     *
+     * @param queryTextWithCustomInput the query text with optional custom input
+     * @return a map with "queryText" and optional reference data entries
+     */
+    static Map<String, String> parseQueryTextWithCustomInput(String queryTextWithCustomInput) {
+        Map<String, String> result = new HashMap<>();
+        String[] queryTextRefArr = queryTextWithCustomInput.split(DELIMITER, 2);
+        String queryText = queryTextRefArr[0];
+        result.put("queryText", queryText);
+
+        if (queryTextRefArr.length > 1 && !queryTextRefArr[1].isEmpty()) {
+            String referenceContent = queryTextRefArr[1];
+
+            // Check if new format (contains newlines with key-value pairs)
+            if (referenceContent.contains("\n")) {
+                // New format: queryText#\nkey1: value1\nkey2: value2\n...
+                String[] lines = referenceContent.split("\n");
+                for (String line : lines) {
+                    if (line.trim().isEmpty()) {
+                        continue;
+                    }
+                    // Parse "key: value" format
+                    int colonIndex = line.indexOf(':');
+                    if (colonIndex > 0) {
+                        String key = line.substring(0, colonIndex).trim();
+                        String value = line.substring(colonIndex + 1).trim();
+                        if (!key.isEmpty() && !value.isEmpty()) {
+                            result.put(key, value);
+                        }
+                    }
+                }
+            } else {
+                // Legacy format: queryText#referenceAnswer
+                result.put("referenceAnswer", referenceContent);
+            }
+        }
+
+        return result;
     }
 }
