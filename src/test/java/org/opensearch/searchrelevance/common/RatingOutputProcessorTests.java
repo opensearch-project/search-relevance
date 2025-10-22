@@ -7,66 +7,70 @@
  */
 package org.opensearch.searchrelevance.common;
 
-import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
 import org.opensearch.test.OpenSearchTestCase;
 
+/**
+ * Tests for RatingOutputProcessor with OpenAI structured output.
+ * These tests focus on parsing properly formatted JSON responses from OpenAI's structured output feature.
+ */
 public class RatingOutputProcessorTests extends OpenSearchTestCase {
 
     // ============================================
-    // Basic Sanitization Tests (no rating type)
+    // Structured Output Format Tests
     // ============================================
 
-    public void testSanitizeLLMResponse_ValidJsonArray() {
+    public void testSanitizeLLMResponse_StructuredOutputWithRatingsArray() {
+        String response = "{\"ratings\": [{\"id\": \"1\", \"rating_score\": 4}, {\"id\": \"2\", \"rating_score\": 3}]}";
+        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response);
+
+        assertTrue(sanitized.startsWith("["));
+        assertTrue(sanitized.endsWith("]"));
+        assertTrue(sanitized.contains("\"id\":\"1\"") || sanitized.contains("\"id\": \"1\""));
+        assertTrue(sanitized.contains("\"rating_score\":4") || sanitized.contains("\"rating_score\": 4"));
+    }
+
+    public void testSanitizeLLMResponse_StructuredOutputNumericRatings() {
+        String response = "{\"ratings\": [{\"id\": \"doc1\", \"rating_score\": 0.75}]}";
+        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response);
+
+        assertTrue(sanitized.contains("0.75"));
+        assertTrue(sanitized.contains("doc1"));
+    }
+
+    public void testSanitizeLLMResponse_StructuredOutputBinaryRatings() {
+        String response =
+            "{\"ratings\": [{\"id\": \"1\", \"rating_score\": \"RELEVANT\"}, {\"id\": \"2\", \"rating_score\": \"IRRELEVANT\"}]}";
+        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response);
+
+        assertTrue(sanitized.contains("RELEVANT"));
+        assertTrue(sanitized.contains("IRRELEVANT"));
+    }
+
+    // ============================================
+    // Direct Array Format Tests
+    // ============================================
+
+    public void testSanitizeLLMResponse_DirectJsonArray() {
         String response = "[{\"id\": \"1\", \"rating_score\": 4}, {\"id\": \"2\", \"rating_score\": 3}]";
         String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response);
 
-        assertEquals("[{\"id\": \"1\", \"rating_score\": 4}, {\"id\": \"2\", \"rating_score\": 3}]", sanitized);
-    }
-
-    public void testSanitizeLLMResponse_WithMarkdownCodeBlocks() {
-        String response = "```json\n[{\"id\": \"1\", \"rating_score\": 5}]\n```";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response);
-
-        assertTrue(sanitized.contains("\"id\""));
-        assertTrue(sanitized.contains("\"rating_score\""));
         assertTrue(sanitized.startsWith("["));
         assertTrue(sanitized.endsWith("]"));
+        assertTrue(sanitized.contains("\"id\":\"1\"") || sanitized.contains("\"id\": \"1\""));
     }
 
-    public void testSanitizeLLMResponse_SingleObjectNeedsWrapping() {
+    public void testSanitizeLLMResponse_SingleObjectWrapping() {
         String response = "{\"id\": \"1\", \"rating_score\": 3}";
         String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response);
 
         assertTrue(sanitized.startsWith("["));
         assertTrue(sanitized.endsWith("]"));
-        assertTrue(sanitized.contains("\"id\": \"1\""));
+        assertTrue(sanitized.contains("\"rating_score\""));
     }
 
-    public void testSanitizeLLMResponse_WithExplanationBeforeJson() {
-        String response = "Here are the ratings:\n[{\"id\": \"1\", \"rating_score\": 4}]";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response);
-
-        assertTrue(sanitized.startsWith("["));
-        assertTrue(sanitized.contains("\"rating_score\": 4"));
-    }
-
-    public void testSanitizeLLMResponse_WithExplanationAndSingleObject() {
-        String response = "Rating: {\"id\": \"1\", \"rating_score\": 5}";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response);
-
-        assertTrue(sanitized.startsWith("["));
-        assertTrue(sanitized.endsWith("]"));
-        assertTrue(sanitized.contains("\"rating_score\": 5"));
-    }
-
-    public void testSanitizeLLMResponse_WithBackticksAndNewlines() {
-        String response = "`\n[{\"id\": \"1\", \"rating_score\": 5}]\n`";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response);
-
-        assertFalse(sanitized.contains("`"));
-        assertTrue(sanitized.startsWith("["));
-        assertTrue(sanitized.contains("\"rating_score\": 5"));
-    }
+    // ============================================
+    // Edge Cases
+    // ============================================
 
     public void testSanitizeLLMResponse_EmptyString() {
         String response = "";
@@ -81,239 +85,111 @@ public class RatingOutputProcessorTests extends OpenSearchTestCase {
         assertEquals("[]", sanitized);
     }
 
-    public void testSanitizeLLMResponse_NoValidJson() {
-        String response = "The document is relevant with a rating of 5.0";
+    public void testSanitizeLLMResponse_InvalidJson() {
+        String response = "This is not valid JSON";
         String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response);
 
         assertEquals("[]", sanitized);
     }
 
-    public void testSanitizeLLMResponse_WithExtraWhitespace() {
-        String response = "  \n  [{\"id\": \"1\", \"rating_score\": 4}]  \n  ";
+    public void testSanitizeLLMResponse_MalformedJson() {
+        String response = "{\"ratings\": [{\"id\": \"1\", \"rating_score\": }";
         String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response);
 
-        assertTrue(sanitized.startsWith("["));
-        assertTrue(sanitized.endsWith("]"));
-        assertFalse(sanitized.contains("\n"));
+        assertEquals("[]", sanitized);
     }
 
-    public void testSanitizeLLMResponse_NestedArrayInText() {
-        String response = "The ratings are: [{\"id\": \"doc1\", \"rating_score\": 3.5}] and that's all.";
+    // ============================================
+    // Multiple Items Tests
+    // ============================================
+
+    public void testSanitizeLLMResponse_MultipleRatings() {
+        String response = "{\"ratings\": ["
+            + "{\"id\": \"1\", \"rating_score\": 5}, "
+            + "{\"id\": \"2\", \"rating_score\": 4}, "
+            + "{\"id\": \"3\", \"rating_score\": 3}"
+            + "]}";
         String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response);
 
-        assertTrue(sanitized.startsWith("["));
-        assertTrue(sanitized.endsWith("]"));
-        assertTrue(sanitized.contains("\"doc1\""));
-        assertFalse(sanitized.contains("that's all"));
+        assertTrue(sanitized.contains("\"id\":\"1\"") || sanitized.contains("\"id\": \"1\""));
+        assertTrue(sanitized.contains("\"id\":\"2\"") || sanitized.contains("\"id\": \"2\""));
+        assertTrue(sanitized.contains("\"id\":\"3\"") || sanitized.contains("\"id\": \"3\""));
     }
 
-    public void testSanitizeLLMResponse_MultipleObjects() {
-        String response =
-            "[{\"id\": \"1\", \"rating_score\": 5}, {\"id\": \"2\", \"rating_score\": 4}, {\"id\": \"3\", \"rating_score\": 3}]";
+    public void testSanitizeLLMResponse_MixedNumericRatings() {
+        String response = "{\"ratings\": ["
+            + "{\"id\": \"doc1\", \"rating_score\": 0.0}, "
+            + "{\"id\": \"doc2\", \"rating_score\": 0.5}, "
+            + "{\"id\": \"doc3\", \"rating_score\": 1.0}"
+            + "]}";
         String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response);
 
-        assertTrue(sanitized.contains("\"id\": \"1\""));
-        assertTrue(sanitized.contains("\"id\": \"2\""));
-        assertTrue(sanitized.contains("\"id\": \"3\""));
+        assertTrue(sanitized.contains("0.0"));
+        assertTrue(sanitized.contains("0.5"));
+        assertTrue(sanitized.contains("1.0"));
     }
 
-    public void testSanitizeLLMResponse_WithFloatingPointScores() {
-        String response = "[{\"id\": \"test_products#1\", \"rating_score\": 4.5}]";
+    // ============================================
+    // Different Rating Types (all handled the same way now)
+    // ============================================
+
+    public void testSanitizeLLMResponse_NumericRating01() {
+        String response = "{\"ratings\": [{\"id\": \"1\", \"rating_score\": 0.8}]}";
+        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response);
+
+        assertTrue(sanitized.contains("0.8"));
+    }
+
+    public void testSanitizeLLMResponse_NumericRating15() {
+        String response = "{\"ratings\": [{\"id\": \"1\", \"rating_score\": 4.5}]}";
         String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response);
 
         assertTrue(sanitized.contains("4.5"));
-        assertTrue(sanitized.contains("test_products#1"));
     }
 
-    public void testSanitizeLLMResponse_ObjectWithoutArray() {
-        String response = "{\"id\": \"product_1\", \"rating_score\": 2}";
+    public void testSanitizeLLMResponse_BinaryRating() {
+        String response = "{\"ratings\": [{\"id\": \"1\", \"rating_score\": \"RELEVANT\"}]}";
         String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response);
 
-        // Should wrap the object in an array
-        assertTrue(sanitized.startsWith("[{"));
-        assertTrue(sanitized.endsWith("}]"));
-        assertTrue(sanitized.contains("product_1"));
+        assertTrue(sanitized.contains("RELEVANT"));
     }
 
     // ============================================
-    // SCORE0_1 Rating Type Tests
+    // Special Characters and IDs Tests
     // ============================================
 
-    public void testSanitizeLLMResponse_Score01_ValidRatings() {
-        String response = "[{\"id\": \"1\", \"rating_score\": 0.5}, {\"id\": \"2\", \"rating_score\": 0.8}]";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response, LLMJudgmentRatingType.SCORE0_1);
+    public void testSanitizeLLMResponse_SpecialCharactersInId() {
+        String response = "{\"ratings\": [{\"id\": \"test_products#123\", \"rating_score\": 4.5}]}";
+        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response);
 
-        assertTrue(sanitized.contains("\"rating_score\": 0.5"));
-        assertTrue(sanitized.contains("\"rating_score\": 0.8"));
+        assertTrue(sanitized.contains("test_products#123"));
+        assertTrue(sanitized.contains("4.5"));
     }
 
-    public void testSanitizeLLMResponse_Score01_RatingsAboveMax() {
-        String response = "[{\"id\": \"1\", \"rating_score\": 1.5}, {\"id\": \"2\", \"rating_score\": 2.0}]";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response, LLMJudgmentRatingType.SCORE0_1);
+    public void testSanitizeLLMResponse_LongIdStrings() {
+        String response = "{\"ratings\": [{\"id\": \"very-long-document-identifier-with-multiple-segments-12345\", \"rating_score\": 3}]}";
+        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response);
 
-        // Should clamp to 1.0
-        assertTrue(sanitized.contains("\"rating_score\": 1"));
-        assertFalse(sanitized.contains("1.5"));
-        assertFalse(sanitized.contains("2.0"));
-    }
-
-    public void testSanitizeLLMResponse_Score01_RatingsBelowMin() {
-        String response = "[{\"id\": \"1\", \"rating_score\": -0.5}, {\"id\": \"2\", \"rating_score\": -1.0}]";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response, LLMJudgmentRatingType.SCORE0_1);
-
-        // Should clamp to 0.0
-        assertTrue(sanitized.contains("\"rating_score\": 0"));
-        assertFalse(sanitized.contains("-0.5"));
-        assertFalse(sanitized.contains("-1.0"));
-    }
-
-    public void testSanitizeLLMResponse_Score01_ExactBoundaries() {
-        String response = "[{\"id\": \"1\", \"rating_score\": 0.0}, {\"id\": \"2\", \"rating_score\": 1.0}]";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response, LLMJudgmentRatingType.SCORE0_1);
-
-        assertTrue(sanitized.contains("\"rating_score\": 0"));
-        assertTrue(sanitized.contains("\"rating_score\": 1"));
+        assertTrue(sanitized.contains("very-long-document-identifier-with-multiple-segments-12345"));
     }
 
     // ============================================
-    // SCORE1_5 Rating Type Tests
+    // Whitespace and Formatting Tests
     // ============================================
 
-    public void testSanitizeLLMResponse_Score15_ValidRatings() {
-        String response = "[{\"id\": \"1\", \"rating_score\": 3}, {\"id\": \"2\", \"rating_score\": 4.5}]";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response, LLMJudgmentRatingType.SCORE1_5);
+    public void testSanitizeLLMResponse_CompactJson() {
+        String response = "{\"ratings\":[{\"id\":\"1\",\"rating_score\":5}]}";
+        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response);
 
-        assertTrue(sanitized.contains("\"rating_score\": 3"));
-        assertTrue(sanitized.contains("\"rating_score\": 4.5"));
+        assertTrue(sanitized.startsWith("["));
+        assertTrue(sanitized.contains("\"id\""));
+        assertTrue(sanitized.contains("\"rating_score\""));
     }
 
-    public void testSanitizeLLMResponse_Score15_RatingsAboveMax() {
-        String response = "[{\"id\": \"1\", \"rating_score\": 6}, {\"id\": \"2\", \"rating_score\": 10}]";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response, LLMJudgmentRatingType.SCORE1_5);
+    public void testSanitizeLLMResponse_PrettyPrintedJson() {
+        String response = "{\n  \"ratings\": [\n    {\n      \"id\": \"1\",\n      \"rating_score\": 4\n    }\n  ]\n}";
+        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response);
 
-        // Should clamp to 5
-        assertTrue(sanitized.contains("\"rating_score\": 5"));
-        assertFalse(sanitized.contains("\"rating_score\": 6"));
-        assertFalse(sanitized.contains("\"rating_score\": 10"));
-    }
-
-    public void testSanitizeLLMResponse_Score15_RatingsBelowMin() {
-        String response = "[{\"id\": \"1\", \"rating_score\": 0}, {\"id\": \"2\", \"rating_score\": -1}]";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response, LLMJudgmentRatingType.SCORE1_5);
-
-        // Should clamp to 1
-        assertTrue(sanitized.contains("\"rating_score\": 1"));
-        assertFalse(sanitized.contains("\"rating_score\": 0"));
-        assertFalse(sanitized.contains("\"rating_score\": -1"));
-    }
-
-    public void testSanitizeLLMResponse_Score15_ExactBoundaries() {
-        String response = "[{\"id\": \"1\", \"rating_score\": 1}, {\"id\": \"2\", \"rating_score\": 5}]";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response, LLMJudgmentRatingType.SCORE1_5);
-
-        assertTrue(sanitized.contains("\"rating_score\": 1"));
-        assertTrue(sanitized.contains("\"rating_score\": 5"));
-    }
-
-    // ============================================
-    // RELEVANT_IRRELEVANT Rating Type Tests
-    // ============================================
-
-    public void testSanitizeLLMResponse_Binary_ValidRelevant() {
-        String response = "[{\"id\": \"1\", \"rating_score\": \"RELEVANT\"}]";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response, LLMJudgmentRatingType.RELEVANT_IRRELEVANT);
-
-        assertTrue(sanitized.contains("\"rating_score\": \"RELEVANT\""));
-    }
-
-    public void testSanitizeLLMResponse_Binary_ValidIrrelevant() {
-        String response = "[{\"id\": \"1\", \"rating_score\": \"IRRELEVANT\"}]";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response, LLMJudgmentRatingType.RELEVANT_IRRELEVANT);
-
-        assertTrue(sanitized.contains("\"rating_score\": \"IRRELEVANT\""));
-    }
-
-    public void testSanitizeLLMResponse_Binary_LowercaseRelevant() {
-        String response = "[{\"id\": \"1\", \"rating_score\": \"relevant\"}]";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response, LLMJudgmentRatingType.RELEVANT_IRRELEVANT);
-
-        assertTrue(sanitized.contains("\"rating_score\": \"RELEVANT\""));
-    }
-
-    public void testSanitizeLLMResponse_Binary_TrueValue() {
-        String response = "[{\"id\": \"1\", \"rating_score\": \"true\"}]";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response, LLMJudgmentRatingType.RELEVANT_IRRELEVANT);
-
-        assertTrue(sanitized.contains("\"rating_score\": \"RELEVANT\""));
-    }
-
-    public void testSanitizeLLMResponse_Binary_NumericOne() {
-        String response = "[{\"id\": \"1\", \"rating_score\": 1}]";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response, LLMJudgmentRatingType.RELEVANT_IRRELEVANT);
-
-        assertTrue(sanitized.contains("\"rating_score\": \"RELEVANT\""));
-    }
-
-    public void testSanitizeLLMResponse_Binary_FalseValue() {
-        String response = "[{\"id\": \"1\", \"rating_score\": \"false\"}]";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response, LLMJudgmentRatingType.RELEVANT_IRRELEVANT);
-
-        assertTrue(sanitized.contains("\"rating_score\": \"IRRELEVANT\""));
-    }
-
-    public void testSanitizeLLMResponse_Binary_NumericZero() {
-        String response = "[{\"id\": \"1\", \"rating_score\": 0}]";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response, LLMJudgmentRatingType.RELEVANT_IRRELEVANT);
-
-        assertTrue(sanitized.contains("\"rating_score\": \"IRRELEVANT\""));
-    }
-
-    public void testSanitizeLLMResponse_Binary_UnrecognizedValue() {
-        String response = "[{\"id\": \"1\", \"rating_score\": \"maybe\"}]";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response, LLMJudgmentRatingType.RELEVANT_IRRELEVANT);
-
-        // Should default to IRRELEVANT
-        assertTrue(sanitized.contains("\"rating_score\": \"IRRELEVANT\""));
-    }
-
-    public void testSanitizeLLMResponse_Binary_MixedValues() {
-        String response =
-            "[{\"id\": \"1\", \"rating_score\": \"RELEVANT\"}, {\"id\": \"2\", \"rating_score\": \"irrelevant\"}, {\"id\": \"3\", \"rating_score\": 1}]";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response, LLMJudgmentRatingType.RELEVANT_IRRELEVANT);
-
-        // Check that all three are normalized correctly
-        int relevantCount = sanitized.split("\"rating_score\": \"RELEVANT\"").length - 1;
-        int irrelevantCount = sanitized.split("\"rating_score\": \"IRRELEVANT\"").length - 1;
-
-        assertEquals(2, relevantCount); // "RELEVANT" and 1
-        assertEquals(1, irrelevantCount); // "irrelevant"
-    }
-
-    // ============================================
-    // Edge Cases with Rating Type Validation
-    // ============================================
-
-    public void testSanitizeLLMResponse_NullRatingType() {
-        String response = "[{\"id\": \"1\", \"rating_score\": 10}]";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response, null);
-
-        // Should not validate, just sanitize
-        assertTrue(sanitized.contains("\"rating_score\": 10"));
-    }
-
-    public void testSanitizeLLMResponse_EmptyResponseWithRatingType() {
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse("", LLMJudgmentRatingType.SCORE1_5);
-
-        assertEquals("[]", sanitized);
-    }
-
-    public void testSanitizeLLMResponse_MarkdownWithValidation() {
-        String response = "```json\n[{\"id\": \"1\", \"rating_score\": 10}]\n```";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response, LLMJudgmentRatingType.SCORE1_5);
-
-        // Should sanitize markdown AND clamp rating
-        assertFalse(sanitized.contains("```"));
-        assertTrue(sanitized.contains("\"rating_score\": 5"));
-        assertFalse(sanitized.contains("\"rating_score\": 10"));
+        assertTrue(sanitized.contains("\"rating_score\""));
     }
 }

@@ -69,13 +69,58 @@ public class MLConstants {
     public static final String PROMPT_SEARCH_RELEVANCE_SCORE_END = escapeJson(
         "\nEvaluate based on: exact matches, semantic relevance, and overall context between the SearchText and content in Hits.\n"
             + "When a reference is provided, evaluate based on the relevance to both SearchText and its reference.\n\n"
-            + "IMPORTANT: Provide your response ONLY as a JSON array of objects, each with \"id\" and \"rating_score\" fields. "
-            + "You MUST include a rating for EVERY hit provided, even if the rating is 0. "
-            + "Do not include any explanation or additional text."
+            + "IMPORTANT: You MUST include a rating for EVERY hit provided."
     );
+
+    /**
+     * JSON Schema definitions for OpenAI structured output.
+     * These schemas enforce the output format at the model level.
+     */
+    public static final String RATING_SCORE_NUMERIC_SCHEMA = "{"
+        + "\"type\":\"object\","
+        + "\"properties\":{"
+        + "\"id\":{\"type\":\"string\"},"
+        + "\"rating_score\":{\"type\":\"number\"}"
+        + "},"
+        + "\"required\":[\"id\",\"rating_score\"],"
+        + "\"additionalProperties\":false"
+        + "}";
+
+    public static final String RATING_SCORE_BINARY_SCHEMA = "{"
+        + "\"type\":\"object\","
+        + "\"properties\":{"
+        + "\"id\":{\"type\":\"string\"},"
+        + "\"rating_score\":{\"type\":\"string\",\"enum\":[\"RELEVANT\",\"IRRELEVANT\"]}"
+        + "},"
+        + "\"required\":[\"id\",\"rating_score\"],"
+        + "\"additionalProperties\":false"
+        + "}";
+
+    public static final String RESPONSE_FORMAT_TEMPLATE = "{"
+        + "\"type\":\"json_schema\","
+        + "\"json_schema\":{"
+        + "\"name\":\"rating_response\","
+        + "\"strict\":true,"
+        + "\"schema\":{"
+        + "\"type\":\"object\","
+        + "\"properties\":{"
+        + "\"ratings\":{"
+        + "\"type\":\"array\","
+        + "\"items\":%s"
+        + "}"
+        + "},"
+        + "\"required\":[\"ratings\"],"
+        + "\"additionalProperties\":false"
+        + "}"
+        + "}"
+        + "}";
 
     public static final String PROMPT_JSON_MESSAGES_SHELL = "[{\"role\":\"system\",\"content\":\"%s\"},"
         + "{\"role\":\"user\",\"content\":\"%s\"}]";
+    public static final String PROMPT_JSON_MESSAGES_WITH_SCHEMA_SHELL = "{"
+        + "\"messages\":[{\"role\":\"system\",\"content\":\"%s\"},{\"role\":\"user\",\"content\":\"%s\"}],"
+        + "\"response_format\":%s"
+        + "}";
     public static final String INPUT_FORMAT_SEARCH = "SearchText - %s; Hits - %s";
     public static final String INPUT_FORMAT_SEARCH_WITH_REFERENCE = "SearchText: %s; Reference: %s; Hits: %s";
 
@@ -87,26 +132,18 @@ public class MLConstants {
     }
 
     /**
-     * Sanitize LLM response without rating type validation (backward compatibility).
-     * @deprecated Use {@link RatingOutputProcessor#sanitizeLLMResponse(String)} instead
-     * @param response The raw LLM response
-     * @return Sanitized JSON array string
+     * Get the appropriate response format schema based on rating type.
+     * @param ratingType The rating type to get the schema for
+     * @return The complete response_format JSON string with the appropriate schema
      */
-    @Deprecated
-    public static String sanitizeLLMResponse(String response) {
-        return RatingOutputProcessor.sanitizeLLMResponse(response);
-    }
-
-    /**
-     * Sanitize LLM response and optionally validate ratings based on rating type.
-     * @deprecated Use {@link RatingOutputProcessor#sanitizeLLMResponse(String, LLMJudgmentRatingType)} instead
-     * @param response The raw LLM response
-     * @param ratingType The expected rating type (nullable for backward compatibility)
-     * @return Sanitized JSON array string
-     */
-    @Deprecated
-    public static String sanitizeLLMResponse(String response, LLMJudgmentRatingType ratingType) {
-        return RatingOutputProcessor.sanitizeLLMResponse(response, ratingType);
+    public static String getResponseFormatSchema(LLMJudgmentRatingType ratingType) {
+        String itemSchema;
+        if (ratingType == LLMJudgmentRatingType.RELEVANT_IRRELEVANT) {
+            itemSchema = RATING_SCORE_BINARY_SCHEMA;
+        } else {
+            itemSchema = RATING_SCORE_NUMERIC_SCHEMA;
+        }
+        return String.format(Locale.ROOT, RESPONSE_FORMAT_TEMPLATE, itemSchema);
     }
 
     public static int validateTokenLimit(Map<String, Object> source) {

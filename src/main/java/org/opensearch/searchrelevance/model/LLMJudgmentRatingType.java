@@ -8,6 +8,8 @@
 package org.opensearch.searchrelevance.model;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.stream.Collectors;
 
 import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.core.common.io.stream.StreamOutput;
@@ -25,5 +27,13 @@ public enum LLMJudgmentRatingType implements Writeable {
 
     public static LLMJudgmentRatingType readFromStream(StreamInput in) throws IOException {
         return in.readEnum(LLMJudgmentRatingType.class);
+    }
+
+    /**
+     * Get a comma-separated string of all valid rating type values.
+     * @return String containing all valid enum values
+     */
+    public static String getValidValues() {
+        return Arrays.stream(LLMJudgmentRatingType.values()).map(Enum::name).collect(Collectors.joining(", "));
     }
 }

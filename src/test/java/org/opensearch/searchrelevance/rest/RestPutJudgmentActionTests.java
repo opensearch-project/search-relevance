@@ -283,4 +283,37 @@ public class RestPutJudgmentActionTests extends SearchRelevanceRestTestCase {
         assertEquals("SCORE1_5", capturedRequest.getLlmJudgmentRatingType().name());
         assertEquals(true, capturedRequest.isOverwriteCache());
     }
+
+    public void testPutLlmJudgment_InvalidRatingType() throws Exception {
+        // Setup
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        String content = "{"
+            + "\"name\": \"test_name\","
+            + "\"description\": \"test_description\","
+            + "\"type\": \"LLM_JUDGMENT\","
+            + "\"modelId\": \"test_model_id\","
+            + "\"querySetId\": \"test_query_set_id\","
+            + "\"searchConfigurationList\": [\"config1\", \"config2\"],"
+            + "\"size\": 10,"
+            + "\"tokenLimit\": 1000,"
+            + "\"contextFields\": [\"field1\", \"field2\"],"
+            + "\"ignoreFailure\": false,"
+            + "\"llmJudgmentRatingType\": \"INVALID_RATING_TYPE\""
+            + "}";
+        RestRequest request = createPutRestRequestWithContent(content, "judgment");
+        when(channel.request()).thenReturn(request);
+
+        // Execute and verify
+        SearchRelevanceException exception = expectThrows(
+            SearchRelevanceException.class,
+            () -> restPutJudgmentAction.handleRequest(request, channel, client)
+        );
+        assertTrue(exception.getMessage().contains("Invalid RatingType"));
+        assertTrue(exception.getMessage().contains("INVALID_RATING_TYPE"));
+        assertTrue(exception.getMessage().contains("Valid values are"));
+        assertTrue(exception.getMessage().contains("SCORE0_1"));
+        assertTrue(exception.getMessage().contains("SCORE1_5"));
+        assertTrue(exception.getMessage().contains("RELEVANT_IRRELEVANT"));
+        assertEquals(RestStatus.BAD_REQUEST, exception.status());
+    }
 }

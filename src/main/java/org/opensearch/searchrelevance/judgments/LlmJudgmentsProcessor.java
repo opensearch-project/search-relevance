@@ -111,6 +111,10 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
             boolean ignoreFailure = (boolean) metadata.get("ignoreFailure");
             String promptTemplate = (String) metadata.get("promptTemplate");
             LLMJudgmentRatingType ratingType = (LLMJudgmentRatingType) metadata.get("llmJudgmentRatingType");
+            // Default to SCORE0_1 if ratingType is not provided
+            if (ratingType == null) {
+                ratingType = LLMJudgmentRatingType.SCORE0_1;
+            }
             boolean overwriteCache = (boolean) metadata.get("overwriteCache");
 
             QuerySet querySet = querySetDao.getQuerySetSync(querySetId);
@@ -273,21 +277,15 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         ConcurrentMap<String, String> docIdToScore = new ConcurrentHashMap<>();
         String queryText = queryTextWithCustomInput.split(DELIMITER, 2)[0];
 
-        log.info("DEBUG: Extracted queryText from custom input: '{}'", queryText);
-        log.info("DEBUG: Search configurations count: {}", searchConfigurations.size());
-        for (SearchConfiguration config : searchConfigurations) {
-            log.info("DEBUG: Search config - index: '{}', query: '{}'", config.index(), config.query());
-        }
-
         try {
             // Step 1: Execute searches concurrently within this query text task
             processSearchConfigurationsAsync(searchConfigurations, queryText, size, allHits, ignoreFailure);
 
-            log.info("DEBUG: After search phase - allHits size: {}, docIds: {}", allHits.size(), allHits.keySet());
+            log.debug("DEBUG: After search phase - allHits size: {}, docIds: {}", allHits.size(), allHits.keySet());
 
             // Step 2: Deduplicate from cache (skip if overwriteCache is true)
             List<String> docIds = new ArrayList<>(allHits.keySet());
-            log.info("DEBUG: docIds list created from allHits: {}", docIds);
+            log.debug("DEBUG: docIds list created from allHits: {}", docIds);
 
             String index = searchConfigurations.get(0).index();
             String promptTemplateCode = generatePromptTemplateCode(promptTemplate, ratingType);
@@ -302,11 +300,11 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                 overwriteCache
             );
 
-            log.info("DEBUG: After deduplication - unprocessedDocIds size: {}, list: {}", unprocessedDocIds.size(), unprocessedDocIds);
+            log.debug("DEBUG: After deduplication - unprocessedDocIds size: {}, list: {}", unprocessedDocIds.size(), unprocessedDocIds);
 
             // Step 3: Process with LLM if needed
             if (!unprocessedDocIds.isEmpty()) {
-                log.info("DEBUG: Calling processWithLLM with {} unprocessed docs", unprocessedDocIds.size());
+                log.debug("DEBUG: Calling processWithLLM with {} unprocessed docs", unprocessedDocIds.size());
                 processWithLLM(
                     modelId,
                     queryTextWithCustomInput,
@@ -319,13 +317,13 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                     promptTemplate,
                     ratingType
                 );
-                log.info("DEBUG: After processWithLLM - docIdToScore size: {}", docIdToScore.size());
+                log.debug("DEBUG: After processWithLLM - docIdToScore size: {}", docIdToScore.size());
             } else {
                 log.warn("DEBUG: SKIPPING LLM PROCESSING - unprocessedDocIds is empty!");
             }
 
             Map<String, Object> result = JudgmentDataTransformer.createJudgmentResult(queryTextWithCustomInput, docIdToScore);
-            log.info("DEBUG: Final result - ratings count: {}", docIdToScore.size());
+            log.debug("DEBUG: Final result - ratings count: {}", docIdToScore.size());
             return result;
         } catch (Exception e) {
             log.warn(
@@ -498,9 +496,6 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         ConcurrentMap<Integer, List<Map<String, Object>>> combinedResponses = new ConcurrentHashMap<>();
         AtomicBoolean hasFailure = new AtomicBoolean(false);
 
-        // Capture ratingType in final variable for use in lambda
-        final LLMJudgmentRatingType finalRatingType = ratingType;
-
         mlAccessor.predict(
             modelId,
             tokenLimit,
@@ -523,7 +518,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                             }
 
                             log.debug("response before sanitization: {}", entry.getValue());
-                            String sanitizedResponse = sanitizeLLMResponse(entry.getValue(), finalRatingType);
+                            String sanitizedResponse = sanitizeLLMResponse(entry.getValue());
                             log.debug("response after sanitization: {}", sanitizedResponse);
                             List<Map<String, Object>> scores = OBJECT_MAPPER.readValue(
                                 sanitizedResponse,

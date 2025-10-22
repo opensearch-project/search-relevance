@@ -94,13 +94,24 @@ public class RestPutQuerySetAction extends BaseRestHandler {
             }
             try {
                 querySetQueries = rawQueries.stream().map(obj -> {
-                    Map<String, String> queryMap = (Map<String, String>) obj;
-                    String queryText = queryMap.get("queryText");
+                    // Use Map<String, Object> to handle various input types (strings, numbers, booleans, etc.)
+                    Map<String, Object> queryMap = (Map<String, Object>) obj;
+                    Object queryTextObj = queryMap.get("queryText");
 
-                    // Create customizedKeyValueMap with all entries except queryText
-                    // This now includes referenceAnswer if present
-                    Map<String, String> customizedKeyValueMap = new HashMap<>(queryMap);
-                    customizedKeyValueMap.remove("queryText");
+                    // Convert queryText to string
+                    if (queryTextObj == null) {
+                        throw new IllegalArgumentException("queryText is required");
+                    }
+                    String queryText = String.valueOf(queryTextObj);
+
+                    // Create customizedKeyValueMap with all entries except queryText, converting values to strings
+                    Map<String, String> customizedKeyValueMap = new HashMap<>();
+                    for (Map.Entry<String, Object> entry : queryMap.entrySet()) {
+                        if (!"queryText".equals(entry.getKey()) && entry.getValue() != null) {
+                            // Convert all values to strings to handle numbers, booleans, etc.
+                            customizedKeyValueMap.put(entry.getKey(), String.valueOf(entry.getValue()));
+                        }
+                    }
 
                     // Validate queryText
                     TextValidationUtil.ValidationResult queryTextValidation = TextValidationUtil.validateText(queryText);
