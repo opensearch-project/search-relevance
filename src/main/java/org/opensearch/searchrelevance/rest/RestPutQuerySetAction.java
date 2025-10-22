@@ -113,18 +113,31 @@ public class RestPutQuerySetAction extends BaseRestHandler {
                         }
                     }
 
-                    // Validate queryText
-                    TextValidationUtil.ValidationResult queryTextValidation = TextValidationUtil.validateText(queryText);
+                    // Validate queryText - must not contain reserved characters (#, :, \n)
+                    TextValidationUtil.ValidationResult queryTextValidation = TextValidationUtil.validateQuerySetValue(queryText);
                     if (!queryTextValidation.isValid()) {
                         throw new IllegalArgumentException("Invalid queryText: " + queryTextValidation.getErrorMessage());
                     }
 
-                    // Validate all values in customizedKeyValueMap (including referenceAnswer)
+                    // Validate all keys and values in customizedKeyValueMap
                     for (Map.Entry<String, String> entry : customizedKeyValueMap.entrySet()) {
+                        // Validate key
+                        TextValidationUtil.ValidationResult keyValidation = TextValidationUtil.validateQuerySetKey(entry.getKey());
+                        if (!keyValidation.isValid()) {
+                            throw new IllegalArgumentException(
+                                "Invalid field name '" + entry.getKey() + "': " + keyValidation.getErrorMessage()
+                            );
+                        }
+
+                        // Validate value
                         if (entry.getValue() != null && !entry.getValue().isEmpty()) {
-                            TextValidationUtil.ValidationResult validation = TextValidationUtil.validateText(entry.getValue());
-                            if (!validation.isValid()) {
-                                throw new IllegalArgumentException("Invalid " + entry.getKey() + ": " + validation.getErrorMessage());
+                            TextValidationUtil.ValidationResult valueValidation = TextValidationUtil.validateQuerySetValue(
+                                entry.getValue()
+                            );
+                            if (!valueValidation.isValid()) {
+                                throw new IllegalArgumentException(
+                                    "Invalid value for field '" + entry.getKey() + "': " + valueValidation.getErrorMessage()
+                                );
                             }
                         }
                     }

@@ -13,6 +13,9 @@ public class TextValidationUtil {
     private static final int MAX_DESCRIPTION_LENGTH = 250;
     // Characters that could break JSON or cause security issues
     private static final String DANGEROUS_CHARS_PATTERN = "[\"\\\\<>]+";  // Excludes quotes, backslashes, and HTML tags
+    // Characters that could break QuerySet parsing logic
+    // Newline (\n), delimiter (#), and colon (:) are reserved for the format: "queryText#\nkey: value"
+    private static final String QUERYSET_RESERVED_CHARS_PATTERN = "[\\r\\n#:]+";  // Excludes newline, carriage return, #, and colon
 
     public static class ValidationResult {
         private final boolean valid;
@@ -87,6 +90,94 @@ public class TextValidationUtil {
      */
     public static ValidationResult validateDescription(String description) {
         return validateText(description, MAX_DESCRIPTION_LENGTH);
+    }
+
+    /**
+     * Validates QuerySet field values (queryText and custom field values).
+     * Checks for reserved characters that would break the QuerySet parsing logic:
+     * - Newline (\n) - used to separate key-value pairs in the new format
+     * - Hash (#) - used as delimiter between queryText and custom fields
+     * - Colon (:) - used to separate keys from values in the new format
+     *
+     * @param text The text to validate
+     * @return ValidationResult indicating if the text is valid for QuerySet
+     */
+    public static ValidationResult validateQuerySetValue(String text) {
+        return validateQuerySetValue(text, DEFAULT_MAX_TEXT_LENGTH);
+    }
+
+    /**
+     * Validates QuerySet field values with a specified maximum length.
+     * Checks for reserved characters that would break the QuerySet parsing logic:
+     * - Newline (\n) - used to separate key-value pairs in the new format
+     * - Hash (#) - used as delimiter between queryText and custom fields
+     * - Colon (:) - used to separate keys from values in the new format
+     *
+     * @param text The text to validate
+     * @param maxLength The maximum allowed length
+     * @return ValidationResult indicating if the text is valid for QuerySet
+     */
+    public static ValidationResult validateQuerySetValue(String text, int maxLength) {
+        if (text == null) {
+            return new ValidationResult(false, "Text cannot be null");
+        }
+
+        if (text.isEmpty()) {
+            return new ValidationResult(false, "Text cannot be empty");
+        }
+
+        if (text.length() > maxLength) {
+            return new ValidationResult(false, "Text exceeds maximum length of " + maxLength + " characters");
+        }
+
+        if (text.matches(".*" + DANGEROUS_CHARS_PATTERN + ".*")) {
+            return new ValidationResult(false, "Text contains invalid characters (quotes, backslashes, or HTML tags are not allowed)");
+        }
+
+        // Check for reserved characters - use contains() for better detection including newlines
+        if (text.contains("\n") || text.contains("\r") || text.contains("#") || text.contains(":")) {
+            return new ValidationResult(false, "Text contains reserved characters (newline, #, or : are not allowed in QuerySet values)");
+        }
+
+        return new ValidationResult(true, null);
+    }
+
+    /**
+     * Validates QuerySet custom field keys.
+     * Keys have additional restrictions to ensure they are valid identifiers.
+     *
+     * @param key The key to validate
+     * @return ValidationResult indicating if the key is valid
+     */
+    public static ValidationResult validateQuerySetKey(String key) {
+        if (key == null) {
+            return new ValidationResult(false, "Key cannot be null");
+        }
+
+        if (key.isEmpty()) {
+            return new ValidationResult(false, "Key cannot be empty");
+        }
+
+        if (key.length() > MAX_NAME_LENGTH) {
+            return new ValidationResult(false, "Key exceeds maximum length of " + MAX_NAME_LENGTH + " characters");
+        }
+
+        // Keys should not contain reserved characters - use contains() for better detection including newlines
+        if (key.contains("\n") || key.contains("\r") || key.contains("#") || key.contains(":")) {
+            return new ValidationResult(false, "Key contains reserved characters (newline, #, or : are not allowed in QuerySet keys)");
+        }
+
+        // Keys should not contain whitespace (except single spaces within the key, not at start/end)
+        if (key.trim().length() != key.length()) {
+            return new ValidationResult(false, "Key cannot have leading or trailing whitespace");
+        }
+
+        // Reserved key name
+        if ("queryText".equals(key)) {
+            return new ValidationResult(false, "Key 'queryText' is reserved and cannot be used as a custom field name");
+        }
+
+        return new ValidationResult(true, null);
     }
 
 }

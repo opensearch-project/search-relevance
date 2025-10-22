@@ -190,7 +190,10 @@ public class RestPutQuerySetActionTests extends SearchRelevanceRestTestCase {
         verify(channel).sendResponse(responseCaptor.capture());
         assertEquals(RestStatus.BAD_REQUEST, responseCaptor.getValue().status());
         String response = responseCaptor.getValue().content().utf8ToString();
-        assertTrue("Response should contain 'Invalid referenceAnswer': " + response, response.contains("Invalid referenceAnswer"));
+        assertTrue(
+            "Response should contain error about invalid referenceAnswer value: " + response,
+            response.contains("referenceAnswer") && response.contains("invalid characters")
+        );
     }
 
     public void testPrepareRequest_WithNumericExpectedScore() throws Exception {
