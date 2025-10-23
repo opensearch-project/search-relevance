@@ -1,0 +1,131 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The OpenSearch Contributors require contributions made to
+ * this file be licensed under the Apache-2.0 license or a
+ * compatible open source license.
+ */
+
+import org.opensearch.gradle.test.RestIntegTestTask
+import java.util.concurrent.Callable
+import org.gradle.api.file.RegularFile
+
+apply plugin: 'opensearch.testclusters'
+apply plugin: 'opensearch.build'
+
+String bwcPluginVersion = System.getProperty("tests.search_relevance.version", "3.2.0")
+// For OpenSearch versions, we just use the plugin version as-is (e.g., 3.2.0 -> 3.2.0)
+String bwcOpenSearchVersion = bwcPluginVersion
+String baseName = "searchRelevanceBwcCluster-rolling"
+
+ext {
+    licenseFile = rootProject.file('LICENSE.txt')
+    noticeFile = rootProject.file('NOTICE.txt')
+}
+
+// Test cluster configuration
+testClusters {
+    "${baseName}" {
+        testDistribution = "ARCHIVE"
+        versions = [bwcOpenSearchVersion, opensearch_version]
+        numberOfNodes = 3
+
+        // JVM settings
+        jvmArgs("-Xms1g", "-Xmx4g")
+
+        // Plugin settings - will be set by tasks
+        setting 'path.repo', "${buildDir}/cluster/shared/repo/${baseName}"
+        setting 'http.content_type.required', 'true'
+    }
+}
+
+// Set up the plugins list for the rolling upgrade
+configurations {
+    bwcPlugin
+}
+
+dependencies {
+    // This creates a dependency on the zipBwcPlugin task output
+    bwcPlugin files("${rootProject.projectDir}/qa/build/bwc-plugins/opensearch-search-relevance-${bwcPluginVersion}.zip")
+}
+
+// Configure the BWC plugin path
+testClusters."${baseName}".plugin(bwcPlugin)
+
+// Helper function to create BWC test tasks
+def createBwcTestTask(String cluster, String taskName, String clusterType, Closure testConfig = {}) {
+    tasks.register(taskName, RestIntegTestTask) {
+        useCluster testClusters."${cluster}"
+        systemProperty 'tests.rest.bwcsuite', clusterType
+        systemProperty 'tests.plugin_bwc_version', bwcPluginVersion
+        nonInputProperties.systemProperty('tests.rest.cluster', "${-> testClusters."${cluster}".allHttpSocketURI.join(",")}")
+        nonInputProperties.systemProperty('tests.clustername', "${-> testClusters."${cluster}".getName()}")
+        testConfig.delegate = it
+        testConfig()
+    }
+}
+
+// Test against old cluster (all nodes on old version)
+createBwcTestTask(baseName, 'testAgainstOldCluster', 'old_cluster') {
+    filter {
+        includeTestsMatching "org.opensearch.searchrelevance.bwc.rolling.*IT"
+    }
+}
+
+// Test against 1/3 upgraded cluster (one node upgraded)
+createBwcTestTask(baseName, 'testAgainstOneThirdUpgradedCluster', 'mixed_cluster') {
+    dependsOn 'testAgainstOldCluster'
+    doFirst {
+        testClusters."${baseName}".upgradeNodeAndPluginToNextVersion(plugins)
+    }
+    systemProperty 'tests.first_round', 'true'
+    filter {
+        includeTestsMatching "org.opensearch.searchrelevance.bwc.rolling.*IT"
+    }
+}
+
+// Test against 2/3 upgraded cluster (two nodes upgraded)
+createBwcTestTask(baseName, 'testAgainstTwoThirdsUpgradedCluster', 'mixed_cluster') {
+    dependsOn 'testAgainstOneThirdUpgradedCluster'
+    doFirst {
+        testClusters."${baseName}".upgradeNodeAndPluginToNextVersion(plugins)
+    }
+    systemProperty 'tests.first_round', 'false'
+    filter {
+        includeTestsMatching "org.opensearch.searchrelevance.bwc.rolling.*IT"
+    }
+}
+
+// Test against fully upgraded cluster (all nodes upgraded)
+tasks.register('testRollingUpgrade', RestIntegTestTask) {
+    dependsOn 'testAgainstTwoThirdsUpgradedCluster'
+    useCluster testClusters."${baseName}"
+    doFirst {
+        testClusters."${baseName}".upgradeNodeAndPluginToNextVersion(plugins)
+    }
+    systemProperty 'tests.rest.bwcsuite', 'upgraded_cluster'
+    systemProperty 'tests.plugin_bwc_version', bwcPluginVersion
+    nonInputProperties.systemProperty('tests.rest.cluster', "${-> testClusters."${baseName}".allHttpSocketURI.join(",")}")
+    nonInputProperties.systemProperty('tests.clustername', "${-> testClusters."${baseName}".getName()}")
+    filter {
+        includeTestsMatching "org.opensearch.searchrelevance.bwc.rolling.*IT"
+    }
+}
+
+// Dependencies
+dependencies {
+    testImplementation project(path: ":qa", configuration: 'testArtifacts')
+}
+
+// Disable default test task
+test.enabled = false
+
+// Make sure we build the plugin and download BWC plugin before running BWC tests
+tasks.matching { it.name.startsWith('testAgainst') }.configureEach {
+    dependsOn ':bundlePlugin'
+    dependsOn ':qa:zipBwcPlugin'
+}
+tasks.named('testRollingUpgrade').configure {
+    dependsOn ':bundlePlugin'
+    dependsOn ':qa:zipBwcPlugin'
+}

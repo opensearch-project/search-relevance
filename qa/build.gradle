@@ -1,0 +1,97 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The OpenSearch Contributors require contributions made to
+ * this file be licensed under the Apache-2.0 license or a
+ * compatible open source license.
+ */
+
+import org.opensearch.gradle.Architecture
+import org.opensearch.gradle.OS
+import org.opensearch.gradle.Version
+import org.opensearch.gradle.VersionProperties
+import org.opensearch.gradle.test.RestIntegTestTask
+
+apply plugin: 'opensearch.testclusters'
+apply plugin: 'opensearch.build'
+apply plugin: 'opensearch.rest-test'
+apply plugin: 'io.freefair.lombok'
+apply plugin: 'opensearch.java-agent'
+
+build.enabled = false
+integTest.enabled = false
+test.enabled = false
+assemble.enabled = false
+dependenciesInfo.enabled = false
+
+ext {
+    bwcPluginVersion = System.getProperty("tests.search_relevance.version", "3.2.0")
+    // For OpenSearch versions, we use the plugin version as-is (e.g., 3.2.0 -> 3.2.0)
+    bwcOpenSearchVersion = bwcPluginVersion
+    arch = System.getProperty("build.architecture", "x64")
+    licenseFile = rootProject.file('LICENSE.txt')
+    noticeFile = rootProject.file('NOTICE.txt')
+}
+
+// Create testArtifacts configuration for sharing test classes with subprojects
+configurations {
+    testArtifacts.extendsFrom testRuntime
+}
+
+dependencies {
+    testImplementation project(':')
+    testImplementation "org.opensearch:common-utils:${opensearch_build}"
+    testImplementation "org.opensearch.test:framework:${opensearch_version}"
+    testImplementation "org.opensearch:opensearch:${opensearch_version}"
+    testImplementation "org.apache.logging.log4j:log4j-core:${versions.log4j}"
+    testImplementation "org.junit.jupiter:junit-jupiter:${versions.junit}"
+    testImplementation "com.carrotsearch.randomizedtesting:randomizedtesting-runner:${versions.randomizedtesting}"
+}
+
+// Task to create test artifacts JAR for sharing with subprojects
+task testJar(type: Jar) {
+    archiveClassifier = 'tests'
+    from sourceSets.test.output
+}
+
+artifacts {
+    testArtifacts testJar
+}
+
+// Task to download OpenSearch artifact for BWC tests
+tasks.register("pullOpensearchArtifact", de.undercouch.gradle.tasks.download.Download) {
+    // Check for CI build first
+    def ciOpenSearchVersion = System.getProperty("ci.opensearch.version")
+    if (ciOpenSearchVersion != null && !ciOpenSearchVersion.isEmpty()) {
+        src "https://ci.opensearch.org/ci/dbc/distribution-build-opensearch/${ciOpenSearchVersion}/${arch}/linux/${ciOpenSearchVersion}/dist/opensearch/opensearch-${ciOpenSearchVersion}-linux-${arch}.tar.gz"
+    } else {
+        // Download from release repository
+        src "https://artifacts.opensearch.org/releases/bundle/opensearch/${bwcOpenSearchVersion}/opensearch-${bwcOpenSearchVersion}-linux-${arch}.tar.gz"
+    }
+    dest "${buildDir}/downloads/opensearch-${bwcOpenSearchVersion}-linux-${arch}.tar.gz"
+    overwrite false
+}
+
+// Task to extract search-relevance plugin from downloaded artifact
+tasks.register("pullBwcPlugin", Copy) {
+    dependsOn "pullOpensearchArtifact"
+    from {
+        tarTree("${buildDir}/downloads/opensearch-${bwcOpenSearchVersion}-linux-${arch}.tar.gz")
+    }
+    include "**/plugins/opensearch-search-relevance*.zip"
+    into "${buildDir}/bwc-plugins"
+}
+
+// Task to repackage the BWC plugin
+tasks.register("zipBwcPlugin", Zip) {
+    dependsOn "pullBwcPlugin"
+    from(zipTree("${buildDir}/bwc-plugins/opensearch-${bwcOpenSearchVersion}/plugins/opensearch-search-relevance-${bwcPluginVersion}.zip"))
+    archiveFileName = "opensearch-search-relevance-${bwcPluginVersion}.zip"
+    destinationDirectory = file("${buildDir}/bwc-plugins")
+}
+
+// Task suite for BWC tests
+tasks.register("bwcTestSuite") {
+    dependsOn "zipBwcPlugin"
+    dependsOn ":qa:rolling-upgrade:testRollingUpgrade"
+}

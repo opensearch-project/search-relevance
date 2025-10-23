@@ -1,4 +1,9 @@
 allprojects {
+    // Skip spotless for qa subprojects (test-only modules)
+    if (project.path.startsWith(':qa')) {
+        return
+    }
+
     spotless {
         java {
             // Normally this isn't necessary, but we have Java sources in
