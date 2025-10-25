@@ -6,126 +6,156 @@
  * compatible open source license.
  */
 
-import org.opensearch.gradle.test.RestIntegTestTask
-import java.util.concurrent.Callable
-import org.gradle.api.file.RegularFile
+import org.opensearch.gradle.testclusters.StandaloneRestIntegTestTask
 
-apply plugin: 'opensearch.testclusters'
-apply plugin: 'opensearch.build'
+apply from : "$rootDir/qa/build.gradle"
 
-String bwcPluginVersion = System.getProperty("tests.search_relevance.version", "3.2.0")
-// For OpenSearch versions, we just use the plugin version as-is (e.g., 3.2.0 -> 3.2.0)
-String bwcOpenSearchVersion = bwcPluginVersion
+def ext=rootProject.ext
 String baseName = "searchRelevanceBwcCluster-rolling"
 
-ext {
-    licenseFile = rootProject.file('LICENSE.txt')
-    noticeFile = rootProject.file('NOTICE.txt')
-}
-
-// Test cluster configuration
+// Creates a test cluster of previous version and loads k-NN plugin of bwcVersion
 testClusters {
     "${baseName}" {
         testDistribution = "ARCHIVE"
-        versions = [bwcOpenSearchVersion, opensearch_version]
-        numberOfNodes = 3
-
-        // JVM settings
         jvmArgs("-Xms1g", "-Xmx4g")
-
-        // Plugin settings - will be set by tasks
+        numberOfNodes = 3
+        if(ext.bwcBundleTest){
+            versions = [ext.search_relevance_bwc_version, ext.currentBundleVersion]
+            def path=ext.opensearch_tmp_dir
+            nodes.each { node ->
+                node.extraConfigFile("kirk.pem", file("$path/kirk.pem"))
+                node.extraConfigFile("kirk-key.pem", file("$path/kirk-key.pem"))
+                node.extraConfigFile("esnode.pem", file("$path/esnode.pem"))
+                node.extraConfigFile("esnode-key.pem", file("$path/esnode-key.pem"))
+                node.extraConfigFile("root-ca.pem", file("$path/root-ca.pem"))
+                node.setting("plugins.security.disabled", "true")
+                node.setting("plugins.security.ssl.transport.pemcert_filepath", "esnode.pem")
+                node.setting("plugins.security.ssl.transport.pemkey_filepath", "esnode-key.pem")
+                node.setting("plugins.security.ssl.transport.pemtrustedcas_filepath", "root-ca.pem")
+                node.setting("plugins.security.ssl.transport.enforce_hostname_verification", "false")
+                node.setting("plugins.security.ssl.http.enabled", "true")
+                node.setting("plugins.security.ssl.http.pemcert_filepath", "esnode.pem")
+                node.setting("plugins.security.ssl.http.pemkey_filepath", "esnode-key.pem")
+                node.setting("plugins.security.ssl.http.pemtrustedcas_filepath", "root-ca.pem")
+                node.setting("plugins.security.allow_unsafe_democertificates", "true")
+                node.setting("plugins.security.allow_default_init_securityindex", "true")
+                node.setting("plugins.security.authcz.admin_dn", "CN=kirk,OU=client,O=client,L=test,C=de")
+                node.setting("plugins.security.audit.type", "internal_elasticsearch")
+                node.setting("plugins.security.enable_snapshot_restore_privilege", "true")
+                node.setting("plugins.security.check_snapshot_restore_write_privileges", "true")
+                node.setting("plugins.security.restapi.roles_enabled", "[\"all_access\", \"security_rest_api_access\"]")
+                node.setting("plugins.security.system_indices.enabled", "true")
+            }
+        }else{
+            versions = [ext.search_relevance_bwc_version, opensearch_version]
+            plugin(project.tasks.zipBwcJobSchedulerPlugin.archiveFile)
+            plugin(project.tasks.zipBwcMlCommonsPlugin.archiveFile)
+            plugin(project.tasks.zipBwcKnnPlugin.archiveFile)
+            plugin(project.tasks.zipBwcPlugin.archiveFile)
+        }
         setting 'path.repo', "${buildDir}/cluster/shared/repo/${baseName}"
         setting 'http.content_type.required', 'true'
     }
 }
 
-// Set up the plugins list for the rolling upgrade
-configurations {
-    bwcPlugin
-}
+def versionsBelow3_3 = ["3.2"]
+def versionsBelow3_4 = versionsBelow3_3 + "3.3"
 
-dependencies {
-    // This creates a dependency on the zipBwcPlugin task output
-    bwcPlugin files("${rootProject.projectDir}/qa/build/bwc-plugins/opensearch-search-relevance-${bwcPluginVersion}.zip")
-}
-
-// Configure the BWC plugin path
-testClusters."${baseName}".plugin(bwcPlugin)
-
-// Helper function to create BWC test tasks
-def createBwcTestTask(String cluster, String taskName, String clusterType, Closure testConfig = {}) {
-    tasks.register(taskName, RestIntegTestTask) {
-        useCluster testClusters."${cluster}"
-        systemProperty 'tests.rest.bwcsuite', clusterType
-        systemProperty 'tests.plugin_bwc_version', bwcPluginVersion
-        nonInputProperties.systemProperty('tests.rest.cluster', "${-> testClusters."${cluster}".allHttpSocketURI.join(",")}")
-        nonInputProperties.systemProperty('tests.clustername', "${-> testClusters."${cluster}".getName()}")
-        testConfig.delegate = it
-        testConfig()
+// Task to run BWC tests against the old cluster
+task testAgainstOldCluster(type: StandaloneRestIntegTestTask) {
+    if(!ext.bwcBundleTest){
+        dependsOn "zipBwcPlugin"
     }
-}
-
-// Test against old cluster (all nodes on old version)
-createBwcTestTask(baseName, 'testAgainstOldCluster', 'old_cluster') {
-    filter {
-        includeTestsMatching "org.opensearch.searchrelevance.bwc.rolling.*IT"
-    }
-}
-
-// Test against 1/3 upgraded cluster (one node upgraded)
-createBwcTestTask(baseName, 'testAgainstOneThirdUpgradedCluster', 'mixed_cluster') {
-    dependsOn 'testAgainstOldCluster'
-    doFirst {
-        testClusters."${baseName}".upgradeNodeAndPluginToNextVersion(plugins)
-    }
-    systemProperty 'tests.first_round', 'true'
-    filter {
-        includeTestsMatching "org.opensearch.searchrelevance.bwc.rolling.*IT"
-    }
-}
-
-// Test against 2/3 upgraded cluster (two nodes upgraded)
-createBwcTestTask(baseName, 'testAgainstTwoThirdsUpgradedCluster', 'mixed_cluster') {
-    dependsOn 'testAgainstOneThirdUpgradedCluster'
-    doFirst {
-        testClusters."${baseName}".upgradeNodeAndPluginToNextVersion(plugins)
-    }
-    systemProperty 'tests.first_round', 'false'
-    filter {
-        includeTestsMatching "org.opensearch.searchrelevance.bwc.rolling.*IT"
-    }
-}
-
-// Test against fully upgraded cluster (all nodes upgraded)
-tasks.register('testRollingUpgrade', RestIntegTestTask) {
-    dependsOn 'testAgainstTwoThirdsUpgradedCluster'
     useCluster testClusters."${baseName}"
-    doFirst {
-        testClusters."${baseName}".upgradeNodeAndPluginToNextVersion(plugins)
-    }
-    systemProperty 'tests.rest.bwcsuite', 'upgraded_cluster'
-    systemProperty 'tests.plugin_bwc_version', bwcPluginVersion
+    systemProperty 'tests.rest.bwcsuite_cluster', 'old_cluster'
+    systemProperty 'tests.plugin_bwc_version', ext.search_relevance_bwc_version
+    systemProperty 'tests.skip_delete_model_index', 'true'
+
     nonInputProperties.systemProperty('tests.rest.cluster', "${-> testClusters."${baseName}".allHttpSocketURI.join(",")}")
     nonInputProperties.systemProperty('tests.clustername', "${-> testClusters."${baseName}".getName()}")
-    filter {
-        includeTestsMatching "org.opensearch.searchrelevance.bwc.rolling.*IT"
+    systemProperty 'tests.security.manager', 'false'
+}
+
+// Part of rolling upgrade. Upgrades one node of the old cluster to new OpenSearch version with upgraded plugin version
+// This results in a mixed cluster with 2 nodes on the old version and 1 upgraded node.
+task testAgainstOneThirdUpgradedCluster(type: StandaloneRestIntegTestTask) {
+    useCluster testClusters."${baseName}"
+    dependsOn rootProject.tasks.assemble
+    dependsOn "testAgainstOldCluster"
+
+    doFirst {
+        // This is added to prevent the cluster from getting stuck in yellow state
+        println "Waiting for cluster to stabilize after previous test, including data synchronization on replica shards"
+        Thread.sleep(10000) // 10 seconds delay
+
+        if(ext.bwcBundleTest){
+            testClusters."${baseName}".nextNodeToNextVersion()
+        }else{
+            testClusters."${baseName}".upgradeNodeAndPluginToNextVersion(project.ext.plugins)
+        }
     }
+
+    systemProperty 'tests.rest.bwcsuite_cluster', 'mixed_cluster'
+    systemProperty 'tests.rest.first_round', 'true'
+    systemProperty 'tests.skip_delete_model_index', 'true'
+    systemProperty 'tests.plugin_bwc_version', ext.search_relevance_bwc_version
+
+    nonInputProperties.systemProperty('tests.rest.cluster', "${-> testClusters."${baseName}".allHttpSocketURI.join(",")}")
+    nonInputProperties.systemProperty('tests.clustername', "${-> testClusters."${baseName}".getName()}")
+    systemProperty 'tests.security.manager', 'false'
 }
 
-// Dependencies
-dependencies {
-    testImplementation project(path: ":qa", configuration: 'testArtifacts')
+// Part of rolling upgrade. Upgrades the second node to new OpenSearch version with upgraded plugin version after the
+// first node is upgraded. This results in a mixed cluster with 1 node on the old version and 2 upgraded nodes.
+task testAgainstTwoThirdsUpgradedCluster(type: StandaloneRestIntegTestTask) {
+    dependsOn "testAgainstOneThirdUpgradedCluster"
+    useCluster testClusters."${baseName}"
+
+    doFirst {
+        // This is added to prevent the cluster from getting stuck in yellow state
+        println "Waiting for cluster to stabilize after previous test, including data synchronization on replica shards"
+        Thread.sleep(10000) // 10 seconds delay
+
+        if(ext.bwcBundleTest){
+            testClusters."${baseName}".nextNodeToNextVersion()
+        }else{
+            testClusters."${baseName}".upgradeNodeAndPluginToNextVersion(project.ext.plugins)
+        }
+    }
+    systemProperty 'tests.rest.bwcsuite_cluster', 'mixed_cluster'
+    systemProperty 'tests.rest.first_round', 'false'
+    systemProperty 'tests.skip_delete_model_index', 'true'
+    systemProperty 'tests.plugin_bwc_version', ext.search_relevance_bwc_version
+
+    nonInputProperties.systemProperty('tests.rest.cluster', "${-> testClusters."${baseName}".allHttpSocketURI.join(",")}")
+    nonInputProperties.systemProperty('tests.clustername', "${-> testClusters."${baseName}".getName()}")
+    systemProperty 'tests.security.manager', 'false'
 }
 
-// Disable default test task
-test.enabled = false
+// Part of rolling upgrade. Upgrades the third node to new OpenSearch version with upgraded plugin version after the
+// second node is upgraded. This results in a fully upgraded cluster.
+task testRollingUpgrade(type: StandaloneRestIntegTestTask) {
+    dependsOn "testAgainstTwoThirdsUpgradedCluster"
+    useCluster testClusters."${baseName}"
 
-// Make sure we build the plugin and download BWC plugin before running BWC tests
-tasks.matching { it.name.startsWith('testAgainst') }.configureEach {
-    dependsOn ':bundlePlugin'
-    dependsOn ':qa:zipBwcPlugin'
-}
-tasks.named('testRollingUpgrade').configure {
-    dependsOn ':bundlePlugin'
-    dependsOn ':qa:zipBwcPlugin'
+    doFirst {
+        // This is added to prevent the cluster from getting stuck in yellow state
+        println "Waiting for cluster to stabilize after previous test, including data synchronization on replica shards"
+        Thread.sleep(10000) // 10 seconds delay
+
+        if(ext.bwcBundleTest){
+            testClusters."${baseName}".nextNodeToNextVersion()
+        }else{
+            testClusters."${baseName}".upgradeNodeAndPluginToNextVersion(project.ext.plugins)
+        }
+    }
+
+    mustRunAfter "testAgainstOneThirdUpgradedCluster"
+    systemProperty 'tests.rest.bwcsuite_cluster', 'upgraded_cluster'
+    systemProperty 'tests.skip_delete_model_index', 'true'
+    systemProperty 'tests.plugin_bwc_version', ext.search_relevance_bwc_version
+
+    nonInputProperties.systemProperty('tests.rest.cluster', "${-> testClusters."${baseName}".allHttpSocketURI.join(",")}")
+    nonInputProperties.systemProperty('tests.clustername', "${-> testClusters."${baseName}".getName()}")
+    systemProperty 'tests.security.manager', 'false'
 }

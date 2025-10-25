@@ -86,6 +86,13 @@ java {
 }
 
 ext {
+
+    default_bwc_version = System.getProperty("bwc.version")
+    default_bwc_bundle_version= System.getProperty("bwc.bundle.version")
+    bwcBundleTest = (project.findProperty('customDistributionDownloadType') != null && project.properties['customDistributionDownloadType'] == "bundle")
+    search_relevance_bwc_version = bwcBundleTest ? System.getProperty("tests.bwc.bundle.version",rootProject.ext.default_bwc_bundle_version): System.getProperty("tests.bwc.version", rootProject.ext.default_bwc_version)
+    currentBundleVersion = opensearch_version.replace("-SNAPSHOT","")
+
     projectSubstitutions = [:]
     licenseFile = rootProject.file('LICENSE.txt')
     noticeFile = rootProject.file('NOTICE.txt')
