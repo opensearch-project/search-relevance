@@ -39,7 +39,7 @@ buildscript {
 
     repositories {
         mavenLocal()
-        maven { url "https://central.sonatype.com/repository/maven-snapshots/" }
+        maven { url "https://ci.opensearch.org/ci/dbc/snapshots/maven/" }
         mavenCentral()
         maven { url "https://plugins.gradle.org/m2/" }
         maven { url 'https://jitpack.io' }
@@ -47,9 +47,9 @@ buildscript {
 
     dependencies {
         classpath "org.opensearch.gradle:build-tools:${opensearch_version}"
-        classpath "com.diffplug.spotless:spotless-plugin-gradle:7.2.1"
+        classpath "com.diffplug.spotless:spotless-plugin-gradle:8.0.0"
         classpath "com.github.form-com.diff-coverage-gradle:diff-coverage:0.9.5"
-        classpath "io.freefair.gradle:lombok-plugin:8.14.2"
+        classpath "io.freefair.gradle:lombok-plugin:9.0.0"
     }
 }
 
@@ -122,10 +122,11 @@ publishing {
     repositories {
         maven {
             name = "Snapshots"
-            url = "https://central.sonatype.com/repository/maven-snapshots/"
-            credentials {
-                username System.getenv("SONATYPE_USERNAME")
-                password System.getenv("SONATYPE_PASSWORD")
+            url = System.getenv("MAVEN_SNAPSHOTS_S3_REPO")
+            credentials(AwsCredentials) {
+                accessKey = System.getenv("AWS_ACCESS_KEY_ID")
+                secretKey = System.getenv("AWS_SECRET_ACCESS_KEY")
+                sessionToken = System.getenv("AWS_SESSION_TOKEN")
             }
         }
         maven {
@@ -197,8 +198,8 @@ dependencies {
     api group: 'org.opensearch', name:'opensearch-ml-client', version: "${opensearch_build}"
     compileOnly "org.opensearch:opensearch-job-scheduler-spi:${opensearch_build}"
     implementation group: 'com.google.guava', name: 'guava', version:'33.4.8-jre'
-    compileOnly group: 'commons-lang', name: 'commons-lang', version: '2.6'
-    implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.18.0'
+    compileOnly group: 'org.apache.commons', name: 'commons-lang3', version: '3.19.0'
+    implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.19.0'
     implementation group: 'org.apache.commons', name: 'commons-math3', version: '3.6.1'
     implementation "org.opensearch:common-utils:${common_utils_version}"
     implementation "com.fasterxml.jackson.core:jackson-annotations:${versions.jackson}"
@@ -245,8 +246,7 @@ def _numNodes = findProperty('numNodes') as Integer ?: 1
 
 repositories {
     mavenLocal()
-    maven { url "https://central.sonatype.com/repository/maven-snapshots/" }
-    maven { url "https://aws.oss.sonatype.org/content/repositories/snapshots" }
+    maven { url "https://ci.opensearch.org/ci/dbc/snapshots/maven/" }
     mavenCentral()
     maven { url "https://plugins.gradle.org/m2/" }
 }
