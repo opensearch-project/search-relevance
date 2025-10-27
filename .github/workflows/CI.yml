@@ -106,7 +106,7 @@ jobs:
           chown -R 1000:1000 `pwd`
           su `id -un 1000` -c "./gradlew precommit --parallel && ./gradlew jacocoTestReport && cp -v build/reports/jacoco/test/jacocoTestReport.xml ./jacocoTestReport.xml"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         if: ${{ matrix.os }} == "ubuntu-latest"
         with:
           name: coverage-report-${{ matrix.os }}-${{ matrix.java }}
