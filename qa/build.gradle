@@ -69,7 +69,7 @@ ext {
 
 def tmp_dir = project.file('build/private/artifact_tmp').absoluteFile
 tmp_dir.mkdirs()
-String default_bwc_version = System.getProperty("bwc.version")
+String default_bwc_version = System.getProperty("bwc.version", rootProject.ext.default_bwc_version)
 String search_relevance_bwc_version = System.getProperty("tests.bwc.version", default_bwc_version)
 boolean isSnapshot = search_relevance_bwc_version.contains("-SNAPSHOT")
 String search_relevance_bwc_version_no_qualifier = isSnapshot ? search_relevance_bwc_version - "-SNAPSHOT" : search_relevance_bwc_version

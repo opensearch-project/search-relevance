@@ -84,8 +84,10 @@ task testAgainstOneThirdUpgradedCluster(type: StandaloneRestIntegTestTask) {
     dependsOn "testAgainstOldCluster"
 
     doFirst {
+        println "${ext.bwcBundleTest}"
         // This is added to prevent the cluster from getting stuck in yellow state
         println "Waiting for cluster to stabilize after previous test, including data synchronization on replica shards"
+        println "BWC Test: Upgrading from ${ext.search_relevance_bwc_version} to ${opensearch_version}"
         Thread.sleep(10000) // 10 seconds delay
 
         if(ext.bwcBundleTest){
@@ -114,6 +116,7 @@ task testAgainstTwoThirdsUpgradedCluster(type: StandaloneRestIntegTestTask) {
     doFirst {
         // This is added to prevent the cluster from getting stuck in yellow state
         println "Waiting for cluster to stabilize after previous test, including data synchronization on replica shards"
+        println "BWC Test: Upgrading from ${ext.search_relevance_bwc_version} to ${opensearch_version}"
         Thread.sleep(10000) // 10 seconds delay
 
         if(ext.bwcBundleTest){
