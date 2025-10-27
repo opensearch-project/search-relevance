@@ -11,13 +11,12 @@ import java.util.Locale;
 
 import org.opensearch.common.settings.Settings;
 import org.opensearch.test.rest.OpenSearchRestTestCase;
-import org.opensearch.upgrades.AbstractRollingUpgradeTestCase;
 
 /**
  * Base class for Search Relevance BWC (Backward Compatibility) tests during rolling upgrades.
  * Provides common utilities and cluster state management for testing compatibility across versions.
  */
-public abstract class AbstractSearchRelevanceRollingUpgradeTestCase extends AbstractRollingUpgradeTestCase {
+public abstract class AbstractSearchRelevanceRollingUpgradeTestCase extends OpenSearchRestTestCase {
 
     private static final String OLD_CLUSTER = "old_cluster";
     private static final String MIXED_CLUSTER = "mixed_cluster";
@@ -52,7 +51,7 @@ public abstract class AbstractSearchRelevanceRollingUpgradeTestCase extends Abst
      * @return The current ClusterType (OLD, MIXED, or UPGRADED)
      */
     protected ClusterType getClusterType() {
-        return ClusterType.instance(System.getProperty("tests.rest.bwcsuite"));
+        return ClusterType.instance(System.getProperty("tests.rest.bwcsuite_cluster"));
     }
 
     /**
@@ -109,7 +108,7 @@ public abstract class AbstractSearchRelevanceRollingUpgradeTestCase extends Abst
      * @return true if this is the first mixed cluster round, false otherwise
      */
     protected boolean isFirstMixedRound() {
-        return Boolean.parseBoolean(System.getProperty("tests.first_round", "false"));
+        return Boolean.parseBoolean(System.getProperty("tests.rest.first_round", "false"));
     }
 
     /**

@@ -168,7 +168,7 @@ public class LlmJudgmentBWCIT extends AbstractSearchRelevanceRollingUpgradeTestC
 
         // Clean up test index
         String indexName = getIndexNameForTest();
-        deleteIndex(indexName);
+        deleteIndexSilently(indexName);
     }
 
     // ==================== Helper Methods ====================
@@ -202,7 +202,7 @@ public class LlmJudgmentBWCIT extends AbstractSearchRelevanceRollingUpgradeTestC
                 + "\"index\": \""
                 + indexName
                 + "\","
-                + "\"query\": {\"match_all\": {}}"
+                + "\"query\": \"{\\\"match_all\\\": {}}\""
                 + "}"
         );
 
@@ -306,7 +306,17 @@ public class LlmJudgmentBWCIT extends AbstractSearchRelevanceRollingUpgradeTestC
         Request request = new Request("GET", QUERY_SET_ENDPOINT + "/" + id);
         Response response = client().performRequest(request);
         assertEquals(200, response.getStatusLine().getStatusCode());
-        return parseResponse(response);
+        Map<String, Object> responseMap = parseResponse(response);
+
+        // Extract the query set from the search response
+        Map<String, Object> hits = (Map<String, Object>) responseMap.get("hits");
+        if (hits != null && hits.get("hits") != null) {
+            java.util.List<Map<String, Object>> hitsList = (java.util.List<Map<String, Object>>) hits.get("hits");
+            if (!hitsList.isEmpty()) {
+                return (Map<String, Object>) hitsList.get(0).get("_source");
+            }
+        }
+        return null;
     }
 
     /**
@@ -316,7 +326,17 @@ public class LlmJudgmentBWCIT extends AbstractSearchRelevanceRollingUpgradeTestC
         Request request = new Request("GET", SEARCH_CONFIG_ENDPOINT + "/" + id);
         Response response = client().performRequest(request);
         assertEquals(200, response.getStatusLine().getStatusCode());
-        return parseResponse(response);
+        Map<String, Object> responseMap = parseResponse(response);
+
+        // Extract the search configuration from the search response
+        Map<String, Object> hits = (Map<String, Object>) responseMap.get("hits");
+        if (hits != null && hits.get("hits") != null) {
+            java.util.List<Map<String, Object>> hitsList = (java.util.List<Map<String, Object>>) hits.get("hits");
+            if (!hitsList.isEmpty()) {
+                return (Map<String, Object>) hitsList.get(0).get("_source");
+            }
+        }
+        return null;
     }
 
     /**
@@ -336,9 +356,9 @@ public class LlmJudgmentBWCIT extends AbstractSearchRelevanceRollingUpgradeTestC
     }
 
     /**
-     * Deletes an index.
+     * Deletes an index silently (ignoring errors if index doesn't exist).
      */
-    private void deleteIndex(String indexName) throws IOException {
+    private void deleteIndexSilently(String indexName) throws IOException {
         Request request = new Request("DELETE", "/" + indexName);
         try {
             client().performRequest(request);

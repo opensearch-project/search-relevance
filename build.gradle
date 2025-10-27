@@ -537,6 +537,8 @@ opensearch_tmp_dir.mkdirs()
 integTest {
     systemProperty 'tests.security.manager', 'false'
     systemProperty 'java.io.tmpdir', opensearch_tmp_dir.absolutePath
+    // allows integration test classes to access test resource from project root path
+    systemProperty 'project.root', project.rootDir.absolutePath
     systemProperty 'buildDir', buildDir.path
     systemProperty "https", securityEnabled
     systemProperty "security", securityEnabled
