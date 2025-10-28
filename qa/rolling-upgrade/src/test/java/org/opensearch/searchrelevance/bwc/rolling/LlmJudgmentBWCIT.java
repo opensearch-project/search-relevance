@@ -99,8 +99,23 @@ public class LlmJudgmentBWCIT extends AbstractSearchRelevanceRollingUpgradeTestC
         assertEquals("Query set ID should match when retrieved by name", querySetId, retrievedQuerySetId);
         assertEquals("Search config ID should match when retrieved by name", searchConfigId, retrievedSearchConfigId);
 
-        // Note: We're not creating LLM judgment in OLD cluster because it requires ML model
-        // which may not be available. We'll test the format compatibility in MIXED/UPGRADED phases.
+        // Create LLM judgment with OLD format (no promptTemplate, no llmJudgmentRatingType)
+        String judgmentName = getJudgmentNameForTest();
+        judgmentId = createLlmJudgmentOldFormat(judgmentName, querySetId, searchConfigId);
+        assertNotNull("LLM judgment should be created with old format", judgmentId);
+
+        // Validate the judgment can be retrieved and has correct OLD format
+        Map<String, Object> judgment = getLlmJudgment(judgmentId);
+        assertNotNull("LLM judgment should be retrievable", judgment);
+        assertEquals("Judgment name should match", judgmentName, judgment.get("name"));
+        assertEquals("Judgment type should be LLM_JUDGMENT", "LLM_JUDGMENT", judgment.get("type"));
+
+        // Validate OLD format: should NOT have new fields like promptTemplate and llmJudgmentRatingType
+        Map<String, Object> metadata = (Map<String, Object>) judgment.get("metadata");
+        if (metadata != null) {
+            assertNull("OLD format should not have promptTemplate", metadata.get("promptTemplate"));
+            assertNull("OLD format should not have llmJudgmentRatingType", metadata.get("llmJudgmentRatingType"));
+        }
     }
 
     /**
@@ -122,6 +137,16 @@ public class LlmJudgmentBWCIT extends AbstractSearchRelevanceRollingUpgradeTestC
         // Validate search configuration still exists
         Map<String, Object> searchConfig = getSearchConfiguration(searchConfigId);
         assertNotNull("Search configuration from OLD cluster should still exist", searchConfig);
+
+        // Validate LLM judgment created in OLD cluster still exists and can be retrieved
+        String judgmentName = getJudgmentNameForTest();
+        judgmentId = getLlmJudgmentIdByName(judgmentName);
+        assertNotNull("LLM judgment from OLD cluster should still exist", judgmentId);
+
+        // Retrieve and validate the old judgment to ensure backward compatibility
+        Map<String, Object> judgment = getLlmJudgment(judgmentId);
+        assertNotNull("Old format LLM judgment should be retrievable in MIXED cluster", judgment);
+        assertEquals("Judgment name should match", judgmentName, judgment.get("name"));
     }
 
     /**
@@ -137,6 +162,18 @@ public class LlmJudgmentBWCIT extends AbstractSearchRelevanceRollingUpgradeTestC
         // Validate new format query set
         Map<String, Object> querySet = getQuerySet(newQuerySetId);
         assertEquals("Query set name should match", querySetName, querySet.get("name"));
+
+        // Create LLM judgment with NEW format (with promptTemplate and ratingType)
+        String newJudgmentId = createLlmJudgmentNewFormat(newQuerySetId, searchConfigId);
+        assertNotNull("New format LLM judgment should be created", newJudgmentId);
+
+        // Validate new format judgment can be retrieved
+        Map<String, Object> newJudgment = getLlmJudgment(newJudgmentId);
+        assertNotNull("New format LLM judgment should be retrievable", newJudgment);
+
+        // In MIXED cluster, the new format fields might not be stored/returned by old nodes (3.3.0)
+        // We just verify the judgment was created successfully
+        // Full validation of new fields will happen in UPGRADED cluster where all nodes support them
     }
 
     /**
@@ -147,9 +184,11 @@ public class LlmJudgmentBWCIT extends AbstractSearchRelevanceRollingUpgradeTestC
         // Retrieve IDs by name (since static variables don't persist across test phases)
         String querySetName = getQuerySetNameForTest();
         String searchConfigName = getSearchConfigNameForTest();
+        String judgmentName = getJudgmentNameForTest();
 
         querySetId = getQuerySetIdByName(querySetName);
         searchConfigId = getSearchConfigIdByName(searchConfigName);
+        judgmentId = getLlmJudgmentIdByName(judgmentName);
 
         // Validate old format query set still works
         Map<String, Object> oldQuerySet = getQuerySet(querySetId);
@@ -158,6 +197,11 @@ public class LlmJudgmentBWCIT extends AbstractSearchRelevanceRollingUpgradeTestC
         // Validate search configuration still works
         Map<String, Object> searchConfig = getSearchConfiguration(searchConfigId);
         assertNotNull("Search configuration should still work in upgraded cluster", searchConfig);
+
+        // Validate old format judgment still works
+        Map<String, Object> oldJudgment = getLlmJudgment(judgmentId);
+        assertNotNull("Old format LLM judgment should still work in upgraded cluster", oldJudgment);
+        assertEquals("Judgment name should match", judgmentName, oldJudgment.get("name"));
     }
 
     /**
@@ -173,12 +217,34 @@ public class LlmJudgmentBWCIT extends AbstractSearchRelevanceRollingUpgradeTestC
         // Validate the query set has custom fields
         Map<String, Object> querySet = getQuerySet(newQuerySetId);
         assertEquals("Query set name should match", querySetName, querySet.get("name"));
+
+        // Create LLM judgment with new format and validate it works
+        String newJudgmentId = createLlmJudgmentNewFormat(newQuerySetId, searchConfigId);
+        assertNotNull("New format LLM judgment should be created in upgraded cluster", newJudgmentId);
+
+        // Validate new judgment exists and can be retrieved with new format fields
+        Map<String, Object> newJudgment = getLlmJudgment(newJudgmentId);
+        assertNotNull("New judgment should exist", newJudgment);
+        assertEquals("New judgment name should match", "bwc-judgment-new-format", newJudgment.get("name"));
+
+        // Validate NEW format fields are present in UPGRADED cluster
+        Map<String, Object> newMetadata = (Map<String, Object>) newJudgment.get("metadata");
+        assertNotNull("Metadata should exist", newMetadata);
+        assertNotNull("NEW format should have promptTemplate", newMetadata.get("promptTemplate"));
+        assertEquals("Prompt template should match", "Evaluate the relevance of the search result", newMetadata.get("promptTemplate"));
+        assertNotNull("NEW format should have llmJudgmentRatingType", newMetadata.get("llmJudgmentRatingType"));
+        assertEquals("Rating type should be SCORE1_5", "SCORE1_5", newMetadata.get("llmJudgmentRatingType"));
     }
 
     /**
      * Clean up test resources.
      */
     private void cleanupResources() throws Exception {
+        // Clean up LLM judgments
+        if (judgmentId != null) {
+            deleteLlmJudgment(judgmentId);
+        }
+
         // Clean up query sets
         if (querySetId != null) {
             deleteQuerySet(querySetId);
@@ -453,6 +519,138 @@ public class LlmJudgmentBWCIT extends AbstractSearchRelevanceRollingUpgradeTestC
             logger.debug("Failed to query index {}: {}", indexName, e.getMessage());
         }
         return null;
+    }
+
+    /**
+     * Gets judgment ID by searching for it by name in the index.
+     */
+    private String getLlmJudgmentIdByName(String name) throws IOException, ParseException {
+        // Index name from PluginConstants.JUDGMENT_INDEX = "search-relevance-judgment"
+        String indexName = "search-relevance-judgment";
+
+        try {
+            Request request = new Request("POST", "/" + indexName + "/_search");
+            // name is already a keyword field, no need for .keyword suffix
+            request.setJsonEntity("{" + "\"query\": {" + "  \"term\": {" + "    \"name\": \"" + name + "\"" + "  }" + "}" + "}");
+
+            Response response = client().performRequest(request);
+            if (response.getStatusLine().getStatusCode() == 200) {
+                Map<String, Object> responseMap = parseResponse(response);
+
+                // Extract the ID from the search response
+                Map<String, Object> hits = (Map<String, Object>) responseMap.get("hits");
+                if (hits != null && hits.get("hits") != null) {
+                    java.util.List<Map<String, Object>> hitsList = (java.util.List<Map<String, Object>>) hits.get("hits");
+                    if (!hitsList.isEmpty()) {
+                        return (String) hitsList.get(0).get("_id");
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // Index might not exist yet
+            logger.debug("Failed to query index {}: {}", indexName, e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * Creates an LLM judgment using OLD format (no promptTemplate, no llmJudgmentRatingType).
+     * Uses default values for these fields.
+     */
+    private String createLlmJudgmentOldFormat(String name, String querySetId, String searchConfigId) throws IOException, ParseException {
+        Request request = new Request("PUT", JUDGMENT_ENDPOINT);
+        request.setJsonEntity(
+            "{"
+                + "\"name\": \""
+                + name
+                + "\","
+                + "\"description\": \"BWC test judgment - old format\","
+                + "\"type\": \"LLM_JUDGMENT\","
+                + "\"modelId\": \"test-model-id\","
+                + "\"querySetId\": \""
+                + querySetId
+                + "\","
+                + "\"searchConfigurationList\": [\""
+                + searchConfigId
+                + "\"],"
+                + "\"size\": 10,"
+                + "\"tokenLimit\": 1000,"
+                + "\"contextFields\": [\"text\"],"
+                + "\"ignoreFailure\": false"
+                + "}"
+        );
+
+        Response response = client().performRequest(request);
+        assertEquals(200, response.getStatusLine().getStatusCode());
+
+        Map<String, Object> responseMap = parseResponse(response);
+        return (String) responseMap.get("judgment_id");
+    }
+
+    /**
+     * Creates an LLM judgment using NEW format (with promptTemplate and llmJudgmentRatingType).
+     */
+    private String createLlmJudgmentNewFormat(String querySetId, String searchConfigId) throws IOException, ParseException {
+        Request request = new Request("PUT", JUDGMENT_ENDPOINT);
+        request.setJsonEntity(
+            "{"
+                + "\"name\": \"bwc-judgment-new-format\","
+                + "\"description\": \"BWC test judgment - new format\","
+                + "\"type\": \"LLM_JUDGMENT\","
+                + "\"modelId\": \"test-model-id\","
+                + "\"querySetId\": \""
+                + querySetId
+                + "\","
+                + "\"searchConfigurationList\": [\""
+                + searchConfigId
+                + "\"],"
+                + "\"size\": 10,"
+                + "\"tokenLimit\": 1000,"
+                + "\"contextFields\": [\"text\"],"
+                + "\"ignoreFailure\": false,"
+                + "\"promptTemplate\": \"Evaluate the relevance of the search result\","
+                + "\"llmJudgmentRatingType\": \"SCORE1_5\","
+                + "\"overwriteCache\": true"
+                + "}"
+        );
+
+        Response response = client().performRequest(request);
+        assertEquals(200, response.getStatusLine().getStatusCode());
+
+        Map<String, Object> responseMap = parseResponse(response);
+        return (String) responseMap.get("judgment_id");
+    }
+
+    /**
+     * Gets an LLM judgment by ID.
+     */
+    private Map<String, Object> getLlmJudgment(String id) throws IOException, ParseException {
+        Request request = new Request("GET", JUDGMENT_ENDPOINT + "/" + id);
+        Response response = client().performRequest(request);
+        assertEquals(200, response.getStatusLine().getStatusCode());
+        Map<String, Object> responseMap = parseResponse(response);
+
+        // Extract the judgment from the search response
+        Map<String, Object> hits = (Map<String, Object>) responseMap.get("hits");
+        if (hits != null && hits.get("hits") != null) {
+            java.util.List<Map<String, Object>> hitsList = (java.util.List<Map<String, Object>>) hits.get("hits");
+            if (!hitsList.isEmpty()) {
+                return (Map<String, Object>) hitsList.get(0).get("_source");
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Deletes an LLM judgment by ID.
+     */
+    private void deleteLlmJudgment(String id) throws IOException {
+        Request request = new Request("DELETE", JUDGMENT_ENDPOINT + "/" + id);
+        try {
+            client().performRequest(request);
+        } catch (Exception e) {
+            // Ignore if judgment doesn't exist
+        }
     }
 
     /**
