@@ -48,6 +48,7 @@ public class LlmJudgmentBWCIT extends AbstractSearchRelevanceRollingUpgradeTestC
         switch (getClusterType()) {
             case OLD:
                 testCreateResourcesWithOldFormat();
+                testValidateOldFormatResources();
                 break;
             case MIXED:
                 testValidateOldFormatResources();
@@ -90,6 +91,14 @@ public class LlmJudgmentBWCIT extends AbstractSearchRelevanceRollingUpgradeTestC
         Map<String, Object> querySet = getQuerySet(querySetId);
         assertEquals("Query set name should match", querySetName, querySet.get("name"));
 
+        // Validate that we can retrieve the resources by name (same approach used in MIXED/UPGRADED cluster)
+        String searchConfigName = getSearchConfigNameForTest();
+        String retrievedQuerySetId = getQuerySetIdByName(querySetName);
+        String retrievedSearchConfigId = getSearchConfigIdByName(searchConfigName);
+
+        assertEquals("Query set ID should match when retrieved by name", querySetId, retrievedQuerySetId);
+        assertEquals("Search config ID should match when retrieved by name", searchConfigId, retrievedSearchConfigId);
+
         // Note: We're not creating LLM judgment in OLD cluster because it requires ML model
         // which may not be available. We'll test the format compatibility in MIXED/UPGRADED phases.
     }
@@ -99,6 +108,13 @@ public class LlmJudgmentBWCIT extends AbstractSearchRelevanceRollingUpgradeTestC
      * Also test creating new format resources if this is the first mixed round.
      */
     private void testValidateOldFormatResources() throws Exception {
+        // Retrieve IDs by name (since static variables don't persist across test phases)
+        String querySetName = getQuerySetNameForTest();
+        String searchConfigName = getSearchConfigNameForTest();
+
+        querySetId = getQuerySetIdByName(querySetName);
+        searchConfigId = getSearchConfigIdByName(searchConfigName);
+
         // Validate query set created in OLD cluster still exists and is readable
         Map<String, Object> querySet = getQuerySet(querySetId);
         assertNotNull("Query set from OLD cluster should still exist", querySet);
@@ -112,7 +128,7 @@ public class LlmJudgmentBWCIT extends AbstractSearchRelevanceRollingUpgradeTestC
      * Test creating resources with new format in MIXED cluster.
      */
     private void testCreateResourcesWithNewFormat() throws Exception {
-        String querySetName = getQuerySetNameForTest() + "-new-format";
+        String querySetName = getQuerySetNameForTest() + "-new";
 
         // Create query set with NEW format (includes custom fields)
         String newQuerySetId = createQuerySetNewFormat(querySetName);
@@ -128,6 +144,13 @@ public class LlmJudgmentBWCIT extends AbstractSearchRelevanceRollingUpgradeTestC
      * Test new format features like promptTemplate and ratingType.
      */
     private void testValidateAllResources() throws Exception {
+        // Retrieve IDs by name (since static variables don't persist across test phases)
+        String querySetName = getQuerySetNameForTest();
+        String searchConfigName = getSearchConfigNameForTest();
+
+        querySetId = getQuerySetIdByName(querySetName);
+        searchConfigId = getSearchConfigIdByName(searchConfigName);
+
         // Validate old format query set still works
         Map<String, Object> oldQuerySet = getQuerySet(querySetId);
         assertNotNull("Old format query set should still work in upgraded cluster", oldQuerySet);
@@ -141,7 +164,7 @@ public class LlmJudgmentBWCIT extends AbstractSearchRelevanceRollingUpgradeTestC
      * Test new format features in UPGRADED cluster.
      */
     private void testNewFormatFeatures() throws Exception {
-        String querySetName = getQuerySetNameForTest() + "-upgraded-format";
+        String querySetName = getQuerySetNameForTest() + "-upg";
 
         // Create query set with new format including multiple custom fields
         String newQuerySetId = createQuerySetWithMultipleCustomFields(querySetName);
@@ -365,6 +388,71 @@ public class LlmJudgmentBWCIT extends AbstractSearchRelevanceRollingUpgradeTestC
         } catch (Exception e) {
             // Ignore if index doesn't exist
         }
+    }
+
+    /**
+     * Gets query set ID by searching for it by name in the index.
+     * Similar to how neural-search BWC tests get model ID from pipeline.
+     */
+    private String getQuerySetIdByName(String name) throws IOException, ParseException {
+        // Index name from PluginConstants.QUERY_SET_INDEX = "search-relevance-queryset"
+        String indexName = "search-relevance-queryset";
+
+        try {
+            Request request = new Request("POST", "/" + indexName + "/_search");
+            // name is already a keyword field, no need for .keyword suffix
+            request.setJsonEntity("{" + "\"query\": {" + "  \"term\": {" + "    \"name\": \"" + name + "\"" + "  }" + "}" + "}");
+
+            Response response = client().performRequest(request);
+            if (response.getStatusLine().getStatusCode() == 200) {
+                Map<String, Object> responseMap = parseResponse(response);
+
+                // Extract the ID from the search response
+                Map<String, Object> hits = (Map<String, Object>) responseMap.get("hits");
+                if (hits != null && hits.get("hits") != null) {
+                    java.util.List<Map<String, Object>> hitsList = (java.util.List<Map<String, Object>>) hits.get("hits");
+                    if (!hitsList.isEmpty()) {
+                        return (String) hitsList.get(0).get("_id");
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // Index might not exist yet
+            logger.debug("Failed to query index {}: {}", indexName, e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * Gets search configuration ID by searching for it by name in the index.
+     */
+    private String getSearchConfigIdByName(String name) throws IOException, ParseException {
+        // Index name from PluginConstants.SEARCH_CONFIGURATION_INDEX = "search-relevance-search-config"
+        String indexName = "search-relevance-search-config";
+
+        try {
+            Request request = new Request("POST", "/" + indexName + "/_search");
+            // name is already a keyword field, no need for .keyword suffix
+            request.setJsonEntity("{" + "\"query\": {" + "  \"term\": {" + "    \"name\": \"" + name + "\"" + "  }" + "}" + "}");
+
+            Response response = client().performRequest(request);
+            if (response.getStatusLine().getStatusCode() == 200) {
+                Map<String, Object> responseMap = parseResponse(response);
+
+                // Extract the ID from the search response
+                Map<String, Object> hits = (Map<String, Object>) responseMap.get("hits");
+                if (hits != null && hits.get("hits") != null) {
+                    java.util.List<Map<String, Object>> hitsList = (java.util.List<Map<String, Object>>) hits.get("hits");
+                    if (!hitsList.isEmpty()) {
+                        return (String) hitsList.get(0).get("_id");
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // Index might not exist yet
+            logger.debug("Failed to query index {}: {}", indexName, e.getMessage());
+        }
+        return null;
     }
 
     /**

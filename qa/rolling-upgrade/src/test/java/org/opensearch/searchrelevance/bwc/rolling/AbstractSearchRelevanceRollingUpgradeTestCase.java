@@ -120,4 +120,32 @@ public abstract class AbstractSearchRelevanceRollingUpgradeTestCase extends Open
     protected String getBWCVersion() {
         return System.getProperty("tests.plugin_bwc_version");
     }
+
+    /**
+     * Preserves indices created during tests across rolling upgrade phases.
+     * This is essential for BWC testing where data created in OLD cluster
+     * must be accessible in MIXED and UPGRADED cluster phases.
+     *
+     * @return true to preserve indices between test phases
+     */
+    @Override
+    protected boolean preserveIndicesUponCompletion() {
+        return true;
+    }
+
+    @Override
+    public boolean preserveClusterUponCompletion() {
+        // Otherwise, the cluster setting to enable ml-common is reset and the model is undeployed
+        return true;
+    }
+
+    @Override
+    protected boolean preserveReposUponCompletion() {
+        return true;
+    }
+
+    @Override
+    protected boolean preserveTemplatesUponCompletion() {
+        return true;
+    }
 }
