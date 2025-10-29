@@ -23,6 +23,7 @@ dependenciesInfo.enabled = false
 dependencyLicenses.enabled = false
 thirdPartyAudit.enabled = false
 validateNebulaPom.enabled = false
+loggerUsageCheck.enabled = false
 
 java {
     targetCompatibility = JavaVersion.VERSION_21
