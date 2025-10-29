@@ -98,8 +98,8 @@ public class ExperimentRunningManager {
     /**
      * Starts the experiment by setting up cancellation callback for the cancellation token and also retrieves the queryset.
      *
-     * One thing to be careful about is that only at most scheduled run for a given experiment should be in the system at
-     * all times.
+     * One thing to be careful about is that only at most scheduled run for a given scheduled experiment run id 
+     * should be in the system at all times.
      * @param experimentId - the id of the experiment to be run
      * @param request - required parameters for placing a request to start an experiment
      * @param cancellationToken - reference to cancellation state of scheduled experiment and cancels all futures tied to it
@@ -117,7 +117,7 @@ public class ExperimentRunningManager {
                 handleAsyncFailure(
                     experimentId,
                     request,
-                    "There is a running scheduled run with the same experiment id",
+                    "There is a running scheduled run with the same scheduled experiment id",
                     new Exception("Cannot run experiment!"),
                     actuallyFinished
                 );

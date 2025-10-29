@@ -187,7 +187,8 @@ public class ExperimentRunningManagerTests extends OpenSearchTestCase {
     }
 
     public void testStartExperimentRunReject() {
-        // Make sure that only at most one experiment run can be scheduled at a given time
+        // Make sure that only at most one experiment run for a given scheduled experiment run id 
+        // can be scheduled at a given time
         // Also makes sure the entry in the mapping futures is removed when the cancellation token is cancelled.
         PutExperimentRequest request = createExperimentRequest();
         CountDownLatch actuallyFinished1 = new CountDownLatch(1);
