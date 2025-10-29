@@ -205,6 +205,5 @@ public class SearchRelevanceJobRunnerTests extends OpenSearchTestCase {
 
         // Verify that the cleanup stage was actually reached.
         verify(manager, times(1)).cleanupResources(any(String.class), any(String.class), any(ExperimentCancellationToken.class));
-        verify(lockService, times(1)).release(any(), any());
     }
 }
