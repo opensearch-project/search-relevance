@@ -54,6 +54,7 @@ import org.opensearch.searchrelevance.dao.QuerySetDao;
 import org.opensearch.searchrelevance.dao.ScheduledExperimentHistoryDao;
 import org.opensearch.searchrelevance.dao.ScheduledJobsDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
+import org.opensearch.searchrelevance.executors.ExperimentRunningManager;
 import org.opensearch.searchrelevance.executors.ExperimentTaskManager;
 import org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager;
 import org.opensearch.searchrelevance.metrics.MetricsHelper;
@@ -119,7 +120,8 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
         MetricsHelper.class,
         InfoStatsManager.class,
         ExperimentTaskManager.class,
-        SearchRelevanceJobRunner.class
+        SearchRelevanceJobRunner.class,
+        ExperimentRunningManager.class
     );
 
     @Override

@@ -63,7 +63,6 @@ public class PutExperimentTransportActionTests extends OpenSearchTestCase {
     private JudgmentDao judgmentDao;
     @Mock
     private ExperimentTaskManager experimentTaskManager;
-    @Mock
     private ExperimentRunningManager experimentRunningManager;
     @Mock
     private ThreadPool threadPool;
@@ -75,6 +74,17 @@ public class PutExperimentTransportActionTests extends OpenSearchTestCase {
     @Before
     public void setup() {
         MockitoAnnotations.openMocks(this);
+        experimentRunningManager = new ExperimentRunningManager(
+            experimentDao,
+            querySetDao,
+            searchConfigurationDao,
+            null,
+            metricsHelper,
+            null,
+            null,
+            threadPool,
+            settingsAccessor
+        );
         transportAction = new PutExperimentTransportAction(
             transportService,
             actionFilters,

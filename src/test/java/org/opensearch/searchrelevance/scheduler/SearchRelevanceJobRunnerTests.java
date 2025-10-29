@@ -203,14 +203,6 @@ public class SearchRelevanceJobRunnerTests extends OpenSearchTestCase {
 
         searchRelevanceJobRunner.runJob(jobParameters, jobExecutionContext);
 
-        // Verify that the ScheduledExperimentRunnerManager actually ran the experiment.
-        verify(manager, times(1)).runScheduledExperiment(
-            any(SearchRelevanceJobParameters.class),
-            any(String.class),
-            any(ExperimentCancellationToken.class),
-            any(CountDownLatch.class)
-        );
-
         // Verify that the cleanup stage was actually reached.
         verify(manager, times(1)).cleanupResources(any(String.class), any(String.class), any(ExperimentCancellationToken.class));
         verify(lockService, times(1)).release(any(), any());

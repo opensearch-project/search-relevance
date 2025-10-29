@@ -118,19 +118,18 @@ public class ScheduledExperimentRunnerManager {
                 scheduledJobsDao.deleteScheduledJob(experimentId, new ActionListener<DeleteResponse>() {
                     @Override
                     public void onResponse(DeleteResponse deleteResponse) {
-                        actuallyFinished.countDown();
                         log.info("Non existent experiment. Deleting scheduled job {}", experimentId);
                     }
 
                     @Override
                     public void onFailure(Exception e) {
-                        actuallyFinished.countDown();
                         log.error(
                             "Somehow scheduled experiment job was deleted while experiment {} was in scheduling queue.",
                             experimentId
                         );
                     }
                 });
+                actuallyFinished.countDown();
             }));
         } catch (Exception e) {
             actuallyFinished.countDown();
