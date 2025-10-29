@@ -13,11 +13,16 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.opensearch.common.util.concurrent.FutureUtils;
 import org.opensearch.searchrelevance.scheduler.ExperimentCancellationToken;
+import org.opensearch.searchrelevance.scheduler.SearchRelevanceJobRunner;
 import org.opensearch.threadpool.ThreadPool;
 
 public class ConcurrencyUtil {
+    private static final Logger log = LogManager.getLogger(SearchRelevanceJobRunner.class);
+
     /**
      * Wraps a future with a timeout value by scheduling a task set to cancel
      * the future after a timeout. Intended to be used for scheduled experiments.
@@ -49,7 +54,7 @@ public class ConcurrencyUtil {
             try {
                 actuallyFinished.await();
             } catch (Exception e) {
-
+                log.error("Somehow the thread waiting for the experiment run and all the async tasks to complete was interrupted.");
             }
             FutureUtils.cancel(timeout); // Cancel timeout task
             if (throwable == null) {

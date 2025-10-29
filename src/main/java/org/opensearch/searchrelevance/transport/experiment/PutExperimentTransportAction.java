@@ -60,6 +60,7 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
         MetricsHelper metricsHelper,
         JudgmentDao judgmentDao,
         ExperimentTaskManager experimentTaskManager,
+        ExperimentRunningManager experimentRunningManager,
         ThreadPool threadPool,
         SearchRelevanceSettingsAccessor settingsAccessor
     ) {
@@ -70,17 +71,7 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
         this.metricsHelper = metricsHelper;
         this.hybridOptimizerExperimentProcessor = new HybridOptimizerExperimentProcessor(judgmentDao, experimentTaskManager);
         this.pointwiseExperimentProcessor = new PointwiseExperimentProcessor(judgmentDao, experimentTaskManager);
-        this.experimentRunningManager = new ExperimentRunningManager(
-            experimentDao,
-            querySetDao,
-            searchConfigurationDao,
-            null,
-            metricsHelper,
-            hybridOptimizerExperimentProcessor,
-            pointwiseExperimentProcessor,
-            threadPool,
-            settingsAccessor
-        );
+        this.experimentRunningManager = experimentRunningManager;
     }
 
     @Override

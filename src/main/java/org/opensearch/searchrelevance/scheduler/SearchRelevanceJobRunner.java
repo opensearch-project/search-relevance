@@ -77,14 +77,27 @@ public enum SearchRelevanceJobRunner implements ScheduledJobRunner {
                     if (lock == null) {
                         return;
                     }
-                    manager.runScheduledExperiment(parameter, scheduledExperimentResultId, cancellationToken, actuallyFinished);
+                    try {
+                        manager.runScheduledExperiment(parameter, scheduledExperimentResultId, cancellationToken, actuallyFinished);
+                    } catch (IllegalStateException e) {
+                        // Before reaching {@link ExperimentRunningManager}, the experiment run failed.
+                        actuallyFinished.countDown();
+                    }
                     lockService.release(
                         lock,
                         ActionListener.wrap(released -> { log.info("Released lock for job {}", jobParameter.getName()); }, exception -> {
+                            // Experiment CountDownLatch would have already finished by then.
                             throw new IllegalStateException("Failed to release lock.");
                         })
                     );
-                }, exception -> { throw new IllegalStateException("Failed to acquire lock."); }));
+                }, exception -> {
+                    // None of the actual experiment logic was run at all. The latch should be counted down
+                    actuallyFinished.countDown();
+                    throw new IllegalStateException("Failed to acquire lock.");
+                }));
+            } else {
+                actuallyFinished.countDown();
+                log.warn("Job Duration Seconds cannot be null, therefore, nothing is run.");
             }
         };
 
@@ -93,13 +106,20 @@ public enum SearchRelevanceJobRunner implements ScheduledJobRunner {
             try {
                 // Schedule the experiment to run then also schedule a timeout to cancel experiment after some time.
                 long timeoutAmount = settingsAccessor.getScheduledExperimentsTimeout().getSeconds();
-                searchEvaluationTask = ConcurrencyUtil.withTimeout(
-                    CompletableFuture.runAsync(jobRunTask, threadPool.generic()),
-                    timeoutAmount,
-                    cancellationToken,
-                    actuallyFinished,
-                    threadPool
-                );
+                CompletableFuture<Void> originalExperimentStart;
+                try {
+                    originalExperimentStart = CompletableFuture.runAsync(jobRunTask, threadPool.generic());
+                    searchEvaluationTask = ConcurrencyUtil.withTimeout(
+                        originalExperimentStart,
+                        timeoutAmount,
+                        cancellationToken,
+                        actuallyFinished,
+                        threadPool
+                    );
+                } catch (Exception e) {
+                    actuallyFinished.countDown();
+                    log.error("scheduled experiment never started " + e.getMessage());
+                }
 
                 // Wait until all asynchronous operations or timeout complete before cleanup
                 searchEvaluationTask.join();
@@ -108,6 +128,12 @@ public enum SearchRelevanceJobRunner implements ScheduledJobRunner {
             } catch (CompletionException e) {
                 log.error("Scheduled experiment has timed out. Moving onto cleanup");
             } finally {
+                // All threads except this current running one should be released if we got to this point.
+                // This is if join somehow failed, but the thread should be waiting at the join call and only
+                // be released when the actuallyFinished latch is counted down.
+                while (actuallyFinished.getCount() > 0) {
+                    actuallyFinished.countDown();
+                }
                 if (cancellationToken.isCancelled()) {
                     log.info("Search evaluation task has concluded through cancellation.");
                 } else {
@@ -118,6 +144,8 @@ public enum SearchRelevanceJobRunner implements ScheduledJobRunner {
                 cancellationToken.cancel();
             }
         };
+        // The logic of the experiment run should not block this calling thread, so it will be scheduled
+        // into a threadpool.
         threadPool.generic().execute(timeoutJobWithCleanup);
     }
 

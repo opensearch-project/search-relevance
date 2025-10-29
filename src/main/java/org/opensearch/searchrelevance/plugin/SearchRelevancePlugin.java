@@ -215,22 +215,23 @@ public class SearchRelevancePlugin extends Plugin
         this.infoStatsManager = new InfoStatsManager(settingsAccessor);
         EventStatsManager.instance().initialize(settingsAccessor);
         SearchRelevanceJobRunner jobRunner = SearchRelevanceJobRunner.INSTANCE;
-        ScheduledExperimentRunnerManager manager = ScheduledExperimentRunnerManager.INSTANCE;
-        manager.setExperimentDao(experimentDao);
-        manager.setScheduledExperimentHistoryDao(scheduledExperimentHistoryDao);
-        manager.setScheduledJobsDao(scheduledJobsDao);
-        manager.setExperimentRunningManager(
-            new ExperimentRunningManager(
-                experimentDao,
-                querySetDao,
-                searchConfigurationDao,
-                scheduledExperimentHistoryDao,
-                metricsHelper,
-                new HybridOptimizerExperimentProcessor(judgmentDao, experimentTaskManager),
-                new PointwiseExperimentProcessor(judgmentDao, experimentTaskManager),
-                threadPool,
-                settingsAccessor
-            )
+        ExperimentRunningManager experimentRunningManager = new ExperimentRunningManager(
+            experimentDao,
+            querySetDao,
+            searchConfigurationDao,
+            scheduledExperimentHistoryDao,
+            metricsHelper,
+            new HybridOptimizerExperimentProcessor(judgmentDao, experimentTaskManager),
+            new PointwiseExperimentProcessor(judgmentDao, experimentTaskManager),
+            threadPool,
+            settingsAccessor
+        );
+
+        ScheduledExperimentRunnerManager manager = new ScheduledExperimentRunnerManager(
+            experimentDao,
+            scheduledExperimentHistoryDao,
+            experimentRunningManager,
+            scheduledJobsDao
         );
         jobRunner.setThreadPool(threadPool);
         jobRunner.setClient(client);
@@ -252,7 +253,8 @@ public class SearchRelevancePlugin extends Plugin
             metricsHelper,
             infoStatsManager,
             experimentTaskManager,
-            jobRunner
+            jobRunner,
+            experimentRunningManager
         );
     }
 

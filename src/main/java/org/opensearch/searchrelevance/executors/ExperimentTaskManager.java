@@ -297,7 +297,14 @@ public class ExperimentTaskManager {
             if (params.getScheduledRunId() != null
                 && params.getRunningFutures() != null
                 && checkIfCancelled(params.getCancellationToken()) == false) {
-                params.getRunningFutures().get(params.getScheduledRunId()).add(variantTaskFuture);
+                try {
+                    params.getRunningFutures().get(params.getScheduledRunId()).add(variantTaskFuture);
+                } catch (Exception e) {
+                    log.info(
+                        "Submitting variant for scheduled experiment with underlying experiment {} cannot be completed",
+                        params.getExperimentId()
+                    );
+                }
             }
         } catch (RejectedExecutionException e) {
             concurrencyControl.release();

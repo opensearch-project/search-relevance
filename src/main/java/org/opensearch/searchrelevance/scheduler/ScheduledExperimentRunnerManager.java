@@ -14,6 +14,7 @@ import java.util.concurrent.CountDownLatch;
 import org.opensearch.action.delete.DeleteResponse;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.common.annotation.ExperimentalApi;
+import org.opensearch.common.inject.Inject;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.searchrelevance.dao.ExperimentDao;
@@ -32,28 +33,24 @@ import lombok.extern.log4j.Log4j2;
 
 @Log4j2
 @ExperimentalApi
-public enum ScheduledExperimentRunnerManager {
-    INSTANCE;
+public class ScheduledExperimentRunnerManager {
 
     private ExperimentDao experimentDao;
     private ScheduledExperimentHistoryDao scheduledExperimentHistoryDao;
     private ExperimentRunningManager experimentRunningManager;
     private ScheduledJobsDao scheduledJobsDao;
 
-    public void setExperimentDao(ExperimentDao experimentDao) {
+    @Inject
+    public ScheduledExperimentRunnerManager(
+        ExperimentDao experimentDao,
+        ScheduledExperimentHistoryDao scheduledExperimentHistoryDao,
+        ExperimentRunningManager experimentRunningManager,
+        ScheduledJobsDao scheduledJobsDao
+    ) {
         this.experimentDao = experimentDao;
-    }
-
-    public void setScheduledExperimentHistoryDao(ScheduledExperimentHistoryDao scheduledExperimentHistoryDao) {
         this.scheduledExperimentHistoryDao = scheduledExperimentHistoryDao;
-    }
-
-    public void setScheduledJobsDao(ScheduledJobsDao scheduledJobsDao) {
-        this.scheduledJobsDao = scheduledJobsDao;
-    }
-
-    public void setExperimentRunningManager(ExperimentRunningManager experimentRunningManager) {
         this.experimentRunningManager = experimentRunningManager;
+        this.scheduledJobsDao = scheduledJobsDao;
     }
 
     /**
@@ -76,6 +73,11 @@ public enum ScheduledExperimentRunnerManager {
         try {
             experimentDao.getExperiment(experimentId, ActionListener.wrap(experimentResponse -> {
                 try {
+                    if (checkIfCancelled(cancellationToken)) {
+                        log.info("Scheduled experiment for {} timed out before placing scheduled experiment into index.", experimentId);
+                        actuallyFinished.countDown();
+                        return;
+                    }
                     Experiment experiment = convertToExperiment(experimentResponse);
                     String timestamp = TimeUtils.getTimestamp();
                     // What I will do here is add a new request parameter to replace the Experiment object so I can store the id
@@ -95,11 +97,6 @@ public enum ScheduledExperimentRunnerManager {
                         experiment.judgmentList(),
                         experiment.size()
                     );
-                    if (checkIfCancelled(cancellationToken)) {
-                        log.info("Scheduled experiment for {} timed out before placing scheduled experiment into index.", experimentId);
-                        actuallyFinished.countDown();
-                        return;
-                    }
                     scheduledExperimentHistoryDao.putScheduledExperimentResult(scheduledExperimentResult, ActionListener.wrap(response -> {
                         if (checkIfCancelled(cancellationToken)) {
                             log.info("Scheduled experiment for {} timed out after placing scheduled experiment into index.", experimentId);
@@ -107,9 +104,13 @@ public enum ScheduledExperimentRunnerManager {
                             return;
                         }
                         experimentRunningManager.startExperimentRun(experimentId, request, cancellationToken, actuallyFinished);
-                    }, e -> { handleAsyncFailure(experimentId, request, "Failed to put ScheduledExperimentResult", e); }));
+                    }, e -> {
+                        handleAsyncFailure(experimentId, request, "Failed to put ScheduledExperimentResult", e);
+                        actuallyFinished.countDown();
+                    }));
                 } catch (Exception e) {
                     log.error("Scheduled experiment result for: {} cannot be added.", experimentId);
+                    actuallyFinished.countDown();
                 }
             }, e -> {
                 // There will always be an attempt to retrieve the underlying experimentId.
@@ -117,11 +118,13 @@ public enum ScheduledExperimentRunnerManager {
                 scheduledJobsDao.deleteScheduledJob(experimentId, new ActionListener<DeleteResponse>() {
                     @Override
                     public void onResponse(DeleteResponse deleteResponse) {
+                        actuallyFinished.countDown();
                         log.info("Non existent experiment. Deleting scheduled job {}", experimentId);
                     }
 
                     @Override
                     public void onFailure(Exception e) {
+                        actuallyFinished.countDown();
                         log.error(
                             "Somehow scheduled experiment job was deleted while experiment {} was in scheduling queue.",
                             experimentId
@@ -130,6 +133,7 @@ public enum ScheduledExperimentRunnerManager {
                 });
             }));
         } catch (Exception e) {
+            actuallyFinished.countDown();
             throw new IllegalStateException("Experiment not found.");
         }
     }
