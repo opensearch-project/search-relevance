@@ -92,7 +92,7 @@ public class PutJudgmentActionTests extends OpenSearchTestCase {
             List.of("field1", "field2"),
             false,
             "test_prompt_template",
-            LLMJudgmentRatingType.SCORE1_5,
+            LLMJudgmentRatingType.SCORE0_1,
             true
         );
 
@@ -112,7 +112,7 @@ public class PutJudgmentActionTests extends OpenSearchTestCase {
         assertEquals(List.of("field1", "field2"), serialized.getContextFields());
         assertEquals(false, serialized.isIgnoreFailure());
         assertEquals("test_prompt_template", serialized.getPromptTemplate());
-        assertEquals(LLMJudgmentRatingType.SCORE1_5, serialized.getLlmJudgmentRatingType());
+        assertEquals(LLMJudgmentRatingType.SCORE0_1, serialized.getLlmJudgmentRatingType());
         assertEquals(true, serialized.isOverwriteCache());
     }
 

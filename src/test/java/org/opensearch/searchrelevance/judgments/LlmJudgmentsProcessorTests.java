@@ -105,10 +105,6 @@ public class LlmJudgmentsProcessorTests extends OpenSearchTestCase {
         metadata.put("llmJudgmentRatingType", LLMJudgmentRatingType.SCORE0_1);
         assertNotNull("SCORE0_1 should be valid", metadata.get("llmJudgmentRatingType"));
 
-        // SCORE1_5
-        metadata.put("llmJudgmentRatingType", LLMJudgmentRatingType.SCORE1_5);
-        assertNotNull("SCORE1_5 should be valid", metadata.get("llmJudgmentRatingType"));
-
         // RELEVANT_IRRELEVANT
         metadata.put("llmJudgmentRatingType", LLMJudgmentRatingType.RELEVANT_IRRELEVANT);
         assertNotNull("RELEVANT_IRRELEVANT should be valid", metadata.get("llmJudgmentRatingType"));
@@ -145,11 +141,11 @@ public class LlmJudgmentsProcessorTests extends OpenSearchTestCase {
         // Test that metadata can hold both rating type and prompt template
         Map<String, Object> metadata = new HashMap<>();
 
-        metadata.put("llmJudgmentRatingType", LLMJudgmentRatingType.SCORE1_5);
-        metadata.put("promptTemplate", "Custom prompt for 1-5 scale");
+        metadata.put("llmJudgmentRatingType", LLMJudgmentRatingType.SCORE0_1);
+        metadata.put("promptTemplate", "Custom prompt for 0-1 scale");
 
-        assertEquals(LLMJudgmentRatingType.SCORE1_5, metadata.get("llmJudgmentRatingType"));
-        assertEquals("Custom prompt for 1-5 scale", metadata.get("promptTemplate"));
+        assertEquals(LLMJudgmentRatingType.SCORE0_1, metadata.get("llmJudgmentRatingType"));
+        assertEquals("Custom prompt for 0-1 scale", metadata.get("promptTemplate"));
     }
 
     public void testMetadata_RequiredFields() {
@@ -174,20 +170,17 @@ public class LlmJudgmentsProcessorTests extends OpenSearchTestCase {
         // Verify all expected rating types exist
         LLMJudgmentRatingType[] ratingTypes = LLMJudgmentRatingType.values();
 
-        assertEquals("Should have exactly 3 rating types", 3, ratingTypes.length);
+        assertEquals("Should have exactly 2 rating types", 2, ratingTypes.length);
 
         boolean hasSCORE0_1 = false;
-        boolean hasSCORE1_5 = false;
         boolean hasRELEVANT_IRRELEVANT = false;
 
         for (LLMJudgmentRatingType type : ratingTypes) {
             if (type == LLMJudgmentRatingType.SCORE0_1) hasSCORE0_1 = true;
-            if (type == LLMJudgmentRatingType.SCORE1_5) hasSCORE1_5 = true;
             if (type == LLMJudgmentRatingType.RELEVANT_IRRELEVANT) hasRELEVANT_IRRELEVANT = true;
         }
 
         assertTrue("Should have SCORE0_1", hasSCORE0_1);
-        assertTrue("Should have SCORE1_5", hasSCORE1_5);
         assertTrue("Should have RELEVANT_IRRELEVANT", hasRELEVANT_IRRELEVANT);
     }
 
@@ -196,7 +189,6 @@ public class LlmJudgmentsProcessorTests extends OpenSearchTestCase {
         String validValues = LLMJudgmentRatingType.getValidValues();
 
         assertTrue("Valid values should contain SCORE0_1", validValues.contains("SCORE0_1"));
-        assertTrue("Valid values should contain SCORE1_5", validValues.contains("SCORE1_5"));
         assertTrue("Valid values should contain RELEVANT_IRRELEVANT", validValues.contains("RELEVANT_IRRELEVANT"));
     }
 

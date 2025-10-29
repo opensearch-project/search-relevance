@@ -10,11 +10,13 @@ package org.opensearch.searchrelevance.ml;
 import static org.opensearch.searchrelevance.common.MLConstants.PARAM_MESSAGES_FIELD;
 import static org.opensearch.searchrelevance.common.MLConstants.PROMPT_JSON_MESSAGES_SHELL;
 import static org.opensearch.searchrelevance.common.MLConstants.PROMPT_SEARCH_RELEVANCE_SCORE_0_1_START;
-import static org.opensearch.searchrelevance.common.MLConstants.PROMPT_SEARCH_RELEVANCE_SCORE_1_5_START;
 import static org.opensearch.searchrelevance.common.MLConstants.PROMPT_SEARCH_RELEVANCE_SCORE_BINARY;
 import static org.opensearch.searchrelevance.common.MLConstants.PROMPT_SEARCH_RELEVANCE_SCORE_END;
+import static org.opensearch.searchrelevance.common.MLConstants.RATING_SCORE_BINARY_SCHEMA;
+import static org.opensearch.searchrelevance.common.MLConstants.RATING_SCORE_NUMERIC_SCHEMA;
 import static org.opensearch.searchrelevance.common.MLConstants.RESPONSE_CHOICES_FIELD;
 import static org.opensearch.searchrelevance.common.MLConstants.RESPONSE_CONTENT_FIELD;
+import static org.opensearch.searchrelevance.common.MLConstants.RESPONSE_FORMAT_TEMPLATE;
 import static org.opensearch.searchrelevance.common.MLConstants.RESPONSE_MESSAGE_FIELD;
 import static org.opensearch.searchrelevance.common.MLConstants.escapeJson;
 
@@ -60,7 +62,7 @@ public class MLInputOutputTransformer {
             Map<String, String> tempChunk = new HashMap<>(currentChunk);
             tempChunk.put(entry.getKey(), entry.getValue());
 
-            String messages = formatMessages(searchText, referenceData, tempChunk, promptTemplate, ratingType);
+            String messages = buildMessagesArray(searchText, referenceData, tempChunk, promptTemplate, ratingType);
             int totalTokens = TokenizerUtil.countTokens(messages);
 
             if (totalTokens > tokenLimit) {
@@ -94,7 +96,7 @@ public class MLInputOutputTransformer {
         log.warn("Entry with key {} causes total tokens to exceed limit of {}", entry.getKey(), tokenLimit);
 
         Map<String, String> testChunk = Map.of(entry.getKey(), entry.getValue());
-        String testMessages = formatMessages(searchText, referenceData, testChunk, promptTemplate, ratingType);
+        String testMessages = buildMessagesArray(searchText, referenceData, testChunk, promptTemplate, ratingType);
         int excessTokens = TokenizerUtil.countTokens(testMessages) - tokenLimit;
 
         int currentTokens = TokenizerUtil.countTokens(entry.getValue());
@@ -112,11 +114,16 @@ public class MLInputOutputTransformer {
         LLMJudgmentRatingType ratingType
     ) {
         Map<String, String> parameters = new HashMap<>();
-        parameters.put(PARAM_MESSAGES_FIELD, formatMessages(searchText, referenceData, hits, promptTemplate, ratingType));
+        String messagesArray = buildMessagesArray(searchText, referenceData, hits, promptTemplate, ratingType);
+        String responseFormat = getResponseFormat(ratingType);
+
+        parameters.put(PARAM_MESSAGES_FIELD, messagesArray);
+        parameters.put("response_format", responseFormat);
+
         return MLInput.builder().algorithm(FunctionName.REMOTE).inputDataset(new RemoteInferenceInputDataSet(parameters)).build();
     }
 
-    public String formatMessages(
+    private String buildMessagesArray(
         String searchText,
         Map<String, String> referenceData,
         Map<String, String> hits,
@@ -141,13 +148,25 @@ public class MLInputOutputTransformer {
             case LLMJudgmentRatingType.SCORE0_1:
                 systemPromptStart = PROMPT_SEARCH_RELEVANCE_SCORE_0_1_START;
                 break;
-            case LLMJudgmentRatingType.SCORE1_5:
-                systemPromptStart = PROMPT_SEARCH_RELEVANCE_SCORE_1_5_START;
-                break;
             default:
                 systemPromptStart = PROMPT_SEARCH_RELEVANCE_SCORE_BINARY;
         }
         return systemPromptStart + systemPromptEnd;
+    }
+
+    private static String getResponseFormat(LLMJudgmentRatingType ratingType) {
+        String schema;
+        switch (ratingType) {
+            case LLMJudgmentRatingType.SCORE0_1:
+                schema = RATING_SCORE_NUMERIC_SCHEMA;
+                break;
+            case LLMJudgmentRatingType.RELEVANT_IRRELEVANT:
+                schema = RATING_SCORE_BINARY_SCHEMA;
+                break;
+            default:
+                schema = RATING_SCORE_NUMERIC_SCHEMA;
+        }
+        return String.format(Locale.ROOT, RESPONSE_FORMAT_TEMPLATE, schema);
     }
 
     private String buildHitsJson(Map<String, String> hits) throws IOException {

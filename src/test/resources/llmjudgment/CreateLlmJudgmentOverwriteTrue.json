@@ -8,7 +8,7 @@
   "tokenLimit": 4000,
   "contextFields": ["name", "description"],
   "ignoreFailure": false,
-  "llmJudgmentRatingType": "SCORE1_5",
-  "promptTemplate": "Rate relevance 1-5",
+  "llmJudgmentRatingType": "SCORE0_1",
+  "promptTemplate": "Rate relevance 0-1",
   "overwriteCache": true
 }

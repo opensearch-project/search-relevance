@@ -233,7 +233,7 @@ public class LlmJudgmentBWCIT extends AbstractSearchRelevanceRollingUpgradeTestC
         assertNotNull("NEW format should have promptTemplate", newMetadata.get("promptTemplate"));
         assertEquals("Prompt template should match", "Evaluate the relevance of the search result", newMetadata.get("promptTemplate"));
         assertNotNull("NEW format should have llmJudgmentRatingType", newMetadata.get("llmJudgmentRatingType"));
-        assertEquals("Rating type should be SCORE1_5", "SCORE1_5", newMetadata.get("llmJudgmentRatingType"));
+        assertEquals("Rating type should be SCORE0_1", "SCORE0_1", newMetadata.get("llmJudgmentRatingType"));
     }
 
     /**
@@ -609,7 +609,7 @@ public class LlmJudgmentBWCIT extends AbstractSearchRelevanceRollingUpgradeTestC
                 + "\"contextFields\": [\"text\"],"
                 + "\"ignoreFailure\": false,"
                 + "\"promptTemplate\": \"Evaluate the relevance of the search result\","
-                + "\"llmJudgmentRatingType\": \"SCORE1_5\","
+                + "\"llmJudgmentRatingType\": \"SCORE0_1\","
                 + "\"overwriteCache\": true"
                 + "}"
         );

@@ -8,7 +8,7 @@
   "tokenLimit": 4000,
   "contextFields": ["name", "description"],
   "ignoreFailure": false,
-  "llmJudgmentRatingType": "SCORE1_5",
-  "promptTemplate": "Given the query {{query}} and reference answer {{referenceAnswer}}, rate the relevance of this document on a scale of 1-5.",
+  "llmJudgmentRatingType": "SCORE0_1",
+  "promptTemplate": "Given the query {{query}} and reference answer {{referenceAnswer}}, rate the relevance of this document on a scale of 0-1.",
   "overwriteCache": false
 }

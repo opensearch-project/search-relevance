@@ -55,7 +55,7 @@ public class RestPutJudgmentActionTests extends SearchRelevanceRestTestCase {
         + "\"contextFields\": [\"field1\", \"field2\"],"
         + "\"ignoreFailure\": false,"
         + "\"promptTemplate\": \"test_prompt_template\","
-        + "\"llmJudgmentRatingType\": \"SCORE1_5\","
+        + "\"llmJudgmentRatingType\": \"SCORE0_1\","
         + "\"overwriteCache\": true"
         + "}";
 
@@ -280,7 +280,7 @@ public class RestPutJudgmentActionTests extends SearchRelevanceRestTestCase {
         // Verify new fields in the captured request
         PutLlmJudgmentRequest capturedRequest = requestCaptor.getValue();
         assertEquals("test_prompt_template", capturedRequest.getPromptTemplate());
-        assertEquals("SCORE1_5", capturedRequest.getLlmJudgmentRatingType().name());
+        assertEquals("SCORE0_1", capturedRequest.getLlmJudgmentRatingType().name());
         assertEquals(true, capturedRequest.isOverwriteCache());
     }
 
@@ -312,7 +312,6 @@ public class RestPutJudgmentActionTests extends SearchRelevanceRestTestCase {
         assertTrue(exception.getMessage().contains("INVALID_RATING_TYPE"));
         assertTrue(exception.getMessage().contains("Valid values are"));
         assertTrue(exception.getMessage().contains("SCORE0_1"));
-        assertTrue(exception.getMessage().contains("SCORE1_5"));
         assertTrue(exception.getMessage().contains("RELEVANT_IRRELEVANT"));
         assertEquals(RestStatus.BAD_REQUEST, exception.status());
     }

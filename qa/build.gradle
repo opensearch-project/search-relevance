@@ -20,6 +20,9 @@ integTest.enabled = false
 test.enabled = false
 assemble.enabled = false
 dependenciesInfo.enabled = false
+dependencyLicenses.enabled = false
+thirdPartyAudit.enabled = false
+validateNebulaPom.enabled = false
 
 java {
     targetCompatibility = JavaVersion.VERSION_21

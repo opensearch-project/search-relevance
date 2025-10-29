@@ -129,7 +129,12 @@ public class ParserUtils {
     }
 
     public static String getDocIdFromCompositeKey(String compositeKey) {
-        return compositeKey.split("::")[1];
+        // Handle both composite keys (index::docId) and plain docIds
+        // LLM may return just docId instead of the full composite key
+        if (compositeKey.contains("::")) {
+            return compositeKey.split("::")[1];
+        }
+        return compositeKey;
     }
 
     /**

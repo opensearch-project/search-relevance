@@ -123,7 +123,7 @@ public class LlmJudgmentTemplateIT extends BaseSearchRelevanceIT {
         assertNotNull(metadata.get("promptTemplate"));
         assertTrue(((String) metadata.get("promptTemplate")).contains("{{query}}"));
         assertNotNull(metadata.get("llmJudgmentRatingType"));
-        assertEquals("SCORE1_5", metadata.get("llmJudgmentRatingType"));
+        assertEquals("SCORE0_1", metadata.get("llmJudgmentRatingType"));
         assertNotNull(metadata.get("overwriteCache"));
 
         // Verify judgmentRatings format

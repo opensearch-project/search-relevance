@@ -17,7 +17,6 @@ import org.opensearch.core.common.io.stream.Writeable;
 
 public enum LLMJudgmentRatingType implements Writeable {
     SCORE0_1,
-    SCORE1_5,
     RELEVANT_IRRELEVANT;
 
     @Override

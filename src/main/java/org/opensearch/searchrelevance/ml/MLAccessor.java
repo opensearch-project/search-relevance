@@ -45,7 +45,16 @@ public class MLAccessor {
         LLMJudgmentRatingType ratingType,
         ActionListener<ChunkResult> progressListener
     ) {
+        log.info(
+            "DEBUG: MLAccessor.predict called - modelId: {}, tokenLimit: {}, searchText: {}, hits.size: {}, ratingType: {}",
+            modelId,
+            tokenLimit,
+            searchText,
+            hits != null ? hits.size() : 0,
+            ratingType
+        );
         List<MLInput> mlInputs = transformer.createMLInputs(tokenLimit, searchText, referenceData, hits, promptTemplate, ratingType);
+        log.info("DEBUG: Created {} MLInput chunks", mlInputs.size());
         log.info("Number of chunks: {}", mlInputs.size());
 
         ChunkProcessingContext context = new ChunkProcessingContext(mlInputs.size(), progressListener);
@@ -56,18 +65,24 @@ public class MLAccessor {
     }
 
     private void processChunk(String modelId, MLInput mlInput, int chunkIndex, ChunkProcessingContext context) {
+        log.info("DEBUG: Processing chunk {} with modelId: {}", chunkIndex, modelId);
         predictSingleChunkWithRetry(modelId, mlInput, chunkIndex, 0, ActionListener.wrap(response -> {
+            log.info("DEBUG: Chunk {} raw response: {}", chunkIndex, response);
             log.info("Chunk {} processed successfully", chunkIndex);
             String processedResponse = cleanResponse(response);
+            log.info("DEBUG: Chunk {} cleaned response: {}", chunkIndex, processedResponse);
             context.handleSuccess(chunkIndex, processedResponse);
         }, e -> {
+            log.error("DEBUG: Chunk {} failed with error", chunkIndex, e);
             log.error("Chunk {} failed after all retries", chunkIndex, e);
             context.handleFailure(chunkIndex, e);
         }));
     }
 
     private String cleanResponse(String response) {
-        return response.substring(1, response.length() - 1); // remove brackets
+        // OpenAI structured output returns properly formatted JSON
+        // No need to strip characters - return as-is
+        return response;
     }
 
     private void predictSingleChunkWithRetry(
