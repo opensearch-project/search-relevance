@@ -7,8 +7,6 @@
  */
 package org.opensearch.searchrelevance.judgments;
 
-import java.lang.reflect.Method;
-
 import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
 import org.opensearch.test.OpenSearchTestCase;
 
@@ -19,12 +17,10 @@ import org.opensearch.test.OpenSearchTestCase;
 public class LlmJudgmentsProcessorRatingConversionTests extends OpenSearchTestCase {
 
     /**
-     * Helper method to invoke the private convertRatingScore method via reflection
+     * Helper method to call the package-private convertRatingScore method
      */
-    private Double invokeConvertRatingScore(Object ratingScoreObj, LLMJudgmentRatingType ratingType) throws Exception {
-        Method method = LlmJudgmentsProcessor.class.getDeclaredMethod("convertRatingScore", Object.class, LLMJudgmentRatingType.class);
-        method.setAccessible(true);
-        return (Double) method.invoke(null, ratingScoreObj, ratingType);
+    private Double invokeConvertRatingScore(Object ratingScoreObj, LLMJudgmentRatingType ratingType) {
+        return LlmJudgmentsProcessor.convertRatingScore(ratingScoreObj, ratingType);
     }
 
     // ============================================
@@ -115,16 +111,12 @@ public class LlmJudgmentsProcessorRatingConversionTests extends OpenSearchTestCa
      * Test convertRatingScore for RELEVANT_IRRELEVANT with invalid value
      */
     public void testConvertRatingScore_RELEVANT_IRRELEVANT_InvalidValue() {
-        Exception exception = expectThrows(
-            Exception.class,
-            () -> { invokeConvertRatingScore("MAYBE", LLMJudgmentRatingType.RELEVANT_IRRELEVANT); }
-        );
+        IllegalArgumentException exception = expectThrows(IllegalArgumentException.class, () -> {
+            invokeConvertRatingScore("MAYBE", LLMJudgmentRatingType.RELEVANT_IRRELEVANT);
+        });
 
-        Throwable cause = exception.getCause();
-        assertNotNull("Should have a cause", cause);
-        assertTrue("Should be IllegalArgumentException", cause instanceof IllegalArgumentException);
-        assertTrue("Error message should mention invalid value", cause.getMessage().contains("Invalid binary rating value"));
-        assertTrue("Error message should mention MAYBE", cause.getMessage().contains("MAYBE"));
+        assertTrue("Error message should mention invalid value", exception.getMessage().contains("Invalid binary rating value"));
+        assertTrue("Error message should mention MAYBE", exception.getMessage().contains("MAYBE"));
     }
 
     /**
@@ -132,16 +124,16 @@ public class LlmJudgmentsProcessorRatingConversionTests extends OpenSearchTestCa
      */
     public void testConvertRatingScore_RELEVANT_IRRELEVANT_CaseSensitive() {
         // Lowercase "relevant" should fail (case-sensitive)
-        Exception lowercase = expectThrows(Exception.class, () -> {
+        IllegalArgumentException lowercase = expectThrows(IllegalArgumentException.class, () -> {
             invokeConvertRatingScore("relevant", LLMJudgmentRatingType.RELEVANT_IRRELEVANT);
         });
-        assertNotNull("Lowercase should throw exception", lowercase.getCause());
+        assertNotNull("Lowercase should throw exception", lowercase);
 
         // Mixed case should fail
-        Exception mixedCase = expectThrows(Exception.class, () -> {
+        IllegalArgumentException mixedCase = expectThrows(IllegalArgumentException.class, () -> {
             invokeConvertRatingScore("Relevant", LLMJudgmentRatingType.RELEVANT_IRRELEVANT);
         });
-        assertNotNull("Mixed case should throw exception", mixedCase.getCause());
+        assertNotNull("Mixed case should throw exception", mixedCase);
     }
 
     /**

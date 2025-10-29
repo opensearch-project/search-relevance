@@ -734,11 +734,13 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
      * For RELEVANT_IRRELEVANT type: converts "RELEVANT" to 1.0 and "IRRELEVANT" to 0.0
      * For SCORE0_1 type: parses the number value to double
      *
+     * Package-private for testing purposes.
+     *
      * @param ratingScoreObj The rating_score object from LLM response
      * @param ratingType The judgment rating type
      * @return The rating score as a double value
      */
-    private static Double convertRatingScore(Object ratingScoreObj, LLMJudgmentRatingType ratingType) {
+    static Double convertRatingScore(Object ratingScoreObj, LLMJudgmentRatingType ratingType) {
         if (ratingType == LLMJudgmentRatingType.RELEVANT_IRRELEVANT) {
             // Handle binary string ratings
             String ratingStr = (String) ratingScoreObj;
