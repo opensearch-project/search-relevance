@@ -49,4 +49,4 @@ jobs:
         run: |
           chown -R 1000:1000 `pwd`
           echo "Running rolling-upgrade backwards compatibility tests..."
-          su `id -un 1000` -c "./gradlew :qa:rolling-upgrade:testRollingUpgrade -Dtests.bwc.version=${{ matrix.bwc_version }}"
+          su `id -un 1000` -c "./gradlew :qa:rolling-upgrade:testRollingUpgrade -Dtests.bwc.version=${{ matrix.bwc_version }} --refresh-dependencies --no-daemon"
