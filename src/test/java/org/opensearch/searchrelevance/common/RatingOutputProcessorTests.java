@@ -10,8 +10,6 @@ package org.opensearch.searchrelevance.common;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-import org.junit.Test;
-
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -22,7 +20,6 @@ public class RatingOutputProcessorTests {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-    @Test
     public void testStructuredOutputWithRatingsArray() throws Exception {
         // GPT-4o with response_format: {"ratings": [...]}
         String response = "{\"ratings\": [{\"id\": \"doc1\", \"rating_score\": 4}, {\"id\": \"doc2\", \"rating_score\": 5}]}";
@@ -35,7 +32,6 @@ public class RatingOutputProcessorTests {
         assertEquals(4, resultNode.get(0).get("rating_score").asInt());
     }
 
-    @Test
     public void testDirectJsonArray() throws Exception {
         // Already an array
         String response = "[{\"id\": \"doc1\", \"rating_score\": 3}]";
@@ -46,7 +42,6 @@ public class RatingOutputProcessorTests {
         assertEquals(1, resultNode.size());
     }
 
-    @Test
     public void testMarkdownCodeBlockWithJson() throws Exception {
         // GPT-3.5 response with markdown code block
         String response = "Here are the ratings:\n\n```json\n{\"ratings\": [{\"id\": \"doc1\", \"rating_score\": 4}]}\n```";
@@ -58,7 +53,6 @@ public class RatingOutputProcessorTests {
         assertEquals("doc1", resultNode.get(0).get("id").asText());
     }
 
-    @Test
     public void testMarkdownCodeBlockWithoutJsonTag() throws Exception {
         // GPT-3.5 response with markdown code block without 'json' tag
         String response = "Here are the ratings:\n\n```\n{\"ratings\": [{\"id\": \"doc1\", \"rating_score\": 5}]}\n```";
@@ -69,7 +63,6 @@ public class RatingOutputProcessorTests {
         assertEquals(1, resultNode.size());
     }
 
-    @Test
     public void testEmbeddedJsonInText() throws Exception {
         // GPT-3.5 response with JSON embedded in prose
         String response =
@@ -81,7 +74,6 @@ public class RatingOutputProcessorTests {
         assertEquals(1, resultNode.size());
     }
 
-    @Test
     public void testEmbeddedJsonArray() throws Exception {
         // GPT-3.5 response with JSON array embedded in text
         String response = "The ratings are: [{\"id\": \"doc1\", \"rating_score\": 4}, {\"id\": \"doc2\", \"rating_score\": 2}]";
@@ -92,7 +84,6 @@ public class RatingOutputProcessorTests {
         assertEquals(2, resultNode.size());
     }
 
-    @Test
     public void testComplexUnstructuredResponse() throws Exception {
         // Realistic GPT-3.5 response
         String response = "I'll rate each document based on relevance:\n\n"
@@ -115,7 +106,6 @@ public class RatingOutputProcessorTests {
         assertEquals(4, resultNode.get(0).get("rating_score").asInt());
     }
 
-    @Test
     public void testEmptyResponse() throws Exception {
         String result = RatingOutputProcessor.sanitizeLLMResponse("");
         JsonNode resultNode = OBJECT_MAPPER.readTree(result);
@@ -123,7 +113,6 @@ public class RatingOutputProcessorTests {
         assertEquals(0, resultNode.size());
     }
 
-    @Test
     public void testNullResponse() throws Exception {
         String result = RatingOutputProcessor.sanitizeLLMResponse(null);
         JsonNode resultNode = OBJECT_MAPPER.readTree(result);
@@ -131,7 +120,6 @@ public class RatingOutputProcessorTests {
         assertEquals(0, resultNode.size());
     }
 
-    @Test
     public void testUnparseableText() throws Exception {
         // Pure text with no JSON
         String response = "This is just plain text without any JSON structure.";
@@ -142,7 +130,6 @@ public class RatingOutputProcessorTests {
         assertEquals(0, resultNode.size());
     }
 
-    @Test
     public void testMultipleJsonObjectsSelectsFirst() throws Exception {
         // Multiple JSON objects - should select the first valid one
         String response = "{\"ratings\": [{\"id\": \"doc1\", \"rating_score\": 4}]} and also {\"other\": \"data\"}";
@@ -154,7 +141,6 @@ public class RatingOutputProcessorTests {
         assertEquals("doc1", resultNode.get(0).get("id").asText());
     }
 
-    @Test
     public void testArrayAppearsBeforeObject() throws Exception {
         // Array appears before object - should extract array
         String response = "Result: [{\"id\": \"doc1\", \"rating_score\": 4}] or {\"ratings\": [...]}";
@@ -166,7 +152,6 @@ public class RatingOutputProcessorTests {
         assertEquals("doc1", resultNode.get(0).get("id").asText());
     }
 
-    @Test
     public void testArrayWithMultipleElementsInText() throws Exception {
         // This is the scenario that was failing - array with 2 elements embedded in text
         String response =
@@ -180,7 +165,6 @@ public class RatingOutputProcessorTests {
         assertEquals("doc2", resultNode.get(1).get("id").asText());
     }
 
-    @Test
     public void testNestedArrayInObject() throws Exception {
         // Object with nested array - should extract the ratings array
         String response = "Text before {\"meta\": \"data\", \"ratings\": [{\"id\": \"doc1\", \"rating_score\": 5}]} text after";
@@ -192,7 +176,6 @@ public class RatingOutputProcessorTests {
         assertEquals("doc1", resultNode.get(0).get("id").asText());
     }
 
-    @Test
     public void testMultipleArraysSelectsFirst() throws Exception {
         // Multiple arrays - should select the first one
         String response = "First: [{\"id\": \"doc1\", \"rating_score\": 4}] Second: [{\"id\": \"doc2\", \"rating_score\": 3}]";
@@ -204,7 +187,6 @@ public class RatingOutputProcessorTests {
         assertEquals("doc1", resultNode.get(0).get("id").asText());
     }
 
-    @Test
     public void testObjectBeforeArrayInText() throws Exception {
         // Realistic case: Object appears first in prose, then array
         String response = "Status: {\"status\": \"ok\"}. Here are the ratings: [{\"id\": \"doc1\", \"rating_score\": 4}]";
@@ -218,7 +200,6 @@ public class RatingOutputProcessorTests {
         assertEquals(1, resultNode.size());
     }
 
-    @Test
     public void testComplexNestedStructure() throws Exception {
         // Complex structure with nested objects and arrays
         String response =
@@ -232,7 +213,6 @@ public class RatingOutputProcessorTests {
         assertEquals(5, resultNode.get(0).get("rating_score").asInt());
     }
 
-    @Test
     public void testArrayWithNoRatingsKey() throws Exception {
         // Direct array without "ratings" wrapper - common GPT-3.5 format
         String response =
@@ -244,7 +224,6 @@ public class RatingOutputProcessorTests {
         assertEquals(3, resultNode.size());
     }
 
-    @Test
     public void testMalformedJsonReturnsEmpty() throws Exception {
         // Malformed JSON should return empty array
         String response = "Text with {broken json [that doesn't close properly";
@@ -255,7 +234,6 @@ public class RatingOutputProcessorTests {
         assertEquals(0, resultNode.size());
     }
 
-    @Test
     public void testProseWithCodeBlockContainingArray() throws Exception {
         // GPT-3.5 style response with explanation and code block
         String response = "I've evaluated each document based on relevance.\n\n"

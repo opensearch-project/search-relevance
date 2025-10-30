@@ -21,9 +21,6 @@ jobs:
       matrix:
         java: [21]
         os: [ubuntu-latest]
-        # LLM Judgment feature was introduced in 3.3.0
-        # Tests against older versions (3.0.0, 3.1.0, 3.2.0) will skip LLM Judgment tests via build.gradle filter
-        # Tests against 3.3.0+ will run all tests including LLM Judgment
         bwc_version: ["3.3.0-SNAPSHOT"]
         opensearch_version: ["3.4.0-SNAPSHOT"]
 
