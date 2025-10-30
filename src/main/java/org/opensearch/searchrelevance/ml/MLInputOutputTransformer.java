@@ -113,12 +113,33 @@ public class MLInputOutputTransformer {
         String promptTemplate,
         LLMJudgmentRatingType ratingType
     ) {
+        return createMLInput(searchText, referenceData, hits, promptTemplate, ratingType, true);
+    }
+
+    /**
+     * Creates MLInput with optional response_format parameter.
+     * Some models (like GPT-3.5) don't support response_format, so we can disable it for fallback.
+     *
+     * @param includeResponseFormat If true, includes response_format parameter; if false, excludes it
+     */
+    public MLInput createMLInput(
+        String searchText,
+        Map<String, String> referenceData,
+        Map<String, String> hits,
+        String promptTemplate,
+        LLMJudgmentRatingType ratingType,
+        boolean includeResponseFormat
+    ) {
         Map<String, String> parameters = new HashMap<>();
         String messagesArray = buildMessagesArray(searchText, referenceData, hits, promptTemplate, ratingType);
-        String responseFormat = getResponseFormat(ratingType);
 
         parameters.put(PARAM_MESSAGES_FIELD, messagesArray);
-        parameters.put("response_format", responseFormat);
+
+        // Only add response_format if requested (for models that support it)
+        if (includeResponseFormat) {
+            String responseFormat = getResponseFormat(ratingType);
+            parameters.put("response_format", responseFormat);
+        }
 
         return MLInput.builder().algorithm(FunctionName.REMOTE).inputDataset(new RemoteInferenceInputDataSet(parameters)).build();
     }

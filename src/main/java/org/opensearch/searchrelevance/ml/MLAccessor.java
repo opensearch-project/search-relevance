@@ -7,6 +7,7 @@
  */
 package org.opensearch.searchrelevance.ml;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -14,7 +15,9 @@ import java.util.concurrent.TimeUnit;
 
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.ml.client.MachineLearningNodeClient;
+import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
 import org.opensearch.ml.common.input.MLInput;
+import org.opensearch.searchrelevance.common.RatingOutputProcessor;
 import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
 
 import lombok.extern.log4j.Log4j2;
@@ -45,16 +48,7 @@ public class MLAccessor {
         LLMJudgmentRatingType ratingType,
         ActionListener<ChunkResult> progressListener
     ) {
-        log.info(
-            "DEBUG: MLAccessor.predict called - modelId: {}, tokenLimit: {}, searchText: {}, hits.size: {}, ratingType: {}",
-            modelId,
-            tokenLimit,
-            searchText,
-            hits != null ? hits.size() : 0,
-            ratingType
-        );
         List<MLInput> mlInputs = transformer.createMLInputs(tokenLimit, searchText, referenceData, hits, promptTemplate, ratingType);
-        log.info("DEBUG: Created {} MLInput chunks", mlInputs.size());
         log.info("Number of chunks: {}", mlInputs.size());
 
         ChunkProcessingContext context = new ChunkProcessingContext(mlInputs.size(), progressListener);
@@ -65,31 +59,35 @@ public class MLAccessor {
     }
 
     private void processChunk(String modelId, MLInput mlInput, int chunkIndex, ChunkProcessingContext context) {
-        log.info("DEBUG: Processing chunk {} with modelId: {}", chunkIndex, modelId);
-        predictSingleChunkWithRetry(modelId, mlInput, chunkIndex, 0, ActionListener.wrap(response -> {
-            log.info("DEBUG: Chunk {} raw response: {}", chunkIndex, response);
+        predictSingleChunkWithRetry(modelId, mlInput, chunkIndex, 0, false, ActionListener.wrap(response -> {
             log.info("Chunk {} processed successfully", chunkIndex);
             String processedResponse = cleanResponse(response);
-            log.info("DEBUG: Chunk {} cleaned response: {}", chunkIndex, processedResponse);
             context.handleSuccess(chunkIndex, processedResponse);
         }, e -> {
-            log.error("DEBUG: Chunk {} failed with error", chunkIndex, e);
             log.error("Chunk {} failed after all retries", chunkIndex, e);
             context.handleFailure(chunkIndex, e);
         }));
     }
 
     private String cleanResponse(String response) {
-        // OpenAI structured output returns properly formatted JSON
-        // No need to strip characters - return as-is
-        return response;
+        // Use sanitizeLLMResponse to handle both structured (with response_format) and unstructured responses
+        // For GPT-4o with response_format: extracts {"ratings": [...]}
+        // For GPT-3.5 without response_format: parses and sanitizes unstructured JSON
+        return RatingOutputProcessor.sanitizeLLMResponse(response);
     }
 
+    /**
+     * Retries prediction with automatic fallback to non-structured output.
+     * First tries with response_format, then falls back to without response_format if it fails.
+     *
+     * @param triedWithoutResponseFormat Tracks if we've already tried without response_format
+     */
     private void predictSingleChunkWithRetry(
         String modelId,
         MLInput mlInput,
         int chunkIndex,
         int retryCount,
+        boolean triedWithoutResponseFormat,
         ActionListener<String> chunkListener
     ) {
         predictSingleChunk(modelId, mlInput, new ActionListener<String>() {
@@ -100,16 +98,53 @@ public class MLAccessor {
 
             @Override
             public void onFailure(Exception e) {
-                if (retryCount < MAX_RETRY_NUMBER) {
+                // If we haven't tried without response_format yet, try that first before regular retries
+                if (!triedWithoutResponseFormat) {
+                    log.warn(
+                        "Chunk {} failed with response_format. Retrying without response_format for GPT-3.5 compatibility...",
+                        chunkIndex
+                    );
+
+                    // Create new MLInput without response_format
+                    MLInput mlInputWithoutFormat = recreateMLInputWithoutResponseFormat(mlInput);
+
+                    long delay = RETRY_DELAY_MS;
+                    scheduleRetry(
+                        () -> predictSingleChunkWithRetry(modelId, mlInputWithoutFormat, chunkIndex, 0, true, chunkListener),
+                        delay
+                    );
+                } else if (retryCount < MAX_RETRY_NUMBER) {
                     log.warn("Chunk {} failed, attempt {}/{}. Retrying...", chunkIndex, retryCount + 1, MAX_RETRY_NUMBER);
 
                     long delay = RETRY_DELAY_MS * (long) Math.pow(2, retryCount);
-                    scheduleRetry(() -> predictSingleChunkWithRetry(modelId, mlInput, chunkIndex, retryCount + 1, chunkListener), delay);
+                    scheduleRetry(
+                        () -> predictSingleChunkWithRetry(modelId, mlInput, chunkIndex, retryCount + 1, true, chunkListener),
+                        delay
+                    );
                 } else {
                     chunkListener.onFailure(e);
                 }
             }
         });
+    }
+
+    /**
+     * Recreates MLInput without response_format parameter for models that don't support it (e.g., GPT-3.5).
+     */
+    private MLInput recreateMLInputWithoutResponseFormat(MLInput originalInput) {
+        // Extract the parameters from the original input and rebuild without response_format
+        RemoteInferenceInputDataSet originalDataSet = (RemoteInferenceInputDataSet) originalInput.getInputDataset();
+        Map<String, String> originalParams = originalDataSet.getParameters();
+
+        // Create new parameters map without response_format
+        Map<String, String> newParams = new HashMap<>();
+        for (Map.Entry<String, String> entry : originalParams.entrySet()) {
+            if (!"response_format".equals(entry.getKey())) {
+                newParams.put(entry.getKey(), entry.getValue());
+            }
+        }
+
+        return MLInput.builder().algorithm(originalInput.getAlgorithm()).inputDataset(new RemoteInferenceInputDataSet(newParams)).build();
     }
 
     private void scheduleRetry(Runnable runnable, long delayMs) {

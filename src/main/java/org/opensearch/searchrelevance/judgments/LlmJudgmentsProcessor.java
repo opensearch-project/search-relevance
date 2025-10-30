@@ -100,7 +100,6 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
 
     private void generateJudgmentRatingInternal(Map<String, Object> metadata, ActionListener<List<Map<String, Object>>> listener) {
         try {
-            log.info("DEBUG: generateJudgmentRatingInternal called with metadata: {}", metadata);
             EventStatsManager.increment(EventStatName.LLM_JUDGMENT_RATING_GENERATIONS);
             String querySetId = (String) metadata.get("querySetId");
             List<String> searchConfigurationList = (List<String>) metadata.get("searchConfigurationList");
@@ -114,26 +113,14 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
             LLMJudgmentRatingType ratingType = (LLMJudgmentRatingType) metadata.get("llmJudgmentRatingType");
             // Default to SCORE0_1 if ratingType is not provided
             if (ratingType == null) {
-                log.info("DEBUG: ratingType is null, defaulting to SCORE0_1");
                 ratingType = LLMJudgmentRatingType.SCORE0_1;
-            } else {
-                log.info("DEBUG: ratingType from metadata: {}", ratingType);
             }
             boolean overwriteCache = (boolean) metadata.get("overwriteCache");
-            log.info(
-                "DEBUG: Extracted parameters - modelId: {}, querySetId: {}, ratingType: {}, overwriteCache: {}",
-                modelId,
-                querySetId,
-                ratingType,
-                overwriteCache
-            );
 
             QuerySet querySet = querySetDao.getQuerySetSync(querySetId);
-            log.info("DEBUG: Retrieved querySet with {} queries", querySet != null ? querySet.querySetQueries().size() : 0);
             List<SearchConfiguration> searchConfigurations = searchConfigurationList.stream()
                 .map(id -> searchConfigurationDao.getSearchConfigurationSync(id))
                 .collect(Collectors.toList());
-            log.info("DEBUG: Retrieved {} search configurations", searchConfigurations.size());
 
             generateLLMJudgmentsAsync(
                 modelId,
@@ -149,7 +136,6 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                 listener
             );
         } catch (Exception e) {
-            log.error("DEBUG: Exception in generateJudgmentRatingInternal", e);
             log.error("Failed to generate LLM judgments", e);
             listener.onFailure(new SearchRelevanceException("Failed to generate LLM judgments", e, RestStatus.INTERNAL_SERVER_ERROR));
         }
@@ -295,11 +281,8 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
             // Step 1: Execute searches concurrently within this query text task
             processSearchConfigurationsAsync(searchConfigurations, queryText, size, allHits, ignoreFailure);
 
-            log.debug("DEBUG: After search phase - allHits size: {}, docIds: {}", allHits.size(), allHits.keySet());
-
             // Step 2: Deduplicate from cache (skip if overwriteCache is true)
             List<String> docIds = new ArrayList<>(allHits.keySet());
-            log.debug("DEBUG: docIds list created from allHits: {}", docIds);
 
             String index = searchConfigurations.get(0).index();
             String promptTemplateCode = generatePromptTemplateCode(promptTemplate, ratingType);
@@ -314,11 +297,8 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                 overwriteCache
             );
 
-            log.debug("DEBUG: After deduplication - unprocessedDocIds size: {}, list: {}", unprocessedDocIds.size(), unprocessedDocIds);
-
             // Step 3: Process with LLM if needed
             if (!unprocessedDocIds.isEmpty()) {
-                log.debug("DEBUG: Calling processWithLLM with {} unprocessed docs", unprocessedDocIds.size());
                 processWithLLM(
                     modelId,
                     queryTextWithCustomInput,
@@ -331,13 +311,9 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                     promptTemplate,
                     ratingType
                 );
-                log.debug("DEBUG: After processWithLLM - docIdToScore size: {}", docIdToScore.size());
-            } else {
-                log.warn("DEBUG: SKIPPING LLM PROCESSING - unprocessedDocIds is empty!");
             }
 
             Map<String, Object> result = JudgmentDataTransformer.createJudgmentResult(queryTextWithCustomInput, docIdToScore);
-            log.debug("DEBUG: Final result - ratings count: {}", docIdToScore.size());
             return result;
         } catch (Exception e) {
             log.warn(
@@ -553,24 +529,13 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                                 chunkResult.getFailedChunksCount()
                             );
 
-                            log.info("DEBUG: Processing {} response chunks for ratingType: {}", combinedResponses.size(), ratingType);
                             for (List<Map<String, Object>> ratings : combinedResponses.values()) {
-                                log.info("DEBUG: Processing rating list with {} items", ratings.size());
                                 for (Map<String, Object> rating : ratings) {
                                     String compositeKey = (String) rating.get("id");
                                     Object rawRatingScore = rating.get("rating_score");
-                                    log.info(
-                                        "DEBUG: Converting rating - compositeKey: {}, rawRatingScore: {} (type: {}), ratingType: {}",
-                                        compositeKey,
-                                        rawRatingScore,
-                                        rawRatingScore != null ? rawRatingScore.getClass().getSimpleName() : "null",
-                                        ratingType
-                                    );
                                     Double ratingScore = convertRatingScore(rawRatingScore, ratingType);
-                                    log.info("DEBUG: Converted rating score: {}", ratingScore);
                                     String docId = getDocIdFromCompositeKey(compositeKey);
                                     processedRatings.put(docId, ratingScore.toString());
-                                    log.info("DEBUG: Stored rating - docId: {}, rating: {}", docId, ratingScore.toString());
                                     updateJudgmentCache(
                                         compositeKey,
                                         queryTextWithCustomInput,
