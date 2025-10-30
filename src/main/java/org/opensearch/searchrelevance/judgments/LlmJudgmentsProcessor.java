@@ -432,6 +432,9 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         }
 
         log.info("Processing {} uncached docs with LLM", unionHits.size());
+        log.debug("DEBUG: unionHits keys being sent to LLM: {}", unionHits.keySet());
+        log.debug("DEBUG: queryTextWithCustomInput: {}", queryTextWithCustomInput);
+        log.debug("DEBUG: modelId: {}, tokenLimit: {}, ratingType: {}", modelId, tokenLimit, ratingType);
 
         // Generate promptTemplateCode for cache updates
         String promptTemplateCode = generatePromptTemplateCode(promptTemplate, ratingType);
@@ -529,12 +532,20 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                                 chunkResult.getFailedChunksCount()
                             );
 
+                            log.debug("DEBUG: combinedResponses size: {}", combinedResponses.size());
                             for (List<Map<String, Object>> ratings : combinedResponses.values()) {
+                                log.debug("DEBUG: Processing ratings batch with {} ratings", ratings.size());
                                 for (Map<String, Object> rating : ratings) {
                                     String compositeKey = (String) rating.get("id");
                                     Object rawRatingScore = rating.get("rating_score");
+                                    log.debug(
+                                        "DEBUG: Processing rating - compositeKey: {}, rawRatingScore: {}",
+                                        compositeKey,
+                                        rawRatingScore
+                                    );
                                     Double ratingScore = convertRatingScore(rawRatingScore, ratingType);
                                     String docId = getDocIdFromCompositeKey(compositeKey);
+                                    log.debug("DEBUG: Converted rating - docId: {}, ratingScore: {}", docId, ratingScore);
                                     processedRatings.put(docId, ratingScore.toString());
                                     updateJudgmentCache(
                                         compositeKey,
@@ -547,6 +558,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                                 }
                             }
 
+                            log.debug("DEBUG: Final processedRatings size: {}, ratings: {}", processedRatings.size(), processedRatings);
                             listener.onResponse(processedRatings);
                         }
                     } catch (Exception e) {

@@ -48,8 +48,16 @@ public class MLAccessor {
         LLMJudgmentRatingType ratingType,
         ActionListener<ChunkResult> progressListener
     ) {
+        log.debug(
+            "DEBUG: MLAccessor.predict called with modelId: {}, searchText: {}, hits count: {}, ratingType: {}",
+            modelId,
+            searchText,
+            hits.size(),
+            ratingType
+        );
         List<MLInput> mlInputs = transformer.createMLInputs(tokenLimit, searchText, referenceData, hits, promptTemplate, ratingType);
         log.info("Number of chunks: {}", mlInputs.size());
+        log.debug("DEBUG: Created {} MLInput chunks", mlInputs.size());
 
         ChunkProcessingContext context = new ChunkProcessingContext(mlInputs.size(), progressListener);
 
@@ -59,10 +67,32 @@ public class MLAccessor {
     }
 
     private void processChunk(String modelId, MLInput mlInput, int chunkIndex, ChunkProcessingContext context) {
-        predictSingleChunkWithRetry(modelId, mlInput, chunkIndex, 0, false, ActionListener.wrap(response -> {
+        processChunkWithFallback(modelId, mlInput, chunkIndex, false, context);
+    }
+
+    private void processChunkWithFallback(
+        String modelId,
+        MLInput mlInput,
+        int chunkIndex,
+        boolean triedWithoutResponseFormat,
+        ChunkProcessingContext context
+    ) {
+        predictSingleChunkWithRetry(modelId, mlInput, chunkIndex, 0, triedWithoutResponseFormat, ActionListener.wrap(response -> {
             log.info("Chunk {} processed successfully", chunkIndex);
             String processedResponse = cleanResponse(response);
-            context.handleSuccess(chunkIndex, processedResponse);
+
+            // Check if parsing failed (empty ratings array) and we haven't tried without response_format yet
+            if ("[]".equals(processedResponse) && !triedWithoutResponseFormat) {
+                log.warn(
+                    "Chunk {} returned empty ratings with response_format. Retrying without response_format for GPT-3.5 compatibility...",
+                    chunkIndex
+                );
+                // Create new MLInput without response_format and retry
+                MLInput mlInputWithoutFormat = recreateMLInputWithoutResponseFormat(mlInput);
+                scheduleRetry(() -> processChunkWithFallback(modelId, mlInputWithoutFormat, chunkIndex, true, context), RETRY_DELAY_MS);
+            } else {
+                context.handleSuccess(chunkIndex, processedResponse);
+            }
         }, e -> {
             log.error("Chunk {} failed after all retries", chunkIndex, e);
             context.handleFailure(chunkIndex, e);
@@ -93,17 +123,31 @@ public class MLAccessor {
         predictSingleChunk(modelId, mlInput, new ActionListener<String>() {
             @Override
             public void onResponse(String response) {
+                log.debug(
+                    "DEBUG: Chunk {} received response (length: {}). First 200 chars: {}",
+                    chunkIndex,
+                    response.length(),
+                    response.substring(0, Math.min(200, response.length()))
+                );
                 chunkListener.onResponse(response);
             }
 
             @Override
             public void onFailure(Exception e) {
+                log.debug(
+                    "DEBUG: Chunk {} failed with error: {}. triedWithoutResponseFormat: {}, retryCount: {}",
+                    chunkIndex,
+                    e.getMessage(),
+                    triedWithoutResponseFormat,
+                    retryCount
+                );
                 // If we haven't tried without response_format yet, try that first before regular retries
                 if (!triedWithoutResponseFormat) {
                     log.warn(
                         "Chunk {} failed with response_format. Retrying without response_format for GPT-3.5 compatibility...",
                         chunkIndex
                     );
+                    log.debug("DEBUG: Creating MLInput without response_format for chunk {}", chunkIndex);
 
                     // Create new MLInput without response_format
                     MLInput mlInputWithoutFormat = recreateMLInputWithoutResponseFormat(mlInput);
@@ -152,11 +196,21 @@ public class MLAccessor {
     }
 
     public void predictSingleChunk(String modelId, MLInput mlInput, ActionListener<String> listener) {
-        mlClient.predict(
-            modelId,
-            mlInput,
-            ActionListener.wrap(mlOutput -> listener.onResponse(transformer.extractResponseContent(mlOutput)), listener::onFailure)
+        log.debug("DEBUG: predictSingleChunk called with modelId: {}", modelId);
+        RemoteInferenceInputDataSet dataset = (RemoteInferenceInputDataSet) mlInput.getInputDataset();
+        Map<String, String> params = dataset.getParameters();
+        log.debug(
+            "DEBUG: MLInput parameters - has response_format: {}, has messages: {}",
+            params.containsKey("response_format"),
+            params.containsKey("messages")
         );
+        mlClient.predict(modelId, mlInput, ActionListener.wrap(mlOutput -> {
+            log.debug("DEBUG: ML prediction succeeded, extracting response content");
+            listener.onResponse(transformer.extractResponseContent(mlOutput));
+        }, e -> {
+            log.debug("DEBUG: ML prediction failed with error: {}", e.getMessage());
+            listener.onFailure(e);
+        }));
     }
 
 }

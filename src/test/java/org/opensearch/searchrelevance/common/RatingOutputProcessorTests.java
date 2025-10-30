@@ -7,189 +7,267 @@
  */
 package org.opensearch.searchrelevance.common;
 
-import org.opensearch.test.OpenSearchTestCase;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
+import org.junit.Test;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
- * Tests for RatingOutputProcessor with OpenAI structured output.
- * These tests focus on parsing properly formatted JSON responses from OpenAI's structured output feature.
+ * Unit tests for RatingOutputProcessor with focus on GPT-3.5 unstructured output handling.
  */
-public class RatingOutputProcessorTests extends OpenSearchTestCase {
+public class RatingOutputProcessorTests {
 
-    // ============================================
-    // Structured Output Format Tests
-    // ============================================
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-    public void testSanitizeLLMResponse_StructuredOutputWithRatingsArray() {
-        String response = "{\"ratings\": [{\"id\": \"1\", \"rating_score\": 4}, {\"id\": \"2\", \"rating_score\": 3}]}";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response);
+    @Test
+    public void testStructuredOutputWithRatingsArray() throws Exception {
+        // GPT-4o with response_format: {"ratings": [...]}
+        String response = "{\"ratings\": [{\"id\": \"doc1\", \"rating_score\": 4}, {\"id\": \"doc2\", \"rating_score\": 5}]}";
+        String result = RatingOutputProcessor.sanitizeLLMResponse(response);
 
-        assertTrue(sanitized.startsWith("["));
-        assertTrue(sanitized.endsWith("]"));
-        assertTrue(sanitized.contains("\"id\":\"1\"") || sanitized.contains("\"id\": \"1\""));
-        assertTrue(sanitized.contains("\"rating_score\":4") || sanitized.contains("\"rating_score\": 4"));
+        JsonNode resultNode = OBJECT_MAPPER.readTree(result);
+        assertTrue(resultNode.isArray());
+        assertEquals(2, resultNode.size());
+        assertEquals("doc1", resultNode.get(0).get("id").asText());
+        assertEquals(4, resultNode.get(0).get("rating_score").asInt());
     }
 
-    public void testSanitizeLLMResponse_StructuredOutputNumericRatings() {
-        String response = "{\"ratings\": [{\"id\": \"doc1\", \"rating_score\": 0.75}]}";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response);
+    @Test
+    public void testDirectJsonArray() throws Exception {
+        // Already an array
+        String response = "[{\"id\": \"doc1\", \"rating_score\": 3}]";
+        String result = RatingOutputProcessor.sanitizeLLMResponse(response);
 
-        assertTrue(sanitized.contains("0.75"));
-        assertTrue(sanitized.contains("doc1"));
+        JsonNode resultNode = OBJECT_MAPPER.readTree(result);
+        assertTrue(resultNode.isArray());
+        assertEquals(1, resultNode.size());
     }
 
-    public void testSanitizeLLMResponse_StructuredOutputBinaryRatings() {
+    @Test
+    public void testMarkdownCodeBlockWithJson() throws Exception {
+        // GPT-3.5 response with markdown code block
+        String response = "Here are the ratings:\n\n```json\n{\"ratings\": [{\"id\": \"doc1\", \"rating_score\": 4}]}\n```";
+        String result = RatingOutputProcessor.sanitizeLLMResponse(response);
+
+        JsonNode resultNode = OBJECT_MAPPER.readTree(result);
+        assertTrue(resultNode.isArray());
+        assertEquals(1, resultNode.size());
+        assertEquals("doc1", resultNode.get(0).get("id").asText());
+    }
+
+    @Test
+    public void testMarkdownCodeBlockWithoutJsonTag() throws Exception {
+        // GPT-3.5 response with markdown code block without 'json' tag
+        String response = "Here are the ratings:\n\n```\n{\"ratings\": [{\"id\": \"doc1\", \"rating_score\": 5}]}\n```";
+        String result = RatingOutputProcessor.sanitizeLLMResponse(response);
+
+        JsonNode resultNode = OBJECT_MAPPER.readTree(result);
+        assertTrue(resultNode.isArray());
+        assertEquals(1, resultNode.size());
+    }
+
+    @Test
+    public void testEmbeddedJsonInText() throws Exception {
+        // GPT-3.5 response with JSON embedded in prose
         String response =
-            "{\"ratings\": [{\"id\": \"1\", \"rating_score\": \"RELEVANT\"}, {\"id\": \"2\", \"rating_score\": \"IRRELEVANT\"}]}";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response);
+            "Based on the query, here is my evaluation: {\"ratings\": [{\"id\": \"doc1\", \"rating_score\": 3}]} as requested.";
+        String result = RatingOutputProcessor.sanitizeLLMResponse(response);
 
-        assertTrue(sanitized.contains("RELEVANT"));
-        assertTrue(sanitized.contains("IRRELEVANT"));
+        JsonNode resultNode = OBJECT_MAPPER.readTree(result);
+        assertTrue(resultNode.isArray());
+        assertEquals(1, resultNode.size());
     }
 
-    // ============================================
-    // Direct Array Format Tests
-    // ============================================
+    @Test
+    public void testEmbeddedJsonArray() throws Exception {
+        // GPT-3.5 response with JSON array embedded in text
+        String response = "The ratings are: [{\"id\": \"doc1\", \"rating_score\": 4}, {\"id\": \"doc2\", \"rating_score\": 2}]";
+        String result = RatingOutputProcessor.sanitizeLLMResponse(response);
 
-    public void testSanitizeLLMResponse_DirectJsonArray() {
-        String response = "[{\"id\": \"1\", \"rating_score\": 4}, {\"id\": \"2\", \"rating_score\": 3}]";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response);
-
-        assertTrue(sanitized.startsWith("["));
-        assertTrue(sanitized.endsWith("]"));
-        assertTrue(sanitized.contains("\"id\":\"1\"") || sanitized.contains("\"id\": \"1\""));
+        JsonNode resultNode = OBJECT_MAPPER.readTree(result);
+        assertTrue(resultNode.isArray());
+        assertEquals(2, resultNode.size());
     }
 
-    public void testSanitizeLLMResponse_SingleObjectWrapping() {
-        String response = "{\"id\": \"1\", \"rating_score\": 3}";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response);
+    @Test
+    public void testComplexUnstructuredResponse() throws Exception {
+        // Realistic GPT-3.5 response
+        String response = "I'll rate each document based on relevance:\n\n"
+            + "```json\n"
+            + "{\n"
+            + "  \"ratings\": [\n"
+            + "    {\"id\": \"query1_doc1\", \"rating_score\": 4},\n"
+            + "    {\"id\": \"query1_doc2\", \"rating_score\": 5},\n"
+            + "    {\"id\": \"query1_doc3\", \"rating_score\": 2}\n"
+            + "  ]\n"
+            + "}\n"
+            + "```\n\n"
+            + "These ratings reflect the relevance of each document.";
+        String result = RatingOutputProcessor.sanitizeLLMResponse(response);
 
-        assertTrue(sanitized.startsWith("["));
-        assertTrue(sanitized.endsWith("]"));
-        assertTrue(sanitized.contains("\"rating_score\""));
+        JsonNode resultNode = OBJECT_MAPPER.readTree(result);
+        assertTrue(resultNode.isArray());
+        assertEquals(3, resultNode.size());
+        assertEquals("query1_doc1", resultNode.get(0).get("id").asText());
+        assertEquals(4, resultNode.get(0).get("rating_score").asInt());
     }
 
-    // ============================================
-    // Edge Cases
-    // ============================================
-
-    public void testSanitizeLLMResponse_EmptyString() {
-        String response = "";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response);
-
-        assertEquals("[]", sanitized);
+    @Test
+    public void testEmptyResponse() throws Exception {
+        String result = RatingOutputProcessor.sanitizeLLMResponse("");
+        JsonNode resultNode = OBJECT_MAPPER.readTree(result);
+        assertTrue(resultNode.isArray());
+        assertEquals(0, resultNode.size());
     }
 
-    public void testSanitizeLLMResponse_NullInput() {
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(null);
-
-        assertEquals("[]", sanitized);
+    @Test
+    public void testNullResponse() throws Exception {
+        String result = RatingOutputProcessor.sanitizeLLMResponse(null);
+        JsonNode resultNode = OBJECT_MAPPER.readTree(result);
+        assertTrue(resultNode.isArray());
+        assertEquals(0, resultNode.size());
     }
 
-    public void testSanitizeLLMResponse_InvalidJson() {
-        String response = "This is not valid JSON";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response);
+    @Test
+    public void testUnparseableText() throws Exception {
+        // Pure text with no JSON
+        String response = "This is just plain text without any JSON structure.";
+        String result = RatingOutputProcessor.sanitizeLLMResponse(response);
 
-        assertEquals("[]", sanitized);
+        JsonNode resultNode = OBJECT_MAPPER.readTree(result);
+        assertTrue(resultNode.isArray());
+        assertEquals(0, resultNode.size());
     }
 
-    public void testSanitizeLLMResponse_MalformedJson() {
-        String response = "{\"ratings\": [{\"id\": \"1\", \"rating_score\": }";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response);
+    @Test
+    public void testMultipleJsonObjectsSelectsFirst() throws Exception {
+        // Multiple JSON objects - should select the first valid one
+        String response = "{\"ratings\": [{\"id\": \"doc1\", \"rating_score\": 4}]} and also {\"other\": \"data\"}";
+        String result = RatingOutputProcessor.sanitizeLLMResponse(response);
 
-        assertEquals("[]", sanitized);
+        JsonNode resultNode = OBJECT_MAPPER.readTree(result);
+        assertTrue(resultNode.isArray());
+        assertEquals(1, resultNode.size());
+        assertEquals("doc1", resultNode.get(0).get("id").asText());
     }
 
-    // ============================================
-    // Multiple Items Tests
-    // ============================================
+    @Test
+    public void testArrayAppearsBeforeObject() throws Exception {
+        // Array appears before object - should extract array
+        String response = "Result: [{\"id\": \"doc1\", \"rating_score\": 4}] or {\"ratings\": [...]}";
+        String result = RatingOutputProcessor.sanitizeLLMResponse(response);
 
-    public void testSanitizeLLMResponse_MultipleRatings() {
-        String response = "{\"ratings\": ["
-            + "{\"id\": \"1\", \"rating_score\": 5}, "
-            + "{\"id\": \"2\", \"rating_score\": 4}, "
-            + "{\"id\": \"3\", \"rating_score\": 3}"
-            + "]}";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response);
-
-        assertTrue(sanitized.contains("\"id\":\"1\"") || sanitized.contains("\"id\": \"1\""));
-        assertTrue(sanitized.contains("\"id\":\"2\"") || sanitized.contains("\"id\": \"2\""));
-        assertTrue(sanitized.contains("\"id\":\"3\"") || sanitized.contains("\"id\": \"3\""));
+        JsonNode resultNode = OBJECT_MAPPER.readTree(result);
+        assertTrue(resultNode.isArray());
+        assertEquals(1, resultNode.size());
+        assertEquals("doc1", resultNode.get(0).get("id").asText());
     }
 
-    public void testSanitizeLLMResponse_MixedNumericRatings() {
-        String response = "{\"ratings\": ["
-            + "{\"id\": \"doc1\", \"rating_score\": 0.0}, "
-            + "{\"id\": \"doc2\", \"rating_score\": 0.5}, "
-            + "{\"id\": \"doc3\", \"rating_score\": 1.0}"
-            + "]}";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response);
+    @Test
+    public void testArrayWithMultipleElementsInText() throws Exception {
+        // This is the scenario that was failing - array with 2 elements embedded in text
+        String response =
+            "Here are the results: [{\"id\": \"doc1\", \"rating_score\": 4}, {\"id\": \"doc2\", \"rating_score\": 2}] as requested";
+        String result = RatingOutputProcessor.sanitizeLLMResponse(response);
 
-        assertTrue(sanitized.contains("0.0"));
-        assertTrue(sanitized.contains("0.5"));
-        assertTrue(sanitized.contains("1.0"));
+        JsonNode resultNode = OBJECT_MAPPER.readTree(result);
+        assertTrue(resultNode.isArray());
+        assertEquals(2, resultNode.size());
+        assertEquals("doc1", resultNode.get(0).get("id").asText());
+        assertEquals("doc2", resultNode.get(1).get("id").asText());
     }
 
-    // ============================================
-    // Different Rating Types (all handled the same way now)
-    // ============================================
+    @Test
+    public void testNestedArrayInObject() throws Exception {
+        // Object with nested array - should extract the ratings array
+        String response = "Text before {\"meta\": \"data\", \"ratings\": [{\"id\": \"doc1\", \"rating_score\": 5}]} text after";
+        String result = RatingOutputProcessor.sanitizeLLMResponse(response);
 
-    public void testSanitizeLLMResponse_NumericRating01() {
-        String response = "{\"ratings\": [{\"id\": \"1\", \"rating_score\": 0.8}]}";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response);
-
-        assertTrue(sanitized.contains("0.8"));
+        JsonNode resultNode = OBJECT_MAPPER.readTree(result);
+        assertTrue(resultNode.isArray());
+        assertEquals(1, resultNode.size());
+        assertEquals("doc1", resultNode.get(0).get("id").asText());
     }
 
-    public void testSanitizeLLMResponse_NumericRating15() {
-        String response = "{\"ratings\": [{\"id\": \"1\", \"rating_score\": 4.5}]}";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response);
+    @Test
+    public void testMultipleArraysSelectsFirst() throws Exception {
+        // Multiple arrays - should select the first one
+        String response = "First: [{\"id\": \"doc1\", \"rating_score\": 4}] Second: [{\"id\": \"doc2\", \"rating_score\": 3}]";
+        String result = RatingOutputProcessor.sanitizeLLMResponse(response);
 
-        assertTrue(sanitized.contains("4.5"));
+        JsonNode resultNode = OBJECT_MAPPER.readTree(result);
+        assertTrue(resultNode.isArray());
+        assertEquals(1, resultNode.size());
+        assertEquals("doc1", resultNode.get(0).get("id").asText());
     }
 
-    public void testSanitizeLLMResponse_BinaryRating() {
-        String response = "{\"ratings\": [{\"id\": \"1\", \"rating_score\": \"RELEVANT\"}]}";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response);
+    @Test
+    public void testObjectBeforeArrayInText() throws Exception {
+        // Realistic case: Object appears first in prose, then array
+        String response = "Status: {\"status\": \"ok\"}. Here are the ratings: [{\"id\": \"doc1\", \"rating_score\": 4}]";
+        String result = RatingOutputProcessor.sanitizeLLMResponse(response);
 
-        assertTrue(sanitized.contains("RELEVANT"));
+        JsonNode resultNode = OBJECT_MAPPER.readTree(result);
+        // Should extract the first valid JSON structure (the object),
+        // and since it doesn't have ratings field, it wraps it in an array
+        assertTrue(resultNode.isArray());
+        // Will extract the first object and wrap it
+        assertEquals(1, resultNode.size());
     }
 
-    // ============================================
-    // Special Characters and IDs Tests
-    // ============================================
+    @Test
+    public void testComplexNestedStructure() throws Exception {
+        // Complex structure with nested objects and arrays
+        String response =
+            "The LLM response:\n```json\n{\n  \"explanation\": \"analysis\",\n  \"ratings\": [\n    {\"id\": \"q1_d1\", \"rating_score\": 5},\n    {\"id\": \"q1_d2\", \"rating_score\": 3},\n    {\"id\": \"q1_d3\", \"rating_score\": 1}\n  ]\n}\n```";
+        String result = RatingOutputProcessor.sanitizeLLMResponse(response);
 
-    public void testSanitizeLLMResponse_SpecialCharactersInId() {
-        String response = "{\"ratings\": [{\"id\": \"test_products#123\", \"rating_score\": 4.5}]}";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response);
-
-        assertTrue(sanitized.contains("test_products#123"));
-        assertTrue(sanitized.contains("4.5"));
+        JsonNode resultNode = OBJECT_MAPPER.readTree(result);
+        assertTrue(resultNode.isArray());
+        assertEquals(3, resultNode.size());
+        assertEquals("q1_d1", resultNode.get(0).get("id").asText());
+        assertEquals(5, resultNode.get(0).get("rating_score").asInt());
     }
 
-    public void testSanitizeLLMResponse_LongIdStrings() {
-        String response = "{\"ratings\": [{\"id\": \"very-long-document-identifier-with-multiple-segments-12345\", \"rating_score\": 3}]}";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response);
+    @Test
+    public void testArrayWithNoRatingsKey() throws Exception {
+        // Direct array without "ratings" wrapper - common GPT-3.5 format
+        String response =
+            "[{\"id\": \"doc1\", \"rating_score\": 4}, {\"id\": \"doc2\", \"rating_score\": 2}, {\"id\": \"doc3\", \"rating_score\": 5}]";
+        String result = RatingOutputProcessor.sanitizeLLMResponse(response);
 
-        assertTrue(sanitized.contains("very-long-document-identifier-with-multiple-segments-12345"));
+        JsonNode resultNode = OBJECT_MAPPER.readTree(result);
+        assertTrue(resultNode.isArray());
+        assertEquals(3, resultNode.size());
     }
 
-    // ============================================
-    // Whitespace and Formatting Tests
-    // ============================================
+    @Test
+    public void testMalformedJsonReturnsEmpty() throws Exception {
+        // Malformed JSON should return empty array
+        String response = "Text with {broken json [that doesn't close properly";
+        String result = RatingOutputProcessor.sanitizeLLMResponse(response);
 
-    public void testSanitizeLLMResponse_CompactJson() {
-        String response = "{\"ratings\":[{\"id\":\"1\",\"rating_score\":5}]}";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response);
-
-        assertTrue(sanitized.startsWith("["));
-        assertTrue(sanitized.contains("\"id\""));
-        assertTrue(sanitized.contains("\"rating_score\""));
+        JsonNode resultNode = OBJECT_MAPPER.readTree(result);
+        assertTrue(resultNode.isArray());
+        assertEquals(0, resultNode.size());
     }
 
-    public void testSanitizeLLMResponse_PrettyPrintedJson() {
-        String response = "{\n  \"ratings\": [\n    {\n      \"id\": \"1\",\n      \"rating_score\": 4\n    }\n  ]\n}";
-        String sanitized = RatingOutputProcessor.sanitizeLLMResponse(response);
+    @Test
+    public void testProseWithCodeBlockContainingArray() throws Exception {
+        // GPT-3.5 style response with explanation and code block
+        String response = "I've evaluated each document based on relevance.\n\n"
+            + "```\n"
+            + "[{\"id\": \"doc1\", \"rating_score\": 0.9}, {\"id\": \"doc2\", \"rating_score\": 0.5}]\n"
+            + "```\n\n"
+            + "The first document is highly relevant.";
+        String result = RatingOutputProcessor.sanitizeLLMResponse(response);
 
-        assertTrue(sanitized.contains("\"rating_score\""));
+        JsonNode resultNode = OBJECT_MAPPER.readTree(result);
+        assertTrue(resultNode.isArray());
+        assertEquals(2, resultNode.size());
+        assertEquals("doc1", resultNode.get(0).get("id").asText());
     }
 }
