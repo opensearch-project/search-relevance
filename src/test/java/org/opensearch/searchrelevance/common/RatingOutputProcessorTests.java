@@ -7,8 +7,7 @@
  */
 package org.opensearch.searchrelevance.common;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import org.opensearch.test.OpenSearchTestCase;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -16,7 +15,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 /**
  * Unit tests for RatingOutputProcessor with focus on GPT-3.5 unstructured output handling.
  */
-public class RatingOutputProcessorTests {
+public class RatingOutputProcessorTests extends OpenSearchTestCase {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
