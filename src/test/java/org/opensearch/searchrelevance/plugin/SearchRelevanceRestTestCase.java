@@ -10,7 +10,6 @@ package org.opensearch.searchrelevance.plugin;
 import static org.mockito.Mockito.when;
 import static org.opensearch.searchrelevance.common.PluginConstants.DOCUMENT_ID;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -50,7 +49,7 @@ public abstract class SearchRelevanceRestTestCase extends OpenSearchTestCase {
         when(channel.newBuilder()).thenReturn(builder);
     }
 
-    public RestRequest createPutRestRequestWithContent(String content, String endpoint) throws IOException {
+    public RestRequest createPutRestRequestWithContent(String content, String endpoint) {
         Map<String, String> params = new HashMap<>(); // Create params map
         return new FakeRestRequest.Builder(NamedXContentRegistry.EMPTY).withContent(new BytesArray(content), XContentType.JSON)
             .withParams(params)

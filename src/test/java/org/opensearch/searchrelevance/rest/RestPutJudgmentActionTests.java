@@ -78,26 +78,6 @@ public class RestPutJudgmentActionTests extends SearchRelevanceRestTestCase {
           ]
         }""";
 
-    private static final String IMPORT_JUDGMENT_CONTENT_INVALID_RATING = "{"
-        + "\"name\": \"test_name\","
-        + "\"description\": \"test_description\","
-        + "\"type\": \"IMPORT_JUDGMENT\","
-        + "\"judgmentRatings\": {"
-        + "    \"red shoes\": ["
-        + "      {"
-        + "        \"docId\": \"B077ZJXCTS\","
-        + "        \"rating\": \"0.000\""
-        + "      }"
-        + "    ],"
-        + "    \"blue jeans\": ["
-        + "      {"
-        + "        \"docId\": \"B071S6LTJJ\","
-        + "        \"rating\": \"AWESOME\""
-        + "      }"
-        + "    ]"
-        + "  }"
-        + "}";
-
     private static final String INVALID_TYPE_CONTENT = "{"
         + "\"name\": \"test_name\","
         + "\"description\": \"test_description\","
@@ -203,10 +183,10 @@ public class RestPutJudgmentActionTests extends SearchRelevanceRestTestCase {
         assertEquals(RestStatus.OK, responseCaptor.getValue().status());
     }
 
-    public void testPutJudgment_InvalidType() throws Exception {
+    public void testPutJudgment_InvalidType() {
         // Setup
         when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
-        RestRequest request = createPutRestRequestWithContent(INVALID_TYPE_CONTENT, "judgmentents");
+        RestRequest request = createPutRestRequestWithContent(INVALID_TYPE_CONTENT, "judgments");
         when(channel.request()).thenReturn(request);
 
         // Execute and verify
@@ -217,7 +197,7 @@ public class RestPutJudgmentActionTests extends SearchRelevanceRestTestCase {
         assertTrue(exception.getMessage().contains("Invalid or missing judgment type"));
     }
 
-    public void testPutLlmJudgment_MissingModelId() throws Exception {
+    public void testPutLlmJudgment_MissingModelId() {
         // Setup
         when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
         String content = "{" + "\"name\": \"test_name\"," + "\"description\": \"test_description\"," + "\"type\": \"LLM_JUDGMENT\"" + "}";

@@ -104,7 +104,7 @@ public class RestPutExperimentActionTests extends SearchRelevanceRestTestCase {
         assertEquals(RestStatus.OK, responseCaptor.getValue().status());
     }
 
-    public void testPutExperiment_InvalidType() throws Exception {
+    public void testPutExperiment_InvalidType() {
         // Setup
         when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
         when(settingsAccessor.getMaxQuerySetAllowed()).thenReturn(1000);
@@ -141,7 +141,7 @@ public class RestPutExperimentActionTests extends SearchRelevanceRestTestCase {
         assertEquals(RestStatus.INTERNAL_SERVER_ERROR, responseCaptor.getValue().status());
     }
 
-    public void testPutExperiment_InputValidationFailure() throws Exception {
+    public void testPutExperiment_InputValidationFailure() {
         // Setup
         when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
         RestRequest request = createPutRestRequestWithContent(INVALID_SEARCH_CONFIGURATION_CONTENT, "experiments");
