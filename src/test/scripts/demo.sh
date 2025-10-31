@@ -5,24 +5,17 @@
 # * An "ecommerce" style sample data
 # You can now exercise the Single Query comparison, Query Set Comparison and Search Evaluation experiments of SRW!  
 # 
-# There are two ways to start:
+# This assumes you started OpenSearch from the root via 
+# ./gradlew run --preserve-data --debug-jvm which faciliates debugging
 # 
-# 1) `docker compose build && docker compose up` which enables UBI support and larger amounts of ecommerce data ingestion.
-# 2) `./gradlew run --preserve-data --debug-jvm` which faciliates debugging, but pass in --skip-ubi
-# 
-# It will clear out any existing data except ecommerce index if you pass --skip-ecommerce as a parameter.
+# It will clear out any existing indexes, except ecommerce index if you pass --skip-ecommerce as a parameter.
 
 # Helper script
 exe() { (set -x ; "$@") | jq | tee RES; echo; }
 
 # Check for --skip-ecommerce parameter
-# Check for --skip-ubi parameter
 SKIP_ECOMMERCE=false
-SKIP_UBI=false
 for arg in "$@"; do
-  if [ "$arg" = "--skip-ubi" ]; then
-    SKIP_UBI=true
-  fi
   if [ "$arg" = "--skip-ecommerce" ]; then
     SKIP_ECOMMERCE=true
   fi
@@ -89,43 +82,40 @@ if [ "$SKIP_ECOMMERCE" = false ]; then
   echo "All data indexed successfully"
 fi
 
-if [ "$SKIP_UBI" = false ]; then
-  echo Deleting UBI indexes
-  (curl -s -X DELETE "http://localhost:9200/ubi_queries" > /dev/null) || true
-  (curl -s -X DELETE "http://localhost:9200/ubi_events" > /dev/null) || true
-  
-  echo Creating UBI indexes using mappings
-  curl -s -X POST http://localhost:9200/_plugins/ubi/initialize
-  
-  echo Loading sample UBI data
-  curl -o /dev/null -X POST 'http://localhost:9200/index-name/_bulk?pretty' --data-binary @../data-esci/ubi_queries_events.ndjson -H "Content-Type: application/x-ndjson"
-  
-  echo Refreshing UBI indexes to make indexed data available for query sampling
-  curl -XPOST "http://localhost:9200/ubi_queries/_refresh"
-  echo
-  curl -XPOST "http://localhost:9200/ubi_events/_refresh"
-  
-  read -r -d '' QUERY_BODY << EOF
-  {
-    "query": {
-      "match_all": {}
-    },
-    "size": 0
-  }
+echo Deleting UBI indexes
+(curl -s -X DELETE "http://localhost:9200/ubi_queries" > /dev/null) || true
+(curl -s -X DELETE "http://localhost:9200/ubi_events" > /dev/null) || true
+
+echo Creating UBI indexes using mappings
+curl -s -X POST http://localhost:9200/_plugins/ubi/initialize
+
+echo Loading sample UBI data
+curl -o /dev/null -X POST 'http://localhost:9200/index-name/_bulk?pretty' --data-binary @../data-esci/ubi_queries_events.ndjson -H "Content-Type: application/x-ndjson"
+
+echo Refreshing UBI indexes to make indexed data available for query sampling
+curl -XPOST "http://localhost:9200/ubi_queries/_refresh"
+echo
+curl -XPOST "http://localhost:9200/ubi_events/_refresh"
+
+read -r -d '' QUERY_BODY << EOF
+{
+  "query": {
+    "match_all": {}
+  },
+  "size": 0
+}
 EOF
+
+NUMBER_OF_QUERIES=$(curl -s -XGET "http://localhost:9200/ubi_queries/_search" \
+  -H "Content-Type: application/json" \
+  -d "${QUERY_BODY}" | jq -r '.hits.total.value')
+
+NUMBER_OF_EVENTS=$(curl -s -XGET "http://localhost:9200/ubi_events/_search" \
+  -H "Content-Type: application/json" \
+  -d "${QUERY_BODY}" | jq -r '.hits.total.value')
   
-  NUMBER_OF_QUERIES=$(curl -s -XGET "http://localhost:9200/ubi_queries/_search" \
-    -H "Content-Type: application/json" \
-    -d "${QUERY_BODY}" | jq -r '.hits.total.value')
-  
-  NUMBER_OF_EVENTS=$(curl -s -XGET "http://localhost:9200/ubi_events/_search" \
-    -H "Content-Type: application/json" \
-    -d "${QUERY_BODY}" | jq -r '.hits.total.value')
-    
-  echo
-  echo "Indexed UBI data: $NUMBER_OF_QUERIES queries and $NUMBER_OF_EVENTS events"
-  
-fi
+echo
+echo "Indexed UBI data: $NUMBER_OF_QUERIES queries and $NUMBER_OF_EVENTS events"
 
 echo
 
@@ -154,7 +144,7 @@ exe curl -s -X PUT "http://localhost:9200/_plugins/_search_relevance/search_conf
 -H "Content-type: application/json" \
 -d'{
       "name": "baseline",
-      "query": "{\"query\":{\"multi_match\":{\"query\":\"%SearchText%\",\"fields\":[\"id\",\"title\",\"category\",\"bullets\",\"description\",\"attrs.Brand\",\"attrs.Color\"]}}}",
+      "query": "{\"query\":{\"multi_match\":{\"query\":\"%SearchText%\",\"fields\":[\"id\",\"title\",\"category\",\"bullet_points\",\"description\",\"brand\",\"color\"]}}}",
       "index": "ecommerce"
 }'
 
@@ -164,7 +154,7 @@ exe curl -s -X PUT "http://localhost:9200/_plugins/_search_relevance/search_conf
 -H "Content-type: application/json" \
 -d'{
       "name": "baseline with title weight",
-      "query": "{\"query\":{\"multi_match\":{\"query\":\"%SearchText%\",\"fields\":[\"id\",\"title^25\",\"category\",\"bullets\",\"description\",\"attrs.Brand\",\"attrs.Color\"]}}}",
+      "query": "{\"query\":{\"multi_match\":{\"query\":\"%SearchText%\",\"fields\":[\"id\",\"title^25\",\"category\",\"bullet_points\",\"description\",\"brand\",\"color\"]}}}",
       "index": "ecommerce"
 }'
 
@@ -187,22 +177,20 @@ echo
 echo Baseline search config id: $SC_BASELINE
 echo Challenger search config id: $SC_CHALLENGER
 
-if [ "$SKIP_UBI" = false ]; then
-  echo
-  echo Create Query Sets by Sampling UBI Data
-  exe curl -s -X POST "localhost:9200/_plugins/_search_relevance/query_sets" \
-  -H "Content-type: application/json" \
-  -d'{
-     	"name": "Top 20",
-     	"description": "Top 20 most frequent queries sourced from user searches.",
-     	"sampling": "topn",
-     	"querySetSize": 20
-  }'
-  
-  QUERY_SET_UBI=`jq -r '.query_set_id' < RES`
-  
-  sleep 2
-fi
+echo
+echo Create Query Sets by Sampling UBI Data
+exe curl -s -X POST "localhost:9200/_plugins/_search_relevance/query_sets" \
+-H "Content-type: application/json" \
+-d'{
+   	"name": "Top 20",
+   	"description": "Top 20 most frequent queries sourced from user searches.",
+   	"sampling": "topn",
+   	"querySetSize": 20
+}'
+
+QUERY_SET_UBI=`jq -r '.query_set_id' < RES`
+
+sleep 2
 
 echo
 echo Upload Manually Curated Query Set 
@@ -246,26 +234,24 @@ exe curl -s -X GET "localhost:9200/_plugins/_search_relevance/query_sets" \
      "size": 10
    }'
 
-if [ "$SKIP_UBI" = false ]; then
-  echo
-  echo Create Implicit Judgments
-  exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/judgments" \
-  -H "Content-type: application/json" \
-  -d'{
-     	"clickModel": "coec",
-      "maxRank": 20,
-     	"name": "Implicit Judgements",
-     	"type": "UBI_JUDGMENT"
-    }'
-    
-  UBI_JUDGMENT_LIST_ID=`jq -r '.judgment_id' < RES`
+echo
+echo Create Implicit Judgments
+exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/judgments" \
+-H "Content-type: application/json" \
+-d'{
+   	"clickModel": "coec",
+    "maxRank": 20,
+   	"name": "Implicit Judgements",
+   	"type": "UBI_JUDGMENT"
+  }'
   
-  # wait for judgments to be created in the background
-  sleep 2
-fi
+UBI_JUDGMENT_LIST_ID=`jq -r '.judgment_id' < RES`
+
+# wait for judgments to be created in the background
+sleep 2
 
 echo
-echo Import Manaully Curated Judgements
+echo Import Manually Curated Judgements
 exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/judgments" \
 -H "Content-type: application/json" \
 -d'{

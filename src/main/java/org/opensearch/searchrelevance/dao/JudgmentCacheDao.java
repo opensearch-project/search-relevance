@@ -151,6 +151,7 @@ public class JudgmentCacheDao {
             }
             listener.onResponse(response);
         }, e -> {
+            LOGGER.debug("Cache lookup failed for docId: {} - continuing without cache", documentId);
             listener.onFailure(e);
         });
 

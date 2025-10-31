@@ -11,7 +11,20 @@ import static java.util.Collections.singletonList;
 import static org.opensearch.rest.RestRequest.Method.PUT;
 import static org.opensearch.searchrelevance.common.MLConstants.validateTokenLimit;
 import static org.opensearch.searchrelevance.common.MetricsConstants.MODEL_ID;
+import static org.opensearch.searchrelevance.common.PluginConstants.CLICK_MODEL;
+import static org.opensearch.searchrelevance.common.PluginConstants.CONTEXT_FIELDS;
+import static org.opensearch.searchrelevance.common.PluginConstants.DESCRIPTION;
+import static org.opensearch.searchrelevance.common.PluginConstants.END_DATE;
+import static org.opensearch.searchrelevance.common.PluginConstants.IGNORE_FAILURE;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENTS_URL;
+import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_RATINGS;
+import static org.opensearch.searchrelevance.common.PluginConstants.NAME;
+import static org.opensearch.searchrelevance.common.PluginConstants.NAX_RANK;
+import static org.opensearch.searchrelevance.common.PluginConstants.QUERYSET_ID;
+import static org.opensearch.searchrelevance.common.PluginConstants.SEARCH_CONFIGURATION_LIST;
+import static org.opensearch.searchrelevance.common.PluginConstants.SIZE;
+import static org.opensearch.searchrelevance.common.PluginConstants.START_DATE;
+import static org.opensearch.searchrelevance.common.PluginConstants.TYPE;
 
 import java.io.IOException;
 import java.util.List;
@@ -20,6 +33,7 @@ import java.util.Optional;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.opensearch.ExceptionsHelper;
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
@@ -36,7 +50,10 @@ import org.opensearch.searchrelevance.transport.judgment.PutJudgmentAction;
 import org.opensearch.searchrelevance.transport.judgment.PutJudgmentRequest;
 import org.opensearch.searchrelevance.transport.judgment.PutLlmJudgmentRequest;
 import org.opensearch.searchrelevance.transport.judgment.PutUbiJudgmentRequest;
+import org.opensearch.searchrelevance.utils.DateValidationUtil;
+import org.opensearch.searchrelevance.utils.DateValidationUtil.DateValidationResult;
 import org.opensearch.searchrelevance.utils.ParserUtils;
+import org.opensearch.searchrelevance.utils.TextValidationUtil;
 import org.opensearch.transport.client.node.NodeClient;
 
 import lombok.AllArgsConstructor;
@@ -68,10 +85,24 @@ public class RestPutJudgmentAction extends BaseRestHandler {
         XContentParser parser = request.contentParser();
         Map<String, Object> source = parser.map();
 
-        String name = (String) source.get("name");
-        String description = (String) source.get("description");
+        String name = (String) source.get(NAME);
+        TextValidationUtil.ValidationResult nameValidation = TextValidationUtil.validateName(name);
+        if (!nameValidation.isValid()) {
+            return channel -> channel.sendResponse(
+                new BytesRestResponse(RestStatus.BAD_REQUEST, "Invalid name: " + nameValidation.getErrorMessage())
+            );
+        }
+        String description = (String) source.get(DESCRIPTION);
+        if (description != null) {
+            TextValidationUtil.ValidationResult descriptionValidation = TextValidationUtil.validateDescription(description);
+            if (!descriptionValidation.isValid()) {
+                return channel -> channel.sendResponse(
+                    new BytesRestResponse(RestStatus.BAD_REQUEST, "Invalid description: " + descriptionValidation.getErrorMessage())
+                );
+            }
+        }
 
-        String typeString = (String) source.get("type");
+        String typeString = (String) source.get(TYPE);
         JudgmentType type;
         try {
             type = JudgmentType.valueOf(typeString);
@@ -86,15 +117,15 @@ public class RestPutJudgmentAction extends BaseRestHandler {
                 if (modelId == null) {
                     throw new SearchRelevanceException("modelId is required for LLM_JUDGMENT", RestStatus.BAD_REQUEST);
                 }
-                String querySetId = (String) source.get("querySetId");
-                List<String> searchConfigurationList = ParserUtils.convertObjToList(source, "searchConfigurationList");
-                int size = (Integer) source.get("size");
-                boolean ignoreFailure = Optional.ofNullable((Boolean) source.get("ignoreFailure")).orElse(Boolean.FALSE);  // default to
-                                                                                                                           // false if not
-                                                                                                                           // provided
+                String querySetId = (String) source.get(QUERYSET_ID);
+                List<String> searchConfigurationList = ParserUtils.convertObjToList(source, SEARCH_CONFIGURATION_LIST);
+                int size = (Integer) source.get(SIZE);
+                boolean ignoreFailure = Optional.ofNullable((Boolean) source.get(IGNORE_FAILURE)).orElse(Boolean.FALSE);  // default to
+                                                                                                                          // false if not
+                                                                                                                          // provided
 
                 int tokenLimit = validateTokenLimit(source);
-                List<String> contextFields = ParserUtils.convertObjToList(source, "contextFields");
+                List<String> contextFields = ParserUtils.convertObjToList(source, CONTEXT_FIELDS);
                 createRequest = new PutLlmJudgmentRequest(
                     type,
                     name,
@@ -109,12 +140,31 @@ public class RestPutJudgmentAction extends BaseRestHandler {
                 );
             }
             case UBI_JUDGMENT -> {
-                String clickModel = (String) source.get("clickModel");
-                int maxRank = (int) source.get("maxRank");
-                createRequest = new PutUbiJudgmentRequest(type, name, description, clickModel, maxRank);
+                String clickModel = (String) source.get(CLICK_MODEL);
+                int maxRank = (int) source.get(NAX_RANK);
+
+                String startDate = (String) source.getOrDefault(START_DATE, "");
+                String endDate = (String) source.getOrDefault(END_DATE, "");
+
+                DateValidationResult validStart = DateValidationUtil.validateDate(startDate);
+                DateValidationResult validEnd = DateValidationUtil.validateDate(endDate);
+
+                if ((validStart.isValid() == false)) {
+                    return channel -> channel.sendResponse(
+                        new BytesRestResponse(RestStatus.BAD_REQUEST, "Invalid start date format: " + validStart.getErrorMessage())
+                    );
+                }
+
+                if ((validEnd.isValid() == false)) {
+                    return channel -> channel.sendResponse(
+                        new BytesRestResponse(RestStatus.BAD_REQUEST, "Invalid end date format: " + validEnd.getErrorMessage())
+                    );
+                }
+
+                createRequest = new PutUbiJudgmentRequest(type, name, description, clickModel, maxRank, startDate, endDate);
             }
             case IMPORT_JUDGMENT -> {
-                List<Map<String, Object>> judgmentRatings = (List<Map<String, Object>>) source.get("judgmentRatings");
+                List<Map<String, Object>> judgmentRatings = (List<Map<String, Object>>) source.get(JUDGMENT_RATINGS);
                 createRequest = new PutImportJudgmentRequest(type, name, description, judgmentRatings);
             }
             default -> {
@@ -139,7 +189,7 @@ public class RestPutJudgmentAction extends BaseRestHandler {
             @Override
             public void onFailure(Exception e) {
                 try {
-                    channel.sendResponse(new BytesRestResponse(channel, RestStatus.INTERNAL_SERVER_ERROR, e));
+                    channel.sendResponse(new BytesRestResponse(channel, ExceptionsHelper.status(e), e));
                 } catch (IOException ex) {
                     LOGGER.error("Failed to send error response", ex);
                 }

@@ -11,10 +11,13 @@ import static org.opensearch.client.RestClientBuilder.DEFAULT_MAX_CONN_PER_ROUTE
 import static org.opensearch.client.RestClientBuilder.DEFAULT_MAX_CONN_TOTAL;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -38,43 +41,80 @@ import org.apache.hc.core5.http.nio.ssl.TlsStrategy;
 import org.apache.hc.core5.ssl.SSLContextBuilder;
 import org.apache.hc.core5.util.Timeout;
 import org.junit.After;
+import org.junit.Before;
 import org.opensearch.client.Request;
 import org.opensearch.client.RequestOptions;
 import org.opensearch.client.Response;
 import org.opensearch.client.RestClient;
 import org.opensearch.client.RestClientBuilder;
 import org.opensearch.client.WarningsHandler;
+import org.opensearch.common.io.PathUtils;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.unit.TimeValue;
 import org.opensearch.common.util.concurrent.ThreadContext;
+import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.common.xcontent.XContentHelper;
 import org.opensearch.common.xcontent.XContentType;
+import org.opensearch.commons.rest.SecureRestClientBuilder;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.core.xcontent.DeprecationHandler;
 import org.opensearch.core.xcontent.MediaType;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
+import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.test.rest.OpenSearchRestTestCase;
 
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakScope;
 import com.google.common.collect.ImmutableList;
 
+import lombok.SneakyThrows;
+
 @ThreadLeakScope(ThreadLeakScope.Scope.NONE)
 public class BaseSearchRelevanceIT extends OpenSearchRestTestCase {
-    private static final String PROTOCOL_HTTP = "http";
-    private static final String PROTOCOL_HTTPS = "https";
-    private static final String SYS_PROPERTY_KEY_HTTPS = "https";
-    private static final String SYS_PROPERTY_KEY_CLUSTER_ENDPOINT = "tests.rest.cluster";
     private static final String SYS_PROPERTY_KEY_USER = "user";
     private static final String SYS_PROPERTY_KEY_PASSWORD = "password";
     private static final String DEFAULT_SOCKET_TIMEOUT = "60s";
     private static final String INTERNAL_INDICES_PREFIX = ".";
     public static final String DEFAULT_USER_AGENT = "Kibana";
-    private static String protocol;
 
-    protected static final Locale LOCALE = Locale.ROOT;
+    protected static final int DEFAULT_INTERVAL_MS = 2000;
 
     protected final ClassLoader classLoader = this.getClass().getClassLoader();
+
+    @Before
+    public void setupSettings() {
+        if (isUpdateClusterSettings()) {
+            updateClusterSettings();
+        }
+    }
+
+    protected void updateClusterSettings() {
+        updateClusterSettings("plugins.search_relevance.workbench_enabled", true);
+    }
+
+    public boolean isUpdateClusterSettings() {
+        return true;
+    }
+
+    @SneakyThrows
+    protected void updateClusterSettings(final String settingKey, final Object value) {
+        XContentBuilder builder = XContentFactory.jsonBuilder()
+            .startObject()
+            .startObject("persistent")
+            .field(settingKey, value)
+            .endObject()
+            .endObject();
+        Response response = makeRequest(
+            client(),
+            "PUT",
+            "_cluster/settings",
+            null,
+            toHttpEntity(builder.toString()),
+            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, ""))
+        );
+
+        assertEquals(RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
+    }
 
     protected static Response makeRequest(
         RestClient client,
@@ -118,37 +158,60 @@ public class BaseSearchRelevanceIT extends OpenSearchRestTestCase {
         return new StringEntity(jsonString, ContentType.APPLICATION_JSON);
     }
 
-    @Override
-    protected String getProtocol() {
-        if (protocol == null) {
-            protocol = readProtocolFromSystemProperty();
+    protected boolean isHttps() {
+        boolean isHttps = Optional.ofNullable(System.getProperty("https")).map("true"::equalsIgnoreCase).orElse(false);
+        if (isHttps) {
+            // currently only external cluster is supported for security enabled testing
+            if (!Optional.ofNullable(System.getProperty("tests.rest.cluster")).isPresent()) {
+                throw new RuntimeException("cluster url should be provided for security enabled testing");
+            }
         }
-        return protocol;
+
+        return isHttps;
     }
 
-    private String readProtocolFromSystemProperty() {
-        final boolean isHttps = Optional.ofNullable(System.getProperty(SYS_PROPERTY_KEY_HTTPS)).map("true"::equalsIgnoreCase).orElse(false);
-        if (!isHttps) {
-            return PROTOCOL_HTTP;
-        }
-
-        // currently only external cluster is supported for security enabled testing
-        if (Optional.ofNullable(System.getProperty(SYS_PROPERTY_KEY_CLUSTER_ENDPOINT)).isEmpty()) {
-            throw new RuntimeException("cluster url should be provided for security enabled testing");
-        }
-        return PROTOCOL_HTTPS;
+    @Override
+    protected String getProtocol() {
+        return isHttps() ? "https" : "http";
     }
 
     @Override
     protected RestClient buildClient(Settings settings, HttpHost[] hosts) throws IOException {
-        final RestClientBuilder builder = RestClient.builder(hosts);
-        if (PROTOCOL_HTTPS.equals(getProtocol())) {
-            configureHttpsClient(builder, settings);
+        boolean strictDeprecationMode = settings.getAsBoolean("strictDeprecationMode", true);
+        RestClientBuilder builder = RestClient.builder(hosts);
+        if (isHttps()) {
+            String keystore = settings.get("plugins.security.ssl.http.keystore_filepath");
+            if (Objects.nonNull(keystore)) {
+                URI uri = null;
+                try {
+                    uri = this.getClass().getClassLoader().getResource("sample.pem").toURI();
+                } catch (URISyntaxException e) {
+                    throw new RuntimeException(e);
+                }
+                Path configPath = PathUtils.get(uri).getParent().toAbsolutePath();
+                return new SecureRestClientBuilder(settings, configPath, hosts).build();
+            } else {
+                configureHttpsClient(builder, settings);
+                builder.setStrictDeprecationMode(strictDeprecationMode);
+                return builder.build();
+            }
         } else {
             configureClient(builder, settings);
+            builder.setStrictDeprecationMode(strictDeprecationMode);
+            return builder.build();
         }
 
-        return builder.build();
+    }
+
+    @Override
+    protected Settings restAdminSettings() {
+        return Settings.builder()
+            .put("http.port", 9200)
+            .put("plugins.security.ssl.http.enabled", isHttps())
+            .put("plugins.security.ssl.http.pemcert_filepath", "sample.pem")
+            .put("plugins.security.ssl.http.keystore_filepath", "test-kirk.jks")
+            .put("plugins.security.ssl.http.keystore_password", "changeit")
+            .build();
     }
 
     private void configureHttpsClient(final RestClientBuilder builder, final Settings settings) {

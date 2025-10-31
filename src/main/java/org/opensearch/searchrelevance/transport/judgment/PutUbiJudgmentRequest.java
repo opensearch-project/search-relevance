@@ -18,23 +18,31 @@ import reactor.util.annotation.NonNull;
 public class PutUbiJudgmentRequest extends PutJudgmentRequest {
     private String clickModel;
     private int maxRank;
+    private String startDate;
+    private String endDate;
 
     public PutUbiJudgmentRequest(
         @NonNull JudgmentType type,
         @NonNull String name,
         @NonNull String description,
         @NonNull String clickModel,
-        int maxRank
+        int maxRank,
+        @NonNull String startDate,
+        @NonNull String endDate
     ) {
         super(type, name, description);
         this.clickModel = clickModel;
         this.maxRank = maxRank;
+        this.startDate = startDate;
+        this.endDate = endDate;
     }
 
     public PutUbiJudgmentRequest(StreamInput in) throws IOException {
         super(in);
         this.clickModel = in.readString();
         this.maxRank = in.readInt();
+        this.startDate = in.readString();
+        this.endDate = in.readString();
     }
 
     @Override
@@ -42,6 +50,8 @@ public class PutUbiJudgmentRequest extends PutJudgmentRequest {
         super.writeTo(out);
         out.writeString(clickModel);
         out.writeInt(maxRank);
+        out.writeString(startDate);
+        out.writeString(endDate);
     }
 
     public String getClickModel() {
@@ -50,5 +60,13 @@ public class PutUbiJudgmentRequest extends PutJudgmentRequest {
 
     public int getMaxRank() {
         return maxRank;
+    }
+
+    public String getStartDate() {
+        return startDate;
+    }
+
+    public String getEndDate() {
+        return endDate;
     }
 }

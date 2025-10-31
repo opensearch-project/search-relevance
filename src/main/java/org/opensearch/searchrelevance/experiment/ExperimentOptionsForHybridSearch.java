@@ -41,8 +41,23 @@ public class ExperimentOptionsForHybridSearch implements ExperimentOptions {
         for (String normalizationTechnique : normalizationTechniques) {
             for (String combinationTechnique : combinationTechniques) {
                 if (includeWeights) {
-                    for (float queryWeightForCombination = weightsRange.getRangeMin(); queryWeightForCombination <= weightsRange
-                        .getRangeMax(); queryWeightForCombination += weightsRange.getIncrement()) {
+                    // use integer-based approach to avoid floating-point precision issues
+                    float min = weightsRange.getRangeMin();
+                    float max = weightsRange.getRangeMax();
+                    float increment = weightsRange.getIncrement();
+
+                    // calculate number of steps to ensure we include all values including the max
+                    int steps = Math.round((max - min) / increment) + 1;
+
+                    for (int i = 0; i < steps; i++) {
+                        // calculate weight, ensuring the last step is exactly the max value
+                        float queryWeightForCombination;
+                        if (i == steps - 1) {
+                            queryWeightForCombination = max;
+                        } else {
+                            queryWeightForCombination = min + (i * increment);
+                        }
+
                         allPossibleParameterCombinations.add(
                             ExperimentVariantHybridSearchDTO.builder()
                                 .normalizationTechnique(normalizationTechnique)

@@ -67,15 +67,15 @@ public class QuerySourceUtil {
      */
     public static void validateHybridQuery(Map<String, Object> fullQueryMap) throws IOException {
         if (fullQueryMap.containsKey("query") == false || fullQueryMap.get("query") instanceof Map == false) {
-            throw new IllegalArgumentException("query in search configuration does not have query");
+            throw new IllegalArgumentException("search configuration must have at least one query");
         }
         Map<String, Object> queryMap = (Map<String, Object>) fullQueryMap.get("query");
         if (queryMap.containsKey("hybrid") == false || queryMap.get("hybrid") instanceof Map<?, ?> == false) {
-            throw new IllegalArgumentException("query in search configuration does must be of type hybrid");
+            throw new IllegalArgumentException("query in search configuration must be of type hybrid");
         }
         Map<String, Object> hybridMap = (Map<String, Object>) queryMap.get("hybrid");
         if (hybridMap.containsKey("queries") == false || hybridMap.get("queries") instanceof List<?> == false) {
-            throw new IllegalArgumentException("hybrid query in search configuration does not have queries");
+            throw new IllegalArgumentException("hybrid query in search configuration does not have sub-queries");
         }
         List<?> queriesMap = (List<?>) hybridMap.get("queries");
         if (queriesMap.size() != NUMBER_OF_SUBQUERIES_IN_HYBRID_QUERY) {

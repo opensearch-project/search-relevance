@@ -40,6 +40,24 @@ public class RestPutSearchConfigurationActionTests extends SearchRelevanceRestTe
         + "\"query\": \"{\\\"match_all\\\": {}}\""
         + "}";
 
+    private static final String INVALID_NAME_TEST_CONTENT = "{"
+        + "\"name\": \"test_name_that_is_way_too_long_and_exceeds_the_fifty_character_limit\","
+        + "\"index\": \"test_index\","
+        + "\"query\": \"{\\\"match_all\\\": {}}\""
+        + "}";
+
+    private static final String INVALID_INDEX_TEST_CONTENT = "{"
+        + "\"name\": \"test_name\","
+        + "\"index\": \"test_index\\\"\","
+        + "\"query\": \"{\\\"match_all\\\": {}}\""
+        + "}";
+
+    private static final String INVALID_QUERY_TEST_CONTENT = "{"
+        + "\"name\": \"test_name\","
+        + "\"index\": \"test_index\","
+        + "\"query\": \"{\\\"match_all\\\": {}}\\\"\""
+        + "}";
+
     @Override
     public void setUp() throws Exception {
         super.setUp();
@@ -130,5 +148,23 @@ public class RestPutSearchConfigurationActionTests extends SearchRelevanceRestTe
         ArgumentCaptor<BytesRestResponse> responseCaptor = ArgumentCaptor.forClass(BytesRestResponse.class);
         verify(channel).sendResponse(responseCaptor.capture());
         assertEquals(RestStatus.INTERNAL_SERVER_ERROR, responseCaptor.getValue().status());
+    }
+
+    public void testPutSearchConfiguration_InvalidName() throws Exception {
+        // Setup
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        RestRequest request = createPutRestRequestWithContent(INVALID_NAME_TEST_CONTENT, "search_configurations");
+        when(channel.request()).thenReturn(request);
+
+        // Execute
+        restPutSearchConfigurationAction.handleRequest(request, channel, client);
+
+        // Verify
+        ArgumentCaptor<BytesRestResponse> responseCaptor = ArgumentCaptor.forClass(BytesRestResponse.class);
+        verify(channel).sendResponse(responseCaptor.capture());
+        assertEquals(RestStatus.BAD_REQUEST, responseCaptor.getValue().status());
+        String response = responseCaptor.getValue().content().utf8ToString();
+        assertTrue("Response should contain 'Invalid name': " + response, response.contains("Invalid name"));
+        assertTrue("Response should contain 'exceeds maximum length': " + response, response.contains("exceeds maximum length"));
     }
 }

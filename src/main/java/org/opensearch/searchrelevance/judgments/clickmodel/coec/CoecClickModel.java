@@ -30,6 +30,7 @@ import org.opensearch.common.unit.TimeValue;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.index.query.BoolQueryBuilder;
 import org.opensearch.index.query.QueryBuilders;
+import org.opensearch.index.query.RangeQueryBuilder;
 import org.opensearch.search.SearchHit;
 import org.opensearch.search.aggregations.AggregationBuilders;
 import org.opensearch.search.aggregations.bucket.terms.Terms;
@@ -77,8 +78,17 @@ public class CoecClickModel extends ClickModel {
     private void getRankAggregatedClickThrough(ActionListener<Map<Integer, Double>> listener) {
         LOGGER.info("Starting rank aggregated clickthrough calculation");
 
+        String startDate = parameters.getStartDate();
+        String endDate = parameters.getEndDate();
+
+        RangeQueryBuilder dateFilter = QueryBuilders.rangeQuery("timestamp")
+            .format("yyyy-MM-dd")
+            .lte(endDate.equals("") ? null : endDate)
+            .gte(startDate.equals("") ? null : startDate);
+
         BoolQueryBuilder queryBuilder = QueryBuilders.boolQuery()
-            .must(QueryBuilders.rangeQuery("event_attributes.position.ordinal").lte(parameters.getMaxRank()));
+            .must(QueryBuilders.rangeQuery("event_attributes.position.ordinal").lte(parameters.getMaxRank()))
+            .must(dateFilter);
 
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder().query(queryBuilder).size(SCROLL_SIZE).timeout(SEARCH_TIMEOUT);
 
@@ -156,8 +166,17 @@ public class CoecClickModel extends ClickModel {
         LOGGER.info("Starting clickthrough rate calculation");
         Map<String, Set<ClickthroughRate>> queriesToClickthroughRates = new ConcurrentHashMap<>();
 
+        String startDate = parameters.getStartDate();
+        String endDate = parameters.getEndDate();
+
+        RangeQueryBuilder dateFilter = QueryBuilders.rangeQuery("timestamp")
+            .format("yyyy-MM-dd")
+            .lte(endDate.equals("") ? null : endDate)
+            .gte(startDate.equals("") ? null : startDate);
+
         BoolQueryBuilder queryBuilder = QueryBuilders.boolQuery()
-            .must(QueryBuilders.rangeQuery("event_attributes.position.ordinal").lte(parameters.getMaxRank()));
+            .must(QueryBuilders.rangeQuery("event_attributes.position.ordinal").lte(parameters.getMaxRank()))
+            .must(dateFilter);
 
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder().query(queryBuilder)
             .size(SCROLL_SIZE)
@@ -703,8 +722,13 @@ public class CoecClickModel extends ClickModel {
                 judgmentRatings.size(),
                 judgmentRatings.stream().mapToInt(item -> ((Map<String, Object>) item.get("ratings")).size()).sum()
             );
-            listener.onResponse(judgmentRatings);
         }
+        LOGGER.debug(
+            "Final judgment ratings size - Queries: {}, Total Documents: {}",
+            judgmentRatings.size(),
+            judgmentRatings.stream().mapToInt(item -> ((Map<String, Object>) item.get("ratings")).size()).sum()
+        );
+        listener.onResponse(judgmentRatings);
     }
 
 }

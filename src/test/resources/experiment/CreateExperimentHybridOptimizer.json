@@ -1,0 +1,7 @@
+{
+    "querySetId": "{{query_set_id}}",
+    "searchConfigurationList": ["{{search_config_id}}"],
+    "size": 2,
+    "judgmentList": ["{{judgment_id}}"],
+    "type": "HYBRID_OPTIMIZER"
+}

@@ -78,7 +78,7 @@ public class QuerySourceUtilTests extends OpenSearchTestCase {
             IllegalArgumentException.class,
             () -> QuerySourceUtil.validateHybridQuery(fullQuery)
         );
-        assertEquals("query in search configuration does not have query", exception.getMessage());
+        assertEquals("search configuration must have at least one query", exception.getMessage());
     }
 
     public void testValidateHybridQuery_InvalidQueryType() {
@@ -89,7 +89,7 @@ public class QuerySourceUtilTests extends OpenSearchTestCase {
             IllegalArgumentException.class,
             () -> QuerySourceUtil.validateHybridQuery(fullQuery)
         );
-        assertEquals("query in search configuration does not have query", exception.getMessage());
+        assertEquals("search configuration must have at least one query", exception.getMessage());
     }
 
     public void testValidateHybridQuery_MissingHybrid() {
@@ -101,7 +101,7 @@ public class QuerySourceUtilTests extends OpenSearchTestCase {
             IllegalArgumentException.class,
             () -> QuerySourceUtil.validateHybridQuery(fullQuery)
         );
-        assertEquals("query in search configuration does must be of type hybrid", exception.getMessage());
+        assertEquals("query in search configuration must be of type hybrid", exception.getMessage());
     }
 
     public void testValidateHybridQuery_InvalidHybridType() {
@@ -114,7 +114,7 @@ public class QuerySourceUtilTests extends OpenSearchTestCase {
             IllegalArgumentException.class,
             () -> QuerySourceUtil.validateHybridQuery(fullQuery)
         );
-        assertEquals("query in search configuration does must be of type hybrid", exception.getMessage());
+        assertEquals("query in search configuration must be of type hybrid", exception.getMessage());
     }
 
     public void testValidateHybridQuery_MissingQueries() {
@@ -128,7 +128,7 @@ public class QuerySourceUtilTests extends OpenSearchTestCase {
             IllegalArgumentException.class,
             () -> QuerySourceUtil.validateHybridQuery(fullQuery)
         );
-        assertEquals("hybrid query in search configuration does not have queries", exception.getMessage());
+        assertEquals("hybrid query in search configuration does not have sub-queries", exception.getMessage());
     }
 
     public void testValidateHybridQuery_InvalidQueriesType() {
@@ -143,7 +143,7 @@ public class QuerySourceUtilTests extends OpenSearchTestCase {
             IllegalArgumentException.class,
             () -> QuerySourceUtil.validateHybridQuery(fullQuery)
         );
-        assertEquals("hybrid query in search configuration does not have queries", exception.getMessage());
+        assertEquals("hybrid query in search configuration does not have sub-queries", exception.getMessage());
     }
 
     public void testValidateHybridQuery_whenOneSubquery_thenFail() {

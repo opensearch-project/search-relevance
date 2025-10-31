@@ -10,14 +10,12 @@ package org.opensearch.searchrelevance.metrics;
 import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_PAIRWISE_COMPARISON_FIELD_NAME;
 import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_A;
 import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_B;
-import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_SNAPSHOTS;
-import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_SEARCH_CONFIGURATION_ID;
 import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_DOC_IDS;
-import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_METRIC;
-import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_VALUE;
+import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_SEARCH_CONFIGURATION_ID;
+import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_SNAPSHOTS;
 import static org.opensearch.searchrelevance.common.MetricsConstants.POINTWISE_FIELD_NAME_EVALUATION_ID;
-import static org.opensearch.searchrelevance.common.MetricsConstants.POINTWISE_FIELD_NAME_EXPERIMENT_VARIANT_ID;
 import static org.opensearch.searchrelevance.common.MetricsConstants.POINTWISE_FIELD_NAME_EVALUATION_RESULTS;
+import static org.opensearch.searchrelevance.common.MetricsConstants.POINTWISE_FIELD_NAME_EXPERIMENT_VARIANT_ID;
 import static org.opensearch.searchrelevance.common.MetricsConstants.POINTWISE_FIELD_NAME_SEARCH_CONFIGURATION_ID;
 import static org.opensearch.searchrelevance.experiment.QuerySourceUtil.createDefinitionOfTemporarySearchPipeline;
 import static org.opensearch.searchrelevance.metrics.EvaluationMetrics.calculateEvaluationMetrics;
@@ -50,6 +48,7 @@ import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.EvaluationResult;
 import org.opensearch.searchrelevance.model.ExperimentVariant;
+import org.opensearch.searchrelevance.model.SearchConfigurationDetails;
 import org.opensearch.searchrelevance.model.builder.SearchRequestBuilder;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.transport.client.Client;
@@ -62,7 +61,6 @@ import reactor.util.annotation.NonNull;
  * Manager for other local index operations.
  */
 public class MetricsHelper {
-    private final ClusterService clusterService;
     private final Client client;
     private final JudgmentDao judgmentDao;
     private final EvaluationResultDao evaluationResultDao;
@@ -76,7 +74,6 @@ public class MetricsHelper {
         @NonNull EvaluationResultDao evaluationResultDao,
         @NonNull ExperimentVariantDao experimentVariantDao
     ) {
-        this.clusterService = clusterService;
         this.client = client;
         this.judgmentDao = judgmentDao;
         this.evaluationResultDao = evaluationResultDao;
@@ -90,20 +87,25 @@ public class MetricsHelper {
      */
     public void processPairwiseMetrics(
         String queryText,
-        Map<String, List<String>> indexAndQueries,
+        Map<String, SearchConfigurationDetails> searchConfigurations,
         int size,
         ActionListener<Map<String, Object>> listener
     ) {
         Map<String, List<String>> searchConfigToDocIds = Collections.synchronizedMap(new HashMap<>());
         AtomicBoolean hasFailure = new AtomicBoolean(false);
-        AtomicInteger pendingSearches = new AtomicInteger(indexAndQueries.size());
+        AtomicInteger pendingSearches = new AtomicInteger(searchConfigurations.size());
 
-        for (Map.Entry<String, List<String>> entry : indexAndQueries.entrySet()) {
+        for (Map.Entry<String, SearchConfigurationDetails> entry : searchConfigurations.entrySet()) {
             String searchConfigId = entry.getKey();
-            String index = entry.getValue().get(0);
-            String query = entry.getValue().get(1);
+            SearchConfigurationDetails configDetails = entry.getValue();
 
-            SearchRequest searchRequest = buildSearchRequest(index, query, queryText, null, size);
+            SearchRequest searchRequest = buildSearchRequest(
+                configDetails.getIndex(),
+                configDetails.getQuery(),
+                queryText,
+                configDetails.getPipeline(),
+                size
+            );
 
             client.search(searchRequest, new ActionListener<SearchResponse>() {
                 @Override
@@ -174,27 +176,6 @@ public class MetricsHelper {
         if (hasFailure.compareAndSet(false, true)) {
             listener.onFailure(error);
         }
-    }
-
-    /**
-     * Create evaluation results for provided queryText
-     * @param queryText - queryText to be evaluated against
-     * @param indexAndQueries - "${searchConfigId}" to ["$index", "$queryPattern"] map
-     * And will add evaluationId back to experiment results
-     *  "results" {
-     *     "${queryText}": {
-     *         "${searchConfigId}": "${evaluationId}"
-     *     }
-     *  }
-     */
-    public void processEvaluationMetrics(
-        String queryText,
-        Map<String, List<String>> indexAndQueries,
-        int size,
-        List<String> judgmentIds,
-        ActionListener<Map<String, Object>> listener
-    ) {
-        processEvaluationMetrics(queryText, indexAndQueries, size, judgmentIds, listener, List.of());
     }
 
     public void processEvaluationMetrics(
@@ -529,10 +510,15 @@ public class MetricsHelper {
                                 }
                                 if (pendingConfigurations.decrementAndGet() == 0) {
                                     Map<String, Object> transformedConfigToExperimentVariants = new HashMap<>();
-                                    transformedConfigToExperimentVariants.put(POINTWISE_FIELD_NAME_SEARCH_CONFIGURATION_ID, searchConfigurationId);
-                                    
+                                    transformedConfigToExperimentVariants.put(
+                                        POINTWISE_FIELD_NAME_SEARCH_CONFIGURATION_ID,
+                                        searchConfigurationId
+                                    );
+
                                     List<Map<String, Object>> evaluationResults = new ArrayList<>();
-                                    Map<String, Object> configMap = (Map<String, Object>) configToExperimentVariants.get(searchConfigurationId);
+                                    Map<String, Object> configMap = (Map<String, Object>) configToExperimentVariants.get(
+                                        searchConfigurationId
+                                    );
                                     configMap.forEach((variantId, evalId) -> {
                                         Map<String, Object> result = new HashMap<>();
                                         result.put(POINTWISE_FIELD_NAME_EVALUATION_ID, evalId);
@@ -540,7 +526,7 @@ public class MetricsHelper {
                                         evaluationResults.add(result);
                                     });
                                     transformedConfigToExperimentVariants.put(POINTWISE_FIELD_NAME_EVALUATION_RESULTS, evaluationResults);
-                                    
+
                                     listener.onResponse(transformedConfigToExperimentVariants);
                                 }
                             }, listener::onFailure);

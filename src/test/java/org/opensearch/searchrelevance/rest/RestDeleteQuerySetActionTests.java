@@ -135,6 +135,6 @@ public class RestDeleteQuerySetActionTests extends SearchRelevanceRestTestCase {
 
         // Verify the exception details
         assertEquals("id cannot be null", exception.getMessage());
-        assertEquals(RestStatus.INTERNAL_SERVER_ERROR, exception.status());
+        assertEquals(RestStatus.BAD_REQUEST, exception.status());
     }
 }

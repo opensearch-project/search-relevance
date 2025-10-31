@@ -49,6 +49,10 @@ public class ChunkResult {
         this.failedChunks = new HashMap<>(failedChunks);
     }
 
+    public int getChunkIndex() {
+        return chunkIndex;
+    }
+
     public int getSuccessfulChunksCount() {
         return succeededChunks.size();
     }

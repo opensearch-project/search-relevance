@@ -7,6 +7,8 @@
  */
 package org.opensearch.searchrelevance.transport.queryset;
 
+import static org.opensearch.searchrelevance.ubi.UbiValidator.checkUbiIndicesExist;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -61,6 +63,11 @@ public class PostQuerySetTransportAction extends HandledTransportAction<PostQuer
 
         String name = request.getName();
         String description = request.getDescription();
+
+        if (!checkUbiIndicesExist(clusterService)) {
+            throw new SearchRelevanceException("UBI is not initialized", RestStatus.CONFLICT);
+        }
+        ;
 
         // Given sampling type and querySetSize, build the queryset accordingly
         String sampling = request.getSampling();

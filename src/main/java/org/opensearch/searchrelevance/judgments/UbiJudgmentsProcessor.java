@@ -45,9 +45,11 @@ public class UbiJudgmentsProcessor implements BaseJudgmentsProcessor {
         EventStatsManager.increment(EventStatName.UBI_JUDGMENT_RATING_GENERATIONS);
         String clickModel = (String) metadata.get("clickModel");
         int maxRank = (int) metadata.get("maxRank");
+        String startDate = (String) metadata.get("startDate");
+        String endDate = (String) metadata.get("endDate");
 
         if (CoecClickModel.CLICK_MODEL_NAME.equalsIgnoreCase(clickModel)) {
-            final CoecClickModelParameters coecClickModelParameters = new CoecClickModelParameters(maxRank);
+            final CoecClickModelParameters coecClickModelParameters = new CoecClickModelParameters(maxRank, startDate, endDate);
             final CoecClickModel coecClickModel = new CoecClickModel(client, coecClickModelParameters);
 
             // Create StepListener for the click model calculation
@@ -127,7 +129,7 @@ public class UbiJudgmentsProcessor implements BaseJudgmentsProcessor {
                                 // Add the docId and score to the list for the current query
                                 Map<String, String> docScoreMap = new HashMap<>();
                                 docScoreMap.put("docId", docId);
-                                docScoreMap.put("score", rating);
+                                docScoreMap.put("rating", rating);
                                 docIdScoreList.add(docScoreMap);
                             }
 
@@ -143,13 +145,7 @@ public class UbiJudgmentsProcessor implements BaseJudgmentsProcessor {
                     @Override
                     public void onFailure(Exception e) {
                         LOGGER.error("Failed to calculate COEC click model judgments", e);
-                        listener.onFailure(
-                            new SearchRelevanceException(
-                                "Failed to calculate COEC click model judgments",
-                                e,
-                                RestStatus.INTERNAL_SERVER_ERROR
-                            )
-                        );
+                        listener.onFailure(new SearchRelevanceException(e.getLocalizedMessage(), e, RestStatus.INTERNAL_SERVER_ERROR));
                     }
                 });
             } catch (Exception e) {

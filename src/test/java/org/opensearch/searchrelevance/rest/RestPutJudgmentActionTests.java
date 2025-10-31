@@ -230,7 +230,7 @@ public class RestPutJudgmentActionTests extends SearchRelevanceRestTestCase {
             () -> restPutJudgmentAction.handleRequest(request, channel, client)
         );
         assertEquals("modelId is required for LLM_JUDGMENT", exception.getMessage());
-        assertEquals(RestStatus.INTERNAL_SERVER_ERROR, exception.status());
+        assertEquals(RestStatus.BAD_REQUEST, exception.status());
     }
 
     public void testPutJudgment_Failure() throws Exception {

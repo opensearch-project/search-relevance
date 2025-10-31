@@ -28,7 +28,6 @@ public class MetricsConstants {
     public static final String PAIRWISE_FIELD_NAME_DOC_IDS = "docIds";
     public static final String PAIRWISE_FIELD_NAME_METRIC = "metric";
     public static final String PAIRWISE_FIELD_NAME_VALUE = "value";
-    public static final String PAIRWISE_FIELD_NAME_QUERY_TEXT = "queryText";
 
     /**
      * pointwise experiment field names
@@ -43,4 +42,5 @@ public class MetricsConstants {
      */
     public static final String JUDGMENT_IDS = "judgmentIds";
     public static final String MODEL_ID = "modelId";
+    public static final String QUERY_TEXT = "queryText";
 }

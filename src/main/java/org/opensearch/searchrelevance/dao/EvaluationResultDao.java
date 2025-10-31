@@ -65,6 +65,28 @@ public class EvaluationResultDao {
     }
 
     /**
+     * Stores evaluation result to in the system index with efficient refresh policy (recommended for experiments)
+     * @param evaluationResult - EvaluationResult content to be stored
+     * @param listener - action lister for async operation
+     */
+    public void putEvaluationResultEfficient(final EvaluationResult evaluationResult, final ActionListener listener) {
+        if (evaluationResult == null) {
+            listener.onFailure(new SearchRelevanceException("EvaluationResult cannot be null", RestStatus.BAD_REQUEST));
+            return;
+        }
+        try {
+            searchRelevanceIndicesManager.putDocEfficient(
+                evaluationResult.id(),
+                evaluationResult.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS),
+                EVALUATION_RESULT,
+                listener
+            );
+        } catch (IOException e) {
+            throw new SearchRelevanceException("Failed to store evaluationResult", e, RestStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
      * Delete evaluationResult by evaluationResultId
      * @param evaluationResultId - id to be deleted
      * @param listener - action lister for async operation

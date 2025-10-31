@@ -22,7 +22,7 @@ import org.opensearch.test.OpenSearchTestCase;
 public class PutJudgmentActionTests extends OpenSearchTestCase {
 
     public void testStreams() throws IOException {
-        PutJudgmentRequest request = new PutUbiJudgmentRequest(JudgmentType.UBI_JUDGMENT, "name", "description", "coec", 20);
+        PutJudgmentRequest request = new PutUbiJudgmentRequest(JudgmentType.UBI_JUDGMENT, "name", "description", "coec", 20, "", "");
         BytesStreamOutput output = new BytesStreamOutput();
         request.writeTo(output);
         StreamInput in = StreamInput.wrap(output.bytes().toBytesRef().bytes);
@@ -31,10 +31,12 @@ public class PutJudgmentActionTests extends OpenSearchTestCase {
         assertEquals(JudgmentType.UBI_JUDGMENT, serialized.getType());
         assertEquals("description", serialized.getDescription());
         assertEquals("coec", serialized.getClickModel());
+        assertEquals("", serialized.getStartDate());
+        assertEquals("", serialized.getEndDate());
     }
 
     public void testRequestValidation() {
-        PutJudgmentRequest request = new PutUbiJudgmentRequest(JudgmentType.UBI_JUDGMENT, "name", "description", "coec", 20);
+        PutJudgmentRequest request = new PutUbiJudgmentRequest(JudgmentType.UBI_JUDGMENT, "name", "description", "coec", 20, "", "");
         assertNull(request.validate());
     }
 

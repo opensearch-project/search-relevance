@@ -26,6 +26,8 @@ public class PluginConstants {
     public static final String JUDGMENTS_URL = SEARCH_RELEVANCE_BASE_URI + "/judgments";
     /** The URI for this plugin's search configurations rest actions */
     public static final String SEARCH_CONFIGURATIONS_URL = SEARCH_RELEVANCE_BASE_URI + "/search_configurations";
+    /** The URI for initializing the UBI indices */
+    public static final String INITIALIZE_URL = "/_plugins/ubi/initialize";
 
     /** The URI PARAMS placeholders */
     public static final String DOCUMENT_ID = "id";
@@ -58,4 +60,33 @@ public class PluginConstants {
     public static final String UBI_QUERIES_INDEX = "ubi_queries";
     public static final String USER_QUERY_FIELD = "user_query";
     public static final String UBI_EVENTS_INDEX = "ubi_events";
+
+    public static final String CLICK_MODEL = "clickModel";
+    public static final String NAX_RANK = "maxRank";
+    public static final String START_DATE = "startDate";
+    public static final String END_DATE = "endDate";
+
+    /**
+     * Rest Input Field Names
+     */
+    public static final String NAME = "name";
+    public static final String DESCRIPTION = "description";
+    public static final String TYPE = "type";
+    public static final String SAMPLING = "sampling";
+    public static final String QUERY_SET_SIZE = "querySetSize";
+    public static final String QUERY_SET_QUERIES = "querySetQueries";
+    public static final String INDEX = "index";
+    public static final String QUERY = "query";
+    public static final String SEARCH_PIPELINE = "searchPipeline";
+    public static final String SIZE = "size";
+    public static final String QUERYSET_ID = "querySetId";
+    public static final String SEARCH_CONFIGURATION_LIST = "searchConfigurationList";
+    public static final String JUDGMENT_LIST = "judgmentList";
+
+    public static final String JUDGMENT_RATINGS = "judgmentRatings";
+    public static final String CONTEXT_FIELDS = "contextFields";
+    public static final String IGNORE_FAILURE = "ignoreFailure";
+
+    public static final int DEFAULTED_QUERY_SET_SIZE = 10;
+    public static final String MANUAL = "manual";
 }

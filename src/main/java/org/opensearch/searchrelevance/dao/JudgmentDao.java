@@ -103,6 +103,18 @@ public class JudgmentDao {
     }
 
     /**
+     * Get judgment by judgmentId synchronously
+     * @param judgmentId - id to be retrieved
+     * @return SearchResponse containing the judgment
+     */
+    public SearchResponse getJudgmentSync(String judgmentId) {
+        if (judgmentId == null || judgmentId.isEmpty()) {
+            throw new SearchRelevanceException("judgmentId must not be null or empty", RestStatus.BAD_REQUEST);
+        }
+        return searchRelevanceIndicesManager.getDocByDocIdSync(judgmentId, JUDGMENT);
+    }
+
+    /**
      * List judgment by source builder
      * @param sourceBuilder - source builder to be searched
      * @param listener - action lister for async operation

@@ -65,6 +65,28 @@ public class ExperimentVariantDao {
         }
     }
 
+    /**
+     * Stores experiment variant to in the system index with efficient refresh policy (recommended for experiments)
+     * @param experimentVariant - Experiment content to be stored
+     * @param listener - action lister for async operation
+     */
+    public void putExperimentVariantEfficient(final ExperimentVariant experimentVariant, final ActionListener listener) {
+        if (Objects.isNull(experimentVariant)) {
+            listener.onFailure(new SearchRelevanceException("Experiment cannot be null", RestStatus.BAD_REQUEST));
+            return;
+        }
+        try {
+            searchRelevanceIndicesManager.putDocEfficient(
+                experimentVariant.getId(),
+                experimentVariant.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS),
+                EXPERIMENT_VARIANT,
+                listener
+            );
+        } catch (IOException e) {
+            throw new SearchRelevanceException("Failed to store experiment variant", e, RestStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
     public void updateExperimentVariant(final ExperimentVariant experimentVariant, final ActionListener listener) {
         if (experimentVariant == null) {
             listener.onFailure(new SearchRelevanceException("Experiment variant cannot be null", RestStatus.BAD_REQUEST));
@@ -72,6 +94,28 @@ public class ExperimentVariantDao {
         }
         try {
             searchRelevanceIndicesManager.updateDoc(
+                experimentVariant.getId(),
+                experimentVariant.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS),
+                EXPERIMENT_VARIANT,
+                listener
+            );
+        } catch (IOException e) {
+            throw new SearchRelevanceException("Failed to store experiment variant", e, RestStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Update experiment variant with efficient refresh policy (recommended for experiments)
+     * @param experimentVariant - Experiment variant to be updated
+     * @param listener - action lister for async operation
+     */
+    public void updateExperimentVariantEfficient(final ExperimentVariant experimentVariant, final ActionListener listener) {
+        if (experimentVariant == null) {
+            listener.onFailure(new SearchRelevanceException("Experiment variant cannot be null", RestStatus.BAD_REQUEST));
+            return;
+        }
+        try {
+            searchRelevanceIndicesManager.updateDocEfficient(
                 experimentVariant.getId(),
                 experimentVariant.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS),
                 EXPERIMENT_VARIANT,

@@ -351,6 +351,25 @@ echo
 echo
 echo BEGIN HYBRID OPTIMIZER DEMO
 echo
+echo Creating Search Pipeline for Hybrid Query Normalization
+curl -s -X PUT "http://localhost:9200/_search/pipeline/normalization-pipeline" \
+-H "Content-Type: application/json" \
+-d"{
+    \"description\": \"Post processor for hybrid search\",
+    \"phase_results_processors\": [
+        {
+            \"normalization-processor\": {
+                \"normalization\": {
+                    \"technique\": \"min_max\"
+                },
+                \"combination\": {
+                    \"technique\": \"arithmetic_mean\"
+                }
+            }
+        }
+    ]
+}"
+echo
 echo Creating Hybrid Query to be Optimized with model $model_id
 
 exe curl -s -X PUT "http://localhost:9200/_plugins/_search_relevance/search_configurations" \
@@ -358,7 +377,8 @@ exe curl -s -X PUT "http://localhost:9200/_plugins/_search_relevance/search_conf
 -d"{
       \"name\": \"hybrid_query\",
       \"query\": \"{\\\"query\\\":{\\\"hybrid\\\":{\\\"queries\\\":[{\\\"multi_match\\\":{\\\"query\\\":\\\"%SearchText%\\\",\\\"fields\\\":[\\\"id\\\",\\\"title\\\",\\\"category\\\",\\\"bullets\\\",\\\"description\\\",\\\"attrs.Brand\\\",\\\"attrs.Color\\\"]}},{\\\"neural\\\":{\\\"title_embedding\\\":{\\\"query_text\\\":\\\"%SearchText%\\\",\\\"k\\\":100,\\\"model_id\\\":\\\"${model_id}\\\"}}}]}},\\\"size\\\":10}\",
-      \"index\": \"ecommerce\"
+      \"index\": \"ecommerce\",
+      \"searchPipeline\": \"normalization-pipeline\"
 }"
 
 SC_HYBRID=`jq -r '.search_configuration_id' < RES`
