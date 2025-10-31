@@ -82,6 +82,8 @@ public class PluginConstants {
     public static final String QUERYSET_ID = "querySetId";
     public static final String SEARCH_CONFIGURATION_LIST = "searchConfigurationList";
     public static final String JUDGMENT_LIST = "judgmentList";
+    public static final String EVALUATION_RESULT_LIST = "evaluationResultList";
+    public static final String RESULTS = "results";
 
     public static final String JUDGMENT_RATINGS = "judgmentRatings";
     public static final String CONTEXT_FIELDS = "contextFields";

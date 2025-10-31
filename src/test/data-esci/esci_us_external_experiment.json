@@ -1,0 +1,5113 @@
+{
+  "querySetId": "80548dbb-982a-479b-8403-c723d409e316",
+  "searchConfigurationList": [
+    "9e3f1481-7545-4658-b652-bc4bc302e06b"
+  ],
+  "judgmentList": [
+    "f30563d6-f4c0-41b0-bf4c-608efd204e41"
+  ],
+  "type": "POINTWISE_EVALUATION",
+  "size": 1,
+  "evaluationResultList": [
+    {
+      "searchText": "%100 silicone not clear",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B086XGNF7N",
+        "B07CHYCKQM",
+        "B01KB89QVY",
+        "B01EZTPX6M",
+        "B08D9SQ4N8",
+        "B0000CBIH9",
+        "B008XKVLBG",
+        "B00ID8EDKY",
+        "B000KE4PBQ",
+        "B0000AYC09"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.04762
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.04762
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "1.75 leather belts without buckles",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07JGPF4V9",
+        "B0786K78HZ",
+        "B07CZ2MYGQ",
+        "B07KS6FCNX",
+        "B00EUHA3NS",
+        "B00LG2JRQ4",
+        "B00JBJ6EQA",
+        "B084PB28BP",
+        "B074TDY25X",
+        "B07JHDH3X1"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 0.1
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.03333
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.03333
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "1/2 inch binder",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B01N35Z6HU",
+        "B07WNS2R7K",
+        "B09CDYQZ4J",
+        "B07LC1LWQV",
+        "B0013CD0NS",
+        "B0098FKGNE",
+        "B000GAXSZI",
+        "B09CBQXTL7",
+        "B07LBZQGJN",
+        "B00972M9B0"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.01887
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.01887
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "1/2 pint double wall containers without lids",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07F7J6QCN",
+        "B077G76C6J",
+        "B07CN819GC",
+        "B01FR5A0BQ",
+        "B081DFLV9K",
+        "B01G7JUPK2",
+        "B00B80TJXU",
+        "B07D9J51PR",
+        "B01KBLXOB4",
+        "B07CPR86SG"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 0.1
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.0625
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.0625
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "1/2 pvc coupling without stop",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B00D5YLJW6",
+        "B007Q2GRVG",
+        "B06XG8Y28P",
+        "B00HZ4O2TE",
+        "B00HZ5XVRC",
+        "B07GPXJ4HJ",
+        "B00HZSD7JQ",
+        "B008I4FUU0",
+        "B007EI3JDG",
+        "B000BQU3Y6"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.03333
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.03333
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "1/2gallon water bottle without straw",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B08MF3LYTY",
+        "B07CYJW9SV",
+        "B08HMLPH5R",
+        "B08MQ82TQW",
+        "B07X3RFJYL",
+        "B08C37KR1M",
+        "B08D3CQH6R",
+        "B08FD65D89",
+        "B08Y8FSCPH",
+        "B08MDTX76Q"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 0.01
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02857
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02857
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "1/34 faucet drain without overflow solid brass",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B06XGXSRXL",
+        "B08PQLMBFZ",
+        "B07M7RBQ7T",
+        "B08DJ1MKW4",
+        "B0859ZJDX3",
+        "B07VX8FBXC",
+        "B07DF7143T",
+        "B08FSZF39H",
+        "B07DT7J28X",
+        "B017VIWB6Y"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02941
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02941
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "adidas gym bag for women",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07RN2PYHP",
+        "B07RN2PMRX",
+        "B07KGGBSY6",
+        "B07RTDCG9B",
+        "B01ICG7EAW",
+        "B073JRQ48D",
+        "B07RN2GN7Y",
+        "B07RP4DHD7",
+        "B09B18M127",
+        "B07KDSYV59"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02632
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02632
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "airpods 2",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07PXGQC1Q",
+        "B07SKLLYTW",
+        "B07H461TBQ",
+        "B07ZPC9QD4",
+        "B07VG3P25T",
+        "B082XW7VP3",
+        "B07SR1Q1N2",
+        "B07SJJ7FTJ",
+        "B08CDWGYF2",
+        "B08B3SSDKS"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 0.1
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02174
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02174
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "amusement park lego set",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B08Z9KTMYC",
+        "B00X6A8VWA",
+        "B07BJ33KWD",
+        "B08Z9TVQHN",
+        "B07NRSSZC6",
+        "B07XJQP6Y5",
+        "B01CU9WUSS",
+        "B07NDYC9HV",
+        "B08YPBTXXS",
+        "B0896VJ64F"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "apple earbuds",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B081NTMGSW",
+        "B085WQRJYJ",
+        "B07XL1LLHM",
+        "B08BCC1QC8",
+        "B086GT4P1B",
+        "B07PXGQC1Q",
+        "B07J49J1C4",
+        "B01M0GB8CC",
+        "B07RX7BQ67",
+        "B08CXHN5HP"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02273
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02273
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "athletic greens powder",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B084GZNKZQ",
+        "B086H452WJ",
+        "B097HR2RJX",
+        "B07234QKG5",
+        "B0864QG5VG",
+        "B0868X7633",
+        "B002HI1LSI",
+        "B07MTM5T7P",
+        "B07FLDK6ZY",
+        "B078GZ8Y66"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02632
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02632
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "audible books",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B08BQ7SBXZ",
+        "B07RQ9LR1K",
+        "B07Z9MM4BC",
+        "B00JAQ4RUE",
+        "B082FQH4K7",
+        "B07WSFQHSX",
+        "B07KKP62FW",
+        "B081K8T3W4",
+        "B06WVJ7V8H",
+        "B082L5W4HF"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 0.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.0
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.0
+        },
+        {
+          "metric": "Precision@1",
+          "value": 0.0
+        }
+      ]
+    },
+    {
+      "searchText": "baby shower gifts",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07L8QWBX6",
+        "B07BS65TNC",
+        "B0814F7LYL",
+        "B003AM93BW",
+        "B076BN5NSX",
+        "B077TG168M",
+        "B01N2QHCL7",
+        "B083W78VJ9",
+        "B0797J3DWK",
+        "B07J1SP855"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02632
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02632
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "basketball",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07MH6LV4C",
+        "B000A7OUE0",
+        "B08BNPD5QQ",
+        "B00F9KVFSM",
+        "B009H0GUX0",
+        "B003VIET82",
+        "B00HNQD894",
+        "B00AOCV50S",
+        "B00AOCVH38",
+        "B06XG3D8X8"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.01887
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.01887
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "bite not collar",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B003E7A8UI",
+        "B001VP87OY",
+        "B006RQU62S",
+        "B006RQU4SO",
+        "B00MYE3DEU",
+        "B08RP8DQ3D",
+        "B001VPAAS0",
+        "B09D3HLGK4",
+        "B01IT5BMRC",
+        "B00XN209EE"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.01887
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.01887
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "black bardot long off the shoulder",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B08Y172Q75",
+        "B08R81S468",
+        "B08MKY9N3T",
+        "B01MZ6ZQP2",
+        "B08M5TLTHK",
+        "B07ZZ38S58",
+        "B07YYVV6QD",
+        "B07BWBBC78",
+        "B07NL1CZTW",
+        "B07QFRLVJG"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 0.1
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02326
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02326
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "blue suit for baby boy",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B08K8L3957",
+        "B07VNFR76X",
+        "B07XCGF4H2",
+        "B07C8N76JQ",
+        "B0844XDT2N",
+        "B08LNWTQSZ",
+        "B07P713L5V",
+        "B07MLW8XHV",
+        "B07TVLPMMR",
+        "B09DCP5954"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02128
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02128
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "boys pants slim fit",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B078HH9ZKW",
+        "B07T8K9ZQF",
+        "B076HXYQM5",
+        "B07LBMG69M",
+        "B0861ZN527",
+        "B00PIQRPFE",
+        "B01FKZRA1Q",
+        "B00PIQRYEG",
+        "B00NAT23GC",
+        "B01DWNKDUI"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.01923
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.01923
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "brass tray rectangular",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07DLMWDGV",
+        "B07Q56MDXQ",
+        "B07M8SN77Y",
+        "B07Y2X436Y",
+        "B07GC7D714",
+        "B01M60QN8H",
+        "B09135W2Q4",
+        "B004PEP098",
+        "B079R34241",
+        "B00VVF8NKW"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 0.1
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02326
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02326
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "brown belt without buckle",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07S811WQN",
+        "B00DR1EZBE",
+        "B08LXL6ZBQ",
+        "B07C87NMXR",
+        "B088FJ6X1L",
+        "B071FJCFK3",
+        "B07SDFXFJQ",
+        "B08TMDBYRC",
+        "B014QROIGO",
+        "B07XGD2MHS"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 0.1
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "carhartt double front pants for men",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07WFHDQKR",
+        "B01N9V6VQF",
+        "B07CTXPBJC",
+        "B07CT6R8N5",
+        "B00879L05A",
+        "B000FXUW3W",
+        "B000JJIBGM",
+        "B086XJRBTJ",
+        "B07CCPS9TH",
+        "B081VPQKNP"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.01493
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.01493
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "cat treats without chicken",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B01B78M736",
+        "B099G5S455",
+        "B099GK27QV",
+        "B089DPHP7C",
+        "B0727PPPFY",
+        "B00IOTB7PG",
+        "B071P7M2HG",
+        "B0828WNJXC",
+        "B01KVUACDS",
+        "B009GENU4E"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.03846
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.03846
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "cdj stand",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B08G37QHDC",
+        "B001Q3KT38",
+        "B00PJWTD9S",
+        "B077V7LF7J",
+        "B07SC4NXSY",
+        "B0024702P0",
+        "B00BC4POAO",
+        "B07KRPFBR7",
+        "B07VZTKRZT",
+        "B00R1RQIO2"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.05556
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.05556
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "christmas ornaments red and silver",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B08KF5LRC3",
+        "B097Y6L1K6",
+        "B09BMVM6PB",
+        "B098CWKVHK",
+        "B08DRCMR6J",
+        "B071VZ81NZ",
+        "B07PX149LQ",
+        "B09C7KW2CW",
+        "B07RGYZ3X8",
+        "B094V74PSL"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02439
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02439
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "couch pillows",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B01L9B25VU",
+        "B095PR64X3",
+        "B071YDNHDD",
+        "B082T2CC9D",
+        "B0714K41PB",
+        "B07TFDCPKZ",
+        "B01LBMPWVC",
+        "B081N895PP",
+        "B07VDKHLJQ",
+        "B01NBNDC1T"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.01923
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.01923
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "cupshe high waisted tankini",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07PNG12DF",
+        "B075LNPYS2",
+        "B07RZZCMLN",
+        "B07RW893SP",
+        "B07PRZ9JZR",
+        "B07MVYWDQQ",
+        "B0874PC7WQ",
+        "B07MB95CWS",
+        "B0771GKZF1",
+        "B087JDBS7Z"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02632
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02632
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "dek pro",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07NKZCB2R",
+        "B07NNPYXDF",
+        "B07B4MMY2W",
+        "B0002E2EYY",
+        "B0864RSM5S",
+        "B07N9L5934",
+        "B06W2KLM3S",
+        "B08XVM93HM",
+        "B098TTXF4G",
+        "B075QWGLVV"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 0.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.0
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.0
+        },
+        {
+          "metric": "Precision@1",
+          "value": 0.0
+        }
+      ]
+    },
+    {
+      "searchText": "dewalt tool cases without tools",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B00403UMGA",
+        "B01M3SP97Z",
+        "B00KB7VR7M",
+        "B08D3KRHJQ",
+        "B0145NWOI8",
+        "B009L33NA6",
+        "B07878RKF4",
+        "B001P30BO6",
+        "B00HEAPOVO",
+        "B0183RLVSQ"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.05556
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.05556
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "dinnerware sets without mugs",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B0979P28SD",
+        "B082PT6H4L",
+        "B07FJ99G13",
+        "B01M35S2CI",
+        "B086M93X34",
+        "B07QJJMJTN",
+        "B07H443D7N",
+        "B01NAWY68K",
+        "B096N18ZKJ",
+        "B08DVVKXXJ"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02703
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02703
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "disney wired ribbon",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B00NIIEKXO",
+        "B079YWPSC3",
+        "B078WBZ3ST",
+        "B07NN8TDD6",
+        "B085G6X5CL",
+        "B074SBW8C6",
+        "B00TKS2WVI",
+        "B0993MRG38",
+        "B00A23JBC8",
+        "B00WWBBS8S"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02632
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02632
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "dremel cleaning tool",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B079D7XDTN",
+        "B07YKN69Y1",
+        "B00005LEXV",
+        "B008DRY5AI",
+        "B008DRY5AS",
+        "B07YKPDMDR",
+        "B002BAHF8W",
+        "B005JRJE56",
+        "B00LUU2XFO",
+        "B002BAA818"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02439
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02439
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "ecloth",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B003WKSTJY",
+        "B01782YY1I",
+        "B004G621ZG",
+        "B07GC7F2HN",
+        "B0009K6M8U",
+        "B00CRSMR8Q",
+        "B00213R21E",
+        "B07JGRV3TQ",
+        "B01C68771S",
+        "B087N971DQ"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.0303
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.0303
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "ez carafe",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B00UKERBHG",
+        "B00V3U2IUG",
+        "B00WKAQZ0M",
+        "B00NE065YS",
+        "B08F9QT9LT",
+        "B01F8P78IS",
+        "B071NXDFRH",
+        "B01GLLM33S",
+        "B0000CFNE3",
+        "B08W6JCKZM"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.04762
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.04762
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "firestick",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07ZZVX1F2",
+        "B0791TX5P5",
+        "B07YNLBS7R",
+        "B079QHML21",
+        "B07B6NM5MH",
+        "B01IQEADEE",
+        "B07F84C1BL",
+        "B07G1PQFBZ",
+        "B07PTMZL8T",
+        "B07ZKDVHFB"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02381
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02381
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "fitbit charge 3",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07G18N2YY",
+        "B07G26PDJQ",
+        "B07QN22K3V",
+        "B07FTN21JL",
+        "B07PVDBN57",
+        "B07PQZNHDM",
+        "B087F4BCBB",
+        "B088K7DCRZ",
+        "B085XRXJB6",
+        "B07MYHBCWY"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.01613
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.01613
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "flip flops",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07532LQSF",
+        "B00ZUY680M",
+        "B00KXD9SO8",
+        "B00ZUY6XAM",
+        "B0101249TE",
+        "B002SNA7XC",
+        "B07Q1D6KB9",
+        "B00AYRN3MG",
+        "B001N0MHLG",
+        "B07Q1D7JJM"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02381
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02381
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "fragon book",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "0786967293",
+        "0763623296",
+        "B07YSLY61W",
+        "1569756414",
+        "006287716X",
+        "1338341057",
+        "1338347500",
+        "1844483126",
+        "B08C4ZKYC4",
+        "1948040077"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02632
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02632
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "frank damazio",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B01A68X2UK",
+        "0914936840",
+        "0801017629",
+        "0801017610",
+        "1459678311",
+        "B011SXO1F2",
+        "B00V9756B6",
+        "B00LH6AIBW",
+        "B012BTP2ZU",
+        "0914936530"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02941
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02941
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "futon frames full size without mattress",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B08YN1LW59",
+        "B00CHV4808",
+        "B00X4JGAJE",
+        "B00M9IB2O4",
+        "B00CHV47D6",
+        "B074CRWMSG",
+        "B07C2MKQW4",
+        "B07C2PFS34",
+        "B00CHV46QE",
+        "B07J5RQTTW"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 0.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.0
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.0
+        },
+        {
+          "metric": "Precision@1",
+          "value": 0.0
+        }
+      ]
+    },
+    {
+      "searchText": "gift not included batteries",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B019OI2B46",
+        "B00UV9ZEEM",
+        "B08HWXX2YQ",
+        "B07YXMNNTL",
+        "B089XZ3X7T",
+        "B09CGTZBN4",
+        "B08BHPZBWB",
+        "B093D2KXR9",
+        "B07H4RJ7NT",
+        "B096LZDCFB"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 0.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.0
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.0
+        },
+        {
+          "metric": "Precision@1",
+          "value": 0.0
+        }
+      ]
+    },
+    {
+      "searchText": "girdle for women tummy control",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07ZLVST5J",
+        "B08CNB11KY",
+        "B000QWDQR6",
+        "B07FT5MSM9",
+        "B08CXTB34Y",
+        "B08MPYBHBR",
+        "B07WD7TQWN",
+        "B07WN1ZM7M",
+        "B07YNXVGPD",
+        "B07Y3W7PS5"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "guitar",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "0634065408",
+        "B01C92QHLC",
+        "B07QKJNPB2",
+        "B07H5QJW86",
+        "B00OJHISTK",
+        "B078M11DLQ",
+        "B07PMLQM4X",
+        "B078LY6H2Q",
+        "B082HMWCXR",
+        "B07Q465G13"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 0.01
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02326
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02326
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "hair glitter",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B008RZWSV4",
+        "B08YLT372L",
+        "B013R40S3E",
+        "B014HZ9PXG",
+        "B07J1Y35RP",
+        "B07PVD9NS9",
+        "B07RPLMNXN",
+        "B099KM8KPC",
+        "B096F2P8JT",
+        "B07HDPH97K"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02381
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02381
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "ji screwdriver",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B08LHDYTPG",
+        "B086Z7KZYH",
+        "B07ZG4VPZT",
+        "B082FP35M8",
+        "B000TG8OTY",
+        "B000TG8ONA",
+        "B01GZEWJ9O",
+        "B07DPSDQMD",
+        "B085KC6X57",
+        "B000TGF4K6"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02439
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02439
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "jura grinder",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07WQYQDW1",
+        "B08HDJL1B7",
+        "B06Y5SBWRW",
+        "B0056D0QTG",
+        "B073X5CBT1",
+        "B07YXCTX3Q",
+        "B07WNK5KZ1",
+        "B07FK4QP24",
+        "B01B1W5O2O",
+        "B000BJSF6Q"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.04762
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.04762
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "kaweco sketch up pencil",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B01DO1ZV9Q",
+        "B00KKNRHIK",
+        "B00KPOUXKI",
+        "B00WHCAP7C",
+        "B01DQCUU5S",
+        "B00KKNTDXM",
+        "B0077OI0P4",
+        "B01FLHV690",
+        "B01F1VV94I",
+        "B007HNFUPI"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02632
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02632
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "keep grinding hat",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07DDFWG4G",
+        "B07R6TBD9L",
+        "B073TWLRW9",
+        "B071JZ66SM",
+        "B07GGRKQ6S",
+        "B06XZYGZPM",
+        "B07JG6WBQ5",
+        "B07173P58P",
+        "B0058O8C7G",
+        "B072KVS9SB"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02703
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02703
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "kindle",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B00UB76290",
+        "B07DPMXZZ7",
+        "B07978J597",
+        "B07FJ91TLB",
+        "B07L5GMVF8",
+        "B07L5GJD99",
+        "B075RNKT6G",
+        "B07HSJKS3S",
+        "B07RX6H433",
+        "B07F7TLZF4"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.01639
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.01639
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "kindle fire",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07FMPZNQQ",
+        "B07FKR6KXF",
+        "B07KZCYF7D",
+        "B07TMJ1R3X",
+        "B07978J597",
+        "B07K1RZWMC",
+        "B01J6RPGKG",
+        "B07KD718K4",
+        "B07KZJN79L",
+        "B07H8WS1FT"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02174
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02174
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "knife sets without block",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B072Z7M52C",
+        "B084G9C47J",
+        "B095BZRW4K",
+        "B07X3N1TYW",
+        "B0009NMW0Y",
+        "B08NB5P2ZN",
+        "B09C8NX38S",
+        "B08WH8CLS8",
+        "B07XQN2T36",
+        "B004OC1PQI"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 0.1
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02941
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02941
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "lights without wiring with switch",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07P9C1S98",
+        "B0751GBYBZ",
+        "B0052ROEB2",
+        "B08QV2RQ1Z",
+        "B0814R5PSX",
+        "B07G19SQ8P",
+        "B0052RODW2",
+        "B07HRG9WRC",
+        "B07RLMNW19",
+        "B099J82WWB"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02381
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02381
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "listen without prejudice shirt",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B08D8XW54W",
+        "B07K13PDXM",
+        "B07J4LPCR5",
+        "B07CLLWKFY",
+        "B017MY5R8G",
+        "B00NMG0HOS",
+        "B084R7LHV7",
+        "B00NMFQPF4",
+        "B07SJVMBRV",
+        "B00P1NBO9C"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02857
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02857
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "lori wall bed",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07NPJ9MBJ",
+        "B079QRQT54",
+        "B07HJDY265",
+        "B07GX6PD1Y",
+        "B07HJFN7H1",
+        "B0788TG3SJ",
+        "B078SH37VT",
+        "B0108UW2ZC",
+        "B075FGY7G2",
+        "B072DY2MHK"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 0.1
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02778
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02778
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "makeup",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B0855T7NRR",
+        "B015CIV4OA",
+        "B00PFCSURS",
+        "B0773PWTY3",
+        "B01F36JBDM",
+        "B01LZ3RLPC",
+        "B07MV3N6QH",
+        "B01CNZMMV4",
+        "B01F36JEXE",
+        "B01CRB3PLA"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "marshmallows without gelatin",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B097RVQM8L",
+        "B093J6DDJN",
+        "B01EHD67QG",
+        "B00297Z00W",
+        "B01G5ZX3OS",
+        "B01FOY60RI",
+        "B08259XD23",
+        "B08SWS2D9Z",
+        "B08ZSY8CFG",
+        "B0761RK9G9"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.04
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.04
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "marvel against humanity game",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B004S8F7QM",
+        "B084BMW4XS",
+        "B08BJCR25S",
+        "B01DDUHO7A",
+        "B0851Q2NGG",
+        "B01J2R98HW",
+        "B07XZYV61X",
+        "B01J2RYK8E",
+        "B077LTF9VM",
+        "B091FDDJTW"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.0303
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.0303
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "men formal wear",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B073XM9FRV",
+        "B07PQSSVRQ",
+        "B076H3SLKZ",
+        "B079NX6LG8",
+        "B07KQ1JFCF",
+        "B07RRRP649",
+        "B01G9SXNDW",
+        "B0058YTPO0",
+        "B075WRSH3N",
+        "B00JAKK0V0"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.03571
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.03571
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "mens bathing suits without mesh liner",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07QLC6L1Q",
+        "B07QGBN863",
+        "B07PMMMJMM",
+        "B07BVNMKS1",
+        "B08FSWDMSW",
+        "B085Q7SPY9",
+        "B073JDW673",
+        "B008L5JG2Y",
+        "B08VRPSPP1",
+        "B07TC29LPV"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02083
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02083
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "mens one piece bikini",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B06ZZW37NL",
+        "B08TLMTRZM",
+        "B086MDJW4W",
+        "B07R6RGSMH",
+        "B082HWBVRV",
+        "B07F9V1F9K",
+        "B086DP7SBZ",
+        "B07SK8J162",
+        "B08V8C2LF8",
+        "B07TSC7H2V"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02703
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02703
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "mens slippers",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07RWDTHD3",
+        "B07P2JVMP4",
+        "B07S84T68M",
+        "B07G4R8H2T",
+        "B081B9NX37",
+        "B07MQ2BTDL",
+        "B07G4TDYJH",
+        "B01MR34D28",
+        "B07JBX6YLK",
+        "B07RWPZMJ4"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "mens socks black and white",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B0962NQ3FX",
+        "B07K1W7DVX",
+        "B08GQRHCWK",
+        "B0933M47QT",
+        "B07WYRN4V2",
+        "B07WZ6VQ3S",
+        "B00ECZGU8K",
+        "B094PQYZZL",
+        "B07HFXTT6J",
+        "B00W61IITQ"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02381
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02381
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "michael kors handbags",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07SLCQH76",
+        "B07XP9WRQC",
+        "B07XC911BX",
+        "B07NPXHC9Q",
+        "B07NPWPB23",
+        "B07ZC8MDR8",
+        "B07TCMWZ2R",
+        "B07DRNPB8T",
+        "B07YMZDJ2P",
+        "B084D9THWZ"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.03226
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.03226
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "minglife led strip lights 5m",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B084XB3F4W",
+        "B07JP5375R",
+        "B079B834PB",
+        "B00DTOAWZ2",
+        "B08HGQ7H8F",
+        "B087D55WK2",
+        "B088RKGZ45",
+        "B0798NG8KJ",
+        "B07N1BVVC7",
+        "B07Q7SGS6Z"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "mini rc cars for adults",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B09837R51R",
+        "B08FFCFWS8",
+        "B083V3C37S",
+        "B0142M6MTE",
+        "B011VL8PZ8",
+        "B094ZD6YZJ",
+        "B07WCJQ7JJ",
+        "B097T5DPVS",
+        "B08HN1FNWB",
+        "B07T7CVJJX"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02703
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02703
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "mini vending machine",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07JD3BKGV",
+        "B001YQGDS2",
+        "B07LDNN3ZY",
+        "B07N6XHB4R",
+        "B000KS52D2",
+        "B01N210XK1",
+        "B08L9NRGX2",
+        "B0124Q3RNO",
+        "B004TBN4AE",
+        "B08NFGL7H3"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.03226
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.03226
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "muse hummingbird feeder",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B089D3NJ32",
+        "B0827CG2YV",
+        "B07SR4F48L",
+        "B086WWNY2P",
+        "B0194F446C",
+        "B015AKL92C",
+        "B07NPKHCK3",
+        "B08XVML89N",
+        "B0194GFZW8",
+        "B08FHR9BQY"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02439
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02439
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "newborn hospital essentials",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B099DP5NDX",
+        "B075G6XMSF",
+        "B097XSSW76",
+        "B00PK3WFJ6",
+        "B07BYLG8R8",
+        "B003AM93BW",
+        "B07RX5BD32",
+        "B00VXMXN30",
+        "B0898LDWT5",
+        "B078GZQ9XV"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02703
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02703
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "nike shoes men without laces",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07TNRYJHN",
+        "B07QKX9X9G",
+        "B07KZ9P78M",
+        "B07742YB67",
+        "B07LDY4SD2",
+        "B095MHNS8X",
+        "B07H5G6SQB",
+        "B08NYJ899M",
+        "B004IM5K1A",
+        "B07FNK145N"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 0.1
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02778
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02778
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "outdoor ceiling fan without light",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B0060TE5FQ",
+        "B01CDGCVBE",
+        "B007PF6SZO",
+        "B07B484QDV",
+        "B002K8DBOC",
+        "B00ESVXP2M",
+        "B08LL7CYTF",
+        "B08SJ1JMHK",
+        "B091V6BD7M",
+        "B07N4B1STF"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.01724
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.01724
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "paper bags without handles",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B09C6L8KQK",
+        "B09BJJ3WP2",
+        "B08DHSVXVY",
+        "B08DH4351J",
+        "B08BG9R57Z",
+        "B088CQPHYZ",
+        "B085G4HBBZ",
+        "B08LH2TDRP",
+        "B097M6NR2V",
+        "B07F3GHFY7"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 0.1
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02778
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02778
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "petite dressy spandex pants",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07J9XP3B2",
+        "B078B1KP81",
+        "B002Q659F2",
+        "B07LGVZF48",
+        "B07FCSZDHS",
+        "B005M9J6OK",
+        "B09BR5PXT3",
+        "B011B7PZT6",
+        "B099NF322S",
+        "B06XPR6NWY"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.01887
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.01887
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "picnic basket without accessories",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B08C55RZQ9",
+        "B08CHLYMY3",
+        "B01DZXINZM",
+        "B08ZCTSYNW",
+        "B083Q3K3D7",
+        "B07T11P3TF",
+        "B07JBM62MN",
+        "B07BY9Z5TC",
+        "B07R7KSDBM",
+        "B07R8PNT3Y"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02632
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02632
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "pocket planner without dates",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07YZLGMNV",
+        "B08ZJ61PP5",
+        "B08Z3MN9ZG",
+        "B07R7JY91N",
+        "B08FR6Z6XJ",
+        "B08J84HBYW",
+        "B07Y1XPKB4",
+        "B095VTG5ZD",
+        "B08FRBWJX1",
+        "B09GT6XSXY"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 0.1
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02857
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02857
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "polygel nail kit without led lamp",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B08G522TLR",
+        "B08FTJXYTP",
+        "B091576WXQ",
+        "B09CYK52BQ",
+        "B08VN8XWZ2",
+        "B08HJZ5WLB",
+        "B08F9NN8WJ",
+        "B0874KYWPN",
+        "B07TBL64WJ",
+        "B07K2R1TZX"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 0.1
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.03704
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.03704
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "potassium citrate 200mg",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07VB11KGW",
+        "B0041U2PTY",
+        "B01JN8WWQ4",
+        "B07SRVKZ5C",
+        "B08XSQDRLN",
+        "B01KFALQ34",
+        "B01G5EQCJM",
+        "B004DSE56K",
+        "B001AWWC1W",
+        "B071WBQ9G3"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.04
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.04
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "puppy bones for teething long lasting",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B00X1A4UPM",
+        "B00061URQA",
+        "B00X6THK82",
+        "B08PQ8QQV8",
+        "B00X6THK2S",
+        "B01HQMFNIS",
+        "B00JZIDDSO",
+        "B095KSLPM9",
+        "B07R4PXC7B",
+        "B08G57XQ76"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 0.1
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02273
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02273
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "pure monkfruit sweetener without erythritol",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B08QSN37R2",
+        "B07NDP4HZN",
+        "B0941XJ8NV",
+        "B07F9QY944",
+        "B097TNVJHB",
+        "B08CC1FMJQ",
+        "B088FZ67WN",
+        "B08KPV5YW6",
+        "B093B77M6T",
+        "B074HTZKFY"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 0.1
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.03125
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.03125
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "red dog bowl",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B00EUUKRVI",
+        "B074ZN294S",
+        "B004J75MIK",
+        "B07S6CBMHV",
+        "B007CRGE7M",
+        "B00CAO4DJI",
+        "B007CRGCKG",
+        "B07S6C9WMZ",
+        "B00546FN2U",
+        "B07QQS9F6G"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02083
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02083
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "red paddle board",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B00FZ9TDY0",
+        "B07NLJFKFJ",
+        "B07RY953XN",
+        "B08HX3FR5Q",
+        "B0979YTS4D",
+        "B08HX495PT",
+        "B089XVSG5J",
+        "B08PFYCHGC",
+        "B08QZM1VN8",
+        "B095S1FR5X"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "reusable spoon and fork combo",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B09CPYDB47",
+        "B07DD9R5ZJ",
+        "B07R5L89Q9",
+        "B084GVPBY6",
+        "B08GRZ28JQ",
+        "B07SDP3YYC",
+        "B07M94MP9V",
+        "B0843PWS2Y",
+        "B08HYZ2D7N",
+        "B07KPR87T4"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02439
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02439
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "salt gun",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B08CZQ146B",
+        "B08FJFVF59",
+        "B01DUPMZKE",
+        "B01NCAI8GP",
+        "B0991NF2KR",
+        "B098XHLNKB",
+        "B09B7BV2LN",
+        "B07WMSNQCB",
+        "B096FLCDK4",
+        "B07JC9968Z"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02857
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02857
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "sandals for women",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07BMQ2ZJ9",
+        "B07FQPZWWW",
+        "B07CZ32X2L",
+        "B07KPRTH2Y",
+        "B01H6ZR8GU",
+        "B0742G3V1W",
+        "B07RXZY23Q",
+        "B0774VJFTL",
+        "B073XRX1HL",
+        "B075PG5FN4"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02941
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02941
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "shaggy dog board game",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B01MUCC6K3",
+        "B01AYEZD6M",
+        "0735356033",
+        "B07XQYQB45",
+        "B06X15W1SS",
+        "B08CX9DHG2",
+        "B08PSDVPPP",
+        "B0115V13QC",
+        "B083YKHS8H",
+        "B084L2LLGT"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02778
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02778
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "silverware storage box without silverware",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B08J8CYCB8",
+        "B08XB4XFN6",
+        "B078NZNQJF",
+        "B08CR6S5MN",
+        "B083FPCWQX",
+        "B07QMNR72K",
+        "B09575S73T",
+        "B08PFLZ97G",
+        "B072JN56KQ",
+        "B088CXDD4F"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.03226
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.03226
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "sliding window screens",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B084S2Q7XZ",
+        "B08X7DGRBR",
+        "B01N2WTDW5",
+        "B07KWDSWR9",
+        "B07Z4443TS",
+        "B0776ZP83Q",
+        "B075X2TTPK",
+        "B0012S230E",
+        "B0833GPRL1",
+        "B093YP514T"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02703
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02703
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "slip on clogs for women",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B0787KFNRC",
+        "B08PT18TLS",
+        "B078FBC5M5",
+        "B08Z7MPLM7",
+        "B00UBJ1PT0",
+        "B091SJ69YJ",
+        "B00BIET7CO",
+        "B07MVLF5BX",
+        "B000H0X9YW",
+        "B083Y5J3TH"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "sojos small round polarized sunglasses for women",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07PYNPMBD",
+        "B08XM3WMF6",
+        "B097CYCZVC",
+        "B08YDN99MP",
+        "B06XKNYYWY",
+        "B08JGLDT5P",
+        "B07Z1BBZ4X",
+        "B08JGM1DCT",
+        "B08R8GWH82",
+        "B078JCZ7MX"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02439
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02439
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "spanx leggings for women high waisted",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B071J95FHD",
+        "B072JHHRCR",
+        "B071J95GF9",
+        "B071FP9Q9Z",
+        "B01MXMVO19",
+        "B08NBDFV67",
+        "B01F9S0K2A",
+        "B00K1YHAUS",
+        "B0891SVRD6",
+        "B07PF24XBK"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02439
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02439
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "stain steel deep frying pan",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B08FCGB74R",
+        "B00421AYHM",
+        "B08X6H4PXN",
+        "B08VBN9R6N",
+        "B08GSDQHNW",
+        "B07XC95TG5",
+        "B000LSYEGW",
+        "B08RC1653G",
+        "B01DZX469Y",
+        "B0732NXYNS"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02564
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02564
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "swissqlip deep carry pocket clip",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B081Y5DSK6",
+        "B08YCYZCSW",
+        "B08SLXLHP6",
+        "B08YCRWV1Z",
+        "B08RHY2FY4",
+        "B07KYQZLSJ",
+        "B08RF3HM7J",
+        "B08RHJG454",
+        "B08K65263D",
+        "B08D7TKZ1C"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02941
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02941
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "t towels kitchen",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07NCQWCQS",
+        "B097BV99D8",
+        "B07NPC54DK",
+        "B09CTV1FL6",
+        "B08FMX7LW2",
+        "B00XK69NRW",
+        "B01LX4ZVUJ",
+        "B07D2L8JPV",
+        "B07QLRTGVQ",
+        "B07GSFXGK1"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02564
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02564
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "table top bandsaw for metal",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B078WSWLNB",
+        "B07PXKZWFK",
+        "B00367WB0G",
+        "B077QMBTLP",
+        "B07VBNWRP9",
+        "B07CLM7HC6",
+        "B08SK9W4Q5",
+        "B01GNTYPZC",
+        "B07NKXFMZP",
+        "B07NMLWD91"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02703
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02703
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "tan strappy heels for women",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B08P6LFKRV",
+        "B077QMJ9QF",
+        "B07LFV45Z7",
+        "B08SL4NS39",
+        "B08N4GH3XH",
+        "B078NL254P",
+        "B01MZZSF5P",
+        "B078P6JJ5P",
+        "B082B665R3",
+        "B078NTLQN6"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.03448
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.03448
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "tank top plus size women",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B01B3IU750",
+        "B08TTJ42NV",
+        "B01HSHI2AW",
+        "B096Z2Q3VH",
+        "B0765PVPGH",
+        "B016LJ5M7E",
+        "B071CQ6MHK",
+        "B07S1P4G2F",
+        "B087RLCMZV",
+        "B07F176LD4"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02941
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02941
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "tape and mudding tools",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B074M7BW77",
+        "B08RP1KDC2",
+        "B01N7T7UZX",
+        "B0045K53N0",
+        "B00NB3U832",
+        "B07RHQJVXJ",
+        "B010PDRK68",
+        "B08NX4NXWH",
+        "B00WL6QNK2",
+        "B0763FB2H6"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02941
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02941
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "tastefully simple spinach and herb dip mix",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B00KOWJNTI",
+        "B079831LYY",
+        "B07HHKZN1Z",
+        "B08JVKSPTZ",
+        "B08Y26BTBB",
+        "B08XN75RZT",
+        "B08XZRYB6H",
+        "B00K05WZLM",
+        "B07982B7K1",
+        "B07982QX7W"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 0.1
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.03125
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.03125
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "tennis lacoste hombre",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B06ZYJ4B62",
+        "B009PO07A0",
+        "B07SRWFHXT",
+        "B06ZZY13VF",
+        "B07G4DMSP3",
+        "B07L2RQN47",
+        "B08BRBQYZB",
+        "B01LZM4O28",
+        "B08BR8D9DQ",
+        "B0832BN715"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02381
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02381
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "the one for whom food is not enough gorman",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B09B36MRLR",
+        "B09B2ZB5SB",
+        "B09B36MR94",
+        "B09B66GSJT",
+        "B09B36MRGM",
+        "B09B36MRGH",
+        "B09B36MRGZ",
+        "B09B35B2SR",
+        "B09B36MRGG",
+        "B09B2CJFXY"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 0.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.0
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.0
+        },
+        {
+          "metric": "Precision@1",
+          "value": 0.0
+        }
+      ]
+    },
+    {
+      "searchText": "thin leather strap",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B01JOOM9GK",
+        "B084FYL8XF",
+        "B08YJ8GDTM",
+        "B01LWY5BIX",
+        "B07GBVDXXZ",
+        "B07ZPXGKBZ",
+        "B087PG6FT5",
+        "B07C12J2VY",
+        "B07967D9QR",
+        "B095PBHC73"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 0.1
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02941
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02941
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "tissa long bottle cleaning brush",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07BJWQNJB",
+        "B074M9TTLT",
+        "B01CQG6II8",
+        "B074MWRZ7J",
+        "B073VSHW6Z",
+        "B07VVBXHW1",
+        "B073P5MKR1",
+        "B01MYUSVT4",
+        "B07L2TQ26R",
+        "B07G4ZG7L4"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "to boot new york mens shoes",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07MLMSWJK",
+        "B07XBDYW1S",
+        "B08FSH3F9V",
+        "B000J4DD1A",
+        "B07WH513WH",
+        "B074WG3BSF",
+        "B08CN432QW",
+        "B08H4W15DN",
+        "B07X9GJCK4",
+        "B07XB3GFXC"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 0.1
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02703
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02703
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "toddler water bottle without straw",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B08X45X1RZ",
+        "B08J7S21L2",
+        "B08V6LJ9J6",
+        "B08MZ3S29N",
+        "B08X43SYP7",
+        "B08BZDJM84",
+        "B0919QNWZ1",
+        "B0797XQ4VV",
+        "B08XVWRBGC",
+        "B09BK79XYL"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.03571
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.03571
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "tool wrap",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B01IDZU8V4",
+        "B08BRV8PF4",
+        "B08GP5N37K",
+        "B01MR4AXIR",
+        "B0822G58YZ",
+        "B07VQCJDGL",
+        "B07PHNYQM3",
+        "B0989FVF3V",
+        "B07NNS1G8N",
+        "B07GP1MSLW"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 0.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.0
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.0
+        },
+        {
+          "metric": "Precision@1",
+          "value": 0.0
+        }
+      ]
+    },
+    {
+      "searchText": "toothpaste without sweetner",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07L2M5C9C",
+        "B01GHFBKKA",
+        "B015T474SC",
+        "B015CVWCN4",
+        "B000YDYWNE",
+        "B00DRE029A",
+        "B07YXG4SKJ",
+        "B01BNEWDFQ",
+        "B01BNEUV9Q",
+        "B0795VHRJZ"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "torino brush medium soft",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07JZ2Y3PP",
+        "B07GWR5F7S",
+        "B07D6DV94Q",
+        "B07S5XK6C1",
+        "B07GV69THS",
+        "B07GWNYYMX",
+        "B0797TPBPQ",
+        "B07D6DDVZF",
+        "B08BYXYC6Z",
+        "B07MYZ9NL5"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "tortillas without interesterified soybean oil”",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B0053DJYOC",
+        "B006E8OGNY",
+        "B071XY8BDQ",
+        "B08C57H945",
+        "B01ETVH4I6",
+        "B0763GC8SB",
+        "B00C3FWXIC",
+        "B07TDC5F9V",
+        "B000R4FHZW",
+        "B00P2DKCHG"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.1
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.1
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "tresemme shampoo anti breakage",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B00WADNHHI",
+        "B00WADNDC2",
+        "B00TBJSR1A",
+        "B00WADNMJ6",
+        "B09HL59HVT",
+        "B06Y1V419P",
+        "B06Y1BWL1Q",
+        "B06Y1C1JLM",
+        "B01LZWP9Q7",
+        "B01AM5FAHK"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02632
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02632
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "trp spyre",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07S7TGFLZ",
+        "B075ZZV4FG",
+        "B07Z3LDJ17",
+        "B00GHPRDNE",
+        "B0763QF8TK",
+        "B0763Q6BXY",
+        "B079P7G356",
+        "B07915SZW1",
+        "B078W642RM",
+        "B00JY8394S"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02778
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02778
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "tub wall mount high spout clawfoot tub faucet w/ handshower",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07Y6PHB6R",
+        "B07DB6Y9VZ",
+        "B08JKWC2Z3",
+        "B07T9GCKF7",
+        "B0719CZQLX",
+        "B07MW2JG61",
+        "B07ZST2K32",
+        "B012IYVG94",
+        "B07FD52PRY",
+        "B013NV1DTE"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02703
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02703
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "ua vital woven pants",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07PT8F44G",
+        "B07QXL7S2P",
+        "B01A02T44U",
+        "B07SLCBM2S",
+        "B01MA6GYX0",
+        "B07PNRZ667",
+        "B07SRXPZCG",
+        "B07TBSDR8C",
+        "B077BHP2GV",
+        "B077XQR6KH"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02564
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02564
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "ugg dakota slippers women",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B083RV29YQ",
+        "B0792MJKD9",
+        "B07NCC5TV6",
+        "B0792TCWF6",
+        "B0026FBJV6",
+        "B005C9WZHA",
+        "B001MHD5NO",
+        "B082Y43JNN",
+        "B001HWYRDQ",
+        "B083RV3K9S"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02857
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02857
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "ugg slippers women",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B08WPXN1W7",
+        "B083RT19BS",
+        "B082HHWYWD",
+        "B0042VIZDW",
+        "B082Y4HLJ4",
+        "B08WPVTD8H",
+        "B08WQ2WG36",
+        "B07T485PYW",
+        "B08YNP4GK2",
+        "B084485683"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.01538
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.01538
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "ultimate guard french tarot",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B00P9FJP5C",
+        "B06XGQNQY3",
+        "B00I99UWXE",
+        "B00GIQKJ9M",
+        "B0771RFC3J",
+        "B00VBQHNSE",
+        "B016CWIEL6",
+        "B00VBQJJQS",
+        "B00GIQKFWS",
+        "B00M6XJSN4"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02326
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02326
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "uniwit mini portable vocal/instrument microphone",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B019F8ALVU",
+        "B08F7XGFZ4",
+        "B082RWP8K1",
+        "B08MT6ZVF2",
+        "B08M9NMQF2",
+        "B08CCTF9N6",
+        "B08PFZJL5H",
+        "B087WGGZ3S",
+        "B08F7XHJJ3",
+        "B082RX35BR"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02564
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02564
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "us divers snorkeling gear for adults",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B00BUMDTQO",
+        "B08VFHWC99",
+        "B005XYI6RC",
+        "B08XW25Y87",
+        "B08P6MKXYG",
+        "B08Z1T46BC",
+        "B08Z41RBRQ",
+        "B0925WTTHQ",
+        "B005XYI7FS",
+        "B07Q2525SX"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "usb lunch box",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B09D3Q9KKJ",
+        "B094MN44ZX",
+        "B08PH9365N",
+        "B0952NSZYF",
+        "B0924PJF5C",
+        "B08K43JRBS",
+        "B0953J1497",
+        "B09B216MDP",
+        "B086GTT8HJ",
+        "B092S88QK9"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02564
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02564
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "vegan benzoyl peroxide face wash",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B00PO7GKLM",
+        "B00FLI6ESI",
+        "B0788M5QB6",
+        "B071HVKYJF",
+        "B081KL2QYJ",
+        "B088XXT7D9",
+        "B00D5X791C",
+        "B081KLNHSG",
+        "B07DKFBFDX",
+        "B00G3LZ02I"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "vermont american drill bit set",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B00004YWKI",
+        "B00004YWM8",
+        "B000ETWIKM",
+        "B00004YXBH",
+        "B000CFLA52",
+        "B001VND9EE",
+        "B074GYFPL4",
+        "B000GAX48E",
+        "B004GIO0F8",
+        "B00004RHBF"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "vibe mattress",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07W2RPPBS",
+        "B074NDQ143",
+        "B085H466BX",
+        "B07QCT69YG",
+        "B07BTRDGRM",
+        "B0864NF6ND",
+        "B0861H48YH",
+        "B0851XH83H",
+        "B083YYBNF9",
+        "B00UVAJUBO"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "vinpositine",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B000264OY0",
+        "B00A0IM72G",
+        "B000Q6BHVY",
+        "1890766089",
+        "B004TSW566",
+        "B01AB175X2",
+        "B086CDKQC8",
+        "B079YF1K1B",
+        "B01A9WLFZC",
+        "B01NCTY3HW"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.03226
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.03226
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "w af1 shadow se",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B08L8TCTP6",
+        "B08L1JQVVW",
+        "B084KWPVXS",
+        "B091D76VZM",
+        "B088MBX7B3",
+        "B094XH3VB7",
+        "B07YN28ZQL",
+        "B091DC4YT1",
+        "B084VBT815",
+        "B09451ZB5H"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "wall beds & murphy bed queen",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B01KH7UEBA",
+        "B07GX6PD1Y",
+        "B078SG8YHM",
+        "B07GX68J25",
+        "B07GB7K1BX",
+        "B018A8R2EA",
+        "B078SH37VT",
+        "B01KH7UCDA",
+        "B01MRWRJJX",
+        "B07VQFXCZM"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 0.1
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02128
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02128
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "wall lamp without cord",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B06ZYB3BLB",
+        "B098NGKW6T",
+        "B097MNBK2V",
+        "B0833N3GJ5",
+        "B08K78XN1T",
+        "B08JPMRSK8",
+        "B085HKX11B",
+        "B08LVGGJNH",
+        "B07V1QX2TF",
+        "B08LZBDC5J"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.03333
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.03333
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "watch the game not your phone tshirt",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07PH1XDQP",
+        "B07CY9GPCJ",
+        "B07JD9L9Z7",
+        "B0155K16A2",
+        "B012XYPNZ2",
+        "B07DNBRW8L",
+        "B00WDS9MTW",
+        "B07XY6SJBQ",
+        "B0162A4HGY",
+        "B00NMFDCOG"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 0.1
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.04762
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.04762
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "weighted blanket without glass beads",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07R69GPSS",
+        "B07C1DBNYP",
+        "B082WYP5YL",
+        "B092VDT81N",
+        "B07GZZ17MN",
+        "B082S182WQ",
+        "B074BX8YMW",
+        "B07S5JQ946",
+        "B07RX2YHSQ",
+        "B08RXG4PDH"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 0.1
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.03571
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.03571
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "western black and white wall art",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B099N5ZDCH",
+        "B00XQZ6MZI",
+        "B084ZMM17F",
+        "B08NF4C5H1",
+        "B08LQVWYVW",
+        "B079N35YFF",
+        "B07BH2YNXC",
+        "B07GSS5L68",
+        "B08RDG5C29",
+        "B07DNWMLY4"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "where the crawdads sing",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "0735219095",
+        "B0874JJFLV",
+        "B07FSXPMHY",
+        "B07T56PWBF",
+        "B07R6LD6NX",
+        "7540492880",
+        "B08H2C71GW",
+        "0593187989",
+        "B07ZDJ64PG",
+        "1078247366"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.05882
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.05882
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "whisk made in usa",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B00DJ6BCRC",
+        "B000NP0UOS",
+        "B07TPY1S22",
+        "B06ZXTXVM7",
+        "B000H7O3O0",
+        "B01AVIK9AQ",
+        "B08Q3DYHYL",
+        "B07D7893HT",
+        "B07R6T8JPV",
+        "B00MHNZ85U"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "white desk chair without wheels",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B00IKBL2ZS",
+        "B08R66CYGD",
+        "B0957LR3VM",
+        "B005NNQ26A",
+        "B08XQKMNZF",
+        "B07QLR12BV",
+        "B08MDNBPDY",
+        "B07FDYXHTV",
+        "B08ZSRWJ6Y",
+        "B07L4HJZLC"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.0303
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.0303
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "white sexy dress pants for women",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B074Z266LG",
+        "B07FNFHBKT",
+        "B07WWV8KLT",
+        "B07CBYXFH5",
+        "B07FDXY3W1",
+        "B097R8BPVB",
+        "B08L5KXG1B",
+        "B0824KJF12",
+        "B07D8JYLFJ",
+        "B094V1XJ5N"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.03333
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.03333
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "white shades glasses for women",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07W7121ZZ",
+        "B08WZ45M8T",
+        "B07GCDDPHJ",
+        "B087TVBMGV",
+        "B07BKQGGZH",
+        "B07WBXKNFQ",
+        "B083JY15VX",
+        "B078RJP4CQ",
+        "B0749GVLD9",
+        "B08NVSR736"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "whole nature whole food multivitamin",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B0774242NN",
+        "B01FYDIP4K",
+        "B07LDDKQ3M",
+        "B01FYDCGZ4",
+        "B07Q1JYQ8Y",
+        "B06XPTH9H2",
+        "B08P291YZ4",
+        "B0714F43GF",
+        "B01N5FWWSJ",
+        "B07Y2D8HLH"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 0.1
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "wind up clocks without battery",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07RGVKDJY",
+        "B07HRXC529",
+        "B06XR712K7",
+        "B07K2PJMLQ",
+        "B08YK4HVF5",
+        "B01MQ14X03",
+        "B09B1876ZH",
+        "B07SM7458R",
+        "B01LT790WQ",
+        "B07ZQ4J239"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.03333
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.03333
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "wine glasses without stem",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B01L7OX9S2",
+        "B07GZD6MJB",
+        "B07F3FMJZ5",
+        "B07376L9FC",
+        "B081V9NGMW",
+        "B01M11A5KD",
+        "B07RDMC7Z3",
+        "B07N1Z8XC7",
+        "B07Y29Z1V1",
+        "B00CRCZXN8"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02857
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02857
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "winter skirts for women",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07H7H9WR8",
+        "B08M3HYRST",
+        "B07KR3CSL8",
+        "B08LKCH552",
+        "B098DG6XHM",
+        "B08KXQXM93",
+        "B07JGT2F52",
+        "B07MKLZ5FW",
+        "B07ZP499LG",
+        "B011K36Q5S"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02703
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02703
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "wireless thermostat without c wire",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B00Y6M2OUC",
+        "B07TXLGM83",
+        "B0166QE9QC",
+        "B003KVGMKS",
+        "B07DS2KZSF",
+        "B071GRB33D",
+        "B07N849J21",
+        "B00KQS35XA",
+        "B001O4F8Y4",
+        "B01LTHM8LG"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 0.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.0
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.0
+        },
+        {
+          "metric": "Precision@1",
+          "value": 0.0
+        }
+      ]
+    },
+    {
+      "searchText": "women long lined sports bra",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B08SW9BXVX",
+        "B093QLZ45B",
+        "B08PS31R24",
+        "B08N15CHYC",
+        "B08HN18BWR",
+        "B08CN9CDN6",
+        "B07MQJ3M5C",
+        "B08FX4TXLP",
+        "B01ES47DF8",
+        "B08JTQ4JHP"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02439
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02439
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "women plus petite pants",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B005GVI6E0",
+        "B005GVLE8A",
+        "B005GVKG1Q",
+        "B010D2IHIG",
+        "B01KHBKTAW",
+        "B005GPL3XM",
+        "B07S1PTV6Q",
+        "B0765QH9CB",
+        "B008GE1P6K",
+        "B089TVN32W"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "women's office shoes",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07MPFHLTJ",
+        "B077ZK4LJ2",
+        "B07PFFZZV6",
+        "B01NBPVACF",
+        "B07GQHBNS7",
+        "B07NQ6HX3F",
+        "B008PPSATA",
+        "B01N6P7K5B",
+        "B0125LRTNM",
+        "B078H2FRYL"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02941
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02941
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "womens wigs for white women short hair",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B08CBTDM8J",
+        "B07Y2NBFZ4",
+        "B091D4HSP2",
+        "B096ZJNYQJ",
+        "B07MHV9FPT",
+        "B08L4SF15J",
+        "B08CVCZZRS",
+        "B092QN7FTG",
+        "B08T5XLRKN",
+        "B08ZNGTBGK"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02326
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02326
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "womens witch costumes plus size",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B005MAJ7SO",
+        "B001F7FS6I",
+        "B001F9SL24",
+        "B004UULFD2",
+        "B098RMVZJX",
+        "B00WDYZZP6",
+        "B00BPFNTWK",
+        "B07VS4ZTCZ",
+        "B07975N6TW",
+        "B004WPHSMM"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02857
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02857
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "wood planner makita",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B001ASDU7G",
+        "B006CXOEYM",
+        "B00004YOD3",
+        "B0033WSK5O",
+        "B089HL43J4",
+        "B083FBRQJP",
+        "B00004YOD2",
+        "B01L8O0C90",
+        "B019WA7146",
+        "B000051ZOO"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.0303
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.0303
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "working mans hand cream",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B088RG8CJD",
+        "B00HA7XFXK",
+        "B07V9PH5T4",
+        "B08GL1QHM6",
+        "B01NCAQ66Q",
+        "B08N33XNQC",
+        "B01M2AAHAL",
+        "B079SL3XFR",
+        "B09CW3549F",
+        "B0148PKYXU"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02564
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02564
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "world of golf putting mat",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B002ALIQ3A",
+        "B08XZ35LX1",
+        "B07TCS31GV",
+        "B0777137V2",
+        "B00HXAJ4VQ",
+        "B07MQK81DV",
+        "B00000J6JO",
+        "B08TDSB8SB",
+        "B01M2161CR",
+        "B087WM2J9H"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "yellow bird napkins",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B072QY6R7K",
+        "B00F2JJCRQ",
+        "B08JWRWS5P",
+        "B081YKYGH2",
+        "B07CVK5CKR",
+        "B01N05SLA3",
+        "B07WPXSH4N",
+        "B07NQLW723",
+        "B084V93L3G",
+        "B00BS4X554"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 0.1
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02381
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02381
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "yellow champion hoodie",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07RB6P2BT",
+        "B08CBFCYM5",
+        "B08CBFVGRB",
+        "B081HFCJP7",
+        "B081HFZHXR",
+        "B0746PVKX5",
+        "B08CBGGHL7",
+        "B08CBGJS6G",
+        "B095QL376G",
+        "B08SSSPTVL"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.025
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "your heart and my heart are very old friends",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07ZF99WT7",
+        "B01LYYNAVH",
+        "B07H8KGZTF",
+        "B07Y3ZFNNF",
+        "B07W92MNWV",
+        "B07D6BZBM8",
+        "B08313H2WV",
+        "B07YDTBT6R",
+        "B08M3W3N7X",
+        "B07Z5K3151"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 0.1
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.04348
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.04348
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "yudu screen printing supplies",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B08KHW6RZC",
+        "B0863NXH7W",
+        "B01GSLW2EQ",
+        "B07Y4R8ZYS",
+        "B082NWF81P",
+        "B0716L9WF2",
+        "B08QTSPKTV",
+        "B01GQYCL82",
+        "B07LD33H4W",
+        "B08595MGMT"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 0.1
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.02778
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.02778
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    },
+    {
+      "searchText": "zipper sweaters for women without hoodie",
+      "judgmentIds": "f30563d6-f4c0-41b0-bf4c-608efd204e41",
+      "documentIds": [
+        "B07JV9ZVTT",
+        "B09HQYRXG4",
+        "B01J4KV7O4",
+        "B0995L8X77",
+        "B08H815TC6",
+        "B07DX1Z1MG",
+        "B07SR1RVZ4",
+        "B08F25DL7L",
+        "B0771LBMS6",
+        "B01B77VOYK"
+      ],
+      "metrics": [
+        {
+          "metric": "NDCG@1",
+          "value": 1.0
+        },
+        {
+          "metric": "MAP@1",
+          "value": 0.0303
+        },
+        {
+          "metric": "Recall@1",
+          "value": 0.0303
+        },
+        {
+          "metric": "Precision@1",
+          "value": 1.0
+        }
+      ]
+    }
+  ]
+}
