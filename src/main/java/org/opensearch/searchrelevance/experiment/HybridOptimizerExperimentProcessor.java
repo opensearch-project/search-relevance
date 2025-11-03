@@ -164,6 +164,7 @@ public class HybridOptimizerExperimentProcessor {
             } else {
                 log.info("Found {} document ratings for query: {}", docIdToScores.size(), queryText);
             }
+
             return docIdToScores;
         });
     }
