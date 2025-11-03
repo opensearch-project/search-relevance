@@ -143,9 +143,7 @@ public class HybridOptimizerExperimentProcessor {
                 listener
             );
         }).exceptionally(e -> {
-            if (hasFailure.compareAndSet(false, true)) {
-                listener.onFailure(new Exception("Failed to process judgments", e));
-            }
+            listener.onFailure(new Exception("Failed to process judgments", e));
             return null;
         });
     }
@@ -165,12 +163,8 @@ public class HybridOptimizerExperimentProcessor {
         return CompletableFuture.allOf(judgmentFutures.toArray(new CompletableFuture[0])).thenApply(v -> {
             Map<String, String> docIdToScores = new HashMap<>();
             for (CompletableFuture<SearchResponse> future : judgmentFutures) {
-                try {
-                    SearchResponse response = future.join();
-                    extractJudgmentScores(queryText, response, docIdToScores);
-                } catch (Exception e) {
-                    log.error("Failed to process judgment response: {}", e.getMessage());
-                }
+                SearchResponse response = future.join();
+                extractJudgmentScores(queryText, response, docIdToScores);
             }
 
             if (docIdToScores.isEmpty()) {
