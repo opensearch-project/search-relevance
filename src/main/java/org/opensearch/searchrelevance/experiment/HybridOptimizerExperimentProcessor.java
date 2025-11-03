@@ -129,7 +129,9 @@ public class HybridOptimizerExperimentProcessor {
                 listener
             );
         }).exceptionally(e -> {
-            listener.onFailure(new Exception("Failed to process judgments", e));
+            if (hasFailure.compareAndSet(false, true)) {
+                listener.onFailure(new Exception("Failed to process judgments", e));
+            }
             return null;
         });
     }
@@ -149,18 +151,20 @@ public class HybridOptimizerExperimentProcessor {
         return CompletableFuture.allOf(judgmentFutures.toArray(new CompletableFuture[0])).thenApply(v -> {
             Map<String, String> docIdToScores = new HashMap<>();
             for (CompletableFuture<SearchResponse> future : judgmentFutures) {
-                SearchResponse response = future.join();
-                extractJudgmentScores(queryText, response, docIdToScores);
+                try {
+                    SearchResponse response = future.join();
+                    extractJudgmentScores(queryText, response, docIdToScores);
+                } catch (Exception e) {
+                    log.error("Failed to process judgment response: {}", e.getMessage());
+                }
             }
 
             if (docIdToScores.isEmpty()) {
                 log.warn("No ratings found for query: {} in any judgment responses", queryText);
+            } else {
+                log.info("Found {} document ratings for query: {}", docIdToScores.size(), queryText);
             }
-            log.info("Found {} document ratings for query: {}", docIdToScores.size(), queryText);
             return docIdToScores;
-        }).exceptionally(ex -> {
-            log.error("Failed to process judgment response {}: {}", queryText, ex.getMessage(), ex);
-            throw new RuntimeException(ex);
         });
     }
 
