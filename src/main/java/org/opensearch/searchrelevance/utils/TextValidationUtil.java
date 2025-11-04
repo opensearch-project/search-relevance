@@ -13,6 +13,7 @@ import static org.opensearch.searchrelevance.common.MLConstants.PLACEHOLDER_RESU
 import static org.opensearch.searchrelevance.common.MLConstants.PLACEHOLDER_SEARCH_TEXT;
 
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 import org.opensearch.searchrelevance.model.QueryWithReference;
@@ -246,6 +247,7 @@ public class TextValidationUtil {
             return new ValidationResult(
                 false,
                 String.format(
+                    Locale.ROOT,
                     "Prompt template must include either {{%s}} or {{%s}} placeholder to provide documents for rating. "
                         + "Example: 'Query: {{%s}}\\n\\nDocuments: {{%s}}'",
                     PLACEHOLDER_HITS,
@@ -263,6 +265,7 @@ public class TextValidationUtil {
             return new ValidationResult(
                 false,
                 String.format(
+                    Locale.ROOT,
                     "Prompt template must include either {{%s}} or {{%s}} placeholder to provide the search query. "
                         + "Example: 'Query: {{%s}}\\n\\nDocuments: {{%s}}'",
                     PLACEHOLDER_QUERY_TEXT,
