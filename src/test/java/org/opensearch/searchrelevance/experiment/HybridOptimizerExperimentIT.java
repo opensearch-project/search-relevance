@@ -9,7 +9,9 @@ package org.opensearch.searchrelevance.experiment;
 
 import static org.opensearch.searchrelevance.common.PluginConstants.EVALUATION_RESULT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENTS_URI;
+import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_VARIANT_INDEX;
+import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_INDEX;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -335,4 +337,47 @@ public class HybridOptimizerExperimentIT extends BaseExperimentIT {
         assertNotNull("Document IDs should exist", documentIds);
         assertFalse("Document IDs should not be empty", documentIds.isEmpty());
     }
+
+    @SneakyThrows
+    public void testHybridOptimizerExperiment_whenJudgmentDeleted_thenError() {
+        // Arrange
+        initializeIndexIfNotExist(INDEX_NAME_ESCI);
+
+        String hybridSearchConfigId = createHybridSearchConfiguration(INDEX_NAME_ESCI);
+        String querySetId = createQuerySet();
+        String judgmentId = createJudgment();
+
+        String getJudgmentsByIdUrl = String.join("/", JUDGMENT_INDEX, "_doc", judgmentId);
+        deleteJudgment(getJudgmentsByIdUrl);
+        try {
+            // Act
+            String experimentId = createHybridOptimizerExperiment(querySetId, hybridSearchConfigId, judgmentId);
+            String getExperimentByIdUrl = String.join("/", EXPERIMENT_INDEX, "_doc", experimentId);
+            Thread.sleep(DEFAULT_INTERVAL_MS);
+
+            Response getExperimentResponse = makeRequest(
+                adminClient(),
+                RestRequest.Method.GET.name(),
+                getExperimentByIdUrl,
+                null,
+                null,
+                ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
+            );
+
+            Map<String, Object> getExperimentResultJson = entityAsMap(getExperimentResponse);
+            assertNotNull(getExperimentResultJson);
+            Map<String, Object> experimentSource = (Map<String, Object>) getExperimentResultJson.get("_source");
+            assertNotNull(experimentSource);
+            String status = (String) experimentSource.get("status");
+
+            // Assert
+            assertEquals(experimentId, experimentSource.get("id"));
+            assertEquals("HYBRID_OPTIMIZER", experimentSource.get("type"));
+            assertEquals(querySetId, experimentSource.get("querySetId"));
+            assertEquals("ERROR", status);
+        } finally {
+            deleteIndex(INDEX_NAME_ESCI);
+        }
+    }
+
 }

@@ -25,6 +25,7 @@ import java.util.Map;
 import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.hc.core5.http.message.BasicHeader;
 import org.opensearch.client.Response;
+import org.opensearch.client.ResponseException;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.searchrelevance.BaseSearchRelevanceIT;
 
@@ -87,6 +88,32 @@ public abstract class BaseExperimentIT extends BaseSearchRelevanceIT {
         // wait for completion of import action
         Thread.sleep(DEFAULT_INTERVAL_MS);
         return judgmentId;
+    }
+
+    protected void deleteJudgment(String getJudgmentsByIdUrl) throws IOException, InterruptedException {
+        Response deleteJudgmentsResponse = makeRequest(
+            client(),
+            RestRequest.Method.DELETE.name(),
+            getJudgmentsByIdUrl,
+            null,
+            null,
+            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
+        );
+        Map<String, Object> deleteJudgmentsResultJson = entityAsMap(deleteJudgmentsResponse);
+        assertNotNull(deleteJudgmentsResultJson);
+        assertEquals("deleted", deleteJudgmentsResultJson.get("result").toString());
+        Thread.sleep(DEFAULT_INTERVAL_MS);
+        expectThrows(
+            ResponseException.class,
+            () -> makeRequest(
+                client(),
+                RestRequest.Method.GET.name(),
+                getJudgmentsByIdUrl,
+                null,
+                null,
+                ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
+            )
+        );
     }
 
     protected String createQuerySet() throws IOException, URISyntaxException {
