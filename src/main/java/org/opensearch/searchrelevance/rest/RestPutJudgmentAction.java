@@ -132,8 +132,15 @@ public class RestPutJudgmentAction extends BaseRestHandler {
                 int tokenLimit = validateTokenLimit(source);
                 List<String> contextFields = ParserUtils.convertObjToList(source, CONTEXT_FIELDS);
 
-                // Prompt template - use simple default if not provided
+                // Prompt template - validate and use simple default if not provided
                 String promptTemplate = (String) source.get(PROMPT_TEMPLATE);
+
+                // Validate prompt template contains required {{hits}} or {{results}} placeholder
+                TextValidationUtil.ValidationResult promptValidation = TextValidationUtil.validatePromptTemplate(promptTemplate);
+                if (!promptValidation.isValid()) {
+                    throw new SearchRelevanceException(promptValidation.getErrorMessage(), RestStatus.BAD_REQUEST);
+                }
+
                 if (promptTemplate == null || promptTemplate.trim().isEmpty()) {
                     promptTemplate = DEFAULT_PROMPT_TEMPLATE;
                 }

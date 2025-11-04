@@ -54,7 +54,7 @@ public class RestPutJudgmentActionTests extends SearchRelevanceRestTestCase {
         + "\"tokenLimit\": 1000,"
         + "\"contextFields\": [\"field1\", \"field2\"],"
         + "\"ignoreFailure\": false,"
-        + "\"promptTemplate\": \"test_prompt_template\","
+        + "\"promptTemplate\": \"Query: {{queryText}}\\\\n\\\\nDocuments: {{hits}}\","
         + "\"llmJudgmentRatingType\": \"SCORE0_1\","
         + "\"overwriteCache\": true"
         + "}";
@@ -279,7 +279,7 @@ public class RestPutJudgmentActionTests extends SearchRelevanceRestTestCase {
 
         // Verify new fields in the captured request
         PutLlmJudgmentRequest capturedRequest = requestCaptor.getValue();
-        assertEquals("test_prompt_template", capturedRequest.getPromptTemplate());
+        assertEquals("Query: {{queryText}}\\n\\nDocuments: {{hits}}", capturedRequest.getPromptTemplate());
         assertEquals("SCORE0_1", capturedRequest.getLlmJudgmentRatingType().name());
         assertEquals(true, capturedRequest.isOverwriteCache());
     }
@@ -313,6 +313,35 @@ public class RestPutJudgmentActionTests extends SearchRelevanceRestTestCase {
         assertTrue(exception.getMessage().contains("Valid values are"));
         assertTrue(exception.getMessage().contains("SCORE0_1"));
         assertTrue(exception.getMessage().contains("RELEVANT_IRRELEVANT"));
+        assertEquals(RestStatus.BAD_REQUEST, exception.status());
+    }
+
+    public void testPutLlmJudgment_InvalidPromptTemplate_MissingHitsPlaceholder() throws Exception {
+        // Setup
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        String content = "{"
+            + "\"name\": \"test_name\","
+            + "\"description\": \"test_description\","
+            + "\"type\": \"LLM_JUDGMENT\","
+            + "\"modelId\": \"test_model_id\","
+            + "\"querySetId\": \"test_query_set_id\","
+            + "\"searchConfigurationList\": [\"config1\", \"config2\"],"
+            + "\"size\": 10,"
+            + "\"tokenLimit\": 1000,"
+            + "\"contextFields\": [\"field1\", \"field2\"],"
+            + "\"ignoreFailure\": false,"
+            + "\"promptTemplate\": \"Query: {{queryText}}\\\\nRate relevance from 0.0 to 1.0\""
+            + "}";
+        RestRequest request = createPutRestRequestWithContent(content, "judgment");
+        when(channel.request()).thenReturn(request);
+
+        // Execute and verify
+        SearchRelevanceException exception = expectThrows(
+            SearchRelevanceException.class,
+            () -> restPutJudgmentAction.handleRequest(request, channel, client)
+        );
+        assertTrue(exception.getMessage().contains("must include either {{hits}} or {{results}} placeholder"));
+        assertTrue(exception.getMessage().contains("Example:"));
         assertEquals(RestStatus.BAD_REQUEST, exception.status());
     }
 }

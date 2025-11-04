@@ -7,6 +7,11 @@
  */
 package org.opensearch.searchrelevance.utils;
 
+import static org.opensearch.searchrelevance.common.MLConstants.PLACEHOLDER_HITS;
+import static org.opensearch.searchrelevance.common.MLConstants.PLACEHOLDER_QUERY_TEXT;
+import static org.opensearch.searchrelevance.common.MLConstants.PLACEHOLDER_RESULTS;
+import static org.opensearch.searchrelevance.common.MLConstants.PLACEHOLDER_SEARCH_TEXT;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -218,6 +223,57 @@ public class TextValidationUtil {
         public QueryWithReference getQueryWithReference() {
             return queryWithReference;
         }
+    }
+
+    /**
+     * Validates that a prompt template contains the required placeholders.
+     * - Must contain {{hits}} or {{results}} to provide documents to the LLM for rating
+     * - Must contain {{queryText}} or {{searchText}} to provide the search query
+     *
+     * @param promptTemplate The prompt template to validate
+     * @return ValidationResult indicating if the template is valid
+     */
+    public static ValidationResult validatePromptTemplate(String promptTemplate) {
+        if (promptTemplate == null || promptTemplate.trim().isEmpty()) {
+            // Null/empty templates are allowed - they will use defaults
+            return new ValidationResult(true, null);
+        }
+
+        // Check if template contains {{hits}} or {{results}} placeholder
+        boolean hasHits = promptTemplate.contains("{{" + PLACEHOLDER_HITS + "}}")
+            || promptTemplate.contains("{{" + PLACEHOLDER_RESULTS + "}}");
+        if (!hasHits) {
+            return new ValidationResult(
+                false,
+                String.format(
+                    "Prompt template must include either {{%s}} or {{%s}} placeholder to provide documents for rating. "
+                        + "Example: 'Query: {{%s}}\\n\\nDocuments: {{%s}}'",
+                    PLACEHOLDER_HITS,
+                    PLACEHOLDER_RESULTS,
+                    PLACEHOLDER_QUERY_TEXT,
+                    PLACEHOLDER_HITS
+                )
+            );
+        }
+
+        // Check if template contains {{queryText}} or {{searchText}} placeholder
+        boolean hasQuery = promptTemplate.contains("{{" + PLACEHOLDER_QUERY_TEXT + "}}")
+            || promptTemplate.contains("{{" + PLACEHOLDER_SEARCH_TEXT + "}}");
+        if (!hasQuery) {
+            return new ValidationResult(
+                false,
+                String.format(
+                    "Prompt template must include either {{%s}} or {{%s}} placeholder to provide the search query. "
+                        + "Example: 'Query: {{%s}}\\n\\nDocuments: {{%s}}'",
+                    PLACEHOLDER_QUERY_TEXT,
+                    PLACEHOLDER_SEARCH_TEXT,
+                    PLACEHOLDER_QUERY_TEXT,
+                    PLACEHOLDER_HITS
+                )
+            );
+        }
+
+        return new ValidationResult(true, null);
     }
 
     /**

@@ -28,6 +28,17 @@ public class MLConstants {
     public static final String OVERWRITE_CACHE = "overwriteCache";
 
     /**
+     * Prompt template placeholder names.
+     * These are the special variables that can be used in custom prompt templates.
+     */
+    public static final String PLACEHOLDER_QUERY_TEXT = "queryText";
+    public static final String PLACEHOLDER_SEARCH_TEXT = "searchText";
+    public static final String PLACEHOLDER_HITS = "hits";
+    public static final String PLACEHOLDER_RESULTS = "results";
+    public static final String PLACEHOLDER_REFERENCE = "reference";
+    public static final String PLACEHOLDER_REFERENCE_ANSWER = "referenceAnswer";
+
+    /**
      * Default prompt template for LLM judgments (simple format without reference data)
      */
     public static final String DEFAULT_PROMPT_TEMPLATE = "SearchText: {{searchText}}; Hits: {{hits}}";

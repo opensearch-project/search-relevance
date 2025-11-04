@@ -9,6 +9,12 @@ package org.opensearch.searchrelevance.ml;
 
 import static org.opensearch.searchrelevance.common.MLConstants.INPUT_FORMAT_SEARCH;
 import static org.opensearch.searchrelevance.common.MLConstants.INPUT_FORMAT_SEARCH_WITH_REFERENCE;
+import static org.opensearch.searchrelevance.common.MLConstants.PLACEHOLDER_HITS;
+import static org.opensearch.searchrelevance.common.MLConstants.PLACEHOLDER_QUERY_TEXT;
+import static org.opensearch.searchrelevance.common.MLConstants.PLACEHOLDER_REFERENCE;
+import static org.opensearch.searchrelevance.common.MLConstants.PLACEHOLDER_REFERENCE_ANSWER;
+import static org.opensearch.searchrelevance.common.MLConstants.PLACEHOLDER_RESULTS;
+import static org.opensearch.searchrelevance.common.MLConstants.PLACEHOLDER_SEARCH_TEXT;
 
 import java.util.Locale;
 import java.util.Map;
@@ -64,8 +70,8 @@ public class UserPromptFactory {
      * Prioritizes "referenceAnswer" key, falls back to concatenating all values.
      */
     private static String getReferenceValue(Map<String, String> referenceData) {
-        if (referenceData.containsKey("referenceAnswer")) {
-            return referenceData.get("referenceAnswer");
+        if (referenceData.containsKey(PLACEHOLDER_REFERENCE_ANSWER)) {
+            return referenceData.get(PLACEHOLDER_REFERENCE_ANSWER);
         }
         // Fallback: concatenate all values with delimiter
         return String.join("; ", referenceData.values());
@@ -76,7 +82,7 @@ public class UserPromptFactory {
      * Supports placeholders like {{variable_name}}.
      *
      * Supported variables:
-     * - {{query}} or {{searchText}} - replaced with the search query
+     * - {{queryText}} or {{searchText}} - replaced with the search query
      * - {{reference}} or {{referenceAnswer}} - replaced with reference answer if available
      * - {{hits}} or {{results}} - replaced with the JSON string of search hits
      * - {{key_name}} - any key from referenceData map (e.g., {{category}}, {{expectedScore}})
@@ -108,20 +114,20 @@ public class UserPromptFactory {
      * Get the value for a template variable.
      */
     private static String getVariableValue(String variableName, String searchText, Map<String, String> referenceData, String hitsJson) {
-        // Handle query/searchText
-        if ("query".equals(variableName) || "searchText".equals(variableName)) {
+        // Handle queryText/searchText
+        if (PLACEHOLDER_QUERY_TEXT.equals(variableName) || PLACEHOLDER_SEARCH_TEXT.equals(variableName)) {
             return searchText != null ? searchText : "";
         }
 
         // Handle hits/results
-        if ("hits".equals(variableName) || "results".equals(variableName)) {
+        if (PLACEHOLDER_HITS.equals(variableName) || PLACEHOLDER_RESULTS.equals(variableName)) {
             return hitsJson != null ? hitsJson : "";
         }
 
         // Handle reference/referenceAnswer
-        if ("reference".equals(variableName) || "referenceAnswer".equals(variableName)) {
-            if (referenceData != null && referenceData.containsKey("referenceAnswer")) {
-                return referenceData.get("referenceAnswer");
+        if (PLACEHOLDER_REFERENCE.equals(variableName) || PLACEHOLDER_REFERENCE_ANSWER.equals(variableName)) {
+            if (referenceData != null && referenceData.containsKey(PLACEHOLDER_REFERENCE_ANSWER)) {
+                return referenceData.get(PLACEHOLDER_REFERENCE_ANSWER);
             }
             return "";
         }

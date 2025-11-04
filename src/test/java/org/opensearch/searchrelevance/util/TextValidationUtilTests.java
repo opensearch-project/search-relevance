@@ -371,4 +371,131 @@ public class TextValidationUtilTests extends SearchRelevanceRestTestCase {
         result = TextValidationUtil.validateQuerySetKey(invalidKey);
         assertFalse("Key with newline should be invalid", result.isValid());
     }
+
+    // ============================================
+    // Prompt Template Validation Tests
+    // ============================================
+
+    public void testValidatePromptTemplate_WithHitsPlaceholder() {
+        // Test valid templates with {{hits}} placeholder and query placeholders
+        List<String> validTemplates = List.of(
+            "Query: {{queryText}}\n\nDocuments: {{hits}}",
+            "Rate these documents: {{hits}}\nQuery: {{queryText}}",
+            "Query: {{queryText}}\nCategory: {{category}}\nDocuments: {{hits}}",
+            "{{queryText}} - {{hits}} - {{referenceAnswer}}",
+            "Search: {{searchText}}\nResults: {{hits}}"
+        );
+
+        for (String template : validTemplates) {
+            TextValidationUtil.ValidationResult result = TextValidationUtil.validatePromptTemplate(template);
+            assertTrue("Template with {{hits}} should be valid: " + template, result.isValid());
+            assertNull("Error message should be null for valid template", result.getErrorMessage());
+        }
+    }
+
+    public void testValidatePromptTemplate_WithResultsPlaceholder() {
+        // Test valid templates with {{results}} placeholder and query placeholders
+        List<String> validTemplates = List.of(
+            "Query: {{queryText}}\n\nDocuments: {{results}}",
+            "Rate these documents: {{results}}\nQuery: {{queryText}}",
+            "Query: {{queryText}}\nCategory: {{category}}\nDocuments: {{results}}",
+            "Search: {{searchText}}\nDocs: {{results}}"
+        );
+
+        for (String template : validTemplates) {
+            TextValidationUtil.ValidationResult result = TextValidationUtil.validatePromptTemplate(template);
+            assertTrue("Template with {{results}} should be valid: " + template, result.isValid());
+            assertNull("Error message should be null for valid template", result.getErrorMessage());
+        }
+    }
+
+    public void testValidatePromptTemplate_NullOrEmpty() {
+        // Null and empty templates are allowed (will use defaults)
+        TextValidationUtil.ValidationResult result = TextValidationUtil.validatePromptTemplate(null);
+        assertTrue("Null template should be valid (uses defaults)", result.isValid());
+        assertNull(result.getErrorMessage());
+
+        result = TextValidationUtil.validatePromptTemplate("");
+        assertTrue("Empty template should be valid (uses defaults)", result.isValid());
+        assertNull(result.getErrorMessage());
+
+        result = TextValidationUtil.validatePromptTemplate("   ");
+        assertTrue("Whitespace-only template should be valid (uses defaults)", result.isValid());
+        assertNull(result.getErrorMessage());
+    }
+
+    public void testValidatePromptTemplate_MissingHitsPlaceholder() {
+        // Test templates missing both {{hits}} and {{results}} placeholders
+        List<String> invalidTemplates = List.of(
+            "Query: {{queryText}}",
+            "Rate relevance from 0.0 to 1.0\nQuery: {{queryText}}\nCategory: {{category}}",
+            "{{queryText}} - {{referenceAnswer}}",
+            "Query: {{query}}\nReference: {{reference}}"
+        );
+
+        for (String template : invalidTemplates) {
+            TextValidationUtil.ValidationResult result = TextValidationUtil.validatePromptTemplate(template);
+            assertFalse("Template without {{hits}} or {{results}} should be invalid: " + template, result.isValid());
+            assertTrue(
+                "Error should mention missing hits placeholder",
+                result.getErrorMessage().contains("must include either {{hits}} or {{results}} placeholder")
+            );
+            assertTrue("Error should provide example", result.getErrorMessage().contains("Example:"));
+        }
+    }
+
+    public void testValidatePromptTemplate_MissingQueryPlaceholder() {
+        // Test templates missing queryText/searchText placeholders
+        List<String> invalidTemplates = List.of(
+            "Documents: {{hits}}",
+            "Rate these documents: {{hits}}\nCategory: {{category}}",
+            "{{hits}} - {{referenceAnswer}}",
+            "Results: {{results}}\nReference: {{reference}}"
+        );
+
+        for (String template : invalidTemplates) {
+            TextValidationUtil.ValidationResult result = TextValidationUtil.validatePromptTemplate(template);
+            assertFalse("Template without query placeholder should be invalid: " + template, result.isValid());
+            assertTrue(
+                "Error should mention missing query placeholder",
+                result.getErrorMessage().contains("must include either {{queryText}} or {{searchText}} placeholder")
+            );
+            assertTrue("Error should provide example", result.getErrorMessage().contains("Example:"));
+        }
+    }
+
+    public void testValidatePromptTemplate_MissingBothPlaceholders() {
+        // Test template missing both required placeholders
+        String template = "Just some plain text without placeholders";
+        TextValidationUtil.ValidationResult result = TextValidationUtil.validatePromptTemplate(template);
+        assertFalse("Template without any placeholders should be invalid", result.isValid());
+        // Should fail on the first check (hits/results)
+        assertTrue(
+            "Error should mention missing hits placeholder",
+            result.getErrorMessage().contains("must include either {{hits}} or {{results}} placeholder")
+        );
+    }
+
+    public void testValidatePromptTemplate_CaseSensitive() {
+        // Test that placeholder matching is case-sensitive
+        List<String> invalidTemplates = List.of(
+            "Query: {{queryText}}\nDocuments: {{HITS}}",
+            "Query: {{queryText}}\nDocuments: {{Hits}}",
+            "Query: {{queryText}}\nDocuments: {{Results}}",
+            "Query: {{queryText}}\nDocuments: {{RESULTS}}"
+        );
+
+        for (String template : invalidTemplates) {
+            TextValidationUtil.ValidationResult result = TextValidationUtil.validatePromptTemplate(template);
+            assertFalse("Case-sensitive: " + template + " should be invalid", result.isValid());
+        }
+    }
+
+    public void testValidatePromptTemplate_BothPlaceholders() {
+        // Test that template can have both {{hits}} and {{results}} (though unusual)
+        String template = "Query: {{queryText}}\nPrimary: {{hits}}\nAlternate: {{results}}";
+        TextValidationUtil.ValidationResult result = TextValidationUtil.validatePromptTemplate(template);
+        assertTrue("Template with both hits and results placeholders should be valid", result.isValid());
+        assertNull(result.getErrorMessage());
+    }
 }

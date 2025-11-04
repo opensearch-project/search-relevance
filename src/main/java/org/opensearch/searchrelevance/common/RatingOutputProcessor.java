@@ -7,6 +7,8 @@
  */
 package org.opensearch.searchrelevance.common;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -19,6 +21,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  */
 public class RatingOutputProcessor {
 
+    private static final Logger log = LogManager.getLogger(RatingOutputProcessor.class);
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private RatingOutputProcessor() {}
@@ -73,21 +76,28 @@ public class RatingOutputProcessor {
      */
     private static String extractJsonFromUnstructuredText(String response) {
         if (response == null || response.trim().isEmpty()) {
+            log.debug("Empty or null response, returning empty array");
             return "[]";
         }
+
+        log.debug("Attempting to extract JSON from unstructured text. Response length: {}", response.length());
 
         // Try to extract JSON from markdown code blocks (```json ... ``` or ``` ... ```)
         String jsonContent = extractFromMarkdownCodeBlock(response);
         if (jsonContent != null) {
+            log.debug("Found markdown code block, attempting to parse");
             try {
                 JsonNode node = OBJECT_MAPPER.readTree(jsonContent);
                 if (node.has("ratings") && node.get("ratings").isArray()) {
+                    log.debug("Successfully extracted ratings array from code block");
                     return node.get("ratings").toString();
                 }
                 if (node.isArray()) {
+                    log.debug("Successfully extracted array from code block");
                     return node.toString();
                 }
             } catch (JsonProcessingException e) {
+                log.debug("Failed to parse JSON from code block: {}", e.getMessage());
                 // Continue to next extraction method
             }
         }
@@ -95,21 +105,31 @@ public class RatingOutputProcessor {
         // Try to find JSON object or array patterns in the text
         jsonContent = extractJsonPattern(response);
         if (jsonContent != null) {
+            log.debug("Found JSON pattern, attempting to parse. Length: {}", jsonContent.length());
             try {
                 JsonNode node = OBJECT_MAPPER.readTree(jsonContent);
                 if (node.has("ratings") && node.get("ratings").isArray()) {
+                    log.debug("Successfully extracted ratings array from pattern");
                     return node.get("ratings").toString();
                 }
                 if (node.isArray()) {
+                    log.debug("Successfully extracted array from pattern");
                     return node.toString();
                 }
                 // If it's an object with ratings, extract it
                 if (node.isObject()) {
+                    log.debug("Wrapping object in array");
                     return "[" + jsonContent + "]";
                 }
             } catch (JsonProcessingException e) {
+                log.warn("Failed to parse extracted JSON pattern. Error: {}. Extracted content: {}", e.getMessage(), jsonContent);
                 // Parsing failed, return empty array
             }
+        } else {
+            log.warn(
+                "No JSON pattern found in response. Response preview: {}",
+                response.length() > 200 ? response.substring(0, 200) + "..." : response
+            );
         }
 
         return "[]";
@@ -165,41 +185,127 @@ public class RatingOutputProcessor {
     }
 
     /**
-     * Finds the matching closing brace for an opening brace.
+     * Finds the matching closing brace for an opening brace using a state machine
+     * that properly handles strings and escaped characters.
+     *
+     * This is a heuristic approach since we don't have access to a full JSON parser state,
+     * but it handles most common LLM response patterns correctly.
+     *
+     * @param text The text to search
+     * @param start The index of the opening brace
+     * @return The index of the matching closing brace, or -1 if not found
      */
     private static int findMatchingBrace(String text, int start) {
         int count = 0;
+        boolean inString = false;
+        char stringQuote = 0; // Track which quote character started the string (" or ')
+        boolean escaped = false;
+
         for (int i = start; i < text.length(); i++) {
             char c = text.charAt(i);
-            if (c == '{') {
-                count++;
-            } else if (c == '}') {
-                count--;
-                if (count == 0) {
-                    return i;
+
+            // Handle escape sequences
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+
+            if (c == '\\') {
+                escaped = true;
+                continue;
+            }
+
+            // Handle string boundaries
+            if (c == '"' || c == '\'') {
+                if (!inString) {
+                    // Entering a string
+                    inString = true;
+                    stringQuote = c;
+                } else if (c == stringQuote) {
+                    // Exiting a string (must match the opening quote)
+                    inString = false;
+                    stringQuote = 0;
+                }
+                continue;
+            }
+
+            // Only count braces outside of strings
+            if (!inString) {
+                if (c == '{') {
+                    count++;
+                } else if (c == '}') {
+                    count--;
+                    if (count == 0) {
+                        return i;
+                    }
                 }
             }
         }
-        return -1;
+
+        log.debug("Failed to find matching brace. Final count: {}, inString: {}", count, inString);
+        return -1; // No matching brace found
     }
 
     /**
-     * Finds the matching closing bracket for an opening bracket.
+     * Finds the matching closing bracket for an opening bracket using a state machine
+     * that properly handles strings and escaped characters.
+     *
+     * This is a heuristic approach since we don't have access to a full JSON parser state,
+     * but it handles most common LLM response patterns correctly.
+     *
+     * @param text The text to search
+     * @param start The index of the opening bracket
+     * @return The index of the matching closing bracket, or -1 if not found
      */
     private static int findMatchingBracket(String text, int start) {
         int count = 0;
+        boolean inString = false;
+        char stringQuote = 0; // Track which quote character started the string (" or ')
+        boolean escaped = false;
+
         for (int i = start; i < text.length(); i++) {
             char c = text.charAt(i);
-            if (c == '[') {
-                count++;
-            } else if (c == ']') {
-                count--;
-                if (count == 0) {
-                    return i;
+
+            // Handle escape sequences
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+
+            if (c == '\\') {
+                escaped = true;
+                continue;
+            }
+
+            // Handle string boundaries
+            if (c == '"' || c == '\'') {
+                if (!inString) {
+                    // Entering a string
+                    inString = true;
+                    stringQuote = c;
+                } else if (c == stringQuote) {
+                    // Exiting a string (must match the opening quote)
+                    inString = false;
+                    stringQuote = 0;
+                }
+                continue;
+            }
+
+            // Only count brackets outside of strings
+            if (!inString) {
+                if (c == '[') {
+                    count++;
+                } else if (c == ']') {
+                    count--;
+                    if (count == 0) {
+                        return i;
+                    }
                 }
             }
         }
-        return -1;
+
+        log.debug("Failed to find matching bracket. Final count: {}, inString: {}", count, inString);
+        return -1; // No matching bracket found
     }
 
     /**
@@ -214,8 +320,21 @@ public class RatingOutputProcessor {
      * @return The rating score as a double value
      */
     public static Double convertRatingScore(Object ratingScoreObj, LLMJudgmentRatingType ratingType) {
+        // Check for null rating score
+        if (ratingScoreObj == null) {
+            throw new IllegalArgumentException(
+                "Missing rating_score field in LLM response. Ensure the prompt template asks the LLM to return JSON with 'rating_score' field."
+            );
+        }
+
         if (ratingType == LLMJudgmentRatingType.RELEVANT_IRRELEVANT) {
             // Handle binary string ratings
+            if (!(ratingScoreObj instanceof String)) {
+                throw new IllegalArgumentException(
+                    "Invalid rating_score type for RELEVANT_IRRELEVANT. Expected String but got: "
+                        + ratingScoreObj.getClass().getSimpleName()
+                );
+            }
             String ratingStr = (String) ratingScoreObj;
             if ("RELEVANT".equals(ratingStr)) {
                 return 1.0;
@@ -226,6 +345,14 @@ public class RatingOutputProcessor {
             }
         } else {
             // Handle numeric ratings (SCORE0_1)
+            if (!(ratingScoreObj instanceof Number)) {
+                throw new IllegalArgumentException(
+                    "Invalid rating_score type for SCORE0_1. Expected Number but got: "
+                        + ratingScoreObj.getClass().getSimpleName()
+                        + ". Value: "
+                        + ratingScoreObj
+                );
+            }
             return ((Number) ratingScoreObj).doubleValue();
         }
     }
