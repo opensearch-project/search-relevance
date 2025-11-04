@@ -431,7 +431,6 @@ public class ExperimentRunningManager {
                     searchConfigurations,
                     judgmentList,
                     request.getSize(),
-                    hasFailure,
                     request.getScheduledExperimentResultId(),
                     cancellationToken,
                     runningFutures,
