@@ -102,15 +102,15 @@ public class UserPromptFactoryTests extends OpenSearchTestCase {
     // ============================================
 
     public void testBuildUserContent_Template_QueryVariable() {
-        // Test replacement of {{query}} variable
+        // Test replacement of {{queryText}} variable
         String searchText = "What is OpenSearch?";
         Map<String, String> referenceData = new HashMap<>();
         String hitsJson = "[{\"id\":\"1\",\"source\":\"doc1\"}]";
-        String template = "User query: {{query}}";
+        String template = "User query: {{queryText}}";
 
         String result = UserPromptFactory.buildUserContent(searchText, referenceData, hitsJson, template);
 
-        assertEquals("Should replace {{query}} with searchText", "User query: What is OpenSearch?", result);
+        assertEquals("Should replace {{queryText}} with searchText", "User query: What is OpenSearch?", result);
     }
 
     public void testBuildUserContent_Template_SearchTextVariable() {
@@ -196,7 +196,7 @@ public class UserPromptFactoryTests extends OpenSearchTestCase {
         referenceData.put("referenceAnswer", "OpenSearch is a search suite");
         referenceData.put("category", "technology");
         String hitsJson = "[{\"id\":\"1\",\"source\":\"doc1\"}]";
-        String template = "Query: {{query}}\nReference: {{referenceAnswer}}\nCategory: {{category}}\nResults: {{hits}}";
+        String template = "Query: {{queryText}}\nReference: {{referenceAnswer}}\nCategory: {{category}}\nResults: {{hits}}";
 
         String result = UserPromptFactory.buildUserContent(searchText, referenceData, hitsJson, template);
 
@@ -213,7 +213,7 @@ public class UserPromptFactoryTests extends OpenSearchTestCase {
         String searchText = "test";
         Map<String, String> referenceData = new HashMap<>();
         String hitsJson = "[{\"id\":\"1\"}]";
-        String template = "Query: {{query}}, Unknown: {{unknownField}}";
+        String template = "Query: {{queryText}}, Unknown: {{unknownField}}";
 
         String result = UserPromptFactory.buildUserContent(searchText, referenceData, hitsJson, template);
 
@@ -226,7 +226,7 @@ public class UserPromptFactoryTests extends OpenSearchTestCase {
         Map<String, String> referenceData = new HashMap<>();
         referenceData.put("category", "tech");
         String hitsJson = "[{\"id\":\"1\"}]";
-        String template = "Query: {{query}}, Reference: {{reference}}";
+        String template = "Query: {{queryText}}, Reference: {{reference}}";
 
         String result = UserPromptFactory.buildUserContent(searchText, referenceData, hitsJson, template);
 
@@ -238,7 +238,7 @@ public class UserPromptFactoryTests extends OpenSearchTestCase {
         String searchText = "test";
         Map<String, String> referenceData = null;
         String hitsJson = "[{\"id\":\"1\"}]";
-        String template = "Query: {{query}}, Results: {{hits}}";
+        String template = "Query: {{queryText}}, Results: {{hits}}";
 
         String result = UserPromptFactory.buildUserContent(searchText, referenceData, hitsJson, template);
 
@@ -250,7 +250,7 @@ public class UserPromptFactoryTests extends OpenSearchTestCase {
         String searchText = "OpenSearch";
         Map<String, String> referenceData = new HashMap<>();
         String hitsJson = "[{\"id\":\"1\"}]";
-        String template = "{{query}} is awesome. {{query}} is open source. What is {{query}}?";
+        String template = "{{queryText}} is awesome. {{queryText}} is open source. What is {{queryText}}?";
 
         String result = UserPromptFactory.buildUserContent(searchText, referenceData, hitsJson, template);
 
@@ -284,7 +284,7 @@ public class UserPromptFactoryTests extends OpenSearchTestCase {
         referenceData.put("expectedScore", "0.9");
         referenceData.put("category", "footwear");
         String hitsJson = "[{\"id\":\"doc1\",\"source\":\"Red shoes\"},{\"id\":\"doc2\",\"source\":\"Leather boots\"}]";
-        String template = "Given the search query: {{query}}\n\n"
+        String template = "Given the search query: {{queryText}}\n\n"
             + "Expected answer: {{referenceAnswer}}\n"
             + "Expected relevance score: {{expectedScore}}\n"
             + "Product category: {{category}}\n\n"
@@ -307,7 +307,7 @@ public class UserPromptFactoryTests extends OpenSearchTestCase {
         String searchText = "";
         Map<String, String> referenceData = new HashMap<>();
         String hitsJson = "[{\"id\":\"1\"}]";
-        String template = "Query: {{query}}, Results: {{hits}}";
+        String template = "Query: {{queryText}}, Results: {{hits}}";
 
         String result = UserPromptFactory.buildUserContent(searchText, referenceData, hitsJson, template);
 
@@ -319,7 +319,7 @@ public class UserPromptFactoryTests extends OpenSearchTestCase {
         String searchText = null;
         Map<String, String> referenceData = new HashMap<>();
         String hitsJson = "[{\"id\":\"1\"}]";
-        String template = "Query: {{query}}, Results: {{hits}}";
+        String template = "Query: {{queryText}}, Results: {{hits}}";
 
         String result = UserPromptFactory.buildUserContent(searchText, referenceData, hitsJson, template);
 
@@ -331,7 +331,7 @@ public class UserPromptFactoryTests extends OpenSearchTestCase {
         String searchText = "test";
         Map<String, String> referenceData = new HashMap<>();
         String hitsJson = "";
-        String template = "Query: {{query}}, Results: {{hits}}";
+        String template = "Query: {{queryText}}, Results: {{hits}}";
 
         String result = UserPromptFactory.buildUserContent(searchText, referenceData, hitsJson, template);
 
@@ -343,7 +343,7 @@ public class UserPromptFactoryTests extends OpenSearchTestCase {
         String searchText = "test";
         Map<String, String> referenceData = new HashMap<>();
         String hitsJson = null;
-        String template = "Query: {{query}}, Results: {{hits}}";
+        String template = "Query: {{queryText}}, Results: {{hits}}";
 
         String result = UserPromptFactory.buildUserContent(searchText, referenceData, hitsJson, template);
 
@@ -356,7 +356,7 @@ public class UserPromptFactoryTests extends OpenSearchTestCase {
         Map<String, String> referenceData = new HashMap<>();
         referenceData.put("referenceAnswer", "Answer with 'quotes' & symbols");
         String hitsJson = "[{\"id\":\"1\",\"source\":\"data\"}]";
-        String template = "Query: {{query}}\nReference: {{referenceAnswer}}";
+        String template = "Query: {{queryText}}\nReference: {{referenceAnswer}}";
 
         String result = UserPromptFactory.buildUserContent(searchText, referenceData, hitsJson, template);
 
