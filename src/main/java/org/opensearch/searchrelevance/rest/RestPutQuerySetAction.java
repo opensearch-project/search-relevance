@@ -18,7 +18,6 @@ import static org.opensearch.searchrelevance.common.PluginConstants.SAMPLING;
 
 import java.io.IOException;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -92,57 +91,18 @@ public class RestPutQuerySetAction extends BaseRestHandler {
             if (rawQueries.size() > settingsAccessor.getMaxQuerySetAllowed()) {
                 return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.FORBIDDEN, "Query Set Limit Exceeded."));
             }
+
+            // Validate and parse each query using the utility method
             try {
                 querySetQueries = rawQueries.stream().map(obj -> {
-                    // Use Map<String, Object> to handle various input types (strings, numbers, booleans, etc.)
                     Map<String, Object> queryMap = (Map<String, Object>) obj;
-                    Object queryTextObj = queryMap.get("queryText");
+                    TextValidationUtil.QueryValidationResult validationResult = TextValidationUtil.validateAndParseQuery(queryMap);
 
-                    // Convert queryText to string
-                    if (queryTextObj == null) {
-                        throw new IllegalArgumentException("queryText is required");
-                    }
-                    String queryText = String.valueOf(queryTextObj);
-
-                    // Create customizedKeyValueMap with all entries except queryText, converting values to strings
-                    Map<String, String> customizedKeyValueMap = new HashMap<>();
-                    for (Map.Entry<String, Object> entry : queryMap.entrySet()) {
-                        if (!"queryText".equals(entry.getKey()) && entry.getValue() != null) {
-                            // Convert all values to strings to handle numbers, booleans, etc.
-                            customizedKeyValueMap.put(entry.getKey(), String.valueOf(entry.getValue()));
-                        }
+                    if (!validationResult.isValid()) {
+                        throw new IllegalArgumentException(validationResult.getErrorMessage());
                     }
 
-                    // Validate queryText - must not contain reserved characters (#, :, \n)
-                    TextValidationUtil.ValidationResult queryTextValidation = TextValidationUtil.validateQuerySetValue(queryText);
-                    if (!queryTextValidation.isValid()) {
-                        throw new IllegalArgumentException("Invalid queryText: " + queryTextValidation.getErrorMessage());
-                    }
-
-                    // Validate all keys and values in customizedKeyValueMap
-                    for (Map.Entry<String, String> entry : customizedKeyValueMap.entrySet()) {
-                        // Validate key
-                        TextValidationUtil.ValidationResult keyValidation = TextValidationUtil.validateQuerySetKey(entry.getKey());
-                        if (!keyValidation.isValid()) {
-                            throw new IllegalArgumentException(
-                                "Invalid field name '" + entry.getKey() + "': " + keyValidation.getErrorMessage()
-                            );
-                        }
-
-                        // Validate value
-                        if (entry.getValue() != null && !entry.getValue().isEmpty()) {
-                            TextValidationUtil.ValidationResult valueValidation = TextValidationUtil.validateQuerySetValue(
-                                entry.getValue()
-                            );
-                            if (!valueValidation.isValid()) {
-                                throw new IllegalArgumentException(
-                                    "Invalid value for field '" + entry.getKey() + "': " + valueValidation.getErrorMessage()
-                                );
-                            }
-                        }
-                    }
-
-                    return new QueryWithReference(queryText, customizedKeyValueMap);
+                    return validationResult.getQueryWithReference();
                 }).collect(Collectors.toList());
             } catch (IllegalArgumentException e) {
                 return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.BAD_REQUEST, e.getMessage()));

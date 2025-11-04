@@ -7,20 +7,21 @@
  */
 package org.opensearch.searchrelevance.judgments;
 
+import org.opensearch.searchrelevance.common.RatingOutputProcessor;
 import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
 import org.opensearch.test.OpenSearchTestCase;
 
 /**
- * Unit tests for LlmJudgmentsProcessor's convertRatingScore method.
+ * Unit tests for RatingOutputProcessor's convertRatingScore method.
  * These tests verify the conversion logic for different rating types.
  */
 public class LlmJudgmentsProcessorRatingConversionTests extends OpenSearchTestCase {
 
     /**
-     * Helper method to call the package-private convertRatingScore method
+     * Helper method to call the convertRatingScore method
      */
     private Double invokeConvertRatingScore(Object ratingScoreObj, LLMJudgmentRatingType ratingType) {
-        return LlmJudgmentsProcessor.convertRatingScore(ratingScoreObj, ratingType);
+        return RatingOutputProcessor.convertRatingScore(ratingScoreObj, ratingType);
     }
 
     // ============================================

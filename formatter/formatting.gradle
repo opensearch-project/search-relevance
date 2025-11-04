@@ -1,9 +1,5 @@
 allprojects {
-    // Skip spotless for qa subprojects (test-only modules)
-    if (project.path.startsWith(':qa')) {
-        return
-    }
-
+    apply plugin: "com.diffplug.spotless"
     spotless {
         java {
             // Normally this isn't necessary, but we have Java sources in

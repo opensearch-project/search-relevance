@@ -28,13 +28,23 @@ public class QueryWithReference implements Writeable {
 
     public QueryWithReference(StreamInput in) throws IOException {
         this.queryText = in.readString();
-        this.customizedKeyValueMap = in.readMap(StreamInput::readString, StreamInput::readString);
+        boolean hasCustomizedKeyValueMap = in.readBoolean();
+        if (hasCustomizedKeyValueMap) {
+            this.customizedKeyValueMap = in.readMap(StreamInput::readString, StreamInput::readString);
+        } else {
+            this.customizedKeyValueMap = null;
+        }
     }
 
     @Override
     public void writeTo(StreamOutput out) throws IOException {
         out.writeString(queryText);
-        out.writeMap(customizedKeyValueMap, StreamOutput::writeString, StreamOutput::writeString);
+        if (customizedKeyValueMap != null) {
+            out.writeBoolean(true);
+            out.writeMap(customizedKeyValueMap, StreamOutput::writeString, StreamOutput::writeString);
+        } else {
+            out.writeBoolean(false);
+        }
     }
 
     public String getQueryText() {

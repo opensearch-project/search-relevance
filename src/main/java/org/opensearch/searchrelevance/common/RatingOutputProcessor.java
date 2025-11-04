@@ -7,6 +7,8 @@
  */
 package org.opensearch.searchrelevance.common;
 
+import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -198,5 +200,33 @@ public class RatingOutputProcessor {
             }
         }
         return -1;
+    }
+
+    /**
+     * Convert rating score from LLM response to double value.
+     * For RELEVANT_IRRELEVANT type: converts "RELEVANT" to 1.0 and "IRRELEVANT" to 0.0
+     * For SCORE0_1 type: parses the number value to double
+     *
+     * Public for testing purposes.
+     *
+     * @param ratingScoreObj The rating_score object from LLM response
+     * @param ratingType The judgment rating type
+     * @return The rating score as a double value
+     */
+    public static Double convertRatingScore(Object ratingScoreObj, LLMJudgmentRatingType ratingType) {
+        if (ratingType == LLMJudgmentRatingType.RELEVANT_IRRELEVANT) {
+            // Handle binary string ratings
+            String ratingStr = (String) ratingScoreObj;
+            if ("RELEVANT".equals(ratingStr)) {
+                return 1.0;
+            } else if ("IRRELEVANT".equals(ratingStr)) {
+                return 0.0;
+            } else {
+                throw new IllegalArgumentException("Invalid binary rating value: " + ratingStr + ". Expected RELEVANT or IRRELEVANT");
+            }
+        } else {
+            // Handle numeric ratings (SCORE0_1)
+            return ((Number) ratingScoreObj).doubleValue();
+        }
     }
 }

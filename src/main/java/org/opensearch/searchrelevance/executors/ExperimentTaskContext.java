@@ -84,11 +84,11 @@ public class ExperimentTaskContext {
             }
         }
 
-        // The DAO call is already async via ActionListener - no need for CompletableFuture.runAsync wrapper
-        // which would create ForkJoinPool threads that cause thread leaks in tests
-        experimentVariantDao.putExperimentVariantEfficient(variant, ActionListener.wrap(response -> {
-            log.debug("write successful for variant: {}", variant.getId());
-        }, error -> { log.error("write failed for variant {}: {}", variant.getId(), error.getMessage()); }));
+        CompletableFuture.runAsync(() -> {
+            experimentVariantDao.putExperimentVariantEfficient(variant, ActionListener.wrap(response -> {
+                log.debug("write successful for variant: {}", variant.getId());
+            }, error -> { log.error("write failed for variant {}: {}", variant.getId(), error.getMessage()); }));
+        });
     }
 
     /**

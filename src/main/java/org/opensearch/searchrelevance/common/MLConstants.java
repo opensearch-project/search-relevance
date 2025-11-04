@@ -23,6 +23,14 @@ public class MLConstants {
      * ML input field names
      */
     public static final String PARAM_MESSAGES_FIELD = "messages";
+    public static final String PROMPT_TEMPLATE = "promptTemplate";
+    public static final String LLM_JUDGMENT_RATING_TYPE = "llmJudgmentRatingType";
+    public static final String OVERWRITE_CACHE = "overwriteCache";
+
+    /**
+     * Default prompt template for LLM judgments (simple format without reference data)
+     */
+    public static final String DEFAULT_PROMPT_TEMPLATE = "SearchText: {{searchText}}; Hits: {{hits}}";
 
     /**
      * ML response field names
@@ -37,19 +45,6 @@ public class MLConstants {
     public static final Integer DEFAULTED_TOKEN_LIMIT = 4000;
     public static final Integer MAXIMUM_TOKEN_LIMIT = 500000;
     public static final Integer MINIMUM_TOKEN_LIMIT = 1000;
-
-    /**
-     * Prompt strings that specific for llm-as-a-judge use case.
-     * TODO: need benchmark for final prompt definition.
-     */
-    public static final String PROMPT_SEARCH_RELEVANCE_SCORE_1_5_START = escapeJson(
-        "You are an expert search relevance rater. Your task is to evaluate the relevance between search query and results with these criteria:\n"
-            + "- Score 5: Perfect match, highly relevant\n"
-            + "- Score 4: Very relevant with minor variations\n"
-            + "- Score 3: Moderately relevant\n"
-            + "- Score 2: Slightly relevant\n"
-            + "- Score 1: Completely irrelevant\n"
-    );
 
     public static final String PROMPT_SEARCH_RELEVANCE_SCORE_0_1_START = escapeJson(
         "You are an expert search relevance rater. Your task is to evaluate the relevance between search query and results with these criteria:\n"

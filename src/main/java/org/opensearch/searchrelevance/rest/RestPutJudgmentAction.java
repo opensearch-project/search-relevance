@@ -9,6 +9,10 @@ package org.opensearch.searchrelevance.rest;
 
 import static java.util.Collections.singletonList;
 import static org.opensearch.rest.RestRequest.Method.PUT;
+import static org.opensearch.searchrelevance.common.MLConstants.DEFAULT_PROMPT_TEMPLATE;
+import static org.opensearch.searchrelevance.common.MLConstants.LLM_JUDGMENT_RATING_TYPE;
+import static org.opensearch.searchrelevance.common.MLConstants.OVERWRITE_CACHE;
+import static org.opensearch.searchrelevance.common.MLConstants.PROMPT_TEMPLATE;
 import static org.opensearch.searchrelevance.common.MLConstants.validateTokenLimit;
 import static org.opensearch.searchrelevance.common.MetricsConstants.MODEL_ID;
 import static org.opensearch.searchrelevance.common.PluginConstants.CLICK_MODEL;
@@ -127,8 +131,15 @@ public class RestPutJudgmentAction extends BaseRestHandler {
 
                 int tokenLimit = validateTokenLimit(source);
                 List<String> contextFields = ParserUtils.convertObjToList(source, CONTEXT_FIELDS);
-                String promptTemplate = (String) source.get("promptTemplate");
-                String llmJudgmentRatingTypeStr = (String) source.get("llmJudgmentRatingType");
+
+                // Prompt template - use simple default if not provided
+                String promptTemplate = (String) source.get(PROMPT_TEMPLATE);
+                if (promptTemplate == null || promptTemplate.trim().isEmpty()) {
+                    promptTemplate = DEFAULT_PROMPT_TEMPLATE;
+                }
+
+                // Rating type - can be null, will be validated at processor level
+                String llmJudgmentRatingTypeStr = (String) source.get(LLM_JUDGMENT_RATING_TYPE);
                 LLMJudgmentRatingType llmJudgmentRatingType = null;
                 if (llmJudgmentRatingTypeStr != null) {
                     try {
@@ -143,7 +154,7 @@ public class RestPutJudgmentAction extends BaseRestHandler {
                         );
                     }
                 }
-                boolean overwriteCache = Optional.ofNullable((Boolean) source.get("overwriteCache")).orElse(Boolean.FALSE);
+                boolean overwriteCache = Optional.ofNullable((Boolean) source.get(OVERWRITE_CACHE)).orElse(Boolean.FALSE);
 
                 createRequest = new PutLlmJudgmentRequest(
                     type,

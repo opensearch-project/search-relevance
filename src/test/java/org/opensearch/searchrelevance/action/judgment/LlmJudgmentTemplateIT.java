@@ -7,6 +7,7 @@
  */
 package org.opensearch.searchrelevance.action.judgment;
 
+import static org.opensearch.searchrelevance.common.MLConstants.DEFAULT_PROMPT_TEMPLATE;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENTS_URL;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.QUERYSETS_URL;
@@ -394,9 +395,10 @@ public class LlmJudgmentTemplateIT extends BaseSearchRelevanceIT {
         Map<String, Object> source = (Map<String, Object>) judgmentDoc.get("_source");
         Map<String, Object> metadata = (Map<String, Object>) source.get("metadata");
 
-        // promptTemplate should be null or empty
+        // promptTemplate should have the default value when not provided
         Object promptTemplate = metadata.get("promptTemplate");
-        assertTrue(promptTemplate == null || ((String) promptTemplate).isEmpty());
+        assertNotNull("promptTemplate should not be null when not provided", promptTemplate);
+        assertEquals("promptTemplate should have default value", DEFAULT_PROMPT_TEMPLATE, promptTemplate);
 
         // llmJudgmentRatingType should have a default or be null
         Object ratingType = metadata.get("llmJudgmentRatingType");

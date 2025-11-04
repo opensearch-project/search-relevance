@@ -7,6 +7,10 @@
  */
 package org.opensearch.searchrelevance.judgments;
 
+import static org.opensearch.searchrelevance.common.MLConstants.LLM_JUDGMENT_RATING_TYPE;
+import static org.opensearch.searchrelevance.common.MLConstants.OVERWRITE_CACHE;
+import static org.opensearch.searchrelevance.common.MLConstants.PROMPT_TEMPLATE;
+import static org.opensearch.searchrelevance.common.RatingOutputProcessor.convertRatingScore;
 import static org.opensearch.searchrelevance.common.RatingOutputProcessor.sanitizeLLMResponse;
 import static org.opensearch.searchrelevance.model.QueryWithReference.DELIMITER;
 import static org.opensearch.searchrelevance.model.builder.SearchRequestBuilder.buildSearchRequest;
@@ -109,13 +113,14 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
             int tokenLimit = (int) metadata.get("tokenLimit");
             List<String> contextFields = (List<String>) metadata.get("contextFields");
             boolean ignoreFailure = (boolean) metadata.get("ignoreFailure");
-            String promptTemplate = (String) metadata.get("promptTemplate");
-            LLMJudgmentRatingType ratingType = (LLMJudgmentRatingType) metadata.get("llmJudgmentRatingType");
+            String promptTemplate = (String) metadata.get(PROMPT_TEMPLATE);
+            LLMJudgmentRatingType ratingType = (LLMJudgmentRatingType) metadata.get(LLM_JUDGMENT_RATING_TYPE);
             // Default to SCORE0_1 if ratingType is not provided
             if (ratingType == null) {
                 ratingType = LLMJudgmentRatingType.SCORE0_1;
+                log.debug("No ratingType provided, defaulting to SCORE0_1");
             }
-            boolean overwriteCache = (boolean) metadata.get("overwriteCache");
+            boolean overwriteCache = (boolean) metadata.get(OVERWRITE_CACHE);
 
             QuerySet querySet = querySetDao.getQuerySetSync(querySetId);
             List<SearchConfiguration> searchConfigurations = searchConfigurationList.stream()
@@ -704,33 +709,5 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         }
 
         return result;
-    }
-
-    /**
-     * Convert rating score from LLM response to double value.
-     * For RELEVANT_IRRELEVANT type: converts "RELEVANT" to 1.0 and "IRRELEVANT" to 0.0
-     * For SCORE0_1 type: parses the number value to double
-     *
-     * Package-private for testing purposes.
-     *
-     * @param ratingScoreObj The rating_score object from LLM response
-     * @param ratingType The judgment rating type
-     * @return The rating score as a double value
-     */
-    static Double convertRatingScore(Object ratingScoreObj, LLMJudgmentRatingType ratingType) {
-        if (ratingType == LLMJudgmentRatingType.RELEVANT_IRRELEVANT) {
-            // Handle binary string ratings
-            String ratingStr = (String) ratingScoreObj;
-            if ("RELEVANT".equals(ratingStr)) {
-                return 1.0;
-            } else if ("IRRELEVANT".equals(ratingStr)) {
-                return 0.0;
-            } else {
-                throw new IllegalArgumentException("Invalid binary rating value: " + ratingStr + ". Expected RELEVANT or IRRELEVANT");
-            }
-        } else {
-            // Handle numeric ratings (SCORE0_1)
-            return ((Number) ratingScoreObj).doubleValue();
-        }
     }
 }

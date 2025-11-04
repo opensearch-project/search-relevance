@@ -7,6 +7,11 @@
  */
 package org.opensearch.searchrelevance.utils;
 
+import java.util.HashMap;
+import java.util.Map;
+
+import org.opensearch.searchrelevance.model.QueryWithReference;
+
 public class TextValidationUtil {
     private static final int DEFAULT_MAX_TEXT_LENGTH = 2000;
     private static final int MAX_NAME_LENGTH = 50;
@@ -178,6 +183,94 @@ public class TextValidationUtil {
         }
 
         return new ValidationResult(true, null);
+    }
+
+    /**
+     * Result class for QueryWithReference validation
+     */
+    public static class QueryValidationResult {
+        private final boolean valid;
+        private final String errorMessage;
+        private final QueryWithReference queryWithReference;
+
+        private QueryValidationResult(boolean valid, String errorMessage, QueryWithReference queryWithReference) {
+            this.valid = valid;
+            this.errorMessage = errorMessage;
+            this.queryWithReference = queryWithReference;
+        }
+
+        public static QueryValidationResult success(QueryWithReference queryWithReference) {
+            return new QueryValidationResult(true, null, queryWithReference);
+        }
+
+        public static QueryValidationResult failure(String errorMessage) {
+            return new QueryValidationResult(false, errorMessage, null);
+        }
+
+        public boolean isValid() {
+            return valid;
+        }
+
+        public String getErrorMessage() {
+            return errorMessage;
+        }
+
+        public QueryWithReference getQueryWithReference() {
+            return queryWithReference;
+        }
+    }
+
+    /**
+     * Validates and parses a query map into a QueryWithReference object.
+     * Extracts queryText and validates all fields including custom key-value pairs.
+     *
+     * @param queryMap The raw query map from the request
+     * @return QueryValidationResult containing either the validated QueryWithReference or an error message
+     */
+    public static QueryValidationResult validateAndParseQuery(Map<String, Object> queryMap) {
+        if (queryMap == null) {
+            return QueryValidationResult.failure("Query object cannot be null");
+        }
+
+        // Extract queryText
+        Object queryTextObj = queryMap.get("queryText");
+        if (queryTextObj == null) {
+            return QueryValidationResult.failure("queryText is required");
+        }
+        String queryText = String.valueOf(queryTextObj);
+
+        // Validate queryText
+        ValidationResult queryTextValidation = validateQuerySetValue(queryText);
+        if (!queryTextValidation.isValid()) {
+            return QueryValidationResult.failure("Invalid queryText: " + queryTextValidation.getErrorMessage());
+        }
+
+        // Create customizedKeyValueMap with all entries except queryText, converting values to strings
+        Map<String, String> customizedKeyValueMap = new HashMap<>();
+        for (Map.Entry<String, Object> entry : queryMap.entrySet()) {
+            if (!"queryText".equals(entry.getKey()) && entry.getValue() != null) {
+                String key = entry.getKey();
+                String value = String.valueOf(entry.getValue());
+
+                // Validate key
+                ValidationResult keyValidation = validateQuerySetKey(key);
+                if (!keyValidation.isValid()) {
+                    return QueryValidationResult.failure("Invalid field name '" + key + "': " + keyValidation.getErrorMessage());
+                }
+
+                // Validate value (if not empty)
+                if (!value.isEmpty()) {
+                    ValidationResult valueValidation = validateQuerySetValue(value);
+                    if (!valueValidation.isValid()) {
+                        return QueryValidationResult.failure("Invalid value for field '" + key + "': " + valueValidation.getErrorMessage());
+                    }
+                }
+
+                customizedKeyValueMap.put(key, value);
+            }
+        }
+
+        return QueryValidationResult.success(new QueryWithReference(queryText, customizedKeyValueMap));
     }
 
 }
