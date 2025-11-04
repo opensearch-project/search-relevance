@@ -9,6 +9,6 @@
   "contextFields": ["name", "description"],
   "ignoreFailure": false,
   "llmJudgmentRatingType": "RELEVANT_IRRELEVANT",
-  "promptTemplate": "Is this document relevant? Answer RELEVANT or IRRELEVANT.",
+  "promptTemplate": "Query: {{queryText}}\n\nDocuments: {{hits}}\n\nIs this document relevant? Answer RELEVANT or IRRELEVANT.",
   "overwriteCache": false
 }
