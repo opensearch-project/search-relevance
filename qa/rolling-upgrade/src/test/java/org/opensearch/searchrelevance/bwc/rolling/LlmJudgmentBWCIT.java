@@ -231,7 +231,11 @@ public class LlmJudgmentBWCIT extends AbstractSearchRelevanceRollingUpgradeTestC
         Map<String, Object> newMetadata = (Map<String, Object>) newJudgment.get("metadata");
         assertNotNull("Metadata should exist", newMetadata);
         assertNotNull("NEW format should have promptTemplate", newMetadata.get("promptTemplate"));
-        assertEquals("Prompt template should match", "Evaluate the relevance of the search result", newMetadata.get("promptTemplate"));
+        assertEquals(
+            "Prompt template should match",
+            "Query: {{queryText}}\\n\\nDocuments: {{hits}}\\n\\nEvaluate the relevance of the search result.",
+            newMetadata.get("promptTemplate")
+        );
         assertNotNull("NEW format should have llmJudgmentRatingType", newMetadata.get("llmJudgmentRatingType"));
         assertEquals("Rating type should be SCORE0_1", "SCORE0_1", newMetadata.get("llmJudgmentRatingType"));
     }
@@ -608,7 +612,7 @@ public class LlmJudgmentBWCIT extends AbstractSearchRelevanceRollingUpgradeTestC
                 + "\"tokenLimit\": 1000,"
                 + "\"contextFields\": [\"text\"],"
                 + "\"ignoreFailure\": false,"
-                + "\"promptTemplate\": \"Evaluate the relevance of the search result\","
+                + "\"promptTemplate\": \"Query: {{queryText}}\\\\n\\\\nDocuments: {{hits}}\\\\n\\\\nEvaluate the relevance of the search result.\","
                 + "\"llmJudgmentRatingType\": \"SCORE0_1\","
                 + "\"overwriteCache\": true"
                 + "}"
