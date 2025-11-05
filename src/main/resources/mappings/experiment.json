@@ -9,6 +9,7 @@
     "judgmentList": { "type": "keyword" },
     "size": {"type":  "keyword"},
     "isScheduled": {"type":  "keyword"},
+    "scheduledExperimentJobId": {"type":  "keyword"},
     "results": { "type": "object", "dynamic": false }
   }
 }

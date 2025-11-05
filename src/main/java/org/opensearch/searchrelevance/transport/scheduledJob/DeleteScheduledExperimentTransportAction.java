@@ -65,7 +65,7 @@ public class DeleteScheduledExperimentTransportAction extends HandledTransportAc
             scheduledJobsDao.deleteScheduledJob(jobId, ActionListener.wrap(deleteResponse -> {
                 experimentDao.getExperiment(jobId, ActionListener.wrap(experimentResponse -> {
                     Experiment updatedExperiment = convertToExperiment(experimentResponse);
-                    final Experiment finalUpdatedExperiment = new Experiment(updatedExperiment, false);
+                    final Experiment finalUpdatedExperiment = new Experiment(updatedExperiment, false, null);
                     experimentDao.updateExperiment(finalUpdatedExperiment, ActionListener.wrap(experimentIndexResponse -> {
                         // Return delete response
                         listener.onResponse(deleteResponse);
