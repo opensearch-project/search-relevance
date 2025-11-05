@@ -257,6 +257,12 @@ repositories {
 test {
     include '**/*Tests.class'
     systemProperty 'tests.security.manager', 'false'
+
+    if (System.getProperty("test.debug") != null) {
+        // Limit forks to one to avoid JDWP port conflicts
+        maxParallelForks = 1
+        jvmArgs '-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:8000'
+    }
 }
 
 jacocoTestReport {
