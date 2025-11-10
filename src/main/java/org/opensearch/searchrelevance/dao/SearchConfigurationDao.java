@@ -186,8 +186,7 @@ public class SearchConfigurationDao {
             (String) source.get(SearchConfiguration.TIME_STAMP),
             (String) source.get(SearchConfiguration.INDEX),
             (String) source.get(SearchConfiguration.QUERY),
-            (String) source.get(SearchConfiguration.SEARCH_PIPELINE),
-            (String) source.get(SearchConfiguration.DESCRIPTION)
+            (String) source.get(SearchConfiguration.SEARCH_PIPELINE)
         );
     }
 }

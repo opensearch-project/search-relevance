@@ -9,7 +9,6 @@ package org.opensearch.searchrelevance.rest;
 
 import static java.util.Collections.singletonList;
 import static org.opensearch.rest.RestRequest.Method.PUT;
-import static org.opensearch.searchrelevance.common.PluginConstants.DESCRIPTION;
 import static org.opensearch.searchrelevance.common.PluginConstants.INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.NAME;
 import static org.opensearch.searchrelevance.common.PluginConstants.QUERY;
@@ -73,28 +72,11 @@ public class RestPutSearchConfigurationAction extends BaseRestHandler {
                 new BytesRestResponse(RestStatus.BAD_REQUEST, "Invalid name: " + nameValidation.getErrorMessage())
             );
         }
-
-        String description = (String) source.get(DESCRIPTION);
-        if (description != null) {
-            TextValidationUtil.ValidationResult descriptionValidation = TextValidationUtil.validateDescription(description);
-            if (!descriptionValidation.isValid()) {
-                return channel -> channel.sendResponse(
-                    new BytesRestResponse(RestStatus.BAD_REQUEST, "Invalid description: " + descriptionValidation.getErrorMessage())
-                );
-            }
-        }
-
         String index = (String) source.get(INDEX);
         String queryBody = (String) source.get(QUERY);
         String searchPipeline = (String) source.getOrDefault(SEARCH_PIPELINE, "");
 
-        PutSearchConfigurationRequest createRequest = new PutSearchConfigurationRequest(
-            name,
-            index,
-            queryBody,
-            searchPipeline,
-            description
-        );
+        PutSearchConfigurationRequest createRequest = new PutSearchConfigurationRequest(name, index, queryBody, searchPipeline);
 
         return channel -> client.execute(PutSearchConfigurationAction.INSTANCE, createRequest, new ActionListener<IndexResponse>() {
             @Override

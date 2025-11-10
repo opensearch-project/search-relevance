@@ -68,7 +68,6 @@ public class SearchConfigurationIT extends BaseSearchRelevanceIT {
         assertEquals("test_index", source.get("index"));
         assertEquals("{\"query\": {\"match_all\": {}}}", source.get("query"));
         assertEquals("test_pipeline", source.get("searchPipeline"));
-        assertEquals("sample description", source.get("description"));
 
         Response deleteSearchConfigResponse = makeRequest(
             client(),

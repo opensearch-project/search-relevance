@@ -2,6 +2,5 @@
   "name": "test_search_config",
   "index": "test_index",
   "query": "{\"query\": {\"match_all\": {}}}",
-  "searchPipeline": "test_pipeline",
-  "description": "sample description"
+  "searchPipeline": "test_pipeline"
 }

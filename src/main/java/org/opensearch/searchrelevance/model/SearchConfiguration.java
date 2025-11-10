@@ -18,7 +18,6 @@ import org.opensearch.core.xcontent.XContentBuilder;
 public class SearchConfiguration implements ToXContentObject {
     public static final String ID = "id";
     public static final String NAME = "name";
-    public static final String DESCRIPTION = "description";
     public static final String TIME_STAMP = "timestamp";
     public static final String INDEX = "index";
 
@@ -30,28 +29,18 @@ public class SearchConfiguration implements ToXContentObject {
      */
     private final String id;
     private final String name;
-    private final String description;
     private final String timestamp;
     private final String index;
     private final String query;
     private final String searchPipeline;
 
-    public SearchConfiguration(
-        String id,
-        String name,
-        String timestamp,
-        String index,
-        String query,
-        String searchPipeline,
-        String description
-    ) {
+    public SearchConfiguration(String id, String name, String timestamp, String index, String query, String searchPipeline) {
         this.id = id;
         this.name = name;
         this.timestamp = timestamp;
         this.index = index;
         this.query = query;
         this.searchPipeline = searchPipeline;
-        this.description = description;
     }
 
     @Override
@@ -63,7 +52,6 @@ public class SearchConfiguration implements ToXContentObject {
         xContentBuilder.field(INDEX, this.index.trim());
         xContentBuilder.field(QUERY, this.query.trim());
         xContentBuilder.field(SEARCH_PIPELINE, this.searchPipeline == null ? "" : this.searchPipeline.trim());
-        xContentBuilder.field(DESCRIPTION, this.description == null ? "" : this.description.trim());
         return xContentBuilder.endObject();
     }
 

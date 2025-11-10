@@ -19,14 +19,12 @@ public class PutSearchConfigurationRequest extends ActionRequest {
     private final String index;
     private final String queryBody;
     private final String searchPipeline;
-    private final String description;
 
-    public PutSearchConfigurationRequest(String name, String index, String queryBody, String searchPipeline, String description) {
+    public PutSearchConfigurationRequest(String name, String index, String queryBody, String searchPipeline) {
         this.name = name;
         this.index = index;
         this.queryBody = queryBody;
         this.searchPipeline = searchPipeline;
-        this.description = description;
     }
 
     public PutSearchConfigurationRequest(StreamInput in) throws IOException {
@@ -35,7 +33,6 @@ public class PutSearchConfigurationRequest extends ActionRequest {
         this.index = in.readString();
         this.queryBody = in.readString();
         this.searchPipeline = in.readOptionalString();
-        this.description = in.readOptionalString();
     }
 
     @Override
@@ -45,7 +42,6 @@ public class PutSearchConfigurationRequest extends ActionRequest {
         out.writeString(index);
         out.writeString(queryBody);
         out.writeOptionalString(searchPipeline);
-        out.writeOptionalString(description);
     }
 
     public String getName() {
@@ -62,10 +58,6 @@ public class PutSearchConfigurationRequest extends ActionRequest {
 
     public String getSearchPipeline() {
         return searchPipeline;
-    }
-
-    public String getDescription() {
-        return description;
     }
 
     @Override
