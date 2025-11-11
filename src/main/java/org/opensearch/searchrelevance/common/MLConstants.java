@@ -81,7 +81,10 @@ public class MLConstants {
     public static final String PROMPT_SEARCH_RELEVANCE_SCORE_END = escapeJson(
         "\nEvaluate based on: exact matches, semantic relevance, and overall context between the SearchText and content in Hits.\n"
             + "When a reference is provided, evaluate based on the relevance to both SearchText and its reference.\n\n"
-            + "IMPORTANT: You MUST include a rating for EVERY hit provided."
+            + "IMPORTANT: You MUST include a rating for EVERY hit provided.\n\n"
+            + "Return ONLY a JSON object in this EXACT format:\n"
+            + "{\"ratings\": [{\"id\": \"doc_id_here\", \"rating_score\": <score/RELEVANT/IRRELEVANT>}]}\n"
+            + "Do not include any explanation, commentary, or markdown formatting. Return only the JSON object."
     );
 
     /**

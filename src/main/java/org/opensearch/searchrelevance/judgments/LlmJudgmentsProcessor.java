@@ -10,14 +10,14 @@ package org.opensearch.searchrelevance.judgments;
 import static org.opensearch.searchrelevance.common.MLConstants.LLM_JUDGMENT_RATING_TYPE;
 import static org.opensearch.searchrelevance.common.MLConstants.OVERWRITE_CACHE;
 import static org.opensearch.searchrelevance.common.MLConstants.PROMPT_TEMPLATE;
-import static org.opensearch.searchrelevance.utils.RatingOutputProcessor.convertRatingScore;
-import static org.opensearch.searchrelevance.utils.RatingOutputProcessor.sanitizeLLMResponse;
 import static org.opensearch.searchrelevance.model.QueryWithReference.DELIMITER;
 import static org.opensearch.searchrelevance.model.builder.SearchRequestBuilder.buildSearchRequest;
 import static org.opensearch.searchrelevance.utils.ParserUtils.combinedIndexAndDocId;
 import static org.opensearch.searchrelevance.utils.ParserUtils.generatePromptTemplateCode;
 import static org.opensearch.searchrelevance.utils.ParserUtils.generateUniqueId;
 import static org.opensearch.searchrelevance.utils.ParserUtils.getDocIdFromCompositeKey;
+import static org.opensearch.searchrelevance.utils.RatingOutputProcessor.convertRatingScore;
+import static org.opensearch.searchrelevance.utils.RatingOutputProcessor.sanitizeLLMResponse;
 
 import java.util.ArrayList;
 import java.util.Collections;

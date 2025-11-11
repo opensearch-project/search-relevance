@@ -1,9 +1,4 @@
 /*
- * Copyright OpenSearch Contributors
- * SPDX-License-Identifier: Apache-2.0
- */
-
-/*
  * SPDX-License-Identifier: Apache-2.0
  *
  * The OpenSearch Contributors require contributions made to
@@ -12,6 +7,9 @@
  */
 package org.opensearch.searchrelevance.utils;
 
+import static org.opensearch.searchrelevance.common.MLConstants.IRRELEVANT_DECISION_STRING;
+import static org.opensearch.searchrelevance.common.MLConstants.RELEVANT_DECISION_STRING;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
@@ -19,9 +17,6 @@ import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-
-import static org.opensearch.searchrelevance.common.MLConstants.IRRELEVANT_DECISION_STRING;
-import static org.opensearch.searchrelevance.common.MLConstants.RELEVANT_DECISION_STRING;
 
 /**
  * Processor for handling LLM rating outputs with structured JSON parsing.
