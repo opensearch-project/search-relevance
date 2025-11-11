@@ -51,6 +51,12 @@ public class MLConstants {
     public static final String RESPONSE_CONTENT_FIELD = "content";
 
     /**
+     * LLM RELEVANT/IRRELEVANT String
+     */
+    public static final String RELEVANT_DECISION_STRING = "RELEVANT";
+    public static final String IRRELEVANT_DECISION_STRING = "IRRELEVANT";
+
+    /**
      * LLM defaulted token limits
      */
     public static final Integer DEFAULTED_TOKEN_LIMIT = 4000;

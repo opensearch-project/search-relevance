@@ -7,7 +7,7 @@
  */
 package org.opensearch.searchrelevance.judgments;
 
-import org.opensearch.searchrelevance.common.RatingOutputProcessor;
+import org.opensearch.searchrelevance.utils.RatingOutputProcessor;
 import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
 import org.opensearch.test.OpenSearchTestCase;
 

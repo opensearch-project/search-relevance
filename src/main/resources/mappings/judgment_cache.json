@@ -8,6 +8,8 @@
     "querySet": { "type": "keyword" },
     "documentId": { "type": "keyword" },
     "contextFieldsStr": { "type": "keyword" },
-    "rating": { "type": "keyword" }
+    "rating": { "type": "keyword" },
+    "modelId": { "type": "keyword"},
+    "encodedPromptTemplate": { "type":  "keyword"}
   }
 }

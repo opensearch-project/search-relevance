@@ -8,6 +8,7 @@
 package org.opensearch.searchrelevance.model;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 
@@ -23,7 +24,7 @@ public class QueryWithReference implements Writeable {
 
     public QueryWithReference(String queryText, Map<String, String> customizedKeyValueMap) {
         this.queryText = queryText;
-        this.customizedKeyValueMap = customizedKeyValueMap;
+        this.customizedKeyValueMap = customizedKeyValueMap != null ? customizedKeyValueMap : Collections.emptyMap();
     }
 
     public QueryWithReference(StreamInput in) throws IOException {
@@ -32,14 +33,14 @@ public class QueryWithReference implements Writeable {
         if (hasCustomizedKeyValueMap) {
             this.customizedKeyValueMap = in.readMap(StreamInput::readString, StreamInput::readString);
         } else {
-            this.customizedKeyValueMap = null;
+            this.customizedKeyValueMap = Collections.emptyMap();
         }
     }
 
     @Override
     public void writeTo(StreamOutput out) throws IOException {
         out.writeString(queryText);
-        if (customizedKeyValueMap != null) {
+        if (customizedKeyValueMap != null && !customizedKeyValueMap.isEmpty()) {
             out.writeBoolean(true);
             out.writeMap(customizedKeyValueMap, StreamOutput::writeString, StreamOutput::writeString);
         } else {

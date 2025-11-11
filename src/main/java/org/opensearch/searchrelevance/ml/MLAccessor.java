@@ -17,7 +17,7 @@ import org.opensearch.core.action.ActionListener;
 import org.opensearch.ml.client.MachineLearningNodeClient;
 import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
 import org.opensearch.ml.common.input.MLInput;
-import org.opensearch.searchrelevance.common.RatingOutputProcessor;
+import org.opensearch.searchrelevance.utils.RatingOutputProcessor;
 import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
 
 import lombok.extern.log4j.Log4j2;

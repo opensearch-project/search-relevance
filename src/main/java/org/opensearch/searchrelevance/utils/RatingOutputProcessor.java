@@ -1,11 +1,16 @@
 /*
+ * Copyright OpenSearch Contributors
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/*
  * SPDX-License-Identifier: Apache-2.0
  *
  * The OpenSearch Contributors require contributions made to
  * this file be licensed under the Apache-2.0 license or a
  * compatible open source license.
  */
-package org.opensearch.searchrelevance.common;
+package org.opensearch.searchrelevance.utils;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -14,6 +19,9 @@ import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import static org.opensearch.searchrelevance.common.MLConstants.IRRELEVANT_DECISION_STRING;
+import static org.opensearch.searchrelevance.common.MLConstants.RELEVANT_DECISION_STRING;
 
 /**
  * Processor for handling LLM rating outputs with structured JSON parsing.
@@ -336,9 +344,9 @@ public class RatingOutputProcessor {
                 );
             }
             String ratingStr = (String) ratingScoreObj;
-            if ("RELEVANT".equals(ratingStr)) {
+            if (RELEVANT_DECISION_STRING.equals(ratingStr)) {
                 return 1.0;
-            } else if ("IRRELEVANT".equals(ratingStr)) {
+            } else if (IRRELEVANT_DECISION_STRING.equals(ratingStr)) {
                 return 0.0;
             } else {
                 throw new IllegalArgumentException("Invalid binary rating value: " + ratingStr + ". Expected RELEVANT or IRRELEVANT");
