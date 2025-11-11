@@ -98,7 +98,7 @@ public class ExperimentRunningManager {
     /**
      * Starts the experiment by setting up cancellation callback for the cancellation token and also retrieves the queryset.
      *
-     * One thing to be careful about is that only at most scheduled run for a given scheduled experiment run id 
+     * One thing to be careful about is that only at most scheduled run for a given scheduled experiment run id
      * should be in the system at all times.
      * @param experimentId - the id of the experiment to be run
      * @param request - required parameters for placing a request to start an experiment

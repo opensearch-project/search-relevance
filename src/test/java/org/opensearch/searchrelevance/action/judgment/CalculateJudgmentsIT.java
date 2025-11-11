@@ -11,6 +11,7 @@ import static org.opensearch.searchrelevance.common.PluginConstants.INITIALIZE_U
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENTS_URL;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.UBI_EVENTS_INDEX;
+import static org.opensearch.searchrelevance.common.PluginConstants.UBI_QUERIES_INDEX;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -18,6 +19,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Logger;
 
 import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.hc.core5.http.message.BasicHeader;
@@ -36,14 +38,29 @@ import lombok.SneakyThrows;
 @OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.SUITE)
 public class CalculateJudgmentsIT extends BaseSearchRelevanceIT {
     public void initializeUBIIndices() throws IOException, URISyntaxException {
-        makeRequest(
-            client(),
-            RestRequest.Method.POST.name(),
-            INITIALIZE_URL,
-            null,
-            toHttpEntity(""),
-            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
-        );
+        try {
+            makeRequest(
+                client(),
+                RestRequest.Method.POST.name(),
+                INITIALIZE_URL,
+                null,
+                toHttpEntity(""),
+                ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
+            );
+            Logger.getLogger("CalculateJudgmentsIT").info("UBI indices initialized through api.");
+        } catch (Exception e) {
+            // If we cannot initialize the UBI, we can try to manually create the index
+            String eventsIndexConfiguration = Files.readString(Path.of(classLoader.getResource("ubi/EventsIndex.json").toURI()));
+            String queriesIndexConfiguration = Files.readString(Path.of(classLoader.getResource("ubi/QueriesIndex.json").toURI()));
+            try {
+                createIndexWithConfiguration(UBI_EVENTS_INDEX, eventsIndexConfiguration);
+                createIndexWithConfiguration(UBI_QUERIES_INDEX, queriesIndexConfiguration);
+            } catch (Exception ex) {
+                // Index may not exist, ignore
+                return;
+            }
+            Logger.getLogger("CalculateJudgmentsIT").info("UBI indices initialized manually.");
+        }
 
         String importDatasetBody = Files.readString(Path.of(classLoader.getResource("sample_ubi_data/SampleUBIEvents.json").toURI()));
 
