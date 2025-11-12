@@ -10,7 +10,6 @@ package org.opensearch.searchrelevance.transport.queryset;
 import static org.opensearch.searchrelevance.model.QueryWithReference.DELIMITER;
 
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -30,7 +29,11 @@ import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 public class PutQuerySetTransportAction extends HandledTransportAction<PutQuerySetRequest, IndexResponse> {
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private final ClusterService clusterService;
     private final QuerySetDao querySetDao;
 
@@ -74,14 +77,14 @@ public class PutQuerySetTransportAction extends HandledTransportAction<PutQueryS
 
     /**
      * Query set input is a list of queryText and customizedKeyValueMap pair.
-     * Converts to format: "queryText#\nkey1: value1\nkey2: value2\n..."
+     * Converts to format: "queryText#json_format"
      * e.g:
      * Input:
      * {
      *     "queryText": "What is OpenSearch?",
      *     "referenceAnswer": "OpenSearch is a community-driven, open source search and analytics suite"
      * }
-     * Output: "What is OpenSearch?#\nreferenceAnswer: OpenSearch is a community-driven, open source search and analytics suite"
+     * Output: "What is OpenSearch?#{"referenceAnswer":"OpenSearch is a community-driven, open source search and analytics suite"}"
      *
      * @param queryWithReferenceList - list of queryText and customizedKeyValueMap pair
      * @return - querySetQueries as a list of QuerySetEntry objects
@@ -90,13 +93,16 @@ public class PutQuerySetTransportAction extends HandledTransportAction<PutQueryS
         return queryWithReferenceList.stream().map(queryWithReference -> {
             StringBuilder queryTextBuilder = new StringBuilder(queryWithReference.getQueryText());
 
-            // Append all key-value pairs from customizedKeyValueMap in "key: value" format
+            // Append customizedKeyValueMap as JSON format
             if (queryWithReference.getCustomizedKeyValueMap() != null && !queryWithReference.getCustomizedKeyValueMap().isEmpty()) {
-                queryTextBuilder.append(DELIMITER);
-                for (Map.Entry<String, String> entry : queryWithReference.getCustomizedKeyValueMap().entrySet()) {
-                    if (entry.getValue() != null && !entry.getValue().isEmpty()) {
-                        queryTextBuilder.append("\n").append(entry.getKey()).append(": ").append(entry.getValue());
-                    }
+                try {
+                    queryTextBuilder.append(DELIMITER);
+                    queryTextBuilder.append(OBJECT_MAPPER.writeValueAsString(queryWithReference.getCustomizedKeyValueMap()));
+                } catch (JsonProcessingException e) {
+                    throw new SearchRelevanceException(
+                        "Failed to serialize custom fields to JSON: " + e.getMessage(),
+                        RestStatus.INTERNAL_SERVER_ERROR
+                    );
                 }
             }
 

@@ -498,4 +498,38 @@ public class TextValidationUtilTests extends SearchRelevanceRestTestCase {
         assertTrue("Template with both hits and results placeholders should be valid", result.isValid());
         assertNull(result.getErrorMessage());
     }
+
+    public void testValidatePromptTemplate_ContainsDelimiter() {
+        // Test that template cannot contain the reserved delimiter character (#)
+        String template = "Query: {{queryText}}#Documents: {{hits}}";
+        TextValidationUtil.ValidationResult result = TextValidationUtil.validatePromptTemplate(template);
+        assertFalse("Template with delimiter character should be invalid", result.isValid());
+        assertTrue(
+            "Error should mention delimiter character",
+            result.getErrorMessage().contains("reserved delimiter character") && result.getErrorMessage().contains("#")
+        );
+    }
+
+    public void testValidatePromptTemplate_ExceedsMaxLength() {
+        // Test that template cannot exceed maximum length (10000 characters)
+        StringBuilder longTemplate = new StringBuilder("Query: {{queryText}}\nDocuments: {{hits}}\n");
+        while (longTemplate.length() < 10001) {
+            longTemplate.append("This is a very long template that exceeds the maximum allowed length. ");
+        }
+        TextValidationUtil.ValidationResult result = TextValidationUtil.validatePromptTemplate(longTemplate.toString());
+        assertFalse("Template exceeding max length should be invalid", result.isValid());
+        assertTrue("Error should mention maximum length", result.getErrorMessage().contains("exceeds maximum length"));
+        assertTrue("Error should mention 10000 characters", result.getErrorMessage().contains("10000"));
+    }
+
+    public void testValidatePromptTemplate_ValidLongTemplate() {
+        // Test that a long but valid template (under 10000 characters) is accepted
+        StringBuilder longTemplate = new StringBuilder("Query: {{queryText}}\nDocuments: {{hits}}\n");
+        while (longTemplate.length() < 9990) {
+            longTemplate.append("This is a long template. ");
+        }
+        TextValidationUtil.ValidationResult result = TextValidationUtil.validatePromptTemplate(longTemplate.toString());
+        assertTrue("Valid long template should be accepted", result.isValid());
+        assertNull(result.getErrorMessage());
+    }
 }

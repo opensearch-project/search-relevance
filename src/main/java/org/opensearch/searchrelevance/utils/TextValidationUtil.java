@@ -22,6 +22,7 @@ public class TextValidationUtil {
     private static final int DEFAULT_MAX_TEXT_LENGTH = 2000;
     private static final int MAX_NAME_LENGTH = 50;
     private static final int MAX_DESCRIPTION_LENGTH = 250;
+    private static final int MAX_PROMPT_TEMPLATE_LENGTH = 10000;
     // Characters that could break JSON or cause security issues
     private static final String DANGEROUS_CHARS_PATTERN = "[\"\\\\<>]+";  // Excludes quotes, backslashes, and HTML tags
     // Characters that could break QuerySet parsing logic
@@ -227,9 +228,11 @@ public class TextValidationUtil {
     }
 
     /**
-     * Validates that a prompt template contains the required placeholders.
+     * Validates that a prompt template contains the required placeholders and meets formatting requirements.
      * - Must contain {{hits}} or {{results}} to provide documents to the LLM for rating
      * - Must contain {{queryText}} or {{searchText}} to provide the search query
+     * - Must not contain the reserved delimiter character (#)
+     * - Must not exceed maximum length
      *
      * @param promptTemplate The prompt template to validate
      * @return ValidationResult indicating if the template is valid
@@ -238,6 +241,21 @@ public class TextValidationUtil {
         if (promptTemplate == null || promptTemplate.trim().isEmpty()) {
             // Null/empty templates are allowed - they will use defaults
             return new ValidationResult(true, null);
+        }
+
+        // Check length
+        if (promptTemplate.length() > MAX_PROMPT_TEMPLATE_LENGTH) {
+            return new ValidationResult(false, "Prompt template exceeds maximum length of " + MAX_PROMPT_TEMPLATE_LENGTH + " characters");
+        }
+
+        // Check for reserved delimiter character
+        if (promptTemplate.contains(QueryWithReference.DELIMITER)) {
+            return new ValidationResult(
+                false,
+                "Prompt template cannot contain the reserved delimiter character '"
+                    + QueryWithReference.DELIMITER
+                    + "' which is used to separate query text from custom fields"
+            );
         }
 
         // Check if template contains {{hits}} or {{results}} placeholder

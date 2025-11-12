@@ -10,7 +10,6 @@ package org.opensearch.searchrelevance.judgments;
 import static org.opensearch.searchrelevance.common.MLConstants.LLM_JUDGMENT_RATING_TYPE;
 import static org.opensearch.searchrelevance.common.MLConstants.OVERWRITE_CACHE;
 import static org.opensearch.searchrelevance.common.MLConstants.PROMPT_TEMPLATE;
-import static org.opensearch.searchrelevance.model.QueryWithReference.DELIMITER;
 import static org.opensearch.searchrelevance.model.builder.SearchRequestBuilder.buildSearchRequest;
 import static org.opensearch.searchrelevance.utils.ParserUtils.combinedIndexAndDocId;
 import static org.opensearch.searchrelevance.utils.ParserUtils.generatePromptTemplateCode;
@@ -52,6 +51,7 @@ import org.opensearch.searchrelevance.model.QuerySet;
 import org.opensearch.searchrelevance.model.SearchConfiguration;
 import org.opensearch.searchrelevance.stats.events.EventStatName;
 import org.opensearch.searchrelevance.stats.events.EventStatsManager;
+import org.opensearch.searchrelevance.utils.ParserUtils;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.client.Client;
@@ -280,7 +280,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
 
         ConcurrentMap<String, SearchHit> allHits = new ConcurrentHashMap<>();
         ConcurrentMap<String, String> docIdToScore = new ConcurrentHashMap<>();
-        String queryText = queryTextWithCustomInput.split(DELIMITER, 2)[0];
+        String queryText = ParserUtils.parseQueryTextWithCustomInput(queryTextWithCustomInput).get("queryText");
 
         try {
             // Step 1: Execute searches concurrently within this query text task
@@ -487,7 +487,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         }
 
         // Parse queryTextWithCustomInput to extract query and reference data
-        Map<String, String> parsedData = parseQueryTextWithCustomInput(queryTextWithCustomInput);
+        Map<String, String> parsedData = ParserUtils.parseQueryTextWithCustomInput(queryTextWithCustomInput);
         String queryText = parsedData.remove("queryText");
         Map<String, String> referenceData = parsedData; // Remaining entries are reference data
 
@@ -666,48 +666,4 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         }
     }
 
-    /**
-     * Parse query text with custom input to extract query and reference data.
-     * Supports both legacy and new formats:
-     * - Legacy format: "queryText#referenceAnswer"
-     * - New format: "queryText#\nkey1: value1\nkey2: value2\n..."
-     *
-     * @param queryTextWithCustomInput the query text with optional custom input
-     * @return a map with "queryText" and optional reference data entries
-     */
-    static Map<String, String> parseQueryTextWithCustomInput(String queryTextWithCustomInput) {
-        Map<String, String> result = new HashMap<>();
-        String[] queryTextRefArr = queryTextWithCustomInput.split(DELIMITER, 2);
-        String queryText = queryTextRefArr[0];
-        result.put("queryText", queryText);
-
-        if (queryTextRefArr.length > 1 && !queryTextRefArr[1].isEmpty()) {
-            String referenceContent = queryTextRefArr[1];
-
-            // Check if new format (contains newlines with key-value pairs)
-            if (referenceContent.contains("\n")) {
-                // New format: queryText#\nkey1: value1\nkey2: value2\n...
-                String[] lines = referenceContent.split("\n");
-                for (String line : lines) {
-                    if (line.trim().isEmpty()) {
-                        continue;
-                    }
-                    // Parse "key: value" format
-                    int colonIndex = line.indexOf(':');
-                    if (colonIndex > 0) {
-                        String key = line.substring(0, colonIndex).trim();
-                        String value = line.substring(colonIndex + 1).trim();
-                        if (!key.isEmpty() && !value.isEmpty()) {
-                            result.put(key, value);
-                        }
-                    }
-                }
-            } else {
-                // Legacy format: queryText#referenceAnswer
-                result.put("referenceAnswer", referenceContent);
-            }
-        }
-
-        return result;
-    }
 }
