@@ -32,6 +32,7 @@ import static org.opensearch.searchrelevance.common.PluginConstants.TYPE;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
@@ -153,7 +154,7 @@ public class RestPutJudgmentAction extends BaseRestHandler {
                         llmJudgmentRatingType = LLMJudgmentRatingType.valueOf(llmJudgmentRatingTypeStr);
                     } catch (IllegalArgumentException e) {
                         throw new SearchRelevanceException(
-                            String.format("Invalid RatingType: '%s'. Valid values are: %s",
+                            String.format(Locale.ROOT, "Invalid RatingType: '%s'. Valid values are: %s",
                                 llmJudgmentRatingTypeStr,
                                 LLMJudgmentRatingType.getValidValues()),
                             RestStatus.BAD_REQUEST
