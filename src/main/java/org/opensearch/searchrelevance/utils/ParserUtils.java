@@ -19,6 +19,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.searchrelevance.model.QueryWithReference;
@@ -28,7 +30,9 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class ParserUtils {
+    private static final Logger LOGGER = LogManager.getLogger(ParserUtils.class);
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final String SHA_256_ALGORITHM = "SHA-256";
 
     public static SearchParams parseSearchParams(RestRequest request) throws IOException {
         SearchParams.Builder builder = SearchParams.builder();
@@ -153,7 +157,7 @@ public class ParserUtils {
     public static String generatePromptTemplateCode(String promptTemplate, Object ratingType) {
         try {
             String input = (promptTemplate != null ? promptTemplate : "") + "::" + (ratingType != null ? ratingType.toString() : "");
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            MessageDigest digest = MessageDigest.getInstance(SHA_256_ALGORITHM);
             byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
 
             // Convert to hexadecimal string
@@ -197,6 +201,11 @@ public class ParserUtils {
                     result.putAll(jsonMap);
                     return result;
                 } catch (Exception e) {
+                    LOGGER.debug(
+                        "Failed to parse reference content as JSON, falling back to legacy format. Content: '{}', Error: {}",
+                        referenceContent,
+                        e.getMessage()
+                    );
                     // Not valid JSON, fall through to legacy format
                 }
             }
