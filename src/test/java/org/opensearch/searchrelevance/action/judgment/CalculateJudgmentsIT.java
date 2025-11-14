@@ -38,6 +38,7 @@ import lombok.SneakyThrows;
 @OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.SUITE)
 public class CalculateJudgmentsIT extends BaseSearchRelevanceIT {
     public void initializeUBIIndices() throws IOException, URISyntaxException {
+        System.out.println("Eric here, hi.  Here is ubi.available: " + System.getProperty("ubi.available"));
         try {
             makeRequest(
                 client(),

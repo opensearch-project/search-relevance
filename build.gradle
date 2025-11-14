@@ -279,6 +279,8 @@ integTest {
     if (System.getProperty("test.debug") != null) {
         jvmArgs '-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:5005'
     }
+    // Pass ubi.available as configurable property via -Dubi.available=false
+    systemProperty 'ubi.available', System.getProperty('ubi.available', 'true')
 }
 
 ext.resolvePluginFile = { pluginId ->
