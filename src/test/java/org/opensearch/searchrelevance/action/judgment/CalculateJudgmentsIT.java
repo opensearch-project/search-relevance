@@ -34,7 +34,6 @@ import com.carrotsearch.randomizedtesting.annotations.ThreadLeakScope;
 import com.google.common.collect.ImmutableList;
 
 import lombok.SneakyThrows;
-import lombok.extern.log4j.Log4j2;
 
 @ThreadLeakScope(ThreadLeakScope.Scope.NONE)
 @OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.SUITE)
@@ -64,8 +63,6 @@ public class CalculateJudgmentsIT extends BaseSearchRelevanceIT {
                     .build();
                 createIndex(UBI_EVENTS_INDEX, indexSettings, eventsIndexMapping);
                 createIndex(UBI_QUERIES_INDEX, indexSettings, queriesIndexMapping);
-                // createIndexWithConfiguration(UBI_EVENTS_INDEX, eventsIndexConfiguration);
-                // createIndexWithConfiguration(UBI_QUERIES_INDEX, queriesIndexConfiguration);
             } catch (Exception ex) {
                 // Index may not exist, ignore
                 throw new IOException("UBI Indices could not be created manually and are not available.", ex);
