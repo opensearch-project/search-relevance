@@ -19,12 +19,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Logger;
 
 import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.hc.core5.http.message.BasicHeader;
 import org.opensearch.client.Response;
 import org.opensearch.client.ResponseException;
+import org.opensearch.cluster.metadata.IndexMetadata;
+import org.opensearch.common.settings.Settings;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.searchrelevance.BaseSearchRelevanceIT;
 import org.opensearch.test.OpenSearchIntegTestCase;
@@ -33,13 +34,13 @@ import com.carrotsearch.randomizedtesting.annotations.ThreadLeakScope;
 import com.google.common.collect.ImmutableList;
 
 import lombok.SneakyThrows;
+import lombok.extern.log4j.Log4j2;
 
 @ThreadLeakScope(ThreadLeakScope.Scope.NONE)
 @OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.SUITE)
 public class CalculateJudgmentsIT extends BaseSearchRelevanceIT {
     public void initializeUBIIndices() throws IOException, URISyntaxException {
-        System.out.println("Eric here, hi.  Here is ubi.available: " + System.getProperty("ubi.available"));
-        try {
+        if (System.getProperty("ubi.available").equals("true")) {
             makeRequest(
                 client(),
                 RestRequest.Method.POST.name(),
@@ -48,19 +49,27 @@ public class CalculateJudgmentsIT extends BaseSearchRelevanceIT {
                 toHttpEntity(""),
                 ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
             );
-            Logger.getLogger("CalculateJudgmentsIT").info("UBI indices initialized through api.");
-        } catch (Exception e) {
-            // If we cannot initialize the UBI, we can try to manually create the index
-            String eventsIndexConfiguration = Files.readString(Path.of(classLoader.getResource("ubi/EventsIndex.json").toURI()));
-            String queriesIndexConfiguration = Files.readString(Path.of(classLoader.getResource("ubi/QueriesIndex.json").toURI()));
+        } else {
+            String eventsIndexMapping = Files.readString(Path.of(classLoader.getResource("ubi/events-mapping.json").toURI()));
+            String queriesIndexMapping = Files.readString(Path.of(classLoader.getResource("ubi/queries-mapping.json").toURI()));
+            int eventsIndexMappingSize = eventsIndexMapping.length();
+            int queriesIndexMappingSize = queriesIndexMapping.length();
+            eventsIndexMapping = eventsIndexMapping.substring(1, eventsIndexMappingSize - 1);
+            queriesIndexMapping = queriesIndexMapping.substring(1, queriesIndexMappingSize - 1);
             try {
-                createIndexWithConfiguration(UBI_EVENTS_INDEX, eventsIndexConfiguration);
-                createIndexWithConfiguration(UBI_QUERIES_INDEX, queriesIndexConfiguration);
+                final Settings indexSettings = Settings.builder()
+                    .put(IndexMetadata.INDEX_NUMBER_OF_SHARDS_SETTING.getKey(), 1)
+                    .put(IndexMetadata.INDEX_AUTO_EXPAND_REPLICAS_SETTING.getKey(), "0-2")
+                    .put(IndexMetadata.SETTING_PRIORITY, Integer.MAX_VALUE)
+                    .build();
+                createIndex(UBI_EVENTS_INDEX, indexSettings, eventsIndexMapping);
+                createIndex(UBI_QUERIES_INDEX, indexSettings, queriesIndexMapping);
+                // createIndexWithConfiguration(UBI_EVENTS_INDEX, eventsIndexConfiguration);
+                // createIndexWithConfiguration(UBI_QUERIES_INDEX, queriesIndexConfiguration);
             } catch (Exception ex) {
                 // Index may not exist, ignore
-                return;
+                throw new IOException("UBI Indices could not be created manually and are not available.", ex);
             }
-            Logger.getLogger("CalculateJudgmentsIT").info("UBI indices initialized manually.");
         }
 
         String importDatasetBody = Files.readString(Path.of(classLoader.getResource("sample_ubi_data/SampleUBIEvents.json").toURI()));
