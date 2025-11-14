@@ -8,8 +8,6 @@
 package org.opensearch.searchrelevance.utils;
 
 import java.io.IOException;
-import java.security.AccessController;
-import java.security.PrivilegedAction;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -30,24 +28,7 @@ public class JsonUtils {
         if (json == null || json.isEmpty() || clazz == null) {
             return null;
         }
-
-        try {
-            return AccessController.doPrivileged((PrivilegedAction<T>) () -> {
-                try {
-                    return objectMapper.readValue(json, clazz);
-                } catch (IOException e) {
-                    // Rethrow as a RuntimeException, so it's caught outside doPrivileged.
-                    throw new RuntimeException(e);
-                }
-            });
-        } catch (RuntimeException e) {
-            // Unwrap the RuntimeException to get the original IOException.
-            if (e.getCause() instanceof IOException) {
-                throw (IOException) e.getCause();
-            }
-            throw new IOException("Error deserializing JSON: " + e.getMessage(), e);
-        }
-
+        return objectMapper.readValue(json, clazz);
     }
 
     /**
@@ -61,21 +42,7 @@ public class JsonUtils {
         if (object == null) {
             return null;
         }
-
-        try {
-            return AccessController.doPrivileged((PrivilegedAction<String>) () -> {
-                try {
-                    return objectMapper.writeValueAsString(object);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-            });
-        } catch (RuntimeException e) {
-            if (e.getCause() instanceof IOException) {
-                throw (IOException) e.getCause();
-            }
-            throw new IOException("Error serializing object to JSON: " + e.getMessage(), e);
-        }
+        return objectMapper.writeValueAsString(object);
     }
 
 }
