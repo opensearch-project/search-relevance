@@ -274,13 +274,6 @@ task integTest(type: RestIntegTestTask) {
 }
 tasks.named("check").configure { dependsOn(integTest) }
 
-integTest {
-    // The --debug-jvm command-line option makes the cluster debuggable; this makes the tests debuggable
-    if (System.getProperty("test.debug") != null) {
-        jvmArgs '-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:5005'
-    }
-}
-
 ext.resolvePluginFile = { pluginId ->
     return new Callable<RegularFile>() {
         @Override
@@ -540,7 +533,7 @@ integTest {
 
     // The -Dcluster.debug option makes the cluster debuggable, this makes the tests debuggable
     if (System.getProperty("test.debug") != null) {
-        jvmArgs '-agentlib:jdwp=transport=dt_socket,server=n,suspend=y,address=8000'
+        jvmArgs '-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:8000'
     }
 }
 

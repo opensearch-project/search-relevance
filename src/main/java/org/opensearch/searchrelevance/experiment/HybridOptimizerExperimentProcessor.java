@@ -58,7 +58,6 @@ public class HybridOptimizerExperimentProcessor {
      * @param searchConfigurations Map of search configuration IDs to SearchConfigurationDetails
      * @param judgmentList List of judgment IDs
      * @param size Result size
-     * @param hasFailure Failure flag
      * @param scheduledRunId id for the experiment to be scheduled
      * @param cancellationToken token to indicate whether the task has been cancelled
      * @param runningFutures futures set to be cancelled when the token is cancelled
@@ -70,7 +69,6 @@ public class HybridOptimizerExperimentProcessor {
         Map<String, SearchConfigurationDetails> searchConfigurations,
         List<String> judgmentList,
         int size,
-        AtomicBoolean hasFailure,
         String scheduledRunId,
         ExperimentCancellationToken cancellationToken,
         Map<String, List<Future<?>>> runningFutures,
@@ -83,6 +81,7 @@ public class HybridOptimizerExperimentProcessor {
 
         List<ExperimentVariantHybridSearchDTO> experimentVariantDTOs = experimentOptionForHybridSearch.getParameterCombinations(true);
         List<ExperimentVariant> experimentVariants = new ArrayList<>();
+        AtomicBoolean hasFailure = new AtomicBoolean(false);
 
         log.info(
             "Starting hybrid optimizer experiment {} with {} parameter combinations for query: {}",
@@ -165,12 +164,8 @@ public class HybridOptimizerExperimentProcessor {
         return CompletableFuture.allOf(judgmentFutures.toArray(new CompletableFuture[0])).thenApply(v -> {
             Map<String, String> docIdToScores = new HashMap<>();
             for (CompletableFuture<SearchResponse> future : judgmentFutures) {
-                try {
-                    SearchResponse response = future.join();
-                    extractJudgmentScores(queryText, response, docIdToScores);
-                } catch (Exception e) {
-                    log.error("Failed to process judgment response: {}", e.getMessage());
-                }
+                SearchResponse response = future.join();
+                extractJudgmentScores(queryText, response, docIdToScores);
             }
 
             if (docIdToScores.isEmpty()) {
