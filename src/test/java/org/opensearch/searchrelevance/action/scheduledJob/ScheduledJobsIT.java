@@ -40,7 +40,7 @@ public class ScheduledJobsIT extends BaseExperimentIT {
     String judgmentId;
     String experimentId;
 
-    public static final int CRON_JOB_COMPLETION_MS = 70000;
+    public static final int CRON_JOB_COMPLETION_MS = 65000;
 
     public void setUpEnvironment() throws Exception {
         // Arrange
