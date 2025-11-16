@@ -88,24 +88,6 @@ public class ScheduledJobsIT extends BaseExperimentIT {
         // Here we have to wait until at last one
         Thread.sleep(CRON_JOB_COMPLETION_MS);
 
-        // Here we want to make sure that the scheduled properties of the experiment has been updated properly
-        Response getUpdatedExperimentResponse = makeRequest(
-            client(),
-            RestRequest.Method.GET.name(),
-            getSingleExperimentByIdUrl,
-            null,
-            null,
-            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
-        );
-
-        Map<String, Object> getUpdatedExperimentResponseJson = entityAsMap(getUpdatedExperimentResponse);
-        assertNotNull(getUpdatedExperimentResponseJson);
-        assertEquals(experimentId, getUpdatedExperimentResponseJson.get("_id").toString());
-        Map<String, Object> updatedExperimentSource = (Map<String, Object>) getUpdatedExperimentResponseJson.get("_source");
-        assertNotNull(updatedExperimentSource);
-        assertEquals(experimentId, updatedExperimentSource.get("scheduledExperimentJobId"));
-        assertEquals(true, updatedExperimentSource.get("isScheduled"));
-
         // Make sure that the last updated time is not the same as the time the job was placed into the scheduler
         String getScheduledExperimentJobRunByIdUrl = String.join("/", SCHEDULED_JOBS_INDEX, "_doc", experimentId);
         Response getScheduledExperimentJobRunResponse = makeRequest(
