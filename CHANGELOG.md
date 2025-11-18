@@ -21,7 +21,7 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 ### Documentation
 
 ### Maintenance
-* Fixed dependency of `CalculateJudgmentsIT.java` on UBI plugin and created a fallback withn plugin does not exist. ([#311](https://github.com/opensearch-project/search-relevance/pull/311))
+* Fixed dependency of `CalculateJudgmentsIT.java` on UBI plugin and created a strategy to handle when plugin does not exist. ([#311](https://github.com/opensearch-project/search-relevance/pull/311))
 * Fixed duplicate JDWP configuration in the `integTest` Gradle task that caused `Cannot load this JVM TI agent twice` errors when running with `-Dtest.debug=1`. ([#296](https://github.com/opensearch-project/search-relevance/pull/296))
 * Removed deprecated `AccessController.doPrivileged()` usage in `JsonUtils` to prevent warnings and ensure compatibility with newer Java versions. ([#307](https://github.com/opensearch-project/search-relevance/pull/307))
 
