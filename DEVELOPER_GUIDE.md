@@ -272,6 +272,12 @@ To debug code running in an integration test (which exercises the server from a 
 
 The test runner JVM will connect to a debugger attached to `localhost:8000` before running the tests.
 
+```
+./gradlew test -Dtest.debug=1
+```
+
+This starts the unit test JVM with a JDWP debugger listening on `localhost:8000`, suspending execution until a debugger is attached.
+
 Additionally, it is possible to attach one debugger to the cluster JVM and another debugger to the test runner. First, make sure one debugger is listening on port `5005` and the other is listening on port `8000`. Then, run:
 ```
 ./gradlew :integTest -Dtest.debug=1 -Dcluster.debug=1
