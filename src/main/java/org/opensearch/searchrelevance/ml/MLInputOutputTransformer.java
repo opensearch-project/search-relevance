@@ -8,17 +8,12 @@
 package org.opensearch.searchrelevance.ml;
 
 import static org.opensearch.searchrelevance.common.MLConstants.PARAM_MESSAGES_FIELD;
-import static org.opensearch.searchrelevance.common.MLConstants.PROMPT_JSON_MESSAGES_SHELL;
 import static org.opensearch.searchrelevance.common.MLConstants.PROMPT_SEARCH_RELEVANCE_SCORE_0_1_START;
 import static org.opensearch.searchrelevance.common.MLConstants.PROMPT_SEARCH_RELEVANCE_SCORE_BINARY;
 import static org.opensearch.searchrelevance.common.MLConstants.PROMPT_SEARCH_RELEVANCE_SCORE_END;
 import static org.opensearch.searchrelevance.common.MLConstants.RATING_SCORE_BINARY_SCHEMA;
 import static org.opensearch.searchrelevance.common.MLConstants.RATING_SCORE_NUMERIC_SCHEMA;
-import static org.opensearch.searchrelevance.common.MLConstants.RESPONSE_CHOICES_FIELD;
-import static org.opensearch.searchrelevance.common.MLConstants.RESPONSE_CONTENT_FIELD;
 import static org.opensearch.searchrelevance.common.MLConstants.RESPONSE_FORMAT_TEMPLATE;
-import static org.opensearch.searchrelevance.common.MLConstants.RESPONSE_MESSAGE_FIELD;
-import static org.opensearch.searchrelevance.common.MLConstants.escapeJson;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -37,6 +32,8 @@ import org.opensearch.ml.common.output.MLOutput;
 import org.opensearch.ml.common.output.model.ModelTensor;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.output.model.ModelTensors;
+import org.opensearch.searchrelevance.ml.connector.LLMConnector;
+import org.opensearch.searchrelevance.ml.connector.OpenAIConnector;
 import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
 
 import lombok.extern.log4j.Log4j2;
@@ -46,6 +43,17 @@ import lombok.extern.log4j.Log4j2;
  */
 @Log4j2
 public class MLInputOutputTransformer {
+
+    private final LLMConnector connector;
+
+    public MLInputOutputTransformer() {
+        // Default to OpenAI for backward compatibility
+        this.connector = new OpenAIConnector();
+    }
+
+    public MLInputOutputTransformer(LLMConnector connector) {
+        this.connector = connector;
+    }
 
     public List<MLInput> createMLInputs(
         int tokenLimit,
@@ -155,7 +163,7 @@ public class MLInputOutputTransformer {
             String hitsJson = buildHitsJson(hits);
             String userContent = UserPromptFactory.buildUserContent(searchText, referenceData, hitsJson, promptTemplate);
             String systemPrompt = getSystemPrompt(ratingType);
-            return String.format(Locale.ROOT, PROMPT_JSON_MESSAGES_SHELL, systemPrompt, escapeJson(userContent));
+            return connector.formatPrompt(systemPrompt, userContent);
         } catch (IOException e) {
             log.error("Error converting hits to JSON string", e);
             throw new IllegalArgumentException("Failed to process hits", e);
@@ -221,8 +229,6 @@ public class MLInputOutputTransformer {
         ModelTensor tensor = tensorOutputList.get(0).getMlModelTensors().get(0);
         Map<String, ?> dataMap = tensor.getDataAsMap();
 
-        Map<String, ?> choices = (Map<String, ?>) ((List<?>) dataMap.get(RESPONSE_CHOICES_FIELD)).get(0);
-        Map<String, ?> message = (Map<String, ?>) choices.get(RESPONSE_MESSAGE_FIELD);
-        return (String) message.get(RESPONSE_CONTENT_FIELD);
+        return connector.extractResponse(dataMap);
     }
 }
