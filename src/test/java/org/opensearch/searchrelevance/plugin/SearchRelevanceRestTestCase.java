@@ -10,6 +10,7 @@ package org.opensearch.searchrelevance.plugin;
 import static org.mockito.Mockito.when;
 import static org.opensearch.searchrelevance.common.PluginConstants.DOCUMENT_ID;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 

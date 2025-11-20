@@ -283,7 +283,7 @@ Additionally, it is possible to attach one debugger to the cluster JVM and anoth
 ./gradlew :integTest -Dtest.debug=1 -Dcluster.debug=1
 ```
 
-When running integration tests, it is assumed that the [UBI Plugin](https://github.com/opensearch-project/user-behavior-insights) is installed. If the cluster does not have that plugin, use the flag `-Dubi.available=false` when running `./gradlew :integTest`. 
+When running integration tests, it is assumed that the [UBI Plugin](https://github.com/opensearch-project/user-behavior-insights) is installed. If the cluster does not have that plugin, use the flag `-Dubi.available=false` when running `./gradlew :integTest`.
 
 ## Design Documentation
 
