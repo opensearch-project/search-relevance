@@ -16,7 +16,7 @@ jobs:
     needs: Get-CI-Image-Tag
     strategy:
       matrix:
-        java: [21, 24]
+        java: [21, 25]
         os: [ubuntu-latest]
 
     name: Gradle Check Linux
@@ -54,7 +54,7 @@ jobs:
   Check-search-relevance-windows:
     strategy:
       matrix:
-        java: [21, 24]
+        java: [21, 25]
         os: [windows-latest]
 
     name: Gradle Check Windows
@@ -77,7 +77,7 @@ jobs:
     needs: Get-CI-Image-Tag
     strategy:
       matrix:
-        java: [21, 24]
+        java: [21, 25]
         os: [ubuntu-latest]
 
     name: Pre-commit Linux
@@ -116,7 +116,7 @@ jobs:
     needs: Precommit-search-relevance-linux
     strategy:
       matrix:
-        java: [21, 24]
+        java: [21, 25]
         os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
