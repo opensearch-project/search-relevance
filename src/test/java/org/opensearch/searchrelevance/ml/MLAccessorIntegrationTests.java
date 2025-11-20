@@ -28,6 +28,7 @@ import org.opensearch.ml.common.output.MLOutput;
 import org.opensearch.ml.common.output.model.ModelTensor;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.output.model.ModelTensors;
+import org.opensearch.searchrelevance.ml.connector.ConnectorType;
 import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
 import org.opensearch.test.OpenSearchTestCase;
 
@@ -99,6 +100,7 @@ public class MLAccessorIntegrationTests extends OpenSearchTestCase {
             hits,
             "Test prompt",
             LLMJudgmentRatingType.SCORE0_1,
+            ConnectorType.OPENAI,
             ActionListener.wrap(chunkResult -> {
                 result.set(chunkResult);
                 latch.countDown();

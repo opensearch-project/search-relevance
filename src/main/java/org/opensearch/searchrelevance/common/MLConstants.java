@@ -23,6 +23,7 @@ public class MLConstants {
      * ML input field names
      */
     public static final String PARAM_MESSAGES_FIELD = "messages";
+    public static final String CONNECTOR_TYPE = "connectorType";
     public static final String PROMPT_TEMPLATE = "promptTemplate";
     public static final String LLM_JUDGMENT_RATING_TYPE = "llmJudgmentRatingType";
     public static final String OVERWRITE_CACHE = "overwriteCache";

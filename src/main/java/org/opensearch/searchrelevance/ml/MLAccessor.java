@@ -17,6 +17,8 @@ import org.opensearch.core.action.ActionListener;
 import org.opensearch.ml.client.MachineLearningNodeClient;
 import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
 import org.opensearch.ml.common.input.MLInput;
+import org.opensearch.searchrelevance.ml.connector.ConnectorType;
+import org.opensearch.searchrelevance.ml.connector.LLMConnectorFactory;
 import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
 import org.opensearch.searchrelevance.utils.RatingOutputProcessor;
 
@@ -46,16 +48,29 @@ public class MLAccessor {
         Map<String, String> hits,
         String promptTemplate,
         LLMJudgmentRatingType ratingType,
+        ConnectorType connectorType,
         ActionListener<ChunkResult> progressListener
     ) {
         log.debug(
-            "DEBUG: MLAccessor.predict called with modelId: {}, searchText: {}, hits count: {}, ratingType: {}",
+            "DEBUG: MLAccessor.predict called with modelId: {}, searchText: {}, hits count: {}, ratingType: {}, connectorType: {}",
             modelId,
             searchText,
             hits.size(),
+            ratingType,
+            connectorType
+        );
+
+        // Create transformer with appropriate connector
+        MLInputOutputTransformer connectorTransformer = new MLInputOutputTransformer(LLMConnectorFactory.create(connectorType));
+
+        List<MLInput> mlInputs = connectorTransformer.createMLInputs(
+            tokenLimit,
+            searchText,
+            referenceData,
+            hits,
+            promptTemplate,
             ratingType
         );
-        List<MLInput> mlInputs = transformer.createMLInputs(tokenLimit, searchText, referenceData, hits, promptTemplate, ratingType);
         log.info("Number of chunks: {}", mlInputs.size());
         log.debug("DEBUG: Created {} MLInput chunks", mlInputs.size());
 

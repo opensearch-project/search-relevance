@@ -12,6 +12,7 @@ import java.util.List;
 
 import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.core.common.io.stream.StreamOutput;
+import org.opensearch.searchrelevance.ml.connector.ConnectorType;
 import org.opensearch.searchrelevance.model.JudgmentType;
 import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
 
@@ -57,6 +58,11 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
      */
     private boolean overwriteCache;
 
+    /**
+     * LLM connector type for formatting prompts and extracting responses
+     */
+    private ConnectorType connectorType;
+
     public PutLlmJudgmentRequest(
         @NonNull JudgmentType type,
         @NonNull String name,
@@ -70,7 +76,8 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         boolean ignoreFailure,
         String promptTemplate,
         LLMJudgmentRatingType llmJudgmentRatingType,
-        boolean overwriteCache
+        boolean overwriteCache,
+        ConnectorType connectorType
     ) {
         super(type, name, description);
         this.modelId = modelId;
@@ -83,6 +90,7 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         this.promptTemplate = promptTemplate;
         this.llmJudgmentRatingType = llmJudgmentRatingType;
         this.overwriteCache = overwriteCache;
+        this.connectorType = connectorType != null ? connectorType : ConnectorType.OPENAI; // default to OpenAI
     }
 
     public PutLlmJudgmentRequest(StreamInput in) throws IOException {
@@ -97,6 +105,8 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         this.promptTemplate = in.readOptionalString();
         this.llmJudgmentRatingType = in.readOptionalWriteable(LLMJudgmentRatingType::readFromStream);
         this.overwriteCache = Boolean.TRUE.equals(in.readOptionalBoolean());
+        String connectorTypeStr = in.readOptionalString();
+        this.connectorType = connectorTypeStr != null ? ConnectorType.valueOf(connectorTypeStr) : ConnectorType.OPENAI;
     }
 
     @Override
@@ -112,6 +122,7 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         out.writeOptionalString(promptTemplate);
         out.writeOptionalWriteable(llmJudgmentRatingType);
         out.writeOptionalBoolean(overwriteCache);
+        out.writeOptionalString(connectorType != null ? connectorType.name() : null);
     }
 
     public String getModelId() {
@@ -152,6 +163,10 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
 
     public boolean isOverwriteCache() {
         return overwriteCache;
+    }
+
+    public ConnectorType getConnectorType() {
+        return connectorType;
     }
 
 }

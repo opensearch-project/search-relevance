@@ -13,6 +13,7 @@ import java.util.Map;
 
 import org.opensearch.common.io.stream.BytesStreamOutput;
 import org.opensearch.core.common.io.stream.StreamInput;
+import org.opensearch.searchrelevance.ml.connector.ConnectorType;
 import org.opensearch.searchrelevance.model.JudgmentType;
 import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
 import org.opensearch.searchrelevance.transport.judgment.PutImportJudgmentRequest;
@@ -93,7 +94,8 @@ public class PutJudgmentActionTests extends OpenSearchTestCase {
             false,
             "test_prompt_template",
             LLMJudgmentRatingType.SCORE0_1,
-            true
+            true,
+            ConnectorType.OPENAI
         );
 
         BytesStreamOutput output = new BytesStreamOutput();
@@ -130,7 +132,8 @@ public class PutJudgmentActionTests extends OpenSearchTestCase {
             true,
             null,
             null,
-            false
+            false,
+            ConnectorType.OPENAI
         );
 
         BytesStreamOutput output = new BytesStreamOutput();

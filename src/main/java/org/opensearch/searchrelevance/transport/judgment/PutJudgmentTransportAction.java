@@ -7,6 +7,7 @@
  */
 package org.opensearch.searchrelevance.transport.judgment;
 
+import static org.opensearch.searchrelevance.common.MLConstants.CONNECTOR_TYPE;
 import static org.opensearch.searchrelevance.common.MLConstants.LLM_JUDGMENT_RATING_TYPE;
 import static org.opensearch.searchrelevance.common.MLConstants.OVERWRITE_CACHE;
 import static org.opensearch.searchrelevance.common.MLConstants.PROMPT_TEMPLATE;
@@ -100,6 +101,7 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
             case LLM_JUDGMENT -> {
                 PutLlmJudgmentRequest llmRequest = (PutLlmJudgmentRequest) request;
                 metadata.put(MODEL_ID, llmRequest.getModelId());
+                metadata.put(CONNECTOR_TYPE, llmRequest.getConnectorType().getValue());
                 metadata.put("querySetId", llmRequest.getQuerySetId());
                 metadata.put("size", llmRequest.getSize());
                 metadata.put("searchConfigurationList", llmRequest.getSearchConfigurationList());

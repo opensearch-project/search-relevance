@@ -9,6 +9,7 @@ package org.opensearch.searchrelevance.rest;
 
 import static java.util.Collections.singletonList;
 import static org.opensearch.rest.RestRequest.Method.PUT;
+import static org.opensearch.searchrelevance.common.MLConstants.CONNECTOR_TYPE;
 import static org.opensearch.searchrelevance.common.MLConstants.DEFAULT_PROMPT_TEMPLATE;
 import static org.opensearch.searchrelevance.common.MLConstants.LLM_JUDGMENT_RATING_TYPE;
 import static org.opensearch.searchrelevance.common.MLConstants.OVERWRITE_CACHE;
@@ -48,6 +49,7 @@ import org.opensearch.rest.BaseRestHandler;
 import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
+import org.opensearch.searchrelevance.ml.connector.ConnectorType;
 import org.opensearch.searchrelevance.model.JudgmentType;
 import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
@@ -166,6 +168,31 @@ public class RestPutJudgmentAction extends BaseRestHandler {
                 }
                 boolean overwriteCache = Optional.ofNullable((Boolean) source.get(OVERWRITE_CACHE)).orElse(Boolean.FALSE);
 
+                // Parse connectorType - optional, defaults to OpenAI
+                ConnectorType connectorType = ConnectorType.OPENAI; // default
+                String connectorTypeStr = (String) source.get(CONNECTOR_TYPE);
+                if (connectorTypeStr != null) {
+                    try {
+                        connectorType = ConnectorType.valueOf(connectorTypeStr.toUpperCase(Locale.ROOT));
+                    } catch (IllegalArgumentException e) {
+                        throw new SearchRelevanceException(
+                            String.format(
+                                Locale.ROOT,
+                                "Invalid connectorType: '%s'. Valid values are: %s",
+                                connectorTypeStr,
+                                String.join(
+                                    ", ",
+                                    ConnectorType.OPENAI.name(),
+                                    ConnectorType.CLAUDE.name(),
+                                    ConnectorType.COHERE.name(),
+                                    ConnectorType.DEEPSEEK.name()
+                                )
+                            ),
+                            RestStatus.BAD_REQUEST
+                        );
+                    }
+                }
+
                 createRequest = new PutLlmJudgmentRequest(
                     type,
                     name,
@@ -179,7 +206,8 @@ public class RestPutJudgmentAction extends BaseRestHandler {
                     ignoreFailure,
                     promptTemplate,
                     llmJudgmentRatingType,
-                    overwriteCache
+                    overwriteCache,
+                    connectorType
                 );
             }
             case UBI_JUDGMENT -> {
