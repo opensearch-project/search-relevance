@@ -22,12 +22,14 @@ import org.opensearch.action.DocWriteRequest.OpType;
 import org.opensearch.action.StepListener;
 import org.opensearch.action.admin.indices.create.CreateIndexRequest;
 import org.opensearch.action.admin.indices.create.CreateIndexResponse;
+import org.opensearch.action.admin.indices.mapping.put.PutMappingRequest;
 import org.opensearch.action.delete.DeleteResponse;
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.search.ShardSearchFailure;
 import org.opensearch.action.support.WriteRequest;
+import org.opensearch.action.support.clustermanager.AcknowledgedResponse;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.io.Streams;
 import org.opensearch.core.action.ActionListener;
@@ -113,6 +115,73 @@ public class SearchRelevanceIndicesManager {
         }
         final CreateIndexRequest createIndexRequest = new CreateIndexRequest(indexName).mapping(mapping);
         StashedThreadContext.run(client, () -> client.admin().indices().create(createIndexRequest));
+    }
+
+    /**
+     * Update mapping for an existing index
+     * @param index - index to be updated
+     * @param listener - action listener for async action
+     */
+    public void updateMappingIfExists(final SearchRelevanceIndices index, final ActionListener<AcknowledgedResponse> listener) {
+        String indexName = index.getIndexName();
+        String mapping = index.getMapping();
+
+        if (!clusterService.state().metadata().hasIndex(indexName)) {
+            log.debug("Index [{}] does not exist, skipping mapping update", indexName);
+            listener.onResponse(null);
+            return;
+        }
+
+        log.info("Updating mapping for index [{}]", indexName);
+        final PutMappingRequest putMappingRequest = new PutMappingRequest(indexName);
+        putMappingRequest.source(mapping, org.opensearch.common.xcontent.XContentType.JSON);
+        StashedThreadContext.run(client, () -> client.admin().indices().putMapping(putMappingRequest, new ActionListener<>() {
+            @Override
+            public void onResponse(final AcknowledgedResponse response) {
+                if (response.isAcknowledged()) {
+                    log.info("Successfully updated mapping for index [{}]", indexName);
+                } else {
+                    log.warn("Mapping update for index [{}] was not acknowledged", indexName);
+                }
+                listener.onResponse(response);
+            }
+
+            @Override
+            public void onFailure(final Exception e) {
+                log.error("Failed to update mapping for index [{}]", indexName, e);
+                listener.onFailure(e);
+            }
+        }));
+    }
+
+    /**
+     * Create index if absent or update mapping if exists
+     * @param index - index to be created or updated
+     * @param listener - action listener for async action
+     */
+    public void createOrUpdateIndex(final SearchRelevanceIndices index, final ActionListener<Void> listener) {
+        String indexName = index.getIndexName();
+
+        if (clusterService.state().metadata().hasIndex(indexName)) {
+            log.debug("Index [{}] already exists, updating mapping", indexName);
+            updateMappingIfExists(index, new ActionListener<>() {
+                @Override
+                public void onResponse(AcknowledgedResponse response) {
+                    listener.onResponse(null);
+                }
+
+                @Override
+                public void onFailure(Exception e) {
+                    log.warn("Failed to update mapping for index [{}], but continuing", indexName, e);
+                    listener.onResponse(null);
+                }
+            });
+        } else {
+            log.debug("Index [{}] does not exist, creating it", indexName);
+            StepListener<Void> createIndexStep = new StepListener<>();
+            createIndexIfAbsent(index, createIndexStep);
+            createIndexStep.whenComplete(listener::onResponse, listener::onFailure);
+        }
     }
 
     public SearchResponse getDocByDocIdSync(final String docId, final SearchRelevanceIndices index) {

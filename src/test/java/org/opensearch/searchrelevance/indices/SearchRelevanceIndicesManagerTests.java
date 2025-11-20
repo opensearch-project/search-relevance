@@ -30,12 +30,14 @@ import org.opensearch.action.DocWriteResponse;
 import org.opensearch.action.StepListener;
 import org.opensearch.action.admin.indices.create.CreateIndexRequest;
 import org.opensearch.action.admin.indices.create.CreateIndexResponse;
+import org.opensearch.action.admin.indices.mapping.put.PutMappingRequest;
 import org.opensearch.action.delete.DeleteRequestBuilder;
 import org.opensearch.action.delete.DeleteResponse;
 import org.opensearch.action.index.IndexRequestBuilder;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.support.WriteRequest;
+import org.opensearch.action.support.clustermanager.AcknowledgedResponse;
 import org.opensearch.cluster.ClusterState;
 import org.opensearch.cluster.metadata.Metadata;
 import org.opensearch.cluster.service.ClusterService;
@@ -412,6 +414,115 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         assertTrue(capturedException instanceof SearchRelevanceException);
         assertEquals("Failed to delete doc", capturedException.getMessage());
         assertEquals(RestStatus.INTERNAL_SERVER_ERROR, ((SearchRelevanceException) capturedException).status());
+    }
+
+    public void testUpdateMappingIfExistsWhenIndexExists() {
+        when(metadata.hasIndex(QUERY_SET.getIndexName())).thenReturn(true);
+
+        @SuppressWarnings("unchecked")
+        ActionListener<AcknowledgedResponse> listener = mock(ActionListener.class);
+        indicesManager.updateMappingIfExists(QUERY_SET, listener);
+
+        ArgumentCaptor<PutMappingRequest> requestCaptor = ArgumentCaptor.forClass(PutMappingRequest.class);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<ActionListener<AcknowledgedResponse>> listenerCaptor = ArgumentCaptor.forClass(ActionListener.class);
+        verify(indicesAdminClient).putMapping(requestCaptor.capture(), listenerCaptor.capture());
+
+        PutMappingRequest capturedRequest = requestCaptor.getValue();
+        assertEquals(QUERY_SET.getIndexName(), capturedRequest.indices()[0]);
+
+        AcknowledgedResponse response = new AcknowledgedResponse(true);
+        listenerCaptor.getValue().onResponse(response);
+
+        verify(listener).onResponse(response);
+    }
+
+    public void testUpdateMappingIfExistsWhenIndexDoesNotExist() {
+        when(metadata.hasIndex(QUERY_SET.getIndexName())).thenReturn(false);
+
+        @SuppressWarnings("unchecked")
+        ActionListener<AcknowledgedResponse> listener = mock(ActionListener.class);
+        indicesManager.updateMappingIfExists(QUERY_SET, listener);
+
+        // putMapping should not be called when index doesn't exist
+        verify(indicesAdminClient, never()).putMapping(any(PutMappingRequest.class), any());
+        verify(listener).onResponse(null);
+    }
+
+    public void testUpdateMappingIfExistsWhenUpdateFails() {
+        when(metadata.hasIndex(QUERY_SET.getIndexName())).thenReturn(true);
+
+        @SuppressWarnings("unchecked")
+        ActionListener<AcknowledgedResponse> listener = mock(ActionListener.class);
+        indicesManager.updateMappingIfExists(QUERY_SET, listener);
+
+        ArgumentCaptor<PutMappingRequest> requestCaptor = ArgumentCaptor.forClass(PutMappingRequest.class);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<ActionListener<AcknowledgedResponse>> listenerCaptor = ArgumentCaptor.forClass(ActionListener.class);
+        verify(indicesAdminClient).putMapping(requestCaptor.capture(), listenerCaptor.capture());
+
+        Exception exception = new RuntimeException("Mapping update failed");
+        listenerCaptor.getValue().onFailure(exception);
+
+        verify(listener).onFailure(exception);
+    }
+
+    public void testCreateOrUpdateIndexWhenIndexExists() {
+        when(metadata.hasIndex(QUERY_SET.getIndexName())).thenReturn(true);
+
+        @SuppressWarnings("unchecked")
+        ActionListener<Void> listener = mock(ActionListener.class);
+        indicesManager.createOrUpdateIndex(QUERY_SET, listener);
+
+        // Should call putMapping, not create
+        ArgumentCaptor<PutMappingRequest> requestCaptor = ArgumentCaptor.forClass(PutMappingRequest.class);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<ActionListener<AcknowledgedResponse>> listenerCaptor = ArgumentCaptor.forClass(ActionListener.class);
+        verify(indicesAdminClient).putMapping(requestCaptor.capture(), listenerCaptor.capture());
+        verify(indicesAdminClient, never()).create(any(CreateIndexRequest.class), any());
+
+        AcknowledgedResponse response = new AcknowledgedResponse(true);
+        listenerCaptor.getValue().onResponse(response);
+
+        verify(listener).onResponse(null);
+    }
+
+    public void testCreateOrUpdateIndexWhenIndexDoesNotExist() {
+        when(metadata.hasIndex(QUERY_SET.getIndexName())).thenReturn(false);
+
+        @SuppressWarnings("unchecked")
+        ActionListener<Void> listener = mock(ActionListener.class);
+        indicesManager.createOrUpdateIndex(QUERY_SET, listener);
+
+        // Should call create, not putMapping
+        ArgumentCaptor<CreateIndexRequest> requestCaptor = ArgumentCaptor.forClass(CreateIndexRequest.class);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<ActionListener<CreateIndexResponse>> listenerCaptor = ArgumentCaptor.forClass(ActionListener.class);
+        verify(indicesAdminClient).create(requestCaptor.capture(), listenerCaptor.capture());
+        verify(indicesAdminClient, never()).putMapping(any(PutMappingRequest.class), any());
+
+        CreateIndexRequest capturedRequest = requestCaptor.getValue();
+        assertEquals(QUERY_SET.getIndexName(), capturedRequest.index());
+        assertEquals(QUERY_SET.getMapping(), capturedRequest.mappings());
+    }
+
+    public void testCreateOrUpdateIndexWhenMappingUpdateFails() {
+        when(metadata.hasIndex(QUERY_SET.getIndexName())).thenReturn(true);
+
+        @SuppressWarnings("unchecked")
+        ActionListener<Void> listener = mock(ActionListener.class);
+        indicesManager.createOrUpdateIndex(QUERY_SET, listener);
+
+        ArgumentCaptor<PutMappingRequest> requestCaptor = ArgumentCaptor.forClass(PutMappingRequest.class);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<ActionListener<AcknowledgedResponse>> listenerCaptor = ArgumentCaptor.forClass(ActionListener.class);
+        verify(indicesAdminClient).putMapping(requestCaptor.capture(), listenerCaptor.capture());
+
+        Exception exception = new RuntimeException("Mapping update failed");
+        listenerCaptor.getValue().onFailure(exception);
+
+        // Should still call onResponse with null even if mapping update fails
+        verify(listener).onResponse(null);
     }
 
 }
