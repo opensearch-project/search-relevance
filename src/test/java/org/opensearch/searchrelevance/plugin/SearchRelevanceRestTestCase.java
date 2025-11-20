@@ -50,7 +50,16 @@ public abstract class SearchRelevanceRestTestCase extends OpenSearchTestCase {
         when(channel.newBuilder()).thenReturn(builder);
     }
 
-    public RestRequest createPutRestRequestWithContent(String content, String endpoint) throws IOException {
+    public RestRequest createPutRestRequestWithContent(String content, String endpoint) {
+        Map<String, String> params = new HashMap<>(); // Create params map
+        return new FakeRestRequest.Builder(NamedXContentRegistry.EMPTY).withContent(new BytesArray(content), XContentType.JSON)
+            .withParams(params)
+            .withMethod(RestRequest.Method.PUT)
+            .withPath("/_plugins/_search_relevance/" + endpoint)
+            .build();
+    }
+
+    public RestRequest createPostRestRequestWithContent(String content, String endpoint) throws IOException {
         Map<String, String> params = new HashMap<>(); // Create params map
         return new FakeRestRequest.Builder(NamedXContentRegistry.EMPTY).withContent(new BytesArray(content), XContentType.JSON)
             .withParams(params)

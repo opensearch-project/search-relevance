@@ -34,6 +34,7 @@ import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.model.ExperimentVariant;
 import org.opensearch.searchrelevance.model.SearchConfigurationDetails;
+import org.opensearch.searchrelevance.scheduler.ExperimentCancellationToken;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 
 import lombok.extern.log4j.Log4j2;
@@ -75,6 +76,8 @@ public class PointwiseExperimentProcessor {
         List<String> judgmentList,
         int size,
         AtomicBoolean hasFailure,
+        String scheduledRunId,
+        ExperimentCancellationToken cancellationToken,
         ActionListener<Map<String, Object>> listener
     ) {
         log.info(
@@ -95,6 +98,8 @@ public class PointwiseExperimentProcessor {
                 size,
                 docIdToScores,
                 hasFailure,
+                scheduledRunId,
+                cancellationToken,
                 listener
             );
         }).exceptionally(e -> {
@@ -189,6 +194,8 @@ public class PointwiseExperimentProcessor {
         int size,
         Map<String, String> docIdToScores,
         AtomicBoolean hasFailure,
+        String scheduledRunId,
+        ExperimentCancellationToken cancellationToken,
         ActionListener<Map<String, Object>> listener
     ) {
         // Create simple variants
@@ -223,7 +230,10 @@ public class PointwiseExperimentProcessor {
                 judgmentList,
                 docIdToScores,
                 configToExperimentVariants,
-                hasFailure
+                hasFailure,
+                scheduledRunId,
+                null,
+                cancellationToken
             );
 
             // Transform results

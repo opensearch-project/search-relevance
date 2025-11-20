@@ -39,7 +39,9 @@ public class SearchRelevanceIndicesTests extends OpenSearchTestCase {
             SearchRelevanceIndices.JUDGMENT_CACHE,
             SearchRelevanceIndices.EVALUATION_RESULT,
             SearchRelevanceIndices.EXPERIMENT_VARIANT,
-            SearchRelevanceIndices.QUERY_SET
+            SearchRelevanceIndices.QUERY_SET,
+            SearchRelevanceIndices.SCHEDULED_JOBS,
+            SearchRelevanceIndices.SCHEDULED_EXPERIMENT_HISTORY
         );
         for (SearchRelevanceIndices index : notProtectedIndices) {
             assertFalse(index.isProtected());

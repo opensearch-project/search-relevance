@@ -6,6 +6,7 @@
     "experimentId": { "type": "keyword" },
     "experimentVariantId": { "type": "keyword" },
     "experimentVariantParameters": { "type": "keyword" },
+    "scheduledRunId": {"type": "keyword"},
     "searchText": { "type": "keyword" },
     "judgmentList": { "type": "keyword" },
     "documentIds": { "type": "keyword" },

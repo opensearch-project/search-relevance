@@ -17,11 +17,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.unit.TimeValue;
 import org.opensearch.common.util.concurrent.OpenSearchExecutors;
@@ -31,6 +31,7 @@ import org.opensearch.searchrelevance.dao.ExperimentVariantDao;
 import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.model.ExperimentVariant;
+import org.opensearch.searchrelevance.scheduler.ExperimentCancellationToken;
 import org.opensearch.test.OpenSearchTestCase;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.client.Client;
@@ -41,7 +42,6 @@ import org.opensearch.transport.client.Client;
 public class ExperimentTaskManagerTests extends OpenSearchTestCase {
 
     private Client client;
-    private ClusterService clusterService;
     private EvaluationResultDao evaluationResultDao;
     private ExperimentVariantDao experimentVariantDao;
     private ThreadPool threadPool;
@@ -51,7 +51,6 @@ public class ExperimentTaskManagerTests extends OpenSearchTestCase {
     public void setUp() throws Exception {
         super.setUp();
         client = mock(Client.class);
-        clusterService = mock(ClusterService.class);
         evaluationResultDao = mock(EvaluationResultDao.class);
         experimentVariantDao = mock(ExperimentVariantDao.class);
         threadPool = mock(ThreadPool.class);
@@ -265,7 +264,7 @@ public class ExperimentTaskManagerTests extends OpenSearchTestCase {
         }
     }
 
-    public void testConfigMapInitialization() throws Exception {
+    public void testConfigMapInitialization() {
         // Arrange
         ExperimentTaskManager taskManager = new ExperimentTaskManager(client, evaluationResultDao, experimentVariantDao, threadPool);
         String experimentId = "test-experiment";
@@ -286,12 +285,49 @@ public class ExperimentTaskManagerTests extends OpenSearchTestCase {
             List.of("judgment-1"),
             Map.of("doc1", "5"),
             initialConfigMap,
-            new AtomicBoolean(false)
+            new AtomicBoolean(false),
+            null,
+            null,
+            null
         );
 
         // Assert
         assertNotNull("Should return a CompletableFuture", future);
         // The initial config map should be preserved
         assertTrue("Should preserve existing keys", initialConfigMap.containsKey("existing-key"));
+    }
+
+    public void testScheduledTaskAsyncWithCancellation() {
+        ExperimentTaskManager taskManager = new ExperimentTaskManager(client, evaluationResultDao, experimentVariantDao, threadPool);
+        String experimentId = "test-experiment";
+        String searchConfigId = "test-config";
+        Map<String, Object> initialConfigMap = new HashMap<>();
+        initialConfigMap.put("existing-key", "existing-value");
+        String scheduledExperimentResultId = "scheduled-experiment-result";
+        ExperimentCancellationToken cancellationToken = new ExperimentCancellationToken(scheduledExperimentResultId);
+        cancellationToken.cancel();
+
+        CompletableFuture<Map<String, Object>> future = taskManager.scheduleTasksAsync(
+            ExperimentType.HYBRID_OPTIMIZER,
+            experimentId,
+            searchConfigId,
+            "test-index",
+            "test-query",
+            "test query text",
+            10,
+            createTestVariants(experimentId, 1),
+            List.of("judgment-1"),
+            Map.of("doc1", "5"),
+            initialConfigMap,
+            new AtomicBoolean(false),
+            scheduledExperimentResultId,
+            new HashMap<>(),
+            cancellationToken
+        );
+
+        // Wait on future to be ready to be cancelled.
+        expectThrows(CompletionException.class, () -> future.join());
+
+        assertTrue(future.isCompletedExceptionally());
     }
 }

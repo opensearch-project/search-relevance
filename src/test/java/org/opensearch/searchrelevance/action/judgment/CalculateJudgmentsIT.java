@@ -11,6 +11,7 @@ import static org.opensearch.searchrelevance.common.PluginConstants.INITIALIZE_U
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENTS_URL;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.UBI_EVENTS_INDEX;
+import static org.opensearch.searchrelevance.common.PluginConstants.UBI_QUERIES_INDEX;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -23,6 +24,8 @@ import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.hc.core5.http.message.BasicHeader;
 import org.opensearch.client.Response;
 import org.opensearch.client.ResponseException;
+import org.opensearch.cluster.metadata.IndexMetadata;
+import org.opensearch.common.settings.Settings;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.searchrelevance.BaseSearchRelevanceIT;
 import org.opensearch.test.OpenSearchIntegTestCase;
@@ -36,14 +39,35 @@ import lombok.SneakyThrows;
 @OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.SUITE)
 public class CalculateJudgmentsIT extends BaseSearchRelevanceIT {
     public void initializeUBIIndices() throws IOException, URISyntaxException {
-        makeRequest(
-            client(),
-            RestRequest.Method.POST.name(),
-            INITIALIZE_URL,
-            null,
-            toHttpEntity(""),
-            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
-        );
+        if (System.getProperty("ubi.available").equals("true")) {
+            makeRequest(
+                client(),
+                RestRequest.Method.POST.name(),
+                INITIALIZE_URL,
+                null,
+                toHttpEntity(""),
+                ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
+            );
+        } else {
+            String eventsIndexMapping = Files.readString(Path.of(classLoader.getResource("ubi/events-mapping.json").toURI()));
+            String queriesIndexMapping = Files.readString(Path.of(classLoader.getResource("ubi/queries-mapping.json").toURI()));
+            int eventsIndexMappingSize = eventsIndexMapping.length();
+            int queriesIndexMappingSize = queriesIndexMapping.length();
+            eventsIndexMapping = eventsIndexMapping.substring(1, eventsIndexMappingSize - 1);
+            queriesIndexMapping = queriesIndexMapping.substring(1, queriesIndexMappingSize - 1);
+            try {
+                final Settings indexSettings = Settings.builder()
+                    .put(IndexMetadata.INDEX_NUMBER_OF_SHARDS_SETTING.getKey(), 1)
+                    .put(IndexMetadata.INDEX_AUTO_EXPAND_REPLICAS_SETTING.getKey(), "0-2")
+                    .put(IndexMetadata.SETTING_PRIORITY, Integer.MAX_VALUE)
+                    .build();
+                createIndex(UBI_EVENTS_INDEX, indexSettings, eventsIndexMapping);
+                createIndex(UBI_QUERIES_INDEX, indexSettings, queriesIndexMapping);
+            } catch (Exception ex) {
+                // Index may not exist, ignore
+                throw new IOException("UBI Indices could not be created manually and are not available.", ex);
+            }
+        }
 
         String importDatasetBody = Files.readString(Path.of(classLoader.getResource("sample_ubi_data/SampleUBIEvents.json").toURI()));
 

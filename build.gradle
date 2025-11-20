@@ -19,7 +19,7 @@ import java.util.stream.Collectors
 
 buildscript {
     ext {
-        opensearch_version = System.getProperty("opensearch.version", "3.2.0-SNAPSHOT")
+        opensearch_version = System.getProperty("opensearch.version", "3.3.0-SNAPSHOT")
         isSnapshot = "true" == System.getProperty("build.snapshot", "true")
         buildVersionQualifier = System.getProperty("build.version_qualifier", "")
         // 2.2.0-SNAPSHOT -> 2.2.0.0-SNAPSHOT
@@ -39,8 +39,7 @@ buildscript {
 
     repositories {
         mavenLocal()
-        maven { url "https://central.sonatype.com/repository/maven-snapshots/" }
-        maven { url "https://aws.oss.sonatype.org/content/repositories/snapshots" }
+        maven { url "https://ci.opensearch.org/ci/dbc/snapshots/maven/" }
         mavenCentral()
         maven { url "https://plugins.gradle.org/m2/" }
         maven { url 'https://jitpack.io' }
@@ -48,9 +47,9 @@ buildscript {
 
     dependencies {
         classpath "org.opensearch.gradle:build-tools:${opensearch_version}"
-        classpath "com.diffplug.spotless:spotless-plugin-gradle:7.2.0"
+        classpath "com.diffplug.spotless:spotless-plugin-gradle:8.0.0"
         classpath "com.github.form-com.diff-coverage-gradle:diff-coverage:0.9.5"
-        classpath "io.freefair.gradle:lombok-plugin:8.14"
+        classpath "io.freefair.gradle:lombok-plugin:9.0.0"
     }
 }
 
@@ -90,15 +89,18 @@ ext {
     licenseFile = rootProject.file('LICENSE.txt')
     noticeFile = rootProject.file('NOTICE.txt')
 
-    ['esnode.pem', 'esnode-key.pem', 'kirk.pem', 'kirk-key.pem', 'root-ca.pem', 'sample.pem', 'test-kirk.jks'].forEach { file ->
-        File local = getLayout().getBuildDirectory().file(file).get().getAsFile()
-        download.run {
-            src "https://raw.githubusercontent.com/opensearch-project/security/refs/heads/main/bwc-test/src/test/resources/security/" + file
-            dest local
-            overwrite false
-        }
-        processTestResources {
-            from(local)
+    runIntegTestWithSecurityPlugin= System.getProperty("security")
+    if (runIntegTestWithSecurityPlugin == "true") {
+        ['esnode.pem', 'esnode-key.pem', 'kirk.pem', 'kirk-key.pem', 'root-ca.pem', 'sample.pem', 'test-kirk.jks'].forEach { file ->
+            File local = getLayout().getBuildDirectory().file(file).get().getAsFile()
+            download.run {
+                src "https://raw.githubusercontent.com/opensearch-project/security/refs/heads/main/bwc-test/src/test/resources/security/" + file
+                dest local
+                overwrite false
+            }
+            processTestResources {
+                from(local)
+            }
         }
     }
 }
@@ -123,10 +125,11 @@ publishing {
     repositories {
         maven {
             name = "Snapshots"
-            url = "https://central.sonatype.com/repository/maven-snapshots/"
-            credentials {
-                username "$System.env.SONATYPE_USERNAME"
-                password "$System.env.SONATYPE_PASSWORD"
+            url = System.getenv("MAVEN_SNAPSHOTS_S3_REPO")
+            credentials(AwsCredentials) {
+                accessKey = System.getenv("AWS_ACCESS_KEY_ID")
+                secretKey = System.getenv("AWS_SECRET_ACCESS_KEY")
+                sessionToken = System.getenv("AWS_SESSION_TOKEN")
             }
         }
         maven {
@@ -175,6 +178,7 @@ opensearchplugin {
     classname "${packagePath}.${pathToPlugin}.${pluginClassName}"
     licenseFile rootProject.file('LICENSE.txt')
     noticeFile rootProject.file('NOTICE.txt')
+    extendedPlugins = ['opensearch-job-scheduler']
 }
 
 dependencyLicenses.enabled = false
@@ -195,9 +199,10 @@ dependencies {
     implementation "org.opensearch:opensearch:${opensearch_version}"
     api "org.opensearch:opensearch:${opensearch_version}"
     api group: 'org.opensearch', name:'opensearch-ml-client', version: "${opensearch_build}"
+    compileOnly "org.opensearch:opensearch-job-scheduler-spi:${opensearch_build}"
     implementation group: 'com.google.guava', name: 'guava', version:'33.4.8-jre'
-    compileOnly group: 'commons-lang', name: 'commons-lang', version: '2.6'
-    implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.18.0'
+    compileOnly group: 'org.apache.commons', name: 'commons-lang3', version: '3.19.0'
+    implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.19.0'
     implementation group: 'org.apache.commons', name: 'commons-math3', version: '3.6.1'
     implementation "org.opensearch:common-utils:${common_utils_version}"
     implementation "com.fasterxml.jackson.core:jackson-annotations:${versions.jackson}"
@@ -209,7 +214,7 @@ dependencies {
     runtimeOnly group: 'org.reflections', name: 'reflections', version: '0.9.12'  // Note the version change
     runtimeOnly group: 'org.javassist', name: 'javassist', version: '3.30.2-GA'
     runtimeOnly group: 'org.opensearch', name: 'common-utils', version: "${opensearch_build}"
-    runtimeOnly group: 'org.apache.commons', name: 'commons-text', version: '1.13.1'
+    runtimeOnly group: 'org.apache.commons', name: 'commons-text', version: '1.14.0'
     runtimeOnly group: 'com.google.code.gson', name: 'gson', version: '2.13.1'
     runtimeOnly group: 'org.json', name: 'json', version: '20250517'
     // json-path 2.9.0 depends on slf4j 2.0.11, which conflicts with the version used by OpenSearch core.
@@ -230,10 +235,12 @@ dependencies {
     zipArchive group: 'org.opensearch.plugin', name:'neural-search', version: "${opensearch_build}"
     zipArchive group: 'org.opensearch.plugin', name:'opensearch-ubi', version: "${opensearch_build}"
     opensearchPlugin "org.opensearch.plugin:opensearch-security:${opensearch_build}@zip"
+    opensearchPlugin "org.opensearch.plugin:opensearch-job-scheduler:${opensearch_build}@zip"
 
     configurations.all {
         resolutionStrategy {
             force("com.google.guava:guava:33.4.8-jre") // CVE for 31.1
+            force("com.google.errorprone:error_prone_annotations:2.43.0") // Fix version conflict
         }
     }
 }
@@ -242,8 +249,7 @@ def _numNodes = findProperty('numNodes') as Integer ?: 1
 
 repositories {
     mavenLocal()
-    maven { url "https://central.sonatype.com/repository/maven-snapshots/" }
-    maven { url "https://aws.oss.sonatype.org/content/repositories/snapshots" }
+    maven { url "https://ci.opensearch.org/ci/dbc/snapshots/maven/" }
     mavenCentral()
     maven { url "https://plugins.gradle.org/m2/" }
 }
@@ -251,6 +257,12 @@ repositories {
 test {
     include '**/*Tests.class'
     systemProperty 'tests.security.manager', 'false'
+
+    if (System.getProperty("test.debug") != null) {
+        // Limit forks to one to avoid JDWP port conflicts
+        maxParallelForks = 1
+        jvmArgs '-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:8000'
+    }
 }
 
 jacocoTestReport {
@@ -273,6 +285,8 @@ integTest {
     if (System.getProperty("test.debug") != null) {
         jvmArgs '-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:5005'
     }
+    // Pass ubi.available as configurable property via -Dubi.available=false
+    systemProperty 'ubi.available', System.getProperty('ubi.available', 'true')
 }
 
 ext.resolvePluginFile = { pluginId ->
@@ -293,6 +307,7 @@ ext.resolvePluginFile = { pluginId ->
     }
 }
 def securityPluginFile = resolvePluginFile("opensearch-security")
+def jobSchedulerFile = resolvePluginFile("opensearch-job-scheduler")
 
 // === Setup security test ===
 // This flag indicates the existence of security plugin
@@ -370,6 +385,11 @@ testClusters.integTest {
             node.setting("plugins.security.system_indices.enabled", "true")
         }
     }
+}
+
+// Set up integration test clusters, installs all zipArchive dependencies
+testClusters.yamlRestTest {
+    plugin(provider(jobSchedulerFile))
 }
 
 // Re-write WaitForHttpResource with updated code to support security plugin use case
@@ -528,7 +548,7 @@ integTest {
 
     // The -Dcluster.debug option makes the cluster debuggable, this makes the tests debuggable
     if (System.getProperty("test.debug") != null) {
-        jvmArgs '-agentlib:jdwp=transport=dt_socket,server=n,suspend=y,address=8000'
+        jvmArgs '-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:8000'
     }
 }
 

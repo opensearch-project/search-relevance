@@ -9,6 +9,7 @@ package org.opensearch.searchrelevance.experiment;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -97,7 +98,10 @@ public class PointwiseExperimentProcessorTests extends OpenSearchTestCase {
                 any(List.class),
                 any(Map.class),
                 any(Map.class),
-                any(AtomicBoolean.class)
+                any(AtomicBoolean.class),
+                isNull(),
+                isNull(),
+                isNull()
             )
         ).thenReturn(mockFuture);
 
@@ -119,7 +123,17 @@ public class PointwiseExperimentProcessorTests extends OpenSearchTestCase {
         };
 
         // Execute
-        processor.processPointwiseExperiment(experimentId, queryText, searchConfigurations, judgmentList, size, hasFailure, listener);
+        processor.processPointwiseExperiment(
+            experimentId,
+            queryText,
+            searchConfigurations,
+            judgmentList,
+            size,
+            hasFailure,
+            null,
+            null,
+            listener
+        );
 
         // Wait for async operation to complete
         assertTrue("Async operation should complete within timeout", latch.await(5, TimeUnit.SECONDS));
@@ -166,7 +180,17 @@ public class PointwiseExperimentProcessorTests extends OpenSearchTestCase {
         };
 
         // Execute
-        processor.processPointwiseExperiment(experimentId, queryText, searchConfigurations, judgmentList, size, hasFailure, listener);
+        processor.processPointwiseExperiment(
+            experimentId,
+            queryText,
+            searchConfigurations,
+            judgmentList,
+            size,
+            hasFailure,
+            null,
+            null,
+            listener
+        );
 
         // Wait for async operation to complete
         assertTrue("Async operation should complete within timeout", latch.await(5, TimeUnit.SECONDS));

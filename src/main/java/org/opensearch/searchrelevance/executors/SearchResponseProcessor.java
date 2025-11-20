@@ -50,7 +50,8 @@ public class SearchResponseProcessor {
         List<String> judgmentIds,
         Map<String, String> docIdToScores,
         String evaluationId,
-        ExperimentTaskContext taskContext
+        ExperimentTaskContext taskContext,
+        String scheduledRunId
     ) {
         if (taskContext.getHasFailure().get()) return;
 
@@ -80,7 +81,8 @@ public class SearchResponseProcessor {
                 metrics,
                 experimentId,
                 experimentVariant.getId(),
-                experimentVariantParameters
+                experimentVariantParameters,
+                scheduledRunId
             );
 
             evaluationResultDao.putEvaluationResultEfficient(

@@ -34,12 +34,15 @@ import org.opensearch.searchrelevance.dao.ExperimentDao;
 import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
+import org.opensearch.searchrelevance.executors.ExperimentRunningManager;
 import org.opensearch.searchrelevance.executors.ExperimentTaskManager;
 import org.opensearch.searchrelevance.metrics.MetricsHelper;
 import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.Experiment;
 import org.opensearch.searchrelevance.model.ExperimentType;
+import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.test.OpenSearchTestCase;
+import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.TransportService;
 
 public class PutExperimentTransportActionTests extends OpenSearchTestCase {
@@ -60,12 +63,28 @@ public class PutExperimentTransportActionTests extends OpenSearchTestCase {
     private JudgmentDao judgmentDao;
     @Mock
     private ExperimentTaskManager experimentTaskManager;
+    private ExperimentRunningManager experimentRunningManager;
+    @Mock
+    private ThreadPool threadPool;
+    @Mock
+    private SearchRelevanceSettingsAccessor settingsAccessor;
 
     private PutExperimentTransportAction transportAction;
 
     @Before
     public void setup() {
         MockitoAnnotations.openMocks(this);
+        experimentRunningManager = new ExperimentRunningManager(
+            experimentDao,
+            querySetDao,
+            searchConfigurationDao,
+            null,
+            metricsHelper,
+            null,
+            null,
+            threadPool,
+            settingsAccessor
+        );
         transportAction = new PutExperimentTransportAction(
             transportService,
             actionFilters,
@@ -74,13 +93,17 @@ public class PutExperimentTransportActionTests extends OpenSearchTestCase {
             searchConfigurationDao,
             metricsHelper,
             judgmentDao,
-            experimentTaskManager
+            experimentTaskManager,
+            experimentRunningManager,
+            threadPool,
+            settingsAccessor
         );
     }
 
     public void testEmptyQueryTextsCompletesExperimentImmediately() {
         PutExperimentRequest request = new PutExperimentRequest(
             ExperimentType.PAIRWISE_COMPARISON,
+            null,
             "test-queryset-id",
             List.of("config1"),
             List.of("judgment1"),
@@ -138,6 +161,7 @@ public class PutExperimentTransportActionTests extends OpenSearchTestCase {
     public void testQuerySetNotFoundHandlesError() {
         PutExperimentRequest request = new PutExperimentRequest(
             ExperimentType.PAIRWISE_COMPARISON,
+            null,
             "nonexistent-queryset",
             List.of("config1"),
             List.of("judgment1"),
@@ -172,6 +196,7 @@ public class PutExperimentTransportActionTests extends OpenSearchTestCase {
     public void testExperimentCreationFailure() {
         PutExperimentRequest request = new PutExperimentRequest(
             ExperimentType.PAIRWISE_COMPARISON,
+            null,
             "test-queryset-id",
             List.of("config1"),
             List.of("judgment1"),

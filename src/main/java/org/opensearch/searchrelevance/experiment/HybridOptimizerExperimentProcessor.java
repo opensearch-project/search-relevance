@@ -20,6 +20,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.opensearch.action.search.SearchResponse;
@@ -30,7 +32,10 @@ import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.model.ExperimentVariant;
 import org.opensearch.searchrelevance.model.SearchConfigurationDetails;
+import org.opensearch.searchrelevance.scheduler.ExperimentCancellationToken;
 import org.opensearch.searchrelevance.utils.TimeUtils;
+
+import com.google.common.annotations.VisibleForTesting;
 
 import lombok.AllArgsConstructor;
 import lombok.extern.log4j.Log4j2;
@@ -53,7 +58,9 @@ public class HybridOptimizerExperimentProcessor {
      * @param searchConfigurations Map of search configuration IDs to SearchConfigurationDetails
      * @param judgmentList List of judgment IDs
      * @param size Result size
-     * @param hasFailure Failure flag
+     * @param scheduledRunId id for the experiment to be scheduled
+     * @param cancellationToken token to indicate whether the task has been cancelled
+     * @param runningFutures futures set to be cancelled when the token is cancelled
      * @param listener Listener to notify when processing is complete
      */
     public void processHybridOptimizerExperiment(
@@ -62,7 +69,9 @@ public class HybridOptimizerExperimentProcessor {
         Map<String, SearchConfigurationDetails> searchConfigurations,
         List<String> judgmentList,
         int size,
-        AtomicBoolean hasFailure,
+        String scheduledRunId,
+        ExperimentCancellationToken cancellationToken,
+        Map<String, List<Future<?>>> runningFutures,
         ActionListener<Map<String, Object>> listener
     ) {
         // Create parameter combinations for hybrid search
@@ -72,6 +81,7 @@ public class HybridOptimizerExperimentProcessor {
 
         List<ExperimentVariantHybridSearchDTO> experimentVariantDTOs = experimentOptionForHybridSearch.getParameterCombinations(true);
         List<ExperimentVariant> experimentVariants = new ArrayList<>();
+        AtomicBoolean hasFailure = new AtomicBoolean(false);
 
         log.info(
             "Starting hybrid optimizer experiment {} with {} parameter combinations for query: {}",
@@ -126,6 +136,9 @@ public class HybridOptimizerExperimentProcessor {
                 experimentVariants,
                 docIdToScores,
                 hasFailure,
+                scheduledRunId,
+                cancellationToken,
+                runningFutures,
                 listener
             );
         }).exceptionally(e -> {
@@ -151,12 +164,8 @@ public class HybridOptimizerExperimentProcessor {
         return CompletableFuture.allOf(judgmentFutures.toArray(new CompletableFuture[0])).thenApply(v -> {
             Map<String, String> docIdToScores = new HashMap<>();
             for (CompletableFuture<SearchResponse> future : judgmentFutures) {
-                try {
-                    SearchResponse response = future.join();
-                    extractJudgmentScores(queryText, response, docIdToScores);
-                } catch (Exception e) {
-                    log.error("Failed to process judgment response: {}", e.getMessage());
-                }
+                SearchResponse response = future.join();
+                extractJudgmentScores(queryText, response, docIdToScores);
             }
 
             if (docIdToScores.isEmpty()) {
@@ -195,10 +204,18 @@ public class HybridOptimizerExperimentProcessor {
         }
     }
 
+    private boolean checkIfCancelled(ExperimentCancellationToken cancellationToken) {
+        if (cancellationToken != null && cancellationToken.isCancelled()) {
+            return true;
+        }
+        return false;
+    }
+
     /**
      * Process search configurations using optimized task manager
      */
-    private void processSearchConfigurationsAsync(
+    @VisibleForTesting
+    void processSearchConfigurationsAsync(
         String experimentId,
         String queryText,
         Map<String, SearchConfigurationDetails> searchConfigurations,
@@ -207,6 +224,9 @@ public class HybridOptimizerExperimentProcessor {
         List<ExperimentVariant> experimentVariants,
         Map<String, String> docIdToScores,
         AtomicBoolean hasFailure,
+        String scheduledRunId,
+        ExperimentCancellationToken cancellationToken,
+        Map<String, List<Future<?>>> runningFutures,
         ActionListener<Map<String, Object>> finalListener
     ) {
         Map<String, Object> hydratedResults = new ConcurrentHashMap<>();
@@ -216,6 +236,18 @@ public class HybridOptimizerExperimentProcessor {
         List<CompletableFuture<Map<String, Object>>> configFutures = new ArrayList<>();
 
         for (Map.Entry<String, SearchConfigurationDetails> entry : searchConfigurations.entrySet()) {
+            // If the task is cancelled, we will stop scheduling more configurations, add a failed future,
+            // and signal that there has been a failure to the task scheduler.
+            if (checkIfCancelled(cancellationToken)) {
+                CompletableFuture<Map<String, Object>> futureToFail = new CompletableFuture<>();
+                configFutures.add(futureToFail);
+                futureToFail.completeExceptionally(new TimeoutException("Timed out when processing search configurations"));
+                if (hasFailure.compareAndSet(false, true)) {
+                    finalListener.onFailure(new TimeoutException("Timed out when processing search configurations"));
+                }
+                log.info("When processing search configurations in HybridOptimizerExperimentProcessor, a timeout cancellation occured");
+                break;
+            }
             String searchConfigId = entry.getKey();
             SearchConfigurationDetails configDetails = entry.getValue();
             String index = configDetails.getIndex();
@@ -234,7 +266,10 @@ public class HybridOptimizerExperimentProcessor {
                 judgmentList,
                 docIdToScores,
                 hydratedResults,
-                hasFailure
+                hasFailure,
+                scheduledRunId,
+                runningFutures,
+                cancellationToken
             );
 
             // Transform the result for this search configuration

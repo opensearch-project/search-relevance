@@ -272,10 +272,18 @@ To debug code running in an integration test (which exercises the server from a 
 
 The test runner JVM will connect to a debugger attached to `localhost:8000` before running the tests.
 
+```
+./gradlew test -Dtest.debug=1
+```
+
+This starts the unit test JVM with a JDWP debugger listening on `localhost:8000`, suspending execution until a debugger is attached.
+
 Additionally, it is possible to attach one debugger to the cluster JVM and another debugger to the test runner. First, make sure one debugger is listening on port `5005` and the other is listening on port `8000`. Then, run:
 ```
 ./gradlew :integTest -Dtest.debug=1 -Dcluster.debug=1
 ```
+
+When running integration tests, it is assumed that the [UBI Plugin](https://github.com/opensearch-project/user-behavior-insights) is installed. If the cluster does not have that plugin, use the flag `-Dubi.available=false` when running `./gradlew :integTest`.
 
 ## Design Documentation
 
@@ -294,3 +302,36 @@ The template is particularly valuable for:
 - Changes affecting security or backward compatibility
 
 Refer to the [design documentation guide](docs/README.md) for detailed instructions, examples, and best practices on using the template effectively.
+
+## Explanation on Scheduled Experiment Indices
+
+When running a scheduled experiment, the data is stored a little bit differently compared to running an individual experiment. The information of the job that runs the experiment is stored in a separate index called, `.search-relevance-scheduled-experiment-jobs`. The information stored is the schedule (in the cron job format) and whether the job is actually running or not.
+
+The diagram below shows how the scheduled experiment API interacts with the `.search-relevance-scheduled-experiment-jobs` index.
+
+```mermaid
+sequenceDiagram
+    PostScheduledExperimentTransportAction->>+.search-relevance-scheduled-experiment-jobs: puts schedule and experiment_id and other metadata into index
+    .search-relevance-scheduled-experiment-jobs->>+IndexOperationListener:The index operation listener activates the scheduler in the job scheduler plugin which submits the experiment to the job runner
+```
+
+The results of these runs are also stored in its own index called `.search-relevance-scheduled-experiment-history`. This helps track the status of the experiment, the results, and the id of the experiment that the scheduled run is based on.
+
+The diagram below shows the code flow behind how the data is stored into this index.
+
+```mermaid
+sequenceDiagram
+    SearchRelevanceJobRunner->>+ThreadPoolExecutor: Submits a scheduled experiment to be run into the threadpool executor
+    ThreadPoolExecutor->>+ScheduledExperimentRunnerManager:Runs the tasks which will invoke ScheduledExperimentRunnerManager to run the experiment
+    ScheduledExperimentRunnerManager->>+.search-relevance-scheduled-experiment-history: Submits result of that scheduled experiment
+```
+
+The evaluation results index `search-relevance-evaluation-result` will also be updated for viewing the scheduled experiment results in Search Relevance Dashboards. One nuance is that there will be an additional marker to indicate that the evaluation result was based on a scheduled experiment.
+
+Below is a diagram to show how evaluation results are submitted.
+
+```mermaid
+sequenceDiagram
+    PutExperimentTransportAction/ScheduledExperimentRunnerManager->>+Hybrid/Pointwise ExperimentProcessor: Starts running a pointwise or hybrid search experiment
+    Hybrid/Pointwise ExperimentProcessor->>+search-relevance-evaluation-result: Submits evaluation_result
+```

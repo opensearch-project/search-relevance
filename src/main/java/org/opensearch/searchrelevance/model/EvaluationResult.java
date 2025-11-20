@@ -29,6 +29,7 @@ public class EvaluationResult implements ToXContentObject {
     public static final String EXPERIMENT_ID = "experimentId";
     public static final String EXPERIMENT_VARIANT_ID = "experimentVariantId";
     public static final String EXPERIMENT_VARIANT_PARAMETERS = "experimentVariantParameters";
+    public static final String SCHEDULED_RUN_ID = "scheduledRunId";
 
     /**
      * Identifier of the system index
@@ -43,6 +44,33 @@ public class EvaluationResult implements ToXContentObject {
     private final String experimentId;
     private final String experimentVariantId;
     private final String experimentVariantParameters;
+    private final String scheduledRunId;
+
+    public EvaluationResult(
+        String id,
+        String timestamp,
+        String searchConfigurationId,
+        String searchText,
+        List<String> judgmentIds,
+        List<String> documentIds,
+        List<Map<String, Object>> metrics,
+        String experimentId,
+        String experimentVariantId,
+        String experimentVariantParameters,
+        String scheduledRunId
+    ) {
+        this.id = id;
+        this.timestamp = timestamp;
+        this.searchConfigurationId = searchConfigurationId;
+        this.searchText = searchText;
+        this.judgmentIds = judgmentIds;
+        this.documentIds = documentIds;
+        this.metrics = metrics;
+        this.experimentId = experimentId;
+        this.experimentVariantId = experimentVariantId;
+        this.experimentVariantParameters = experimentVariantParameters;
+        this.scheduledRunId = scheduledRunId;
+    }
 
     public EvaluationResult(
         String id,
@@ -56,16 +84,19 @@ public class EvaluationResult implements ToXContentObject {
         String experimentVariantId,
         String experimentVariantParameters
     ) {
-        this.id = id;
-        this.timestamp = timestamp;
-        this.searchConfigurationId = searchConfigurationId;
-        this.searchText = searchText;
-        this.judgmentIds = judgmentIds;
-        this.documentIds = documentIds;
-        this.metrics = metrics;
-        this.experimentId = experimentId;
-        this.experimentVariantId = experimentVariantId;
-        this.experimentVariantParameters = experimentVariantParameters;
+        this(
+            id,
+            timestamp,
+            searchConfigurationId,
+            searchText,
+            judgmentIds,
+            documentIds,
+            metrics,
+            experimentId,
+            experimentVariantId,
+            experimentVariantParameters,
+            null
+        );
     }
 
     public EvaluationResult(
@@ -78,6 +109,19 @@ public class EvaluationResult implements ToXContentObject {
         List<Map<String, Object>> metrics
     ) {
         this(id, timestamp, searchConfigurationId, searchText, judgmentIds, documentIds, metrics, null, null, null);
+    }
+
+    public EvaluationResult(
+        String id,
+        String timestamp,
+        String searchConfigurationId,
+        String searchText,
+        List<String> judgmentIds,
+        List<String> documentIds,
+        List<Map<String, Object>> metrics,
+        String scheduledRunId
+    ) {
+        this(id, timestamp, searchConfigurationId, searchText, judgmentIds, documentIds, metrics, null, null, null, scheduledRunId);
     }
 
     @Override
@@ -98,6 +142,9 @@ public class EvaluationResult implements ToXContentObject {
         }
         if (this.experimentVariantParameters != null) {
             xContentBuilder.field(EXPERIMENT_VARIANT_PARAMETERS, this.experimentVariantParameters);
+        }
+        if (this.scheduledRunId != null) {
+            xContentBuilder.field(SCHEDULED_RUN_ID, this.scheduledRunId);
         }
         return xContentBuilder.endObject();
     }
@@ -140,5 +187,9 @@ public class EvaluationResult implements ToXContentObject {
 
     public String experimentVariantParameters() {
         return experimentVariantParameters;
+    }
+
+    public String scheduledRunId() {
+        return scheduledRunId;
     }
 }

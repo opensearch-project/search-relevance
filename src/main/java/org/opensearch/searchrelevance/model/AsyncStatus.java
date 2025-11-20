@@ -10,5 +10,6 @@ package org.opensearch.searchrelevance.model;
 public enum AsyncStatus {
     PROCESSING,
     COMPLETED,
+    TIMEOUT,
     ERROR
 }

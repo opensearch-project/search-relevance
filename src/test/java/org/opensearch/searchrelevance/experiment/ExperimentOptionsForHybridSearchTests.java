@@ -241,4 +241,97 @@ public class ExperimentOptionsForHybridSearchTests extends OpenSearchTestCase {
             assertTrue("Missing expected weight: " + expected, foundWeight);
         }
     }
+
+    public void testGetParameterCombinations_weightsAreRoundedToOneDecimal() {
+        // Given
+        Set<String> normalizationTechniques = Set.of("min_max");
+        Set<String> combinationTechniques = Set.of("arithmetic_mean");
+
+        // Use increment that is MOST LIKELY TO EXPOSE FLOAT DRIFT
+        ExperimentOptionsForHybridSearch.WeightsRange weightsRange = ExperimentOptionsForHybridSearch.WeightsRange.builder()
+            .rangeMin(0.0f)
+            .rangeMax(1.0f)
+            .increment(0.1f)
+            .build();
+
+        ExperimentOptionsForHybridSearch options = ExperimentOptionsForHybridSearch.builder()
+            .normalizationTechniques(normalizationTechniques)
+            .combinationTechniques(combinationTechniques)
+            .weightsRange(weightsRange)
+            .build();
+
+        // When
+        List<ExperimentVariantHybridSearchDTO> combinations = options.getParameterCombinations(true);
+
+        // Then
+        for (ExperimentVariantHybridSearchDTO combo : combinations) {
+            float w1 = combo.getQueryWeightsForCombination()[0];
+            float w2 = combo.getQueryWeightsForCombination()[1];
+
+            assertEquals(1.0f, w1 + w2, 0.0f);
+
+            String w1Str = Float.toString(w1);
+            String w2Str = Float.toString(w2);
+
+            assertFalse("w1 has float drift: " + w1Str, w1Str.matches(".*\\d{2,}E-.*"));
+            assertFalse("w2 has float drift: " + w2Str, w2Str.matches(".*\\d{2,}E-.*"));
+            assertTrue("w1 is not 1-decimal rounded: " + w1Str, w1Str.matches("^-?\\d(\\.\\d)?$"));
+            assertTrue("w2 is not 1-decimal rounded: " + w2Str, w2Str.matches("^-?\\d(\\.\\d)?$"));
+        }
+    }
+
+    public void testGetParameterCombinations_withConstantListOfCorrectValues_weightsAreRoundedToOneDecimal() {
+        // Given
+        Set<String> normalizationTechniques = Set.of("min_max");
+        Set<String> combinationTechniques = Set.of("arithmetic_mean");
+
+        // Use increment that is MOST LIKELY TO EXPOSE FLOAT DRIFT
+        ExperimentOptionsForHybridSearch.WeightsRange weightsRange = ExperimentOptionsForHybridSearch.WeightsRange.builder()
+            .rangeMin(0.0f)
+            .rangeMax(1.0f)
+            .increment(0.1f)
+            .build();
+
+        ExperimentOptionsForHybridSearch options = ExperimentOptionsForHybridSearch.builder()
+            .normalizationTechniques(normalizationTechniques)
+            .combinationTechniques(combinationTechniques)
+            .weightsRange(weightsRange)
+            .build();
+
+        // When
+        List<ExperimentVariantHybridSearchDTO> combinations = options.getParameterCombinations(true);
+
+        // Then
+        float[][] expected = {
+            { 0.0f, 1.0f },
+            { 0.1f, 0.9f },
+            { 0.2f, 0.8f },
+            { 0.3f, 0.7f },
+            { 0.4f, 0.6f },
+            { 0.5f, 0.5f },
+            { 0.6f, 0.4f },
+            { 0.7f, 0.3f },
+            { 0.8f, 0.2f },
+            { 0.9f, 0.1f },
+            { 1.0f, 0.0f } };
+
+        assertEquals(11, combinations.size());
+
+        for (int i = 0; i < 11; i++) {
+            float w1 = combinations.get(i).getQueryWeightsForCombination()[0];
+            float w2 = combinations.get(i).getQueryWeightsForCombination()[1];
+
+            assertEquals(expected[i][0], w1, 0.0f);
+            assertEquals(expected[i][1], w2, 0.0f);
+            assertEquals(1.0f, w1 + w2, 0.0f);
+
+            String w1Str = Float.toString(w1);
+            String w2Str = Float.toString(w2);
+
+            assertFalse("w1 has float drift: " + w1Str, w1Str.matches(".*\\d{2,}E-.*"));
+            assertFalse("w2 has float drift: " + w2Str, w2Str.matches(".*\\d{2,}E-.*"));
+            assertTrue("w1 is not 1-decimal rounded: " + w1Str, w1Str.matches("^-?\\d(\\.\\d)?$"));
+            assertTrue("w2 is not 1-decimal rounded: " + w2Str, w2Str.matches("^-?\\d(\\.\\d)?$"));
+        }
+    }
 }
