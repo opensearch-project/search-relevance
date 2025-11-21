@@ -7,23 +7,21 @@
  */
 package org.opensearch.searchrelevance.indices;
 
-import java.util.concurrent.atomic.AtomicBoolean;
-
 import org.opensearch.cluster.ClusterChangedEvent;
 import org.opensearch.cluster.ClusterStateListener;
+import org.opensearch.cluster.RestoreInProgress;
 import org.opensearch.core.action.ActionListener;
 
 import lombok.extern.log4j.Log4j2;
 
 /**
- * Listener that updates search relevance index mappings when the cluster becomes ready.
- * This handles both node startup and snapshot restore scenarios.
+ * Listener that updates search relevance index mappings when indices are restored from snapshots.
+ * This only updates mappings for indices that were restored - it does not create new indices.
  */
 @Log4j2
 public class SearchRelevanceMappingUpdateListener implements ClusterStateListener {
 
     private final SearchRelevanceIndicesManager indicesManager;
-    private final AtomicBoolean initialized = new AtomicBoolean(false);
 
     public SearchRelevanceMappingUpdateListener(SearchRelevanceIndicesManager indicesManager) {
         this.indicesManager = indicesManager;
@@ -31,41 +29,47 @@ public class SearchRelevanceMappingUpdateListener implements ClusterStateListene
 
     @Override
     public void clusterChanged(ClusterChangedEvent event) {
-        // Only process once when the cluster becomes ready
+        // Only process on cluster manager node
         if (!event.localNodeClusterManager()) {
             return;
         }
 
-        // Check if cluster has global blocks that would prevent operations
-        if (!event.state().blocks().global().isEmpty()) {
+        // Check for completed snapshot restore operations
+        RestoreInProgress restoreInProgress = event.state().custom(RestoreInProgress.TYPE, RestoreInProgress.EMPTY);
+        if (restoreInProgress == null) {
             return;
         }
 
-        // Only run once per node lifecycle
-        if (!initialized.compareAndSet(false, true)) {
-            return;
-        }
+        for (RestoreInProgress.Entry entry : restoreInProgress) {
+            // Only process successfully completed restores
+            if (!RestoreInProgress.State.SUCCESS.equals(entry.state())) {
+                continue;
+            }
 
-        log.info("Cluster is ready, checking and updating search relevance index mappings");
-        updateAllMappings();
+            // Check if any search relevance indices were restored
+            for (SearchRelevanceIndices index : SearchRelevanceIndices.values()) {
+                String indexName = index.getIndexName();
+                if (entry.indices().contains(indexName)) {
+                    updateMappingForRestoredIndex(index);
+                }
+            }
+        }
     }
 
     /**
-     * Update mappings for all search relevance indices
+     * Update mapping for a restored index
      */
-    private void updateAllMappings() {
-        for (SearchRelevanceIndices index : SearchRelevanceIndices.values()) {
-            indicesManager.createOrUpdateIndex(index, new ActionListener<>() {
-                @Override
-                public void onResponse(Void response) {
-                    log.debug("Successfully processed index [{}]", index.getIndexName());
-                }
+    private void updateMappingForRestoredIndex(SearchRelevanceIndices index) {
+        indicesManager.updateMappingIfExists(index, new ActionListener<>() {
+            @Override
+            public void onResponse(org.opensearch.action.support.clustermanager.AcknowledgedResponse response) {
+                // Mapping updated successfully
+            }
 
-                @Override
-                public void onFailure(Exception e) {
-                    log.error("Failed to process index [{}]", index.getIndexName(), e);
-                }
-            });
-        }
+            @Override
+            public void onFailure(Exception e) {
+                log.error("Failed to update mapping for restored index [{}]", index.getIndexName(), e);
+            }
+        });
     }
 }

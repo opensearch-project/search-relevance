@@ -192,7 +192,7 @@ public class SearchRelevancePlugin extends Plugin
         this.clusterService = clusterService;
         this.searchRelevanceIndicesManager = new SearchRelevanceIndicesManager(clusterService, client);
 
-        // Register listener to update mappings on node start or snapshot restore
+        // Register listener to update mappings when indices are restored from snapshots
         SearchRelevanceMappingUpdateListener mappingUpdateListener = new SearchRelevanceMappingUpdateListener(
             searchRelevanceIndicesManager
         );
@@ -383,6 +383,36 @@ public class SearchRelevancePlugin extends Plugin
         }
         XContentParserUtils.throwUnknownToken(parser.currentToken(), parser.getTokenLocation());
         return null;
+    }
+
+    /**
+     * Called when the node starts. This updates mappings for existing search relevance indices
+     * to ensure they match the latest version. Does not create new indices.
+     * For snapshot restore, see SearchRelevanceMappingUpdateListener.
+     */
+    @Override
+    public void onNodeStarted(org.opensearch.cluster.node.DiscoveryNode localNode) {
+        if (searchRelevanceIndicesManager != null) {
+            for (org.opensearch.searchrelevance.indices.SearchRelevanceIndices index : org.opensearch.searchrelevance.indices.SearchRelevanceIndices
+                .values()) {
+                searchRelevanceIndicesManager.updateMappingIfExists(
+                    index,
+                    new org.opensearch.core.action.ActionListener<org.opensearch.action.support.clustermanager.AcknowledgedResponse>() {
+                        @Override
+                        public void onResponse(org.opensearch.action.support.clustermanager.AcknowledgedResponse response) {
+                            if (response != null && response.isAcknowledged()) {
+                                // Mapping updated successfully
+                            }
+                        }
+
+                        @Override
+                        public void onFailure(Exception e) {
+                            // Log errors but don't fail node startup
+                        }
+                    }
+                );
+            }
+        }
     }
 
     @Override

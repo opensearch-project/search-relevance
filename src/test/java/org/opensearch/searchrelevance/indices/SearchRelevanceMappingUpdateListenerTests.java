@@ -15,13 +15,13 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.util.Set;
+import java.util.List;
 
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.opensearch.cluster.ClusterChangedEvent;
 import org.opensearch.cluster.ClusterState;
-import org.opensearch.cluster.block.ClusterBlocks;
+import org.opensearch.cluster.RestoreInProgress;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.test.OpenSearchTestCase;
 
@@ -36,9 +36,6 @@ public class SearchRelevanceMappingUpdateListenerTests extends OpenSearchTestCas
     @Mock
     private ClusterState clusterState;
 
-    @Mock
-    private ClusterBlocks clusterBlocks;
-
     private AutoCloseable openMocks;
     private SearchRelevanceMappingUpdateListener listener;
 
@@ -49,7 +46,6 @@ public class SearchRelevanceMappingUpdateListenerTests extends OpenSearchTestCas
         listener = new SearchRelevanceMappingUpdateListener(indicesManager);
 
         when(event.state()).thenReturn(clusterState);
-        when(clusterState.blocks()).thenReturn(clusterBlocks);
     }
 
     @Override
@@ -63,53 +59,96 @@ public class SearchRelevanceMappingUpdateListenerTests extends OpenSearchTestCas
 
         listener.clusterChanged(event);
 
-        // Should not call createOrUpdateIndex when not cluster manager
-        verify(indicesManager, never()).createOrUpdateIndex(any(), any());
+        // Should not call updateMappingIfExists when not cluster manager
+        verify(indicesManager, never()).updateMappingIfExists(any(), any());
     }
 
-    public void testClusterChangedWhenClusterHasGlobalBlocks() {
+    public void testClusterChangedWhenNoRestoreInProgress() {
         when(event.localNodeClusterManager()).thenReturn(true);
-        when(clusterBlocks.global()).thenReturn(Set.of(mock(org.opensearch.cluster.block.ClusterBlock.class)));
+        when(clusterState.custom(RestoreInProgress.TYPE, RestoreInProgress.EMPTY)).thenReturn(RestoreInProgress.EMPTY);
 
         listener.clusterChanged(event);
 
-        // Should not call createOrUpdateIndex when cluster has global blocks
-        verify(indicesManager, never()).createOrUpdateIndex(any(), any());
+        // Should not call updateMappingIfExists when no restore in progress
+        verify(indicesManager, never()).updateMappingIfExists(any(), any());
     }
 
-    public void testClusterChangedWhenReadyFirstTime() {
+    public void testClusterChangedWhenRestoreInProgressButNotSuccess() {
         when(event.localNodeClusterManager()).thenReturn(true);
-        when(clusterBlocks.global()).thenReturn(Set.of());
+
+        // Create a restore entry that is not successful
+        RestoreInProgress.Entry entry = mock(RestoreInProgress.Entry.class);
+        when(entry.state()).thenReturn(RestoreInProgress.State.STARTED);
+        when(entry.indices()).thenReturn(List.of(".plugins-search-relevance-experiment"));
+
+        RestoreInProgress restoreInProgress = mock(RestoreInProgress.class);
+        when(restoreInProgress.iterator()).thenReturn(List.of(entry).iterator());
+        when(clusterState.custom(RestoreInProgress.TYPE, RestoreInProgress.EMPTY)).thenReturn(restoreInProgress);
 
         listener.clusterChanged(event);
 
-        // Should call createOrUpdateIndex for all SearchRelevanceIndices enum values
-        int expectedCallCount = SearchRelevanceIndices.values().length;
-        verify(indicesManager, times(expectedCallCount)).createOrUpdateIndex(any(SearchRelevanceIndices.class), any());
+        // Should not call updateMappingIfExists when restore is not successful
+        verify(indicesManager, never()).updateMappingIfExists(any(), any());
     }
 
-    public void testClusterChangedOnlyRunsOnce() {
+    public void testClusterChangedWhenRestoreSuccessfulForSearchRelevanceIndex() {
         when(event.localNodeClusterManager()).thenReturn(true);
-        when(clusterBlocks.global()).thenReturn(Set.of());
 
-        // Call twice
-        listener.clusterChanged(event);
+        // Create a successful restore entry for experiment index
+        RestoreInProgress.Entry entry = mock(RestoreInProgress.Entry.class);
+        when(entry.state()).thenReturn(RestoreInProgress.State.SUCCESS);
+        when(entry.indices()).thenReturn(List.of(".plugins-search-relevance-experiment"));
+
+        RestoreInProgress restoreInProgress = mock(RestoreInProgress.class);
+        when(restoreInProgress.iterator()).thenReturn(List.of(entry).iterator());
+        when(clusterState.custom(RestoreInProgress.TYPE, RestoreInProgress.EMPTY)).thenReturn(restoreInProgress);
+
         listener.clusterChanged(event);
 
-        // Should only call createOrUpdateIndex once for all indices
-        int expectedCallCount = SearchRelevanceIndices.values().length;
-        verify(indicesManager, times(expectedCallCount)).createOrUpdateIndex(any(SearchRelevanceIndices.class), any());
+        // Should call updateMappingIfExists for the experiment index
+        verify(indicesManager, times(1)).updateMappingIfExists(eq(SearchRelevanceIndices.EXPERIMENT), any(ActionListener.class));
     }
 
-    public void testClusterChangedCallsForAllIndices() {
+    public void testClusterChangedWhenRestoreSuccessfulForMultipleIndices() {
         when(event.localNodeClusterManager()).thenReturn(true);
-        when(clusterBlocks.global()).thenReturn(Set.of());
+
+        // Create a successful restore entry for multiple search relevance indices
+        RestoreInProgress.Entry entry = mock(RestoreInProgress.Entry.class);
+        when(entry.state()).thenReturn(RestoreInProgress.State.SUCCESS);
+        when(entry.indices()).thenReturn(
+            List.of(
+                ".plugins-search-relevance-experiment",
+                ".plugins-search-relevance-judgment-cache",
+                "other-index" // This should be ignored
+            )
+        );
+
+        RestoreInProgress restoreInProgress = mock(RestoreInProgress.class);
+        when(restoreInProgress.iterator()).thenReturn(List.of(entry).iterator());
+        when(clusterState.custom(RestoreInProgress.TYPE, RestoreInProgress.EMPTY)).thenReturn(restoreInProgress);
 
         listener.clusterChanged(event);
 
-        // Verify that createOrUpdateIndex is called for each index type
-        for (SearchRelevanceIndices index : SearchRelevanceIndices.values()) {
-            verify(indicesManager, times(1)).createOrUpdateIndex(eq(index), any(ActionListener.class));
-        }
+        // Should call updateMappingIfExists for both search relevance indices
+        verify(indicesManager, times(1)).updateMappingIfExists(eq(SearchRelevanceIndices.EXPERIMENT), any(ActionListener.class));
+        verify(indicesManager, times(1)).updateMappingIfExists(eq(SearchRelevanceIndices.JUDGMENT_CACHE), any(ActionListener.class));
+    }
+
+    public void testClusterChangedWhenRestoreSuccessfulForNonSearchRelevanceIndex() {
+        when(event.localNodeClusterManager()).thenReturn(true);
+
+        // Create a successful restore entry for a non-search-relevance index
+        RestoreInProgress.Entry entry = mock(RestoreInProgress.Entry.class);
+        when(entry.state()).thenReturn(RestoreInProgress.State.SUCCESS);
+        when(entry.indices()).thenReturn(List.of("other-index"));
+
+        RestoreInProgress restoreInProgress = mock(RestoreInProgress.class);
+        when(restoreInProgress.iterator()).thenReturn(List.of(entry).iterator());
+        when(clusterState.custom(RestoreInProgress.TYPE, RestoreInProgress.EMPTY)).thenReturn(restoreInProgress);
+
+        listener.clusterChanged(event);
+
+        // Should not call updateMappingIfExists for non-search-relevance indices
+        verify(indicesManager, never()).updateMappingIfExists(any(), any());
     }
 }

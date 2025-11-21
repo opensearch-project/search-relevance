@@ -132,15 +132,12 @@ public class SearchRelevanceIndicesManager {
             return;
         }
 
-        log.info("Updating mapping for index [{}]", indexName);
         final PutMappingRequest putMappingRequest = new PutMappingRequest(indexName);
         putMappingRequest.source(mapping, org.opensearch.common.xcontent.XContentType.JSON);
         StashedThreadContext.run(client, () -> client.admin().indices().putMapping(putMappingRequest, new ActionListener<>() {
             @Override
             public void onResponse(final AcknowledgedResponse response) {
-                if (response.isAcknowledged()) {
-                    log.info("Successfully updated mapping for index [{}]", indexName);
-                } else {
+                if (!response.isAcknowledged()) {
                     log.warn("Mapping update for index [{}] was not acknowledged", indexName);
                 }
                 listener.onResponse(response);
