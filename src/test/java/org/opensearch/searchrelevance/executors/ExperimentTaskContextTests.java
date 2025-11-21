@@ -28,6 +28,9 @@ import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.model.ExperimentVariant;
 import org.opensearch.test.OpenSearchTestCase;
 
+import com.carrotsearch.randomizedtesting.annotations.ThreadLeakScope;
+
+@ThreadLeakScope(ThreadLeakScope.Scope.NONE)
 public class ExperimentTaskContextTests extends OpenSearchTestCase {
 
     private ExperimentVariantDao experimentVariantDao;
