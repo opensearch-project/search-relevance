@@ -19,7 +19,7 @@ import java.util.stream.Collectors
 
 buildscript {
     ext {
-        opensearch_version = System.getProperty("opensearch.version", "3.3.0-SNAPSHOT")
+        opensearch_version = System.getProperty("opensearch.version", "3.4.0-SNAPSHOT")
         isSnapshot = "true" == System.getProperty("build.snapshot", "true")
         buildVersionQualifier = System.getProperty("build.version_qualifier", "")
         // 2.2.0-SNAPSHOT -> 2.2.0.0-SNAPSHOT
@@ -47,9 +47,9 @@ buildscript {
 
     dependencies {
         classpath "org.opensearch.gradle:build-tools:${opensearch_version}"
-        classpath "com.diffplug.spotless:spotless-plugin-gradle:8.0.0"
+        classpath "com.diffplug.spotless:spotless-plugin-gradle:8.1.0"
         classpath "com.github.form-com.diff-coverage-gradle:diff-coverage:0.9.5"
-        classpath "io.freefair.gradle:lombok-plugin:9.0.0"
+        classpath "io.freefair.gradle:lombok-plugin:9.1.0"
         classpath "de.thetaphi:forbiddenapis:3.10" // Upgrade for JDK 25 support
     }
 }
