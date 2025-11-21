@@ -42,4 +42,9 @@ public class ClaudeConnector implements LLMConnector {
     public ConnectorType getType() {
         return ConnectorType.CLAUDE;
     }
+
+    @Override
+    public String getMessageParameterName() {
+        return "messages"; // Claude uses plural "messages"
+    }
 }

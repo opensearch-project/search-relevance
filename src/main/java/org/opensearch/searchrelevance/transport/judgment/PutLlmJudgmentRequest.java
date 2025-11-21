@@ -63,6 +63,11 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
      */
     private ConnectorType connectorType;
 
+    /**
+     * Rate limit in milliseconds between requests (0 = no limit)
+     */
+    private long rateLimit;
+
     public PutLlmJudgmentRequest(
         @NonNull JudgmentType type,
         @NonNull String name,
@@ -77,7 +82,8 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         String promptTemplate,
         LLMJudgmentRatingType llmJudgmentRatingType,
         boolean overwriteCache,
-        ConnectorType connectorType
+        ConnectorType connectorType,
+        long rateLimit
     ) {
         super(type, name, description);
         this.modelId = modelId;
@@ -91,6 +97,7 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         this.llmJudgmentRatingType = llmJudgmentRatingType;
         this.overwriteCache = overwriteCache;
         this.connectorType = connectorType != null ? connectorType : ConnectorType.OPENAI; // default to OpenAI
+        this.rateLimit = Math.max(0, rateLimit); // ensure non-negative
     }
 
     public PutLlmJudgmentRequest(StreamInput in) throws IOException {
@@ -107,6 +114,8 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         this.overwriteCache = Boolean.TRUE.equals(in.readOptionalBoolean());
         String connectorTypeStr = in.readOptionalString();
         this.connectorType = connectorTypeStr != null ? ConnectorType.valueOf(connectorTypeStr) : ConnectorType.OPENAI;
+        Long rateLimitValue = in.readOptionalLong();
+        this.rateLimit = rateLimitValue != null ? rateLimitValue : 0L; // default to 0 (no limit) if not provided
     }
 
     @Override
@@ -123,6 +132,7 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         out.writeOptionalWriteable(llmJudgmentRatingType);
         out.writeOptionalBoolean(overwriteCache);
         out.writeOptionalString(connectorType != null ? connectorType.name() : null);
+        out.writeOptionalLong(rateLimit);
     }
 
     public String getModelId() {
@@ -167,6 +177,10 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
 
     public ConnectorType getConnectorType() {
         return connectorType;
+    }
+
+    public long getRateLimit() {
+        return rateLimit;
     }
 
 }

@@ -11,6 +11,8 @@ import static org.opensearch.searchrelevance.common.MLConstants.CONNECTOR_TYPE;
 import static org.opensearch.searchrelevance.common.MLConstants.LLM_JUDGMENT_RATING_TYPE;
 import static org.opensearch.searchrelevance.common.MLConstants.OVERWRITE_CACHE;
 import static org.opensearch.searchrelevance.common.MLConstants.PROMPT_TEMPLATE;
+import static org.opensearch.searchrelevance.common.MLConstants.RATE_LIMIT;
+import static org.opensearch.searchrelevance.common.MLConstants.parseRateLimit;
 import static org.opensearch.searchrelevance.model.builder.SearchRequestBuilder.buildSearchRequest;
 import static org.opensearch.searchrelevance.utils.ParserUtils.combinedIndexAndDocId;
 import static org.opensearch.searchrelevance.utils.ParserUtils.generatePromptTemplateCode;
@@ -108,58 +110,153 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
     private void generateJudgmentRatingInternal(Map<String, Object> metadata, ActionListener<List<Map<String, Object>>> listener) {
         try {
             EventStatsManager.increment(EventStatName.LLM_JUDGMENT_RATING_GENERATIONS);
+
             String querySetId = (String) metadata.get("querySetId");
             List<String> searchConfigurationList = (List<String>) metadata.get("searchConfigurationList");
-            int size = (int) metadata.get("size");
-
-            String modelId = (String) metadata.get("modelId");
-            int tokenLimit = (int) metadata.get("tokenLimit");
-            List<String> contextFields = (List<String>) metadata.get("contextFields");
-            boolean ignoreFailure = (boolean) metadata.get("ignoreFailure");
-            String promptTemplate = (String) metadata.get(PROMPT_TEMPLATE);
-            LLMJudgmentRatingType ratingType = (LLMJudgmentRatingType) metadata.get(LLM_JUDGMENT_RATING_TYPE);
-            // Default to SCORE0_1 if ratingType is not provided
-            if (ratingType == null) {
-                ratingType = LLMJudgmentRatingType.SCORE0_1;
-                log.debug("No ratingType provided, defaulting to SCORE0_1");
-            }
-            boolean overwriteCache = (boolean) metadata.get(OVERWRITE_CACHE);
-
-            // Extract connectorType from metadata, default to OpenAI if not provided
-            ConnectorType connectorType = ConnectorType.OPENAI; // default
-            String connectorTypeStr = (String) metadata.get(CONNECTOR_TYPE);
-            if (connectorTypeStr != null) {
-                try {
-                    connectorType = ConnectorType.valueOf(connectorTypeStr.toUpperCase(Locale.ROOT));
-                } catch (IllegalArgumentException e) {
-                    log.warn("Invalid connectorType '{}' in metadata, defaulting to OpenAI", connectorTypeStr);
-                }
-            }
 
             QuerySet querySet = querySetDao.getQuerySetSync(querySetId);
             List<SearchConfiguration> searchConfigurations = searchConfigurationList.stream()
                 .map(id -> searchConfigurationDao.getSearchConfigurationSync(id))
                 .collect(Collectors.toList());
 
-            // Build context object
-            LlmJudgmentContext context = LlmJudgmentContext.builder()
-                .modelId(modelId)
-                .size(size)
-                .tokenLimit(tokenLimit)
-                .contextFields(contextFields)
-                .searchConfigurations(searchConfigurations)
-                .ignoreFailure(ignoreFailure)
-                .promptTemplate(promptTemplate)
-                .ratingType(ratingType)
-                .overwriteCache(overwriteCache)
-                .connectorType(connectorType)
-                .build();
+            // Build context from metadata
+            LlmJudgmentContext context = buildContextFromMetadata(metadata, searchConfigurations);
 
             generateLLMJudgmentsAsync(context, querySet, listener);
         } catch (Exception e) {
             log.error("Failed to generate LLM judgments", e);
             listener.onFailure(new SearchRelevanceException("Failed to generate LLM judgments", e, RestStatus.INTERNAL_SERVER_ERROR));
         }
+    }
+
+    private LlmJudgmentContext buildContextFromMetadata(Map<String, Object> metadata, List<SearchConfiguration> searchConfigurations) {
+        // Check if we have a pre-built context (new approach)
+        Object contextObj = metadata.get("llmJudgmentContext");
+        if (contextObj != null) {
+            if (contextObj instanceof LlmJudgmentContext) {
+                // Direct object case (in-memory)
+                LlmJudgmentContext baseContext = (LlmJudgmentContext) contextObj;
+                return LlmJudgmentContext.builder()
+                    .modelId(baseContext.getModelId())
+                    .size(baseContext.getSize())
+                    .tokenLimit(baseContext.getTokenLimit())
+                    .contextFields(baseContext.getContextFields())
+                    .searchConfigurations(searchConfigurations)
+                    .ignoreFailure(baseContext.isIgnoreFailure())
+                    .promptTemplate(baseContext.getPromptTemplate())
+                    .ratingType(baseContext.getRatingType())
+                    .overwriteCache(baseContext.isOverwriteCache())
+                    .connectorType(baseContext.getConnectorType())
+                    .rateLimit(baseContext.getRateLimit())
+                    .build();
+            } else if (contextObj instanceof Map) {
+                // Deserialized from OpenSearch as Map
+                return buildContextFromMap((Map<String, Object>) contextObj, searchConfigurations);
+            }
+        }
+
+        // Fallback to legacy metadata parsing for backward compatibility
+        return buildContextFromLegacyMetadata(metadata, searchConfigurations);
+    }
+
+    private LlmJudgmentContext buildContextFromMap(Map<String, Object> contextMap, List<SearchConfiguration> searchConfigurations) {
+        String modelId = (String) contextMap.get(LlmJudgmentContext.MODEL_ID);
+        Integer size = (Integer) contextMap.get(LlmJudgmentContext.SIZE);
+        Integer tokenLimit = (Integer) contextMap.get(LlmJudgmentContext.TOKEN_LIMIT);
+        List<String> contextFields = (List<String>) contextMap.get(LlmJudgmentContext.CONTEXT_FIELDS);
+        Boolean ignoreFailure = (Boolean) contextMap.get(LlmJudgmentContext.IGNORE_FAILURE);
+        String promptTemplate = (String) contextMap.get(LlmJudgmentContext.PROMPT_TEMPLATE);
+        Boolean overwriteCache = (Boolean) contextMap.get(LlmJudgmentContext.OVERWRITE_CACHE);
+
+        Long rateLimit = 1000L;
+        Object rateLimitObj = contextMap.get(LlmJudgmentContext.RATE_LIMIT);
+        if (rateLimitObj instanceof Number) {
+            rateLimit = ((Number) rateLimitObj).longValue();
+        }
+
+        // Parse enum values with proper defaults
+        LLMJudgmentRatingType ratingType = LLMJudgmentRatingType.SCORE0_1;
+        String ratingTypeStr = (String) contextMap.get(LlmJudgmentContext.RATING_TYPE);
+        if (ratingTypeStr != null && !ratingTypeStr.isEmpty()) {
+            try {
+                ratingType = LLMJudgmentRatingType.valueOf(ratingTypeStr);
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid ratingType '{}' in context, defaulting to SCORE0_1", ratingTypeStr);
+            }
+        }
+        log.debug("Using ratingType: {} for judgment processing", ratingType);
+
+        ConnectorType connectorType = ConnectorType.OPENAI;
+        String connectorTypeStr = (String) contextMap.get(LlmJudgmentContext.CONNECTOR_TYPE);
+        if (connectorTypeStr != null && !connectorTypeStr.isEmpty()) {
+            try {
+                connectorType = ConnectorType.valueOf(connectorTypeStr);
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid connectorType '{}' in context, defaulting to OPENAI", connectorTypeStr);
+            }
+        }
+
+        return LlmJudgmentContext.builder()
+            .modelId(modelId)
+            .size(size != null ? size : 5)
+            .tokenLimit(tokenLimit != null ? tokenLimit : 1000)
+            .contextFields(contextFields != null ? contextFields : new ArrayList<>())
+            .searchConfigurations(searchConfigurations)
+            .ignoreFailure(ignoreFailure != null ? ignoreFailure : false)
+            .promptTemplate(
+                promptTemplate != null
+                    ? promptTemplate
+                    : "Rate the relevance of the search results to the query. SearchText: {{searchText}}; Results: {{hits}}"
+            )
+            .ratingType(ratingType)
+            .overwriteCache(overwriteCache != null ? overwriteCache : false)
+            .connectorType(connectorType)
+            .rateLimit(rateLimit)
+            .build();
+    }
+
+    private LlmJudgmentContext buildContextFromLegacyMetadata(
+        Map<String, Object> metadata,
+        List<SearchConfiguration> searchConfigurations
+    ) {
+        String modelId = (String) metadata.get("modelId");
+        int size = (int) metadata.get("size");
+        int tokenLimit = (int) metadata.get("tokenLimit");
+        List<String> contextFields = (List<String>) metadata.get("contextFields");
+        boolean ignoreFailure = (boolean) metadata.get("ignoreFailure");
+        String promptTemplate = (String) metadata.get(PROMPT_TEMPLATE);
+        LLMJudgmentRatingType ratingType = (LLMJudgmentRatingType) metadata.get(LLM_JUDGMENT_RATING_TYPE);
+        if (ratingType == null) {
+            ratingType = LLMJudgmentRatingType.SCORE0_1;
+            log.debug("No ratingType provided, defaulting to SCORE0_1");
+        }
+        boolean overwriteCache = (boolean) metadata.get(OVERWRITE_CACHE);
+
+        ConnectorType connectorType = ConnectorType.OPENAI;
+        String connectorTypeStr = (String) metadata.get(CONNECTOR_TYPE);
+        if (connectorTypeStr != null) {
+            try {
+                connectorType = ConnectorType.valueOf(connectorTypeStr.toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid connectorType '{}' in metadata, defaulting to OpenAI", connectorTypeStr);
+            }
+        }
+
+        long rateLimit = parseRateLimit(metadata.get(RATE_LIMIT));
+
+        return LlmJudgmentContext.builder()
+            .modelId(modelId)
+            .size(size)
+            .tokenLimit(tokenLimit)
+            .contextFields(contextFields)
+            .searchConfigurations(searchConfigurations)
+            .ignoreFailure(ignoreFailure)
+            .promptTemplate(promptTemplate)
+            .ratingType(ratingType)
+            .overwriteCache(overwriteCache)
+            .connectorType(connectorType)
+            .rateLimit(rateLimit)
+            .build();
     }
 
     private void generateLLMJudgmentsAsync(
@@ -460,6 +557,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
             context.getPromptTemplate(),
             context.getRatingType(),
             context.getConnectorType(),
+            context.getRateLimit(),
             new ActionListener<ChunkResult>() {
                 @Override
                 public void onResponse(ChunkResult chunkResult) {

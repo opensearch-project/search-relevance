@@ -24,9 +24,16 @@ public class MLConstants {
      */
     public static final String PARAM_MESSAGES_FIELD = "messages";
     public static final String CONNECTOR_TYPE = "connectorType";
+    public static final String RATE_LIMIT = "rateLimit";
     public static final String PROMPT_TEMPLATE = "promptTemplate";
     public static final String LLM_JUDGMENT_RATING_TYPE = "llmJudgmentRatingType";
     public static final String OVERWRITE_CACHE = "overwriteCache";
+
+    /**
+     * Default prompt template for LLM judgments
+     */
+    public static final String DEFAULT_PROMPT_TEMPLATE =
+        "Rate the relevance of the search results to the query. SearchText: {{searchText}}; Results: {{hits}}";
 
     /**
      * Prompt template placeholder names.
@@ -38,11 +45,6 @@ public class MLConstants {
     public static final String PLACEHOLDER_RESULTS = "results";
     public static final String PLACEHOLDER_REFERENCE = "reference";
     public static final String PLACEHOLDER_REFERENCE_ANSWER = "referenceAnswer";
-
-    /**
-     * Default prompt template for LLM judgments (simple format without reference data)
-     */
-    public static final String DEFAULT_PROMPT_TEMPLATE = "SearchText: {{searchText}}; Hits: {{hits}}";
 
     /**
      * ML response field names
@@ -197,6 +199,30 @@ public class MLConstants {
             return tokenLimit;
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("Invalid tokenLimit value. Expected numeric value, got: " + tokenLimitObj);
+        }
+    }
+
+    /**
+    * Parses rateLimit value from an object, ensuring it's non-negative
+    *
+    * @param rateLimitObj The object to parse (can be Number, String, or null)
+    * @return Parsed rate limit value, or 0 if null/invalid
+    */
+    public static long parseRateLimit(Object rateLimitObj) {
+        if (rateLimitObj == null) {
+            return 0L;
+        }
+
+        try {
+            long rateLimit;
+            if (rateLimitObj instanceof Number) {
+                rateLimit = ((Number) rateLimitObj).longValue();
+            } else {
+                rateLimit = Long.parseLong(rateLimitObj.toString());
+            }
+            return Math.max(0, rateLimit); // ensure non-negative
+        } catch (NumberFormatException e) {
+            return 0L; // default to 0 on parse error
         }
     }
 

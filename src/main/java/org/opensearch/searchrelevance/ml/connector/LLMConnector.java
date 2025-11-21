@@ -37,4 +37,11 @@ public interface LLMConnector {
      * @return The ConnectorType enum value
      */
     ConnectorType getType();
+
+    /**
+     * Returns the parameter name used for messages in ML input
+     *
+     * @return The parameter name (e.g., "messages" for Claude/OpenAI, "message" for Cohere)
+     */
+    String getMessageParameterName();
 }

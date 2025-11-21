@@ -14,6 +14,8 @@ import static org.opensearch.searchrelevance.common.MLConstants.DEFAULT_PROMPT_T
 import static org.opensearch.searchrelevance.common.MLConstants.LLM_JUDGMENT_RATING_TYPE;
 import static org.opensearch.searchrelevance.common.MLConstants.OVERWRITE_CACHE;
 import static org.opensearch.searchrelevance.common.MLConstants.PROMPT_TEMPLATE;
+import static org.opensearch.searchrelevance.common.MLConstants.RATE_LIMIT;
+import static org.opensearch.searchrelevance.common.MLConstants.parseRateLimit;
 import static org.opensearch.searchrelevance.common.MLConstants.validateTokenLimit;
 import static org.opensearch.searchrelevance.common.MetricsConstants.MODEL_ID;
 import static org.opensearch.searchrelevance.common.PluginConstants.CLICK_MODEL;
@@ -193,6 +195,9 @@ public class RestPutJudgmentAction extends BaseRestHandler {
                     }
                 }
 
+                // Parse rateLimit - optional, defaults to 0
+                long rateLimit = parseRateLimit(source.get(RATE_LIMIT));
+
                 createRequest = new PutLlmJudgmentRequest(
                     type,
                     name,
@@ -207,7 +212,8 @@ public class RestPutJudgmentAction extends BaseRestHandler {
                     promptTemplate,
                     llmJudgmentRatingType,
                     overwriteCache,
-                    connectorType
+                    connectorType,
+                    rateLimit
                 );
             }
             case UBI_JUDGMENT -> {

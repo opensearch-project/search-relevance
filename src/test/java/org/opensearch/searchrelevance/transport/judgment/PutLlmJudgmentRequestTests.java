@@ -34,7 +34,8 @@ public class PutLlmJudgmentRequestTests extends OpenSearchTestCase {
             "{{searchText}} {{hits}}",
             LLMJudgmentRatingType.SCORE0_1,
             false,
-            null // connectorType is null
+            null, // connectorType is null
+            1000L
         );
 
         assertEquals(ConnectorType.OPENAI, request.getConnectorType());
@@ -55,7 +56,8 @@ public class PutLlmJudgmentRequestTests extends OpenSearchTestCase {
             "{{searchText}} {{hits}}",
             LLMJudgmentRatingType.SCORE0_1,
             false,
-            ConnectorType.CLAUDE
+            ConnectorType.CLAUDE,
+            1000L
         );
 
         assertEquals(ConnectorType.CLAUDE, request.getConnectorType());
@@ -77,11 +79,56 @@ public class PutLlmJudgmentRequestTests extends OpenSearchTestCase {
                 "{{searchText}} {{hits}}",
                 LLMJudgmentRatingType.SCORE0_1,
                 false,
-                type
+                type,
+                1000L
             );
 
             assertEquals(type, request.getConnectorType());
             assertNotNull(request.getConnectorType());
         }
+    }
+
+    public void testRateLimitDefaultsToZero() {
+        PutLlmJudgmentRequest request = new PutLlmJudgmentRequest(
+            JudgmentType.LLM_JUDGMENT,
+            "test-judgment",
+            "Test description",
+            "test-model-id",
+            "test-queryset-id",
+            List.of("test-config"),
+            10,
+            1000,
+            List.of("field1"),
+            false,
+            "{{searchText}} {{hits}}",
+            LLMJudgmentRatingType.SCORE0_1,
+            false,
+            ConnectorType.OPENAI,
+            0L // explicitly set rateLimit to 0
+        );
+
+        assertEquals(0L, request.getRateLimit());
+    }
+
+    public void testNegativeRateLimitBecomesZero() {
+        PutLlmJudgmentRequest request = new PutLlmJudgmentRequest(
+            JudgmentType.LLM_JUDGMENT,
+            "test-judgment",
+            "Test description",
+            "test-model-id",
+            "test-queryset-id",
+            List.of("test-config"),
+            10,
+            1000,
+            List.of("field1"),
+            false,
+            "{{searchText}} {{hits}}",
+            LLMJudgmentRatingType.SCORE0_1,
+            false,
+            ConnectorType.OPENAI,
+            -100L // negative rateLimit
+        );
+
+        assertEquals(0L, request.getRateLimit()); // should be clamped to 0
     }
 }

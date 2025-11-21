@@ -30,4 +30,9 @@ public class CohereConnector implements LLMConnector {
     public ConnectorType getType() {
         return ConnectorType.COHERE;
     }
+
+    @Override
+    public String getMessageParameterName() {
+        return "message"; // Cohere uses singular "message"
+    }
 }

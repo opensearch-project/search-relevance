@@ -7,16 +7,36 @@
  */
 package org.opensearch.searchrelevance.judgments;
 
+import java.io.IOException;
 import java.util.List;
 
+import org.opensearch.core.xcontent.ToXContentObject;
+import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.searchrelevance.ml.connector.ConnectorType;
 import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
 import org.opensearch.searchrelevance.model.SearchConfiguration;
 
+import lombok.Builder;
+import lombok.Getter;
+
 /**
  * Context object to hold LLM judgment parameters
  */
-public class LlmJudgmentContext {
+@Getter
+@Builder
+public class LlmJudgmentContext implements ToXContentObject {
+    public static final String MODEL_ID = "modelId";
+    public static final String SIZE = "size";
+    public static final String TOKEN_LIMIT = "tokenLimit";
+    public static final String CONTEXT_FIELDS = "contextFields";
+    public static final String SEARCH_CONFIGURATIONS = "searchConfigurations";
+    public static final String IGNORE_FAILURE = "ignoreFailure";
+    public static final String PROMPT_TEMPLATE = "promptTemplate";
+    public static final String RATING_TYPE = "ratingType";
+    public static final String OVERWRITE_CACHE = "overwriteCache";
+    public static final String CONNECTOR_TYPE = "connectorType";
+    public static final String RATE_LIMIT = "rateLimit";
+
     private final String modelId;
     private final int size;
     private final int tokenLimit;
@@ -27,128 +47,32 @@ public class LlmJudgmentContext {
     private final LLMJudgmentRatingType ratingType;
     private final boolean overwriteCache;
     private final ConnectorType connectorType;
+    private final long rateLimit; // milliseconds between requests
 
-    private LlmJudgmentContext(Builder builder) {
-        this.modelId = builder.modelId;
-        this.size = builder.size;
-        this.tokenLimit = builder.tokenLimit;
-        this.contextFields = builder.contextFields;
-        this.searchConfigurations = builder.searchConfigurations;
-        this.ignoreFailure = builder.ignoreFailure;
-        this.promptTemplate = builder.promptTemplate;
-        this.ratingType = builder.ratingType;
-        this.overwriteCache = builder.overwriteCache;
-        this.connectorType = builder.connectorType;
-    }
-
-    public static Builder builder() {
-        return new Builder();
-    }
-
-    public String getModelId() {
-        return modelId;
-    }
-
-    public int getSize() {
-        return size;
-    }
-
-    public int getTokenLimit() {
-        return tokenLimit;
-    }
-
-    public List<String> getContextFields() {
-        return contextFields;
-    }
-
-    public List<SearchConfiguration> getSearchConfigurations() {
-        return searchConfigurations;
-    }
-
-    public boolean isIgnoreFailure() {
-        return ignoreFailure;
-    }
-
-    public String getPromptTemplate() {
-        return promptTemplate;
-    }
-
-    public LLMJudgmentRatingType getRatingType() {
-        return ratingType;
-    }
-
-    public boolean isOverwriteCache() {
-        return overwriteCache;
-    }
-
-    public ConnectorType getConnectorType() {
-        return connectorType;
-    }
-
-    public static class Builder {
-        private String modelId;
-        private int size;
-        private int tokenLimit;
-        private List<String> contextFields;
-        private List<SearchConfiguration> searchConfigurations;
-        private boolean ignoreFailure;
-        private String promptTemplate;
-        private LLMJudgmentRatingType ratingType;
-        private boolean overwriteCache;
-        private ConnectorType connectorType;
-
-        public Builder modelId(String modelId) {
-            this.modelId = modelId;
-            return this;
+    @Override
+    public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
+        builder.startObject();
+        builder.field(MODEL_ID, modelId);
+        builder.field(SIZE, size);
+        builder.field(TOKEN_LIMIT, tokenLimit);
+        if (contextFields != null) {
+            builder.field(CONTEXT_FIELDS, contextFields);
         }
-
-        public Builder size(int size) {
-            this.size = size;
-            return this;
+        if (searchConfigurations != null) {
+            builder.field(SEARCH_CONFIGURATIONS, searchConfigurations);
         }
-
-        public Builder tokenLimit(int tokenLimit) {
-            this.tokenLimit = tokenLimit;
-            return this;
+        builder.field(IGNORE_FAILURE, ignoreFailure);
+        if (promptTemplate != null) {
+            builder.field(PROMPT_TEMPLATE, promptTemplate);
         }
-
-        public Builder contextFields(List<String> contextFields) {
-            this.contextFields = contextFields;
-            return this;
+        // Always include ratingType, use default if null
+        String ratingTypeValue = (ratingType != null) ? ratingType.name() : LLMJudgmentRatingType.SCORE0_1.name();
+        builder.field(RATING_TYPE, ratingTypeValue);
+        builder.field(OVERWRITE_CACHE, overwriteCache);
+        if (connectorType != null) {
+            builder.field(CONNECTOR_TYPE, connectorType.name());
         }
-
-        public Builder searchConfigurations(List<SearchConfiguration> searchConfigurations) {
-            this.searchConfigurations = searchConfigurations;
-            return this;
-        }
-
-        public Builder ignoreFailure(boolean ignoreFailure) {
-            this.ignoreFailure = ignoreFailure;
-            return this;
-        }
-
-        public Builder promptTemplate(String promptTemplate) {
-            this.promptTemplate = promptTemplate;
-            return this;
-        }
-
-        public Builder ratingType(LLMJudgmentRatingType ratingType) {
-            this.ratingType = ratingType;
-            return this;
-        }
-
-        public Builder overwriteCache(boolean overwriteCache) {
-            this.overwriteCache = overwriteCache;
-            return this;
-        }
-
-        public Builder connectorType(ConnectorType connectorType) {
-            this.connectorType = connectorType;
-            return this;
-        }
-
-        public LlmJudgmentContext build() {
-            return new LlmJudgmentContext(this);
-        }
+        builder.field(RATE_LIMIT, rateLimit);
+        return builder.endObject();
     }
 }

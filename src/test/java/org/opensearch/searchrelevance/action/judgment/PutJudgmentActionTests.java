@@ -95,7 +95,8 @@ public class PutJudgmentActionTests extends OpenSearchTestCase {
             "test_prompt_template",
             LLMJudgmentRatingType.SCORE0_1,
             true,
-            ConnectorType.OPENAI
+            ConnectorType.OPENAI,
+            1000L
         );
 
         BytesStreamOutput output = new BytesStreamOutput();
@@ -133,7 +134,8 @@ public class PutJudgmentActionTests extends OpenSearchTestCase {
             null,
             null,
             false,
-            ConnectorType.OPENAI
+            ConnectorType.OPENAI,
+            1000L
         );
 
         BytesStreamOutput output = new BytesStreamOutput();

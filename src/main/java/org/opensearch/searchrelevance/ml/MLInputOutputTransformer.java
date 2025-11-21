@@ -7,7 +7,6 @@
  */
 package org.opensearch.searchrelevance.ml;
 
-import static org.opensearch.searchrelevance.common.MLConstants.PARAM_MESSAGES_FIELD;
 import static org.opensearch.searchrelevance.common.MLConstants.PROMPT_SEARCH_RELEVANCE_SCORE_0_1_START;
 import static org.opensearch.searchrelevance.common.MLConstants.PROMPT_SEARCH_RELEVANCE_SCORE_BINARY;
 import static org.opensearch.searchrelevance.common.MLConstants.PROMPT_SEARCH_RELEVANCE_SCORE_END;
@@ -22,6 +21,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.core.common.util.CollectionUtils;
 import org.opensearch.core.xcontent.XContentBuilder;
@@ -36,13 +37,11 @@ import org.opensearch.searchrelevance.ml.connector.LLMConnector;
 import org.opensearch.searchrelevance.ml.connector.OpenAIConnector;
 import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
 
-import lombok.extern.log4j.Log4j2;
-
 /**
  * Handles ML input/output transformations for search relevance predictions
  */
-@Log4j2
 public class MLInputOutputTransformer {
+    private static final Logger log = LogManager.getLogger(MLInputOutputTransformer.class);
 
     private final LLMConnector connector;
 
@@ -141,7 +140,9 @@ public class MLInputOutputTransformer {
         Map<String, String> parameters = new HashMap<>();
         String messagesArray = buildMessagesArray(searchText, referenceData, hits, promptTemplate, ratingType);
 
-        parameters.put(PARAM_MESSAGES_FIELD, messagesArray);
+        // Use connector-specific parameter name
+        String paramName = connector.getMessageParameterName();
+        parameters.put(paramName, messagesArray);
 
         // Only add response_format if requested (for models that support it)
         if (includeResponseFormat) {
@@ -173,8 +174,14 @@ public class MLInputOutputTransformer {
     private static String getSystemPrompt(LLMJudgmentRatingType ratingType) {
         String systemPromptStart;
         String systemPromptEnd = PROMPT_SEARCH_RELEVANCE_SCORE_END;
+
+        // Handle null ratingType with default
+        if (ratingType == null) {
+            ratingType = LLMJudgmentRatingType.SCORE0_1;
+        }
+
         switch (ratingType) {
-            case LLMJudgmentRatingType.SCORE0_1:
+            case SCORE0_1:
                 systemPromptStart = PROMPT_SEARCH_RELEVANCE_SCORE_0_1_START;
                 break;
             default:
@@ -184,12 +191,17 @@ public class MLInputOutputTransformer {
     }
 
     private static String getResponseFormat(LLMJudgmentRatingType ratingType) {
+        // Handle null ratingType with default
+        if (ratingType == null) {
+            ratingType = LLMJudgmentRatingType.SCORE0_1;
+        }
+
         String schema;
         switch (ratingType) {
-            case LLMJudgmentRatingType.SCORE0_1:
+            case SCORE0_1:
                 schema = RATING_SCORE_NUMERIC_SCHEMA;
                 break;
-            case LLMJudgmentRatingType.RELEVANT_IRRELEVANT:
+            case RELEVANT_IRRELEVANT:
                 schema = RATING_SCORE_BINARY_SCHEMA;
                 break;
             default:

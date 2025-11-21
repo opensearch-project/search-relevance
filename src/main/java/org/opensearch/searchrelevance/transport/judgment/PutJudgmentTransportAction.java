@@ -7,11 +7,6 @@
  */
 package org.opensearch.searchrelevance.transport.judgment;
 
-import static org.opensearch.searchrelevance.common.MLConstants.CONNECTOR_TYPE;
-import static org.opensearch.searchrelevance.common.MLConstants.LLM_JUDGMENT_RATING_TYPE;
-import static org.opensearch.searchrelevance.common.MLConstants.OVERWRITE_CACHE;
-import static org.opensearch.searchrelevance.common.MLConstants.PROMPT_TEMPLATE;
-import static org.opensearch.searchrelevance.common.MetricsConstants.MODEL_ID;
 import static org.opensearch.searchrelevance.ubi.UbiValidator.checkUbiIndicesExist;
 
 import java.util.ArrayList;
@@ -33,6 +28,7 @@ import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.judgments.BaseJudgmentsProcessor;
 import org.opensearch.searchrelevance.judgments.JudgmentsProcessorFactory;
+import org.opensearch.searchrelevance.judgments.LlmJudgmentContext;
 import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.Judgment;
 import org.opensearch.searchrelevance.utils.TimeUtils;
@@ -99,18 +95,24 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
         Map<String, Object> metadata = new HashMap<>();
         switch (request.getType()) {
             case LLM_JUDGMENT -> {
+                // Use structured context for complex LLM parameters
                 PutLlmJudgmentRequest llmRequest = (PutLlmJudgmentRequest) request;
-                metadata.put(MODEL_ID, llmRequest.getModelId());
-                metadata.put(CONNECTOR_TYPE, llmRequest.getConnectorType().getValue());
+                LlmJudgmentContext context = LlmJudgmentContext.builder()
+                    .modelId(llmRequest.getModelId())
+                    .connectorType(llmRequest.getConnectorType())
+                    .rateLimit(llmRequest.getRateLimit())
+                    .size(llmRequest.getSize())
+                    .tokenLimit(llmRequest.getTokenLimit())
+                    .contextFields(llmRequest.getContextFields())
+                    .ignoreFailure(llmRequest.isIgnoreFailure())
+                    .promptTemplate(llmRequest.getPromptTemplate())
+                    .ratingType(llmRequest.getLlmJudgmentRatingType())
+                    .overwriteCache(llmRequest.isOverwriteCache())
+                    .build();
+
+                metadata.put("llmJudgmentContext", context);
                 metadata.put("querySetId", llmRequest.getQuerySetId());
-                metadata.put("size", llmRequest.getSize());
                 metadata.put("searchConfigurationList", llmRequest.getSearchConfigurationList());
-                metadata.put("tokenLimit", llmRequest.getTokenLimit());
-                metadata.put("contextFields", llmRequest.getContextFields());
-                metadata.put("ignoreFailure", llmRequest.isIgnoreFailure());
-                metadata.put(PROMPT_TEMPLATE, llmRequest.getPromptTemplate());
-                metadata.put(LLM_JUDGMENT_RATING_TYPE, llmRequest.getLlmJudgmentRatingType());
-                metadata.put(OVERWRITE_CACHE, llmRequest.isOverwriteCache());
             }
             case UBI_JUDGMENT -> {
                 if (!checkUbiIndicesExist(clusterService)) {

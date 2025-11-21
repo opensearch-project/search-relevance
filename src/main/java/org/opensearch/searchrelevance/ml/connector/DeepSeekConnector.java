@@ -16,4 +16,9 @@ public class DeepSeekConnector extends OpenAIConnector {
     public ConnectorType getType() {
         return ConnectorType.DEEPSEEK;
     }
+
+    @Override
+    public String getMessageParameterName() {
+        return "messages"; // DeepSeek uses plural "messages"
+    }
 }

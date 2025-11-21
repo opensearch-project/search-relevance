@@ -38,4 +38,9 @@ public class OpenAIConnector implements LLMConnector {
     public ConnectorType getType() {
         return ConnectorType.OPENAI;
     }
+
+    @Override
+    public String getMessageParameterName() {
+        return "messages"; // OpenAI uses plural "messages"
+    }
 }
