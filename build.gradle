@@ -50,6 +50,7 @@ buildscript {
         classpath "com.diffplug.spotless:spotless-plugin-gradle:8.0.0"
         classpath "com.github.form-com.diff-coverage-gradle:diff-coverage:0.9.5"
         classpath "io.freefair.gradle:lombok-plugin:9.0.0"
+        classpath "de.thetaphi:forbiddenapis:3.10" // Upgrade for JDK 25 support
     }
 }
 
