@@ -7,6 +7,12 @@
  */
 package org.opensearch.searchrelevance.transport.judgment;
 
+import static org.opensearch.searchrelevance.common.MLConstants.CONNECTOR_TYPE;
+import static org.opensearch.searchrelevance.common.MLConstants.DEFAULT_PROMPT_TEMPLATE;
+import static org.opensearch.searchrelevance.common.MLConstants.LLM_JUDGMENT_RATING_TYPE;
+import static org.opensearch.searchrelevance.common.MLConstants.OVERWRITE_CACHE;
+import static org.opensearch.searchrelevance.common.MLConstants.PROMPT_TEMPLATE;
+import static org.opensearch.searchrelevance.common.MLConstants.RATE_LIMIT;
 import static org.opensearch.searchrelevance.ubi.UbiValidator.checkUbiIndicesExist;
 
 import java.util.ArrayList;
@@ -28,9 +34,10 @@ import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.judgments.BaseJudgmentsProcessor;
 import org.opensearch.searchrelevance.judgments.JudgmentsProcessorFactory;
-import org.opensearch.searchrelevance.judgments.LlmJudgmentContext;
+import org.opensearch.searchrelevance.ml.connector.ConnectorType;
 import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.Judgment;
+import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
@@ -41,6 +48,20 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
     private final JudgmentsProcessorFactory judgmentsProcessorFactory;
 
     private static final Logger LOGGER = LogManager.getLogger(PutJudgmentTransportAction.class);
+
+    // Metadata keys
+    private static final String QUERY_SET_ID = "querySetId";
+    private static final String SEARCH_CONFIGURATION_LIST = "searchConfigurationList";
+    private static final String MODEL_ID = "modelId";
+    private static final String SIZE = "size";
+    private static final String TOKEN_LIMIT = "tokenLimit";
+    private static final String CONTEXT_FIELDS = "contextFields";
+    private static final String IGNORE_FAILURE = "ignoreFailure";
+    private static final String CLICK_MODEL = "clickModel";
+    private static final String MAX_RANK = "maxRank";
+    private static final String START_DATE = "startDate";
+    private static final String END_DATE = "endDate";
+    private static final String JUDGMENT_RATINGS = "judgmentRatings";
 
     @Inject
     public PutJudgmentTransportAction(
@@ -95,39 +116,44 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
         Map<String, Object> metadata = new HashMap<>();
         switch (request.getType()) {
             case LLM_JUDGMENT -> {
-                // Use structured context for complex LLM parameters
                 PutLlmJudgmentRequest llmRequest = (PutLlmJudgmentRequest) request;
-                LlmJudgmentContext context = LlmJudgmentContext.builder()
-                    .modelId(llmRequest.getModelId())
-                    .connectorType(llmRequest.getConnectorType())
-                    .rateLimit(llmRequest.getRateLimit())
-                    .size(llmRequest.getSize())
-                    .tokenLimit(llmRequest.getTokenLimit())
-                    .contextFields(llmRequest.getContextFields())
-                    .ignoreFailure(llmRequest.isIgnoreFailure())
-                    .promptTemplate(llmRequest.getPromptTemplate())
-                    .ratingType(llmRequest.getLlmJudgmentRatingType())
-                    .overwriteCache(llmRequest.isOverwriteCache())
-                    .build();
 
-                metadata.put("llmJudgmentContext", context);
-                metadata.put("querySetId", llmRequest.getQuerySetId());
-                metadata.put("searchConfigurationList", llmRequest.getSearchConfigurationList());
+                // Store flat metadata fields for compatibility
+                metadata.put(QUERY_SET_ID, llmRequest.getQuerySetId());
+                metadata.put(SEARCH_CONFIGURATION_LIST, llmRequest.getSearchConfigurationList());
+                metadata.put(MODEL_ID, llmRequest.getModelId());
+                metadata.put(SIZE, llmRequest.getSize());
+                metadata.put(TOKEN_LIMIT, llmRequest.getTokenLimit());
+                metadata.put(CONTEXT_FIELDS, llmRequest.getContextFields());
+                metadata.put(IGNORE_FAILURE, llmRequest.isIgnoreFailure());
+                metadata.put(
+                    PROMPT_TEMPLATE,
+                    llmRequest.getPromptTemplate() != null ? llmRequest.getPromptTemplate() : DEFAULT_PROMPT_TEMPLATE
+                );
+                metadata.put(
+                    LLM_JUDGMENT_RATING_TYPE,
+                    llmRequest.getLlmJudgmentRatingType() != null ? llmRequest.getLlmJudgmentRatingType() : LLMJudgmentRatingType.SCORE0_1
+                );
+                metadata.put(OVERWRITE_CACHE, llmRequest.isOverwriteCache());
+                metadata.put(
+                    CONNECTOR_TYPE,
+                    llmRequest.getConnectorType() != null ? llmRequest.getConnectorType().name() : ConnectorType.OPENAI.name()
+                );
+                metadata.put(RATE_LIMIT, llmRequest.getRateLimit());
             }
             case UBI_JUDGMENT -> {
                 if (!checkUbiIndicesExist(clusterService)) {
                     throw new SearchRelevanceException("UBI is not initialized", RestStatus.CONFLICT);
                 }
-                ;
                 PutUbiJudgmentRequest ubiRequest = (PutUbiJudgmentRequest) request;
-                metadata.put("clickModel", ubiRequest.getClickModel());
-                metadata.put("maxRank", ubiRequest.getMaxRank());
-                metadata.put("startDate", ubiRequest.getStartDate());
-                metadata.put("endDate", ubiRequest.getEndDate());
+                metadata.put(CLICK_MODEL, ubiRequest.getClickModel());
+                metadata.put(MAX_RANK, ubiRequest.getMaxRank());
+                metadata.put(START_DATE, ubiRequest.getStartDate());
+                metadata.put(END_DATE, ubiRequest.getEndDate());
             }
             case IMPORT_JUDGMENT -> {
                 PutImportJudgmentRequest importRequest = (PutImportJudgmentRequest) request;
-                metadata.put("judgmentRatings", importRequest.getJudgmentRatings());
+                metadata.put(JUDGMENT_RATINGS, importRequest.getJudgmentRatings());
             }
         }
         return metadata;

@@ -49,6 +49,16 @@ import org.opensearch.test.OpenSearchTestCase;
  */
 public class MLAccessorIntegrationTests extends OpenSearchTestCase {
 
+    private MLAccessor mlAccessor;
+
+    @Override
+    public void tearDown() throws Exception {
+        if (mlAccessor != null) {
+            mlAccessor.shutdown();
+        }
+        super.tearDown();
+    }
+
     /**
      * Note: GPT-3.5 fallback testing is documented in TESTING_GPT35_FALLBACK.md as "Scenario 2"
      * This scenario requires triggering scheduleRetry which creates CompletableFuture threads that leak.
@@ -63,7 +73,7 @@ public class MLAccessorIntegrationTests extends OpenSearchTestCase {
      */
     public void testFirstAttemptSuccess_WhenModelSupportsResponseFormat() throws Exception {
         MachineLearningNodeClient mlClient = mock(MachineLearningNodeClient.class);
-        MLAccessor mlAccessor = new MLAccessor(mlClient);
+        mlAccessor = new MLAccessor(mlClient);
 
         AtomicInteger attemptCount = new AtomicInteger(0);
         CountDownLatch latch = new CountDownLatch(1);
@@ -101,7 +111,8 @@ public class MLAccessorIntegrationTests extends OpenSearchTestCase {
             "Test prompt",
             LLMJudgmentRatingType.SCORE0_1,
             ConnectorType.OPENAI,
-            ActionListener.wrap(chunkResult -> {
+            1000L,
+            ActionListener.wrap((ChunkResult chunkResult) -> {
                 result.set(chunkResult);
                 latch.countDown();
             }, e -> latch.countDown())
@@ -134,6 +145,68 @@ public class MLAccessorIntegrationTests extends OpenSearchTestCase {
      * The retry logic with exponential backoff uses CompletableFuture.delayedExecutor which creates
      * daemon threads that cannot be properly cleaned up in the OpenSearch test framework.
      */
+
+    /**
+     * Test that non-OpenAI connectors (Claude, Cohere, DeepSeek) don't trigger response_format retry logic.
+     * This verifies the fix for the issue where all connector types were attempting response_format fallback.
+     */
+    public void testNonOpenAIConnectors_DoNotUseResponseFormatRetry() throws Exception {
+        // Test each non-OpenAI connector type
+        ConnectorType[] nonOpenAIConnectors = { ConnectorType.CLAUDE, ConnectorType.COHERE, ConnectorType.DEEPSEEK };
+
+        for (ConnectorType connectorType : nonOpenAIConnectors) {
+            MachineLearningNodeClient mlClient = mock(MachineLearningNodeClient.class);
+            mlAccessor = new MLAccessor(mlClient);
+
+            AtomicInteger attemptCount = new AtomicInteger(0);
+            CountDownLatch latch = new CountDownLatch(1);
+            AtomicReference<Exception> error = new AtomicReference<>();
+
+            // Mock ML client to always fail - this should NOT trigger response_format retry for non-OpenAI
+            doAnswer(invocation -> {
+                ActionListener<MLOutput> listener = invocation.getArgument(2);
+                attemptCount.incrementAndGet();
+
+                // Fail immediately - non-OpenAI connectors should not retry with response_format removal
+                listener.onFailure(new RuntimeException("Simulated failure for " + connectorType));
+                return null;
+            }).when(mlClient).predict(any(), any(MLInput.class), any());
+
+            // Execute prediction
+            Map<String, String> hits = Map.of("doc1", "test content");
+            mlAccessor.predict(
+                "test-model",
+                4000,
+                "test query",
+                new HashMap<>(),
+                hits,
+                "Test prompt",
+                LLMJudgmentRatingType.SCORE0_1,
+                connectorType,
+                1000L,
+                ActionListener.wrap((ChunkResult chunkResult) -> {
+                    // Should not succeed
+                    latch.countDown();
+                }, e -> {
+                    error.set(e);
+                    latch.countDown();
+                })
+            );
+
+            assertTrue("Should complete for " + connectorType, latch.await(15, TimeUnit.SECONDS));
+
+            // Verify failure occurred (as expected)
+            assertNotNull("Should have failed for " + connectorType, error.get());
+
+            // Key assertion: For non-OpenAI connectors, should attempt regular retries but not response_format retry
+            // The fix ensures that only OpenAI connectors attempt the response_format fallback
+            assertTrue("Should attempt at least once for " + connectorType, attemptCount.get() >= 1);
+            // With regular retry logic (3 attempts), we expect exactly 4 attempts (1 initial + 3 retries)
+            assertEquals("Should attempt exactly 4 times (1 initial + 3 retries) for " + connectorType, 4, attemptCount.get());
+
+            mlAccessor.shutdown();
+        }
+    }
 
     // ============================================
     // Helper Methods

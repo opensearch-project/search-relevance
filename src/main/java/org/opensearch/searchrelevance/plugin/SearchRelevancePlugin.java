@@ -393,4 +393,11 @@ public class SearchRelevancePlugin extends Plugin
     public List<ExecutorBuilder<?>> getExecutorBuilders(Settings settings) {
         return List.of(SearchRelevanceExecutor.getExecutorBuilder(settings));
     }
+
+    @Override
+    public void close() throws IOException {
+        if (mlAccessor != null) {
+            mlAccessor.shutdown();
+        }
+    }
 }

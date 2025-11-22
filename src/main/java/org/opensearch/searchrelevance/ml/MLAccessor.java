@@ -10,8 +10,6 @@ package org.opensearch.searchrelevance.ml;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.ml.client.MachineLearningNodeClient;
@@ -31,6 +29,7 @@ import lombok.extern.log4j.Log4j2;
 public class MLAccessor {
     private final MachineLearningNodeClient mlClient;
     private final MLInputOutputTransformer transformer;
+    private final AdaptiveRateLimiter rateLimiter;
 
     private static final int MAX_RETRY_NUMBER = 3;
     private static final long RETRY_DELAY_MS = 1000;
@@ -38,6 +37,16 @@ public class MLAccessor {
     public MLAccessor(MachineLearningNodeClient mlClient) {
         this.mlClient = mlClient;
         this.transformer = new MLInputOutputTransformer();
+        this.rateLimiter = new AdaptiveRateLimiter();
+    }
+
+    /**
+     * Shutdown the MLAccessor and clean up resources
+     */
+    public void shutdown() {
+        if (rateLimiter != null) {
+            rateLimiter.shutdown();
+        }
     }
 
     public void predict(
@@ -49,15 +58,17 @@ public class MLAccessor {
         String promptTemplate,
         LLMJudgmentRatingType ratingType,
         ConnectorType connectorType,
+        long rateLimit,
         ActionListener<ChunkResult> progressListener
     ) {
         log.debug(
-            "DEBUG: MLAccessor.predict called with modelId: {}, searchText: {}, hits count: {}, ratingType: {}, connectorType: {}",
+            "DEBUG: MLAccessor.predict called with modelId: {}, searchText: {}, hits count: {}, ratingType: {}, connectorType: {}, rateLimit: {}ms",
             modelId,
             searchText,
             hits.size(),
             ratingType,
-            connectorType
+            connectorType,
+            rateLimit
         );
 
         // Create transformer with appropriate connector
@@ -77,12 +88,19 @@ public class MLAccessor {
         ChunkProcessingContext context = new ChunkProcessingContext(mlInputs.size(), progressListener);
 
         for (int i = 0; i < mlInputs.size(); i++) {
-            processChunk(modelId, mlInputs.get(i), i, context);
+            processChunk(modelId, mlInputs.get(i), i, connectorType, rateLimit, context);
         }
     }
 
-    private void processChunk(String modelId, MLInput mlInput, int chunkIndex, ChunkProcessingContext context) {
-        processChunkWithFallback(modelId, mlInput, chunkIndex, false, context);
+    private void processChunk(
+        String modelId,
+        MLInput mlInput,
+        int chunkIndex,
+        ConnectorType connectorType,
+        long rateLimit,
+        ChunkProcessingContext context
+    ) {
+        processChunkWithFallback(modelId, mlInput, chunkIndex, false, connectorType, rateLimit, context);
     }
 
     private void processChunkWithFallback(
@@ -90,28 +108,43 @@ public class MLAccessor {
         MLInput mlInput,
         int chunkIndex,
         boolean triedWithoutResponseFormat,
+        ConnectorType connectorType,
+        long rateLimit,
         ChunkProcessingContext context
     ) {
-        predictSingleChunkWithRetry(modelId, mlInput, chunkIndex, 0, triedWithoutResponseFormat, ActionListener.wrap(response -> {
-            log.info("Chunk {} processed successfully", chunkIndex);
-            String processedResponse = cleanResponse(response);
+        predictSingleChunkWithRetry(
+            modelId,
+            mlInput,
+            chunkIndex,
+            0,
+            triedWithoutResponseFormat,
+            connectorType,
+            rateLimit,
+            ActionListener.wrap(response -> {
+                log.info("Chunk {} processed successfully", chunkIndex);
+                String processedResponse = cleanResponse(response);
 
-            // Check if parsing failed (empty ratings array) and we haven't tried without response_format yet
-            if ("[]".equals(processedResponse) && !triedWithoutResponseFormat) {
-                log.warn(
-                    "Chunk {} returned empty ratings with response_format. Retrying without response_format for GPT-3.5 compatibility...",
-                    chunkIndex
-                );
-                // Create new MLInput without response_format and retry
-                MLInput mlInputWithoutFormat = recreateMLInputWithoutResponseFormat(mlInput);
-                scheduleRetry(() -> processChunkWithFallback(modelId, mlInputWithoutFormat, chunkIndex, true, context), RETRY_DELAY_MS);
-            } else {
-                context.handleSuccess(chunkIndex, processedResponse);
-            }
-        }, e -> {
-            log.error("Chunk {} failed after all retries", chunkIndex, e);
-            context.handleFailure(chunkIndex, e);
-        }));
+                // Check if parsing failed (empty ratings array) and we haven't tried without response_format yet
+                // Only apply this retry logic for OpenAI connectors
+                if ("[]".equals(processedResponse) && !triedWithoutResponseFormat && connectorType == ConnectorType.OPENAI) {
+                    log.warn(
+                        "Chunk {} returned empty ratings with response_format. Retrying without response_format for GPT-3.5 compatibility...",
+                        chunkIndex
+                    );
+                    // Create new MLInput without response_format and retry
+                    MLInput mlInputWithoutFormat = recreateMLInputWithoutResponseFormat(mlInput);
+                    scheduleRetry(
+                        () -> processChunkWithFallback(modelId, mlInputWithoutFormat, chunkIndex, true, connectorType, rateLimit, context),
+                        RETRY_DELAY_MS
+                    );
+                } else {
+                    context.handleSuccess(chunkIndex, processedResponse);
+                }
+            }, e -> {
+                log.error("Chunk {} failed after all retries", chunkIndex, e);
+                context.handleFailure(chunkIndex, e);
+            })
+        );
     }
 
     private String cleanResponse(String response) {
@@ -133,9 +166,11 @@ public class MLAccessor {
         int chunkIndex,
         int retryCount,
         boolean triedWithoutResponseFormat,
+        ConnectorType connectorType,
+        long rateLimit,
         ActionListener<String> chunkListener
     ) {
-        predictSingleChunk(modelId, mlInput, new ActionListener<String>() {
+        predictSingleChunk(modelId, mlInput, connectorType, rateLimit, new ActionListener<String>() {
             @Override
             public void onResponse(String response) {
                 log.debug(
@@ -156,8 +191,8 @@ public class MLAccessor {
                     triedWithoutResponseFormat,
                     retryCount
                 );
-                // If we haven't tried without response_format yet, try that first before regular retries
-                if (!triedWithoutResponseFormat) {
+                // Only try response_format fallback for OpenAI connectors
+                if (!triedWithoutResponseFormat && connectorType == ConnectorType.OPENAI) {
                     log.warn(
                         "Chunk {} failed with response_format. Retrying without response_format for GPT-3.5 compatibility...",
                         chunkIndex
@@ -169,7 +204,16 @@ public class MLAccessor {
 
                     long delay = RETRY_DELAY_MS;
                     scheduleRetry(
-                        () -> predictSingleChunkWithRetry(modelId, mlInputWithoutFormat, chunkIndex, 0, true, chunkListener),
+                        () -> predictSingleChunkWithRetry(
+                            modelId,
+                            mlInputWithoutFormat,
+                            chunkIndex,
+                            0,
+                            true,
+                            connectorType,
+                            rateLimit,
+                            chunkListener
+                        ),
                         delay
                     );
                 } else if (retryCount < MAX_RETRY_NUMBER) {
@@ -177,7 +221,16 @@ public class MLAccessor {
 
                     long delay = RETRY_DELAY_MS * (long) Math.pow(2, retryCount);
                     scheduleRetry(
-                        () -> predictSingleChunkWithRetry(modelId, mlInput, chunkIndex, retryCount + 1, true, chunkListener),
+                        () -> predictSingleChunkWithRetry(
+                            modelId,
+                            mlInput,
+                            chunkIndex,
+                            retryCount + 1,
+                            true,
+                            connectorType,
+                            rateLimit,
+                            chunkListener
+                        ),
                         delay
                     );
                 } else {
@@ -207,25 +260,55 @@ public class MLAccessor {
     }
 
     private void scheduleRetry(Runnable runnable, long delayMs) {
-        CompletableFuture.delayedExecutor(delayMs, TimeUnit.MILLISECONDS).execute(runnable);
+        // Use the rate limiter's managed scheduler for retries to avoid thread leaks
+        rateLimiter.scheduleTask(runnable, delayMs);
     }
 
-    public void predictSingleChunk(String modelId, MLInput mlInput, ActionListener<String> listener) {
-        log.debug("DEBUG: predictSingleChunk called with modelId: {}", modelId);
-        RemoteInferenceInputDataSet dataset = (RemoteInferenceInputDataSet) mlInput.getInputDataset();
-        Map<String, String> params = dataset.getParameters();
+    public void predictSingleChunk(
+        String modelId,
+        MLInput mlInput,
+        ConnectorType connectorType,
+        long rateLimit,
+        ActionListener<String> listener
+    ) {
         log.debug(
-            "DEBUG: MLInput parameters - has response_format: {}, has messages: {}",
-            params.containsKey("response_format"),
-            params.containsKey("messages")
+            "DEBUG: predictSingleChunk called with modelId: {}, connectorType: {}, rateLimit: {}ms",
+            modelId,
+            connectorType,
+            rateLimit
         );
-        mlClient.predict(modelId, mlInput, ActionListener.wrap(mlOutput -> {
-            log.debug("DEBUG: ML prediction succeeded, extracting response content");
-            listener.onResponse(transformer.extractResponseContent(mlOutput));
-        }, e -> {
-            log.debug("DEBUG: ML prediction failed with error: {}", e.getMessage());
-            listener.onFailure(e);
-        }));
+
+        // Apply rate limiting before making the prediction
+        rateLimiter.applyRateLimit(modelId, connectorType, rateLimit).whenComplete((result, rateLimitError) -> {
+            if (rateLimitError != null) {
+                log.error("Rate limiting failed for modelId: {}", modelId, rateLimitError);
+                listener.onFailure(new Exception(rateLimitError));
+                return;
+            }
+
+            // Create connector-specific transformer
+            MLInputOutputTransformer connectorTransformer = new MLInputOutputTransformer(LLMConnectorFactory.create(connectorType));
+
+            RemoteInferenceInputDataSet dataset = (RemoteInferenceInputDataSet) mlInput.getInputDataset();
+            Map<String, String> params = dataset.getParameters();
+            log.debug(
+                "DEBUG: MLInput parameters - has response_format: {}, has messages: {}",
+                params.containsKey("response_format"),
+                params.containsKey("messages")
+            );
+
+            mlClient.predict(modelId, mlInput, ActionListener.wrap(mlOutput -> {
+                log.debug("DEBUG: ML prediction succeeded, extracting response content");
+                // Record successful result for rate limiter learning
+                rateLimiter.recordResult(modelId, connectorType, true, null);
+                listener.onResponse(connectorTransformer.extractResponseContent(mlOutput));
+            }, e -> {
+                log.debug("DEBUG: ML prediction failed with error: {}", e.getMessage());
+                // Record failed result for rate limiter learning
+                rateLimiter.recordResult(modelId, connectorType, false, e);
+                listener.onFailure(e);
+            }));
+        });
     }
 
 }

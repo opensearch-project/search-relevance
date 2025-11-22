@@ -33,7 +33,7 @@ CONNECTOR_RESPONSE=$(curl -s -X POST "${OPENSEARCH_URL}/_plugins/_ml/connectors/
     "model": "us.anthropic.claude-3-5-haiku-20241022-v1:0"
   },
   "client_config": {
-    "max_connection": 1,
+    "max_connection": 2,
     "connection_timeout": 60000,
     "read_timeout": 60000,
     "retry_backoff_millis": 3000,
