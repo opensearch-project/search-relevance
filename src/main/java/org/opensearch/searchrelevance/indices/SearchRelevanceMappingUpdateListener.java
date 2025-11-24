@@ -17,16 +17,6 @@ import lombok.extern.log4j.Log4j2;
 /**
  * Listener that updates search relevance index mappings when indices are restored from snapshots.
  * This only updates mappings for indices that were restored - it does not create new indices.
- *
- * <p>Known limitation: There is a potential race condition where a snapshot restore might complete
- * between cluster state updates, and the RestoreInProgress entry could be removed before this listener
- * processes it. In such cases, restored indices could miss the mapping update. However, this is an
- * extremely unlikely scenario in practice, as:
- * <ul>
- *   <li>The window for this race is very small (between cluster state updates)</li>
- *   <li>Most restored indices will be caught by this listener or by the onNodeStarted() hook</li>
- *   <li>Mapping updates are non-critical and can be applied later if needed</li>
- * </ul>
  */
 @Log4j2
 public class SearchRelevanceMappingUpdateListener implements ClusterStateListener {
@@ -45,6 +35,12 @@ public class SearchRelevanceMappingUpdateListener implements ClusterStateListene
         }
 
         // Check for completed snapshot restore operations
+        // Note: There is a potential race condition where a snapshot restore might complete between cluster state
+        // updates, and the RestoreInProgress entry could be removed before this listener processes it. In such cases,
+        // restored indices could miss the mapping update. However, this is an extremely unlikely scenario in practice:
+        // - The race window is very small (between cluster state updates)
+        // - Most restored indices will be caught by this listener or by the onNodeStarted() hook
+        // - Mapping updates are non-critical and can be applied later if needed
         RestoreInProgress restoreInProgress = event.state().custom(RestoreInProgress.TYPE, RestoreInProgress.EMPTY);
         if (restoreInProgress == null) {
             return;
