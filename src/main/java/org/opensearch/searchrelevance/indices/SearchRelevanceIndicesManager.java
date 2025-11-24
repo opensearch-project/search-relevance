@@ -44,6 +44,8 @@ import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.search.internal.InternalSearchResponse;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.shared.StashedThreadContext;
+import org.opensearch.searchrelevance.stats.events.EventStatName;
+import org.opensearch.searchrelevance.stats.events.EventStatsManager;
 import org.opensearch.transport.client.Client;
 
 import lombok.Builder;
@@ -139,6 +141,13 @@ public class SearchRelevanceIndicesManager {
             public void onResponse(final AcknowledgedResponse response) {
                 if (!response.isAcknowledged()) {
                     log.warn("Mapping update for index [{}] was not acknowledged", indexName);
+                } else {
+                    // Record successful mapping update
+                    try {
+                        EventStatsManager.increment(EventStatName.MAPPING_UPDATE_SUCCESS);
+                    } catch (Exception ex) {
+                        log.debug("Failed to record mapping update success metric", ex);
+                    }
                 }
                 listener.onResponse(response);
             }
@@ -146,6 +155,12 @@ public class SearchRelevanceIndicesManager {
             @Override
             public void onFailure(final Exception e) {
                 log.error("Failed to update mapping for index [{}]", indexName, e);
+                // Record failed mapping update
+                try {
+                    EventStatsManager.increment(EventStatName.MAPPING_UPDATE_FAILURE);
+                } catch (Exception ex) {
+                    log.debug("Failed to record mapping update failure metric", ex);
+                }
                 listener.onFailure(e);
             }
         }));
