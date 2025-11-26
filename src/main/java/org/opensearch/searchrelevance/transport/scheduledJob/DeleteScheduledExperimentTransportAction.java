@@ -59,7 +59,9 @@ public class DeleteScheduledExperimentTransportAction extends HandledTransportAc
         try {
             String jobId = request.getId();
             if (jobId == null || jobId.trim().isEmpty()) {
-                listener.onFailure(new SearchRelevanceException("Query set ID cannot be null or empty", RestStatus.BAD_REQUEST));
+                listener.onFailure(
+                    new SearchRelevanceException("Scheduled experiment run ID cannot be null or empty", RestStatus.BAD_REQUEST)
+                );
                 return;
             }
             scheduledJobsDao.deleteScheduledJob(jobId, ActionListener.wrap(deleteResponse -> {

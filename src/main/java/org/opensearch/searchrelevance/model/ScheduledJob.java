@@ -29,6 +29,9 @@ public class ScheduledJob implements ToXContentObject {
     public static final String ENABLED_TIME_FIELD_READABLE = "enabledTimeField";
     public static final String TIME_STAMP = "timestamp";
 
+    /**
+     * Will be equivalent to the underlying experiment id
+     */
     private final String id;
     private final Instant lastUpdateTime;
     private final Instant enabledTime;

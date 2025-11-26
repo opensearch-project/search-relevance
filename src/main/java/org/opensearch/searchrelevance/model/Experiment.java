@@ -33,7 +33,8 @@ public class Experiment implements ToXContentObject {
     private static final int DEFAULTED_SIZE = 10;
 
     /**
-     * Identifier of the system index
+     * Identifier of the system index will be equivalent to any
+     * scheduled experiment runs
      */
     private final String id;
     private final String timestamp;
