@@ -9,19 +9,9 @@ In search applications, tuning relevance is a constant, iterative exercise to br
 
 This plugin provides resource management for each tool provided. For example, most use cases involve configuring and creating search configurations, query sets, and judgments. All of these resources are created, updated, deleted, and maintained by the Search Relevance plugin. When users are satisfied with the improvements to relevancy then they take the output and manually deploy the changes into their environment.
 
-Exposing these powerful features through a simple UI is done through the  [Dashboards Search Relevance](https://github.com/opensearch-project/dashboards-search-relevance) plugin.
+Also included are advanced tools such as LLM as a Judge and a Global Parameter Space Optimizer for Hybrid search.
 
-> [!IMPORTANT]
-> While shipping with OpenSearch, you must OPT IN to this feature.  To enable this run:
-> ```
-> curl -X PUT "http://localhost:9200/_cluster/settings" -H 'Content-Type: application/json' -d'
->  {
->    "persistent" : {
->     "plugins.search_relevance.workbench_enabled" : true
->   }
-> }
->  '
-> ```
+Exposing these powerful features through a simple UI is done through the  [Dashboards Search Relevance](https://github.com/opensearch-project/dashboards-search-relevance) plugin.
 
 
 For tutorials on how to leverage these tools, see [here](https://docs.opensearch.org/docs/latest/search-plugins/search-relevance/).
