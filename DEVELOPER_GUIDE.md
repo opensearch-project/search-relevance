@@ -314,7 +314,7 @@ SRW is unique that it has a large number of indices that it uses to maintain the
 ```mermaid
 erDiagram
 
-    .plugins-search-relevance-experiment {
+    ".plugins-search-relevance-experiment" {
         keyword id
         date timestamp
         keyword type
