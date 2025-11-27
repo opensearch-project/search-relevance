@@ -340,6 +340,17 @@ erDiagram
         nested metrics        
     }
     
+    search-relevance-judgment
+    ".plugins-search-relevance-judgment-cache"
+    search-relevance-search-config
+    search-relevance-queryset
+    search-relevance-experiment-variant
+    ".search-relevance-scheduled-experiment-jobs"
+    ".search-relevance-scheduled-experiment-history"
+
+    ubi_events
+    ubi_queries
+    
     
     CAR ||--o{ NAMED-DRIVER : allows
     CAR {
