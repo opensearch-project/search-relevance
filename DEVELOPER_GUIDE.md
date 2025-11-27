@@ -372,12 +372,52 @@ erDiagram
       nested querySetQueries
       keyword sampling
     }
-    search-relevance-experiment-variant
-    ".search-relevance-scheduled-experiment-jobs"
-    ".search-relevance-scheduled-experiment-history"
-
-    ubi_events
-    ubi_queries
+    search-relevance-experiment-variant {
+      keyword id
+      date timestamp
+      keyword type
+      keyword status
+      keyword experimentId
+      object parameters
+      nested results
+    }
+    ".search-relevance-scheduled-experiment-jobs" {
+      keyword id
+      boolean enabled
+      long enabledTime
+      long lastUpdateTime
+      keyword timestamp
+      keyword schedule
+    }
+    ".search-relevance-scheduled-experiment-history" {
+      keyword id
+      keyword experimentId
+      date timestamp
+      keyword status
+      object results
+    }
+    ubi_events {
+      keyword application
+      keyword action_name
+      keyword client_id
+      keyword query_id
+      keyword message
+      keyword message_type
+      keyword user_query
+      date timestamp
+      object event_attributes
+    }
+    ubi_queries {
+      date timestamp
+      keyword query_id
+      text query
+      keyword query_response_id
+      keyword query_response_hit_ids
+      keyword user_query
+      flat_object query_attributes
+      keyword client_id
+      keyword application
+    }
     
     
     CAR ||--o{ NAMED-DRIVER : allows
