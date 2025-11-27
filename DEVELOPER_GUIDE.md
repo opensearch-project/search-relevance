@@ -397,29 +397,7 @@ erDiagram
       keyword status
       object results
     }
-    ubi_events {
-      keyword application
-      keyword action_name
-      keyword client_id
-      keyword query_id FK
-      keyword message
-      keyword message_type
-      keyword user_query
-      date timestamp
-      object event_attributes
-    }
-    ubi_queries {
-      keyword query_id PK
-      date timestamp
-      text query
-      keyword query_response_id
-      keyword query_response_hit_ids
-      keyword user_query
-      flat_object query_attributes
-      keyword client_id
-      keyword application
-    }
-    
+
     ".plugins-search-relevance-experiment" ||--o{ search-relevance-evaluation-result : has
     ".plugins-search-relevance-experiment" ||--o{ search-relevance-queryset : has
     ".plugins-search-relevance-experiment" ||--o{ search-relevance-search-config : "has many"
@@ -429,7 +407,6 @@ erDiagram
     search-relevance-evaluation-result }o--o{ search-relevance-judgment : includes
     ".plugins-search-relevance-experiment" }o--|| ".search-relevance-scheduled-experiment-jobs" : "schedule opt link"
     ".plugins-search-relevance-experiment" ||--o{ ".search-relevance-scheduled-experiment-history" : "has histories"
-    ubi_queries ||--o{ ubi_events : "referenced by"
     
 ```
 
