@@ -313,6 +313,18 @@ SRW is unique that it has a large number of indices that it uses to maintain the
 
 ```mermaid
 erDiagram
+    .plugins-search-relevance-experiment {
+        keyword id
+        date timestamp
+        keyword type
+        keyword status
+        keyword querySetId
+        list[keyword] searchCOnfigurationList
+        keyword jdugementList
+        keyword size
+        keyword isScheduled
+        object[] results
+    }
     search-relevance-evaluation-result {
         keyword id
         date timestamp
@@ -326,16 +338,7 @@ erDiagram
         keyword documentIds
         nested metrics        
     }
-    search-relevance-judgment
-    .plugins-search-relevance-judgment-cache
-    search-relevance-search-config
-    search-relevance-queryset
-    search-relevance-experiment-variant
-    .search-relevance-scheduled-experiment-jobs
-    .search-relevance-scheduled-experiment-history
-
-    ubi_events
-    ubi_queries
+    
     
     CAR ||--o{ NAMED-DRIVER : allows
     CAR {
