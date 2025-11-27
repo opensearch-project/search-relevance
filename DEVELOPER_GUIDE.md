@@ -3,15 +3,18 @@
         - [Fork OpenSearch search-relevance Repo](#fork-opensearch-search-relevance-repo)
         - [Install Prerequisites](#install-prerequisites)
             - [JDK 21](#jdk-21)
-            - [Environment](#Environment)
     - [Use an Editor](#use-an-editor)
         - [IntelliJ IDEA](#intellij-idea)
+    - [Java Language Formatting Guidelines](#java-language-formatting-guidelines)
     - [Build](#build)
     - [Run OpenSearch search-relevance](#run-opensearch-search-relevance)
         - [Run Single-node Cluster Locally](#run-single-node-cluster-locally)
         - [Run SRW in Demo Mode](#run-srw-in-demo-mode)
-        - [Run remote cluster](#run-remote-clusters-with-search-relevance)
+        - [Run SRW in Hybrid Search Optimizer Demo Mode](#run-srw-in-hybrid-search-optimizer-demo-mode)
+        - [Run remote clusters with search-relevance](#run-remote-clusters-with-search-relevance)
     - [Debugging](#debugging)
+    - [Design Documentation](#design-documentation)
+    - [Explanation on Scheduled Experiment Indices](#explanation-on-scheduled-experiment-indices)
 
 # Developer Guide
 
