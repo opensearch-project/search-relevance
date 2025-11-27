@@ -311,6 +311,8 @@ Refer to the [design documentation guide](docs/README.md) for detailed instructi
 
 SRW is unusual that it has a large number of indices that it uses to maintain the state of the information.  It's reasonable to think of them like you would database tables, but without the full capablities of a relational database of course!
 
+#### Core SRW Indices
+
 ```mermaid
 erDiagram
 
@@ -431,6 +433,37 @@ erDiagram
     
 ```
 
+#### UBI Plugin provided Indices
+
+```mermaid
+erDiagram
+
+    ubi_events {
+      keyword application
+      keyword action_name
+      keyword client_id
+      keyword query_id FK
+      keyword message
+      keyword message_type
+      keyword user_query
+      date timestamp
+      object event_attributes
+    }
+    ubi_queries {
+      keyword query_id PK
+      date timestamp
+      text query
+      keyword query_response_id
+      keyword query_response_hit_ids
+      keyword user_query
+      flat_object query_attributes
+      keyword client_id
+      keyword application
+    }
+    
+    ubi_queries ||--o{ ubi_events : "referenced by"
+    
+```
 
 ## Explanation on Scheduled Experiment Indices
 
