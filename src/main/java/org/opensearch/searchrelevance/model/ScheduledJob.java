@@ -30,7 +30,7 @@ public class ScheduledJob implements ToXContentObject {
     public static final String TIME_STAMP = "timestamp";
 
     /**
-     * Will be equivalent to the underlying experiment id
+     * The job id is set to be the same as the associated experiment id
      */
     private final String id;
     private final Instant lastUpdateTime;
