@@ -315,12 +315,12 @@ SRW is unusual that it has a large number of indices that it uses to maintain th
 erDiagram
 
     ".plugins-search-relevance-experiment" {
-        keyword id
+        keyword id PK
         date timestamp
         keyword type
         keyword status
         keyword querySetId
-        list[keyword] searchCOnfigurationList
+        list[keyword] searchConfigurationList
         keyword jdugementList
         keyword size
         keyword isScheduled
@@ -339,7 +339,6 @@ erDiagram
         keyword documentIds
         nested metrics        
     }
-    
     search-relevance-judgment {
       keyword id
       date timestamp
@@ -419,27 +418,17 @@ erDiagram
       keyword application
     }
     
+    ".plugins-search-relevance-experiment" ||--o{ search-relevance-evaluation-result : has
+    ".plugins-search-relevance-experiment" ||--o{ search-relevance-queryset : has
+    ".plugins-search-relevance-experiment" ||--o{ search-relevance-search-config : "has many"
+    search-relevance-search-config ||--o{ search-relevance-evaluation-result : "referenced by"
+    search-relevance-experiment-variant ||--o{ search-relevance-evaluation-result : "referenced by"
+    ".search-relevance-scheduled-experiment-history" ||--o{ search-relevance-evaluation-result : "referenced by"
+    search-relevance-evaluation-result }o--o{ search-relevance-judgment : includes
+    ".plugins-search-relevance-experiment" }o--|| ".search-relevance-scheduled-experiment-jobs" : "schedule opt link"
+    ".plugins-search-relevance-experiment" ||--o{ ".search-relevance-scheduled-experiment-history" : "has histories"
+    ubi_queries ||--o{ ubi_events : "referenced by"
     
-    CAR ||--o{ NAMED-DRIVER : allows
-    CAR {
-        string registrationNumber PK
-        string make
-        string model
-        string[] parts
-    }
-    PERSON ||--o{ NAMED-DRIVER : is
-    PERSON {
-        string driversLicense PK "The license #"
-        string(99) firstName "Only 99 characters are allowed"
-        string lastName
-        string phone UK
-        int age
-    }
-    NAMED-DRIVER {
-        string carRegistrationNumber PK, FK
-        string driverLicence PK, FK
-    }
-    MANUFACTURER only one to zero or more CAR : makes
 ```
 
 
