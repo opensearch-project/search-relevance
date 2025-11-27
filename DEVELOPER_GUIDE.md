@@ -319,28 +319,28 @@ erDiagram
         date timestamp
         keyword type
         keyword status
-        keyword querySetId
-        list[keyword] searchConfigurationList
-        keyword jdugementList
+        keyword querySetId FK
+        list[keyword] searchConfigurationList FK
+        keyword jdugementList FK
         keyword size
         keyword isScheduled
         object[] results
     }
     search-relevance-evaluation-result {
-        keyword id
+        keyword id PK
         date timestamp
-        keyword searchConfigurationId
-        keyword experimentId
-        keyword experimentVariantId
+        keyword searchConfigurationId FK
+        keyword experimentId FK
+        keyword experimentVariantId FK
         keyword experimentVariantParameters
-        keyword scheduledRunId
+        keyword scheduledRunId FK
         keyword searchText
-        keyword judgmentList
+        keyword judgmentList FK
         keyword documentIds
         nested metrics        
     }
     search-relevance-judgment {
-      keyword id
+      keyword id PK
       date timestamp
       keyword name
       keyword type
@@ -348,7 +348,7 @@ erDiagram
       nested judgmentRatings
     }
     ".plugins-search-relevance-judgment-cache" {
-      keyword id
+      keyword id PK
       date timestamp
       keyword querySet
       keyword documentId
@@ -356,7 +356,7 @@ erDiagram
       keyword rating
     }
     search-relevance-search-config {
-      keyword id
+      keyword id PK
       date timestamp
       keyword name
       keyword index
@@ -364,7 +364,7 @@ erDiagram
       keyword searchPipeline
     }
     search-relevance-queryset {
-      keyword id
+      keyword id PK
       date timestamp
       keyword name
       text description
@@ -372,16 +372,16 @@ erDiagram
       keyword sampling
     }
     search-relevance-experiment-variant {
-      keyword id
+      keyword id PK
       date timestamp
       keyword type
       keyword status
-      keyword experimentId
+      keyword experimentId FK
       object parameters
       nested results
     }
     ".search-relevance-scheduled-experiment-jobs" {
-      keyword id
+      keyword id PK
       boolean enabled
       long enabledTime
       long lastUpdateTime
@@ -389,8 +389,8 @@ erDiagram
       keyword schedule
     }
     ".search-relevance-scheduled-experiment-history" {
-      keyword id
-      keyword experimentId
+      keyword id PK
+      keyword experimentId FK
       date timestamp
       keyword status
       object results
@@ -399,7 +399,7 @@ erDiagram
       keyword application
       keyword action_name
       keyword client_id
-      keyword query_id
+      keyword query_id FK
       keyword message
       keyword message_type
       keyword user_query
@@ -407,8 +407,8 @@ erDiagram
       object event_attributes
     }
     ubi_queries {
+      keyword query_id PK
       date timestamp
-      keyword query_id
       text query
       keyword query_response_id
       keyword query_response_hit_ids
