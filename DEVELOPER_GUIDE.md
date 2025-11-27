@@ -19,7 +19,7 @@
 # Developer Guide
 
 ## Getting Started
-Please define the OpenSearch version in `build.gradle`. By default, we're developing with `3.1.0-SNAPSHOT`
+Please define the OpenSearch version in `build.gradle`.
 
 ### Fork OpenSearch search-relevance Repo
 
@@ -305,6 +305,34 @@ The template is particularly valuable for:
 - Changes affecting security or backward compatibility
 
 Refer to the [design documentation guide](docs/README.md) for detailed instructions, examples, and best practices on using the template effectively.
+
+### SRW Indices Layout
+
+SRW is unique that it has a large number of indices that it uses to maintain the state of the information.  It's reasonable to think of them like you would database tables, but without the full capablities of a relational database of course!
+
+```mermaid
+erDiagram
+    CAR ||--o{ NAMED-DRIVER : allows
+    CAR {
+        string registrationNumber PK
+        string make
+        string model
+        string[] parts
+    }
+    PERSON ||--o{ NAMED-DRIVER : is
+    PERSON {
+        string driversLicense PK "The license #"
+        string(99) firstName "Only 99 characters are allowed"
+        string lastName
+        string phone UK
+        int age
+    }
+    NAMED-DRIVER {
+        string carRegistrationNumber PK, FK
+        string driverLicence PK, FK
+    }
+    MANUFACTURER only one to zero or more CAR : makes
+```
 
 ## Explanation on Scheduled Experiment Indices
 
