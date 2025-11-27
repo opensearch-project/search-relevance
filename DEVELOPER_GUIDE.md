@@ -309,7 +309,7 @@ Refer to the [design documentation guide](docs/README.md) for detailed instructi
 
 ### SRW Indices Layout
 
-SRW is unique that it has a large number of indices that it uses to maintain the state of the information.  It's reasonable to think of them like you would database tables, but without the full capablities of a relational database of course!
+SRW is unusual that it has a large number of indices that it uses to maintain the state of the information.  It's reasonable to think of them like you would database tables, but without the full capablities of a relational database of course!
 
 ```mermaid
 erDiagram
@@ -340,10 +340,38 @@ erDiagram
         nested metrics        
     }
     
-    search-relevance-judgment
-    ".plugins-search-relevance-judgment-cache"
-    search-relevance-search-config
-    search-relevance-queryset
+    search-relevance-judgment {
+      keyword id
+      date timestamp
+      keyword name
+      keyword type
+      object metadata
+      nested judgmentRatings
+    }
+    ".plugins-search-relevance-judgment-cache" {
+      keyword id
+      date timestamp
+      keyword querySet
+      keyword documentId
+      keyword contextFieldsStr
+      keyword rating
+    }
+    search-relevance-search-config {
+      keyword id
+      date timestamp
+      keyword name
+      keyword index
+      text queryBody
+      keyword searchPipeline
+    }
+    search-relevance-queryset {
+      keyword id
+      date timestamp
+      keyword name
+      text description
+      nested querySetQueries
+      keyword sampling
+    }
     search-relevance-experiment-variant
     ".search-relevance-scheduled-experiment-jobs"
     ".search-relevance-scheduled-experiment-history"
@@ -373,6 +401,7 @@ erDiagram
     }
     MANUFACTURER only one to zero or more CAR : makes
 ```
+
 
 ## Explanation on Scheduled Experiment Indices
 
