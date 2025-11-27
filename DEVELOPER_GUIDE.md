@@ -412,6 +412,8 @@ erDiagram
 
 #### UBI Plugin provided Indices
 
+UBI provides two indices that may be used in conjunction with SRW.  There are no direct links.
+
 ```mermaid
 erDiagram
 
