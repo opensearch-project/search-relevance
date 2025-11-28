@@ -72,7 +72,7 @@ public class Experiment implements ToXContentObject {
         this.results = results;
     }
 
-    public Experiment(Experiment previousExperiment, boolean isScheduled, String scheduledExperimentJobIdscheduled) {
+    public Experiment(Experiment previousExperiment, boolean isScheduled, String scheduledExperimentJobId) {
         this.id = previousExperiment.id();
         this.timestamp = previousExperiment.timestamp();
         this.type = previousExperiment.type();
@@ -82,7 +82,7 @@ public class Experiment implements ToXContentObject {
         this.judgmentList = previousExperiment.judgmentList();
         this.size = previousExperiment.size();
         this.isScheduled = isScheduled;
-        this.scheduledExperimentJobId = scheduledExperimentJobIdscheduled;
+        this.scheduledExperimentJobId = scheduledExperimentJobId;
         this.results = previousExperiment.results();
     }
 
