@@ -323,7 +323,7 @@ erDiagram
         keyword status
         keyword querySetId FK
         list[keyword] searchConfigurationList FK
-        keyword jdugementList FK
+        keyword judgementList FK
         keyword size
         keyword isScheduled
         object[] results
