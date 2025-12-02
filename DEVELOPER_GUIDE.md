@@ -323,7 +323,7 @@ erDiagram
         keyword status
         keyword querySetId FK
         list[keyword] searchConfigurationList FK
-        keyword judgementList FK
+        list[keyword] judgementList FK
         keyword size
         keyword isScheduled
         object[] results
@@ -402,6 +402,7 @@ erDiagram
     ".plugins-search-relevance-experiment" ||--o{ search-relevance-queryset : has
     ".plugins-search-relevance-experiment" ||--o{ search-relevance-search-config : "has many"
     search-relevance-search-config ||--o{ search-relevance-evaluation-result : "referenced by"
+    search-relevance-experiment-variant ||--o{ ".plugins-search-relevance-experiment" : "hybrid optimizer only"
     search-relevance-experiment-variant ||--o{ search-relevance-evaluation-result : "referenced by"
     ".search-relevance-scheduled-experiment-history" ||--o{ search-relevance-evaluation-result : "referenced by"
     search-relevance-evaluation-result }o--o{ search-relevance-judgment : includes
