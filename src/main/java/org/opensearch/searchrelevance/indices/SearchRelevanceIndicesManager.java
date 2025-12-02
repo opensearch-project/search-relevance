@@ -44,8 +44,6 @@ import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.search.internal.InternalSearchResponse;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.shared.StashedThreadContext;
-import org.opensearch.searchrelevance.stats.events.EventStatName;
-import org.opensearch.searchrelevance.stats.events.EventStatsManager;
 import org.opensearch.transport.client.Client;
 
 import lombok.Builder;
@@ -141,13 +139,6 @@ public class SearchRelevanceIndicesManager {
             public void onResponse(final AcknowledgedResponse response) {
                 if (!response.isAcknowledged()) {
                     log.warn("Mapping update for index [{}] was not acknowledged", indexName);
-                } else {
-                    // Record successful mapping update
-                    try {
-                        EventStatsManager.increment(EventStatName.MAPPING_UPDATE_SUCCESS);
-                    } catch (Exception ex) {
-                        log.debug("Failed to record mapping update success metric", ex);
-                    }
                 }
                 listener.onResponse(response);
             }
@@ -155,45 +146,9 @@ public class SearchRelevanceIndicesManager {
             @Override
             public void onFailure(final Exception e) {
                 log.error("Failed to update mapping for index [{}]", indexName, e);
-                // Record failed mapping update
-                try {
-                    EventStatsManager.increment(EventStatName.MAPPING_UPDATE_FAILURE);
-                } catch (Exception ex) {
-                    log.debug("Failed to record mapping update failure metric", ex);
-                }
                 listener.onFailure(e);
             }
         }));
-    }
-
-    /**
-     * Create index if absent or update mapping if exists
-     * @param index - index to be created or updated
-     * @param listener - action listener for async action
-     */
-    public void createOrUpdateIndex(final SearchRelevanceIndices index, final ActionListener<Void> listener) {
-        String indexName = index.getIndexName();
-
-        if (clusterService.state().metadata().hasIndex(indexName)) {
-            log.debug("Index [{}] already exists, updating mapping", indexName);
-            updateMappingIfExists(index, new ActionListener<>() {
-                @Override
-                public void onResponse(AcknowledgedResponse response) {
-                    listener.onResponse(null);
-                }
-
-                @Override
-                public void onFailure(Exception e) {
-                    log.warn("Failed to update mapping for index [{}], but continuing", indexName, e);
-                    listener.onResponse(null);
-                }
-            });
-        } else {
-            log.debug("Index [{}] does not exist, creating it", indexName);
-            StepListener<Void> createIndexStep = new StepListener<>();
-            createIndexIfAbsent(index, createIndexStep);
-            createIndexStep.whenComplete(listener::onResponse, listener::onFailure);
-        }
     }
 
     public SearchResponse getDocByDocIdSync(final String docId, final SearchRelevanceIndices index) {

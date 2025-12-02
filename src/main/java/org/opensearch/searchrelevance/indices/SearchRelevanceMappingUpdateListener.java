@@ -31,6 +31,7 @@ public class SearchRelevanceMappingUpdateListener implements ClusterStateListene
     public void clusterChanged(ClusterChangedEvent event) {
         // Only process on cluster manager node
         if (!event.localNodeClusterManager()) {
+            log.info("Skipping mapping update check - not cluster manager node");
             return;
         }
 
@@ -42,9 +43,6 @@ public class SearchRelevanceMappingUpdateListener implements ClusterStateListene
         // - Most restored indices will be caught by this listener or by the onNodeStarted() hook
         // - Mapping updates are non-critical and can be applied later if needed
         RestoreInProgress restoreInProgress = event.state().custom(RestoreInProgress.TYPE, RestoreInProgress.EMPTY);
-        if (restoreInProgress == null) {
-            return;
-        }
 
         for (RestoreInProgress.Entry entry : restoreInProgress) {
             // Only process successfully completed restores

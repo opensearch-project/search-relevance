@@ -396,7 +396,12 @@ public class SearchRelevancePlugin extends Plugin
     @Override
     public void onNodeStarted(org.opensearch.cluster.node.DiscoveryNode localNode) {
         if (searchRelevanceIndicesManager == null) {
-            log.warn("SearchRelevanceIndicesManager is null, skipping mapping updates on node startup");
+            throw new IllegalStateException("SearchRelevanceIndicesManager is null - plugin not properly initialized");
+        }
+
+        // Only process on cluster manager node
+        if (!clusterService.state().nodes().isLocalNodeElectedClusterManager()) {
+            log.debug("Skipping mapping update check - node [{}] is not cluster manager", localNode.getId());
             return;
         }
 
@@ -412,12 +417,12 @@ public class SearchRelevancePlugin extends Plugin
                     public void onResponse(org.opensearch.action.support.clustermanager.AcknowledgedResponse response) {
                         if (response != null) {
                             if (response.isAcknowledged()) {
-                                log.debug("Mapping update acknowledged for index [{}] on node startup", indexName);
+                                log.info("Mapping update acknowledged for index [{}] on node startup", indexName);
                             } else {
                                 log.warn("Mapping update not acknowledged for index [{}] on node startup", indexName);
                             }
                         } else {
-                            log.debug("Index [{}] does not exist, skipping mapping update", indexName);
+                            log.warn("Received null response for mapping update of index [{}] on node startup", indexName);
                         }
                     }
 

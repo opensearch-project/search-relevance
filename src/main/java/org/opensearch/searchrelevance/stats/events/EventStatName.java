@@ -58,9 +58,7 @@ public enum EventStatName implements StatName {
         "experiments",
         EventStatType.TIMESTAMPED_EVENT_COUNTER,
         Version.V_3_1_0
-    ),
-    MAPPING_UPDATE_SUCCESS("mapping_update_success", "indices", EventStatType.TIMESTAMPED_EVENT_COUNTER, Version.V_3_1_0),
-    MAPPING_UPDATE_FAILURE("mapping_update_failure", "indices", EventStatType.TIMESTAMPED_EVENT_COUNTER, Version.V_3_1_0),;
+    );
 
     private final String nameString;
     private final String path;
