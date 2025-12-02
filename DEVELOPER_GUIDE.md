@@ -315,6 +315,7 @@ SRW is unusual that it has a large number of indices that it uses to maintain th
 
 ```mermaid
 erDiagram
+    direction TB
 
     ".plugins-search-relevance-experiment" {
         keyword id PK
