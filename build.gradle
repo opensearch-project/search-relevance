@@ -211,8 +211,8 @@ dependencies {
     api group: 'org.opensearch', name:'opensearch-ml-client', version: "${opensearch_build}"
     compileOnly "org.opensearch:opensearch-job-scheduler-spi:${opensearch_build}"
     implementation group: 'com.google.guava', name: 'guava', version:'33.4.8-jre'
-    compileOnly group: 'org.apache.commons', name: 'commons-lang3', version: '3.19.0'
-    implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.19.0'
+    compileOnly group: 'org.apache.commons', name: 'commons-lang3', version: '3.20.0'
+    implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.20.0'
     implementation group: 'org.apache.commons', name: 'commons-math3', version: '3.6.1'
     implementation "org.opensearch:common-utils:${common_utils_version}"
     implementation "com.fasterxml.jackson.core:jackson-annotations:${versions.jackson}"
