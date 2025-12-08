@@ -224,7 +224,7 @@ dependencies {
     runtimeOnly group: 'org.reflections', name: 'reflections', version: '0.9.12'  // Note the version change
     runtimeOnly group: 'org.javassist', name: 'javassist', version: '3.30.2-GA'
     runtimeOnly group: 'org.opensearch', name: 'common-utils', version: "${opensearch_build}"
-    runtimeOnly group: 'org.apache.commons', name: 'commons-text', version: '1.14.0'
+    runtimeOnly group: 'org.apache.commons', name: 'commons-text', version: '1.15.0'
     runtimeOnly group: 'com.google.code.gson', name: 'gson', version: '2.13.1'
     runtimeOnly group: 'org.json', name: 'json', version: '20250517'
     // json-path 2.9.0 depends on slf4j 2.0.11, which conflicts with the version used by OpenSearch core.
