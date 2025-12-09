@@ -37,6 +37,7 @@ import org.opensearch.action.index.IndexRequestBuilder;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.support.WriteRequest;
+import org.opensearch.action.support.PlainActionFuture;
 import org.opensearch.action.support.clustermanager.AcknowledgedResponse;
 import org.opensearch.cluster.ClusterState;
 import org.opensearch.cluster.metadata.Metadata;
@@ -465,6 +466,48 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         listenerCaptor.getValue().onFailure(exception);
 
         verify(listener).onFailure(exception);
+    }
+
+    public void testUpdateMappingIfExistsSyncWhenIndexExists() {
+        when(metadata.hasIndex(QUERY_SET.getIndexName())).thenReturn(true);
+
+        AcknowledgedResponse expectedResponse = new AcknowledgedResponse(true);
+        PlainActionFuture<AcknowledgedResponse> future = PlainActionFuture.newFuture();
+        future.onResponse(expectedResponse);
+        when(indicesAdminClient.putMapping(any(PutMappingRequest.class))).thenReturn(future);
+
+        AcknowledgedResponse response = indicesManager.updateMappingIfExistsSync(QUERY_SET);
+
+        assertNotNull(response);
+        assertTrue(response.isAcknowledged());
+        verify(indicesAdminClient).putMapping(any(PutMappingRequest.class));
+    }
+
+    public void testUpdateMappingIfExistsSyncWhenIndexDoesNotExist() {
+        when(metadata.hasIndex(QUERY_SET.getIndexName())).thenReturn(false);
+
+        AcknowledgedResponse response = indicesManager.updateMappingIfExistsSync(QUERY_SET);
+
+        assertNull(response);
+        verify(indicesAdminClient, never()).putMapping(any(PutMappingRequest.class));
+    }
+
+    public void testUpdateMappingIfExistsSyncWhenUpdateFails() {
+        when(metadata.hasIndex(QUERY_SET.getIndexName())).thenReturn(true);
+
+        PlainActionFuture<AcknowledgedResponse> future = PlainActionFuture.newFuture();
+        RuntimeException exception = new RuntimeException("Mapping update failed");
+        future.onFailure(exception);
+        when(indicesAdminClient.putMapping(any(PutMappingRequest.class))).thenReturn(future);
+
+        try {
+            indicesManager.updateMappingIfExistsSync(QUERY_SET);
+            fail("Expected exception to be thrown");
+        } catch (RuntimeException e) {
+            assertEquals("Mapping update failed", e.getMessage());
+        }
+
+        verify(indicesAdminClient).putMapping(any(PutMappingRequest.class));
     }
 
 }

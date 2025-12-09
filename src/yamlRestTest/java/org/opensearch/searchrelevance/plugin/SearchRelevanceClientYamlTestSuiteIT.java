@@ -25,9 +25,9 @@ public class SearchRelevanceClientYamlTestSuiteIT extends OpenSearchClientYamlSu
     }
 
     /**
-     * Preserve system indices created by the SearchRelevanceMappingUpdateListener.
-     * These indices are created automatically on cluster startup and should not be
-     * deleted during test cleanup to avoid warnings about accessing system indices.
+     * Preserve system indices created by the search relevance plugin.
+     * These indices should not be deleted during test cleanup to avoid warnings
+     * about accessing system indices.
      */
     @Override
     protected boolean preserveIndicesUponCompletion() {

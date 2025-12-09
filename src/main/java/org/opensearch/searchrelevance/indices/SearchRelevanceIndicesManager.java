@@ -151,6 +151,42 @@ public class SearchRelevanceIndicesManager {
         }));
     }
 
+    /**
+     * Update mapping for an existing index using synchronous call
+     * @param index - index to be updated
+     * @return AcknowledgedResponse if index exists and update was attempted, null if index doesn't exist
+     */
+    public AcknowledgedResponse updateMappingIfExistsSync(final SearchRelevanceIndices index) {
+        String indexName = index.getIndexName();
+        String mapping = index.getMapping();
+
+        if (!clusterService.state().metadata().hasIndex(indexName)) {
+            log.debug("Index [{}] does not exist, skipping mapping update", indexName);
+            return null;
+        }
+
+        final PutMappingRequest putMappingRequest = new PutMappingRequest(indexName);
+        putMappingRequest.source(mapping, org.opensearch.common.xcontent.XContentType.JSON);
+
+        try {
+            AcknowledgedResponse response = StashedThreadContext.run(
+                client,
+                () -> client.admin().indices().putMapping(putMappingRequest).actionGet()
+            );
+
+            if (!response.isAcknowledged()) {
+                log.warn("Mapping update for index [{}] was not acknowledged", indexName);
+            } else {
+                log.debug("Mapping update for index [{}] was acknowledged", indexName);
+            }
+
+            return response;
+        } catch (Exception e) {
+            log.error("Failed to update mapping for index [{}]", indexName, e);
+            throw e;
+        }
+    }
+
     public SearchResponse getDocByDocIdSync(final String docId, final SearchRelevanceIndices index) {
         SearchRequest searchRequest = new SearchRequest(index.getIndexName());
         SearchSourceBuilder sourceBuilder = new SearchSourceBuilder().query(QueryBuilders.termQuery("_id", docId)).size(1);

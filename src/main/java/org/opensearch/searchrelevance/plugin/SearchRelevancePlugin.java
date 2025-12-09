@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.function.Supplier;
 
 import org.opensearch.action.ActionRequest;
+import org.opensearch.action.support.clustermanager.AcknowledgedResponse;
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver;
 import org.opensearch.cluster.node.DiscoveryNodes;
 import org.opensearch.cluster.service.ClusterService;
@@ -69,7 +70,6 @@ import org.opensearch.searchrelevance.executors.SearchRelevanceExecutor;
 import org.opensearch.searchrelevance.experiment.HybridOptimizerExperimentProcessor;
 import org.opensearch.searchrelevance.experiment.PointwiseExperimentProcessor;
 import org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager;
-import org.opensearch.searchrelevance.indices.SearchRelevanceMappingUpdateListener;
 import org.opensearch.searchrelevance.metrics.MetricsHelper;
 import org.opensearch.searchrelevance.ml.MLAccessor;
 import org.opensearch.searchrelevance.model.ScheduledJob;
@@ -194,12 +194,6 @@ public class SearchRelevancePlugin extends Plugin
         this.client = client;
         this.clusterService = clusterService;
         this.searchRelevanceIndicesManager = new SearchRelevanceIndicesManager(clusterService, client);
-
-        // Register listener to update mappings when indices are restored from snapshots
-        SearchRelevanceMappingUpdateListener mappingUpdateListener = new SearchRelevanceMappingUpdateListener(
-            searchRelevanceIndicesManager
-        );
-        clusterService.addListener(mappingUpdateListener);
 
         this.experimentDao = new ExperimentDao(searchRelevanceIndicesManager);
         this.experimentVariantDao = new ExperimentVariantDao(searchRelevanceIndicesManager);
@@ -391,7 +385,6 @@ public class SearchRelevancePlugin extends Plugin
     /**
      * Called when the node starts. This updates mappings for existing search relevance indices
      * to ensure they match the latest version. Does not create new indices.
-     * For snapshot restore, see SearchRelevanceMappingUpdateListener.
      */
     @Override
     public void onNodeStarted(org.opensearch.cluster.node.DiscoveryNode localNode) {
@@ -401,37 +394,30 @@ public class SearchRelevancePlugin extends Plugin
 
         // Only process on cluster manager node
         if (!clusterService.state().nodes().isLocalNodeElectedClusterManager()) {
-            log.debug("Skipping mapping update check - node [{}] is not cluster manager", localNode.getId());
+            log.info("Skipping mapping update check - node [{}] is not cluster manager", localNode.getId());
             return;
         }
 
-        log.debug("Node [{}] started, checking for search relevance index mapping updates", localNode.getId());
+        log.info("Node [{}] started, checking for search relevance index mapping updates", localNode.getId());
 
         for (org.opensearch.searchrelevance.indices.SearchRelevanceIndices index : org.opensearch.searchrelevance.indices.SearchRelevanceIndices
             .values()) {
             final String indexName = index.getIndexName();
-            searchRelevanceIndicesManager.updateMappingIfExists(
-                index,
-                new org.opensearch.core.action.ActionListener<org.opensearch.action.support.clustermanager.AcknowledgedResponse>() {
-                    @Override
-                    public void onResponse(org.opensearch.action.support.clustermanager.AcknowledgedResponse response) {
-                        if (response != null) {
-                            if (response.isAcknowledged()) {
-                                log.info("Mapping update acknowledged for index [{}] on node startup", indexName);
-                            } else {
-                                log.warn("Mapping update not acknowledged for index [{}] on node startup", indexName);
-                            }
-                        } else {
-                            log.warn("Received null response for mapping update of index [{}] on node startup", indexName);
-                        }
-                    }
+            try {
+                AcknowledgedResponse response = searchRelevanceIndicesManager.updateMappingIfExistsSync(index);
 
-                    @Override
-                    public void onFailure(Exception e) {
-                        log.error("Failed to update mapping for index [{}] on node startup, but not failing node startup", indexName, e);
+                if (response != null) {
+                    if (response.isAcknowledged()) {
+                        log.info("Mapping update acknowledged for index [{}] on node startup", indexName);
+                    } else {
+                        log.warn("Mapping update not acknowledged for index [{}] on node startup", indexName);
                     }
+                } else {
+                    log.debug("Index [{}] does not exist, skipping mapping update", indexName);
                 }
-            );
+            } catch (Exception e) {
+                log.error("Failed to update mapping for index [{}] on node startup, but not failing node startup", indexName, e);
+            }
         }
     }
 
