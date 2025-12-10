@@ -9,6 +9,7 @@ package org.opensearch.searchrelevance.plugin;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX;
@@ -340,8 +341,8 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
         // Should complete successfully
         plugin.onNodeStarted(localNode);
 
-        // Verify updateMappingIfExistsSync was called for all indices
-        verify(mockIndicesManager).updateMappingIfExistsSync(any(SearchRelevanceIndices.class));
+        // Verify updateMappingIfExistsSync was called for all 9 indices
+        verify(mockIndicesManager, times(9)).updateMappingIfExistsSync(any(SearchRelevanceIndices.class));
     }
 
     public void testOnNodeStartedWhenClusterManagerAndIndexDoesNotExist() {
@@ -379,7 +380,8 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
         // Should complete successfully (null is expected when index doesn't exist)
         plugin.onNodeStarted(localNode);
 
-        verify(mockIndicesManager).updateMappingIfExistsSync(any(SearchRelevanceIndices.class));
+        // Verify updateMappingIfExistsSync was called for all 9 indices
+        verify(mockIndicesManager, times(9)).updateMappingIfExistsSync(any(SearchRelevanceIndices.class));
     }
 
     public void testOnNodeStartedWhenClusterManagerAndMappingNotAcknowledged() {
