@@ -28,7 +28,7 @@ public class AutoExpandReplicasIT extends BaseSearchRelevanceIT {
         Response resp = makeRequest(
             client(),
             "PUT",
-            "/_plugins/_search_relevance/search_configurations/" + "test-config",
+            org.opensearch.searchrelevance.common.PluginConstants.SEARCH_CONFIGURATIONS_URL,
             null,
             toHttpEntity(body),
             null
@@ -47,8 +47,20 @@ public class AutoExpandReplicasIT extends BaseSearchRelevanceIT {
     }
 
     private String readTemplate(String path) throws Exception {
-        java.nio.file.Path p = java.nio.file.Paths.get(path);
-        return java.nio.file.Files.readString(p);
+        // Load resource from classpath so tests running in testclusters can access it reliably
+        String resourcePath = path;
+        final String prefix = "src/test/resources/";
+        if (resourcePath.startsWith(prefix)) {
+            resourcePath = resourcePath.substring(prefix.length());
+        } else if (resourcePath.startsWith("/")) {
+            resourcePath = resourcePath.substring(1);
+        }
+        try (java.io.InputStream is = this.getClass().getClassLoader().getResourceAsStream(resourcePath)) {
+            if (is == null) {
+                throw new IllegalArgumentException("Resource not found on classpath: " + resourcePath);
+            }
+            return new String(is.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        }
     }
 
     @SuppressWarnings("unchecked")
