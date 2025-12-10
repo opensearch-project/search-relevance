@@ -417,57 +417,6 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         assertEquals(RestStatus.INTERNAL_SERVER_ERROR, ((SearchRelevanceException) capturedException).status());
     }
 
-    public void testUpdateMappingIfExistsWhenIndexExists() {
-        when(metadata.hasIndex(QUERY_SET.getIndexName())).thenReturn(true);
-
-        @SuppressWarnings("unchecked")
-        ActionListener<AcknowledgedResponse> listener = mock(ActionListener.class);
-        indicesManager.updateMappingIfExists(QUERY_SET, listener);
-
-        ArgumentCaptor<PutMappingRequest> requestCaptor = ArgumentCaptor.forClass(PutMappingRequest.class);
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<ActionListener<AcknowledgedResponse>> listenerCaptor = ArgumentCaptor.forClass(ActionListener.class);
-        verify(indicesAdminClient).putMapping(requestCaptor.capture(), listenerCaptor.capture());
-
-        PutMappingRequest capturedRequest = requestCaptor.getValue();
-        assertEquals(QUERY_SET.getIndexName(), capturedRequest.indices()[0]);
-
-        AcknowledgedResponse response = new AcknowledgedResponse(true);
-        listenerCaptor.getValue().onResponse(response);
-
-        verify(listener).onResponse(response);
-    }
-
-    public void testUpdateMappingIfExistsWhenIndexDoesNotExist() {
-        when(metadata.hasIndex(QUERY_SET.getIndexName())).thenReturn(false);
-
-        @SuppressWarnings("unchecked")
-        ActionListener<AcknowledgedResponse> listener = mock(ActionListener.class);
-        indicesManager.updateMappingIfExists(QUERY_SET, listener);
-
-        // putMapping should not be called when index doesn't exist
-        verify(indicesAdminClient, never()).putMapping(any(PutMappingRequest.class), any());
-        verify(listener).onResponse(null);
-    }
-
-    public void testUpdateMappingIfExistsWhenUpdateFails() {
-        when(metadata.hasIndex(QUERY_SET.getIndexName())).thenReturn(true);
-
-        @SuppressWarnings("unchecked")
-        ActionListener<AcknowledgedResponse> listener = mock(ActionListener.class);
-        indicesManager.updateMappingIfExists(QUERY_SET, listener);
-
-        ArgumentCaptor<PutMappingRequest> requestCaptor = ArgumentCaptor.forClass(PutMappingRequest.class);
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<ActionListener<AcknowledgedResponse>> listenerCaptor = ArgumentCaptor.forClass(ActionListener.class);
-        verify(indicesAdminClient).putMapping(requestCaptor.capture(), listenerCaptor.capture());
-
-        Exception exception = new RuntimeException("Mapping update failed");
-        listenerCaptor.getValue().onFailure(exception);
-
-        verify(listener).onFailure(exception);
-    }
-
     public void testUpdateMappingIfExistsSyncWhenIndexExists() {
         when(metadata.hasIndex(QUERY_SET.getIndexName())).thenReturn(true);
 
@@ -507,6 +456,23 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
             assertEquals("Mapping update failed", e.getMessage());
         }
 
+        verify(indicesAdminClient).putMapping(any(PutMappingRequest.class));
+    }
+
+    public void testUpdateMappingIfExistsSyncWhenNotAcknowledged() {
+        when(metadata.hasIndex(QUERY_SET.getIndexName())).thenReturn(true);
+
+        AcknowledgedResponse notAcknowledgedResponse = new AcknowledgedResponse(false);
+        PlainActionFuture<AcknowledgedResponse> future = PlainActionFuture.newFuture();
+        future.onResponse(notAcknowledgedResponse);
+        when(indicesAdminClient.putMapping(any(PutMappingRequest.class))).thenReturn(future);
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> {
+            indicesManager.updateMappingIfExistsSync(QUERY_SET);
+        });
+
+        assertTrue(exception.getMessage().contains("was not acknowledged"));
+        assertTrue(exception.getMessage().contains(QUERY_SET.getIndexName()));
         verify(indicesAdminClient).putMapping(any(PutMappingRequest.class));
     }
 

@@ -413,15 +413,15 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
         when(clusterState.nodes()).thenReturn(nodes);
         when(nodes.isLocalNodeElectedClusterManager()).thenReturn(true);
 
-        // Mock not acknowledged response
-        AcknowledgedResponse notAcknowledgedResponse = new AcknowledgedResponse(false);
-        when(mockIndicesManager.updateMappingIfExistsSync(any(SearchRelevanceIndices.class))).thenReturn(notAcknowledgedResponse);
+        // Mock IllegalStateException thrown by updateMappingIfExistsSync when not acknowledged
+        when(mockIndicesManager.updateMappingIfExistsSync(any(SearchRelevanceIndices.class))).thenThrow(
+            new IllegalStateException("Mapping update for index [test-index] was not acknowledged")
+        );
 
         // Should throw IllegalStateException
         IllegalStateException exception = assertThrows(IllegalStateException.class, () -> { plugin.onNodeStarted(localNode); });
 
-        assertTrue(exception.getMessage().contains("Mapping update not acknowledged"));
-        assertTrue(exception.getMessage().contains("failing node startup"));
+        assertTrue(exception.getMessage().contains("was not acknowledged"));
     }
 
     public void testOnNodeStartedWhenClusterManagerAndMappingUpdateThrowsException() {

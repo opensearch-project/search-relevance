@@ -118,40 +118,6 @@ public class SearchRelevanceIndicesManager {
     }
 
     /**
-     * Update mapping for an existing index
-     * @param index - index to be updated
-     * @param listener - action listener for async action
-     */
-    public void updateMappingIfExists(final SearchRelevanceIndices index, final ActionListener<AcknowledgedResponse> listener) {
-        String indexName = index.getIndexName();
-        String mapping = index.getMapping();
-
-        if (!clusterService.state().metadata().hasIndex(indexName)) {
-            log.debug("Index [{}] does not exist, skipping mapping update", indexName);
-            listener.onResponse(null);
-            return;
-        }
-
-        final PutMappingRequest putMappingRequest = new PutMappingRequest(indexName);
-        putMappingRequest.source(mapping, org.opensearch.common.xcontent.XContentType.JSON);
-        StashedThreadContext.run(client, () -> client.admin().indices().putMapping(putMappingRequest, new ActionListener<>() {
-            @Override
-            public void onResponse(final AcknowledgedResponse response) {
-                if (!response.isAcknowledged()) {
-                    log.warn("Mapping update for index [{}] was not acknowledged", indexName);
-                }
-                listener.onResponse(response);
-            }
-
-            @Override
-            public void onFailure(final Exception e) {
-                log.error("Failed to update mapping for index [{}]", indexName, e);
-                listener.onFailure(e);
-            }
-        }));
-    }
-
-    /**
      * Update mapping for an existing index using synchronous call with timeout
      * @param index - index to be updated
      * @return AcknowledgedResponse if index exists and update was attempted, null if index doesn't exist
@@ -176,11 +142,16 @@ public class SearchRelevanceIndicesManager {
             );
 
             if (!response.isAcknowledged()) {
-                log.warn("Mapping update for index [{}] was not acknowledged", indexName);
-            } else {
-                log.debug("Mapping update for index [{}] was acknowledged", indexName);
+                String errorMsg = String.format(
+                    java.util.Locale.ROOT,
+                    "Mapping update for index [%s] was not acknowledged",
+                    indexName
+                );
+                log.error(errorMsg);
+                throw new IllegalStateException(errorMsg);
             }
 
+            log.debug("Mapping update for index [{}] was acknowledged", indexName);
             return response;
         } catch (Exception e) {
             log.error("Failed to update mapping for index [{}]", indexName, e);

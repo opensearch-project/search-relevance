@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.function.Supplier;
 
 import org.opensearch.action.ActionRequest;
-import org.opensearch.action.support.clustermanager.AcknowledgedResponse;
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver;
 import org.opensearch.cluster.node.DiscoveryNodes;
 import org.opensearch.cluster.service.ClusterService;
@@ -410,24 +409,11 @@ public class SearchRelevancePlugin extends Plugin
 
         for (org.opensearch.searchrelevance.indices.SearchRelevanceIndices index : org.opensearch.searchrelevance.indices.SearchRelevanceIndices
             .values()) {
-            final String indexName = index.getIndexName();
-            AcknowledgedResponse response = searchRelevanceIndicesManager.updateMappingIfExistsSync(index);
-
-            if (response != null) {
-                if (response.isAcknowledged()) {
-                    log.info("Mapping update acknowledged for index [{}] on node startup", indexName);
-                } else {
-                    String errorMsg = String.format(
-                        java.util.Locale.ROOT,
-                        "Mapping update not acknowledged for index [%s] - failing node startup",
-                        indexName
-                    );
-                    log.error(errorMsg);
-                    throw new IllegalStateException(errorMsg);
-                }
-            } else {
-                log.debug("Index [{}] does not exist, skipping mapping update", indexName);
-            }
+            // updateMappingIfExistsSync handles all logic:
+            // - Returns null if index doesn't exist (skips update)
+            // - Throws IllegalStateException if update not acknowledged
+            // - Returns response if successful
+            searchRelevanceIndicesManager.updateMappingIfExistsSync(index);
         }
     }
 
