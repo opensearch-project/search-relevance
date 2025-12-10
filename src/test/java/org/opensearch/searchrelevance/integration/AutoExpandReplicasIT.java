@@ -53,10 +53,11 @@ public class AutoExpandReplicasIT extends BaseSearchRelevanceIT {
 
     @SuppressWarnings("unchecked")
     private Map<String, Object> convertToMap(Response response) throws Exception {
-        String json = org.apache.http.util.EntityUtils.toString(response.getEntity());
-        return (Map<String, Object>) org.opensearch.common.xcontent.json.JsonXContent.jsonXContent.createParser(
-            org.opensearch.core.xcontent.NamedXContentRegistry.EMPTY,
-            json
-        ).map();
+        String json = org.apache.hc.core5.http.io.entity.EntityUtils.toString(response.getEntity());
+        return (Map<String, Object>) org.opensearch.common.xcontent.XContentHelper.convertToMap(
+            org.opensearch.common.xcontent.XContentType.JSON.xContent(),
+            json,
+            false
+        );
     }
 }
