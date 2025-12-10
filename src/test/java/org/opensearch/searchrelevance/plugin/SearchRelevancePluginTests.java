@@ -320,17 +320,9 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
             repositoriesServiceSupplier
         );
 
-        // Extract the SearchRelevanceIndicesManager from components
+        // Set mock indicesManager using package-private setter
         SearchRelevanceIndicesManager mockIndicesManager = mock(SearchRelevanceIndicesManager.class);
-
-        // Use reflection to set the mock indicesManager
-        try {
-            java.lang.reflect.Field field = SearchRelevancePlugin.class.getDeclaredField("searchRelevanceIndicesManager");
-            field.setAccessible(true);
-            field.set(plugin, mockIndicesManager);
-        } catch (Exception e) {
-            fail("Failed to set mock indicesManager: " + e.getMessage());
-        }
+        plugin.setSearchRelevanceIndicesManager(mockIndicesManager);
 
         DiscoveryNode localNode = mock(DiscoveryNode.class);
         when(localNode.getId()).thenReturn("node-1");
@@ -368,16 +360,9 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
             repositoriesServiceSupplier
         );
 
+        // Set mock indicesManager using package-private setter
         SearchRelevanceIndicesManager mockIndicesManager = mock(SearchRelevanceIndicesManager.class);
-
-        // Use reflection to set the mock indicesManager
-        try {
-            java.lang.reflect.Field field = SearchRelevancePlugin.class.getDeclaredField("searchRelevanceIndicesManager");
-            field.setAccessible(true);
-            field.set(plugin, mockIndicesManager);
-        } catch (Exception e) {
-            fail("Failed to set mock indicesManager: " + e.getMessage());
-        }
+        plugin.setSearchRelevanceIndicesManager(mockIndicesManager);
 
         DiscoveryNode localNode = mock(DiscoveryNode.class);
         when(localNode.getId()).thenReturn("node-1");
@@ -413,16 +398,9 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
             repositoriesServiceSupplier
         );
 
+        // Set mock indicesManager using package-private setter
         SearchRelevanceIndicesManager mockIndicesManager = mock(SearchRelevanceIndicesManager.class);
-
-        // Use reflection to set the mock indicesManager
-        try {
-            java.lang.reflect.Field field = SearchRelevancePlugin.class.getDeclaredField("searchRelevanceIndicesManager");
-            field.setAccessible(true);
-            field.set(plugin, mockIndicesManager);
-        } catch (Exception e) {
-            fail("Failed to set mock indicesManager: " + e.getMessage());
-        }
+        plugin.setSearchRelevanceIndicesManager(mockIndicesManager);
 
         DiscoveryNode localNode = mock(DiscoveryNode.class);
         when(localNode.getId()).thenReturn("node-1");
@@ -460,16 +438,9 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
             repositoriesServiceSupplier
         );
 
+        // Set mock indicesManager using package-private setter
         SearchRelevanceIndicesManager mockIndicesManager = mock(SearchRelevanceIndicesManager.class);
-
-        // Use reflection to set the mock indicesManager
-        try {
-            java.lang.reflect.Field field = SearchRelevancePlugin.class.getDeclaredField("searchRelevanceIndicesManager");
-            field.setAccessible(true);
-            field.set(plugin, mockIndicesManager);
-        } catch (Exception e) {
-            fail("Failed to set mock indicesManager: " + e.getMessage());
-        }
+        plugin.setSearchRelevanceIndicesManager(mockIndicesManager);
 
         DiscoveryNode localNode = mock(DiscoveryNode.class);
         when(localNode.getId()).thenReturn("node-1");

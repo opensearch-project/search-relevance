@@ -383,6 +383,14 @@ public class SearchRelevancePlugin extends Plugin
     }
 
     /**
+     * Package-private setter for testing purposes only.
+     * Allows tests to inject mock SearchRelevanceIndicesManager.
+     */
+    void setSearchRelevanceIndicesManager(SearchRelevanceIndicesManager manager) {
+        this.searchRelevanceIndicesManager = manager;
+    }
+
+    /**
      * Called when the node starts. This updates mappings for existing search relevance indices
      * to ensure they match the latest version. Does not create new indices.
      */
