@@ -403,20 +403,22 @@ public class SearchRelevancePlugin extends Plugin
         for (org.opensearch.searchrelevance.indices.SearchRelevanceIndices index : org.opensearch.searchrelevance.indices.SearchRelevanceIndices
             .values()) {
             final String indexName = index.getIndexName();
-            try {
-                AcknowledgedResponse response = searchRelevanceIndicesManager.updateMappingIfExistsSync(index);
+            AcknowledgedResponse response = searchRelevanceIndicesManager.updateMappingIfExistsSync(index);
 
-                if (response != null) {
-                    if (response.isAcknowledged()) {
-                        log.info("Mapping update acknowledged for index [{}] on node startup", indexName);
-                    } else {
-                        log.warn("Mapping update not acknowledged for index [{}] on node startup", indexName);
-                    }
+            if (response != null) {
+                if (response.isAcknowledged()) {
+                    log.info("Mapping update acknowledged for index [{}] on node startup", indexName);
                 } else {
-                    log.debug("Index [{}] does not exist, skipping mapping update", indexName);
+                    String errorMsg = String.format(
+                        java.util.Locale.ROOT,
+                        "Mapping update not acknowledged for index [%s] - failing node startup",
+                        indexName
+                    );
+                    log.error(errorMsg);
+                    throw new IllegalStateException(errorMsg);
                 }
-            } catch (Exception e) {
-                log.error("Failed to update mapping for index [{}] on node startup, but not failing node startup", indexName, e);
+            } else {
+                log.debug("Index [{}] does not exist, skipping mapping update", indexName);
             }
         }
     }

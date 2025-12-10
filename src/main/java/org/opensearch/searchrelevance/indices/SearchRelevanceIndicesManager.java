@@ -152,7 +152,7 @@ public class SearchRelevanceIndicesManager {
     }
 
     /**
-     * Update mapping for an existing index using synchronous call
+     * Update mapping for an existing index using synchronous call with timeout
      * @param index - index to be updated
      * @return AcknowledgedResponse if index exists and update was attempted, null if index doesn't exist
      */
@@ -169,9 +169,10 @@ public class SearchRelevanceIndicesManager {
         putMappingRequest.source(mapping, org.opensearch.common.xcontent.XContentType.JSON);
 
         try {
+            // Use timeout to prevent indefinite blocking and potential deadlocks
             AcknowledgedResponse response = StashedThreadContext.run(
                 client,
-                () -> client.admin().indices().putMapping(putMappingRequest).actionGet()
+                () -> client.admin().indices().putMapping(putMappingRequest).actionGet(java.util.concurrent.TimeUnit.SECONDS.toMillis(30))
             );
 
             if (!response.isAcknowledged()) {

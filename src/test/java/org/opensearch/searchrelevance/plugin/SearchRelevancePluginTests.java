@@ -7,7 +7,9 @@
  */
 package org.opensearch.searchrelevance.plugin;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_CACHE_INDEX;
@@ -29,7 +31,11 @@ import java.util.function.Supplier;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.opensearch.action.ActionRequest;
+import org.opensearch.action.support.clustermanager.AcknowledgedResponse;
+import org.opensearch.cluster.ClusterState;
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver;
+import org.opensearch.cluster.node.DiscoveryNode;
+import org.opensearch.cluster.node.DiscoveryNodes;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.settings.ClusterSettings;
 import org.opensearch.common.settings.Setting;
@@ -56,6 +62,7 @@ import org.opensearch.searchrelevance.dao.ScheduledJobsDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
 import org.opensearch.searchrelevance.executors.ExperimentRunningManager;
 import org.opensearch.searchrelevance.executors.ExperimentTaskManager;
+import org.opensearch.searchrelevance.indices.SearchRelevanceIndices;
 import org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager;
 import org.opensearch.searchrelevance.metrics.MetricsHelper;
 import org.opensearch.searchrelevance.ml.MLAccessor;
@@ -254,5 +261,232 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
         Setting<?> setting5 = settings.get(5);
         assertEquals("plugins.search_relevance.scheduled_experiments_minimum_interval", setting5.getKey());
         assertEquals(TimeValue.timeValueSeconds(1), setting5.get(Settings.EMPTY));
+    }
+
+    public void testOnNodeStartedWhenIndicesManagerIsNull() {
+        // Create plugin without calling createComponents (so indicesManager remains null)
+        SearchRelevancePlugin pluginWithoutInit = new SearchRelevancePlugin();
+        DiscoveryNode localNode = mock(DiscoveryNode.class);
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> { pluginWithoutInit.onNodeStarted(localNode); });
+
+        assertTrue(exception.getMessage().contains("SearchRelevanceIndicesManager is null"));
+    }
+
+    public void testOnNodeStartedWhenNotClusterManager() {
+        // Setup: create plugin with components initialized
+        plugin.createComponents(
+            client,
+            clusterService,
+            threadPool,
+            resourceWatcherService,
+            scriptService,
+            xContentRegistry,
+            environment,
+            nodeEnvironment,
+            namedWriteableRegistry,
+            indexNameExpressionResolver,
+            repositoriesServiceSupplier
+        );
+
+        DiscoveryNode localNode = mock(DiscoveryNode.class);
+        when(localNode.getId()).thenReturn("node-1");
+
+        ClusterState clusterState = mock(ClusterState.class);
+        DiscoveryNodes nodes = mock(DiscoveryNodes.class);
+        when(clusterService.state()).thenReturn(clusterState);
+        when(clusterState.nodes()).thenReturn(nodes);
+        when(nodes.isLocalNodeElectedClusterManager()).thenReturn(false);
+
+        // Should not throw, just return early
+        plugin.onNodeStarted(localNode);
+
+        // No further verification needed - test passes if no exception thrown
+    }
+
+    public void testOnNodeStartedWhenClusterManagerAndMappingUpdateSucceeds() {
+        // Setup: create plugin with components initialized
+        Collection<Object> components = plugin.createComponents(
+            client,
+            clusterService,
+            threadPool,
+            resourceWatcherService,
+            scriptService,
+            xContentRegistry,
+            environment,
+            nodeEnvironment,
+            namedWriteableRegistry,
+            indexNameExpressionResolver,
+            repositoriesServiceSupplier
+        );
+
+        // Extract the SearchRelevanceIndicesManager from components
+        SearchRelevanceIndicesManager mockIndicesManager = mock(SearchRelevanceIndicesManager.class);
+
+        // Use reflection to set the mock indicesManager
+        try {
+            java.lang.reflect.Field field = SearchRelevancePlugin.class.getDeclaredField("searchRelevanceIndicesManager");
+            field.setAccessible(true);
+            field.set(plugin, mockIndicesManager);
+        } catch (Exception e) {
+            fail("Failed to set mock indicesManager: " + e.getMessage());
+        }
+
+        DiscoveryNode localNode = mock(DiscoveryNode.class);
+        when(localNode.getId()).thenReturn("node-1");
+
+        ClusterState clusterState = mock(ClusterState.class);
+        DiscoveryNodes nodes = mock(DiscoveryNodes.class);
+        when(clusterService.state()).thenReturn(clusterState);
+        when(clusterState.nodes()).thenReturn(nodes);
+        when(nodes.isLocalNodeElectedClusterManager()).thenReturn(true);
+
+        // Mock successful mapping update
+        AcknowledgedResponse successResponse = new AcknowledgedResponse(true);
+        when(mockIndicesManager.updateMappingIfExistsSync(any(SearchRelevanceIndices.class))).thenReturn(successResponse);
+
+        // Should complete successfully
+        plugin.onNodeStarted(localNode);
+
+        // Verify updateMappingIfExistsSync was called for all indices
+        verify(mockIndicesManager).updateMappingIfExistsSync(any(SearchRelevanceIndices.class));
+    }
+
+    public void testOnNodeStartedWhenClusterManagerAndIndexDoesNotExist() {
+        // Setup: create plugin with components initialized
+        plugin.createComponents(
+            client,
+            clusterService,
+            threadPool,
+            resourceWatcherService,
+            scriptService,
+            xContentRegistry,
+            environment,
+            nodeEnvironment,
+            namedWriteableRegistry,
+            indexNameExpressionResolver,
+            repositoriesServiceSupplier
+        );
+
+        SearchRelevanceIndicesManager mockIndicesManager = mock(SearchRelevanceIndicesManager.class);
+
+        // Use reflection to set the mock indicesManager
+        try {
+            java.lang.reflect.Field field = SearchRelevancePlugin.class.getDeclaredField("searchRelevanceIndicesManager");
+            field.setAccessible(true);
+            field.set(plugin, mockIndicesManager);
+        } catch (Exception e) {
+            fail("Failed to set mock indicesManager: " + e.getMessage());
+        }
+
+        DiscoveryNode localNode = mock(DiscoveryNode.class);
+        when(localNode.getId()).thenReturn("node-1");
+
+        ClusterState clusterState = mock(ClusterState.class);
+        DiscoveryNodes nodes = mock(DiscoveryNodes.class);
+        when(clusterService.state()).thenReturn(clusterState);
+        when(clusterState.nodes()).thenReturn(nodes);
+        when(nodes.isLocalNodeElectedClusterManager()).thenReturn(true);
+
+        // Mock null response (index doesn't exist)
+        when(mockIndicesManager.updateMappingIfExistsSync(any(SearchRelevanceIndices.class))).thenReturn(null);
+
+        // Should complete successfully (null is expected when index doesn't exist)
+        plugin.onNodeStarted(localNode);
+
+        verify(mockIndicesManager).updateMappingIfExistsSync(any(SearchRelevanceIndices.class));
+    }
+
+    public void testOnNodeStartedWhenClusterManagerAndMappingNotAcknowledged() {
+        // Setup: create plugin with components initialized
+        plugin.createComponents(
+            client,
+            clusterService,
+            threadPool,
+            resourceWatcherService,
+            scriptService,
+            xContentRegistry,
+            environment,
+            nodeEnvironment,
+            namedWriteableRegistry,
+            indexNameExpressionResolver,
+            repositoriesServiceSupplier
+        );
+
+        SearchRelevanceIndicesManager mockIndicesManager = mock(SearchRelevanceIndicesManager.class);
+
+        // Use reflection to set the mock indicesManager
+        try {
+            java.lang.reflect.Field field = SearchRelevancePlugin.class.getDeclaredField("searchRelevanceIndicesManager");
+            field.setAccessible(true);
+            field.set(plugin, mockIndicesManager);
+        } catch (Exception e) {
+            fail("Failed to set mock indicesManager: " + e.getMessage());
+        }
+
+        DiscoveryNode localNode = mock(DiscoveryNode.class);
+        when(localNode.getId()).thenReturn("node-1");
+
+        ClusterState clusterState = mock(ClusterState.class);
+        DiscoveryNodes nodes = mock(DiscoveryNodes.class);
+        when(clusterService.state()).thenReturn(clusterState);
+        when(clusterState.nodes()).thenReturn(nodes);
+        when(nodes.isLocalNodeElectedClusterManager()).thenReturn(true);
+
+        // Mock not acknowledged response
+        AcknowledgedResponse notAcknowledgedResponse = new AcknowledgedResponse(false);
+        when(mockIndicesManager.updateMappingIfExistsSync(any(SearchRelevanceIndices.class))).thenReturn(notAcknowledgedResponse);
+
+        // Should throw IllegalStateException
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> { plugin.onNodeStarted(localNode); });
+
+        assertTrue(exception.getMessage().contains("Mapping update not acknowledged"));
+        assertTrue(exception.getMessage().contains("failing node startup"));
+    }
+
+    public void testOnNodeStartedWhenClusterManagerAndMappingUpdateThrowsException() {
+        // Setup: create plugin with components initialized
+        plugin.createComponents(
+            client,
+            clusterService,
+            threadPool,
+            resourceWatcherService,
+            scriptService,
+            xContentRegistry,
+            environment,
+            nodeEnvironment,
+            namedWriteableRegistry,
+            indexNameExpressionResolver,
+            repositoriesServiceSupplier
+        );
+
+        SearchRelevanceIndicesManager mockIndicesManager = mock(SearchRelevanceIndicesManager.class);
+
+        // Use reflection to set the mock indicesManager
+        try {
+            java.lang.reflect.Field field = SearchRelevancePlugin.class.getDeclaredField("searchRelevanceIndicesManager");
+            field.setAccessible(true);
+            field.set(plugin, mockIndicesManager);
+        } catch (Exception e) {
+            fail("Failed to set mock indicesManager: " + e.getMessage());
+        }
+
+        DiscoveryNode localNode = mock(DiscoveryNode.class);
+        when(localNode.getId()).thenReturn("node-1");
+
+        ClusterState clusterState = mock(ClusterState.class);
+        DiscoveryNodes nodes = mock(DiscoveryNodes.class);
+        when(clusterService.state()).thenReturn(clusterState);
+        when(clusterState.nodes()).thenReturn(nodes);
+        when(nodes.isLocalNodeElectedClusterManager()).thenReturn(true);
+
+        // Mock exception during mapping update
+        RuntimeException testException = new RuntimeException("Test mapping update failure");
+        when(mockIndicesManager.updateMappingIfExistsSync(any(SearchRelevanceIndices.class))).thenThrow(testException);
+
+        // Should propagate the exception
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> { plugin.onNodeStarted(localNode); });
+
+        assertEquals("Test mapping update failure", exception.getMessage());
     }
 }
