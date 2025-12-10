@@ -467,9 +467,10 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         future.onResponse(notAcknowledgedResponse);
         when(indicesAdminClient.putMapping(any(PutMappingRequest.class))).thenReturn(future);
 
-        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> {
-            indicesManager.updateMappingIfExistsSync(QUERY_SET);
-        });
+        IllegalStateException exception = assertThrows(
+            IllegalStateException.class,
+            () -> { indicesManager.updateMappingIfExistsSync(QUERY_SET); }
+        );
 
         assertTrue(exception.getMessage().contains("was not acknowledged"));
         assertTrue(exception.getMessage().contains(QUERY_SET.getIndexName()));

@@ -142,11 +142,7 @@ public class SearchRelevanceIndicesManager {
             );
 
             if (!response.isAcknowledged()) {
-                String errorMsg = String.format(
-                    java.util.Locale.ROOT,
-                    "Mapping update for index [%s] was not acknowledged",
-                    indexName
-                );
+                String errorMsg = String.format(java.util.Locale.ROOT, "Mapping update for index [%s] was not acknowledged", indexName);
                 log.error(errorMsg);
                 throw new IllegalStateException(errorMsg);
             }
