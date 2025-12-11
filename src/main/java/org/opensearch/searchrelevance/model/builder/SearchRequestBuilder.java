@@ -21,6 +21,10 @@ import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.index.query.QueryBuilders;
+import org.opensearch.script.Script;
+import org.opensearch.script.ScriptService;
+import org.opensearch.script.ScriptType;
+import org.opensearch.script.TemplateScript;
 import org.opensearch.search.builder.SearchSourceBuilder;
 
 import lombok.extern.log4j.Log4j2;
@@ -36,6 +40,7 @@ import lombok.extern.log4j.Log4j2;
 public class SearchRequestBuilder {
 
     private static volatile NamedXContentRegistry NAMED_XCONTENT_REGISTRY;
+    private static volatile ScriptService SCRIPT_SERVICE;
     private static final String SIZE_FIELD_NAME = "size";
     private static final String QUERY_FIELD_NAME = "query";
 
@@ -43,9 +48,10 @@ public class SearchRequestBuilder {
      * Initialize the builder with the cluster's NamedXContentRegistry so that
      * SearchSourceBuilder can parse all plugin-registered query types.
      */
-    public static void initialize(NamedXContentRegistry registry) {
+    public static void initialize(NamedXContentRegistry registry, ScriptService scriptService) {
         NAMED_XCONTENT_REGISTRY = registry;
-        log.debug("SearchRequestBuilder initialized with NamedXContentRegistry");
+        SCRIPT_SERVICE = scriptService;
+        log.debug("SearchRequestBuilder initialized with NamedXContentRegistry and ScriptService");
     }
 
     private static XContentParser newParserWithRegistry(String json) throws IOException {
@@ -56,6 +62,33 @@ public class SearchRequestBuilder {
             );
         }
         return JsonXContent.jsonXContent.createParser(NAMED_XCONTENT_REGISTRY, DeprecationHandler.IGNORE_DEPRECATIONS, json);
+    }
+
+    /**
+     * Process a Mustache template by compiling and executing it with the given
+     * query text.
+     *
+     * @param template  - the Mustache template string containing {{query_string}}
+     *                  placeholder
+     * @param queryText - the actual query text to substitute into the template
+     * @return the compiled template with substituted values
+     * @throws IOException if template compilation or execution fails
+     */
+    private static String processMustacheTemplate(String template, String queryText) throws IOException {
+        if (SCRIPT_SERVICE == null) {
+            throw new IllegalStateException(
+                "SearchRequestBuilder is not initialized with ScriptService. "
+                    + "Ensure SearchRelevancePlugin.createComponents calls SearchRequestBuilder.initialize(xContentRegistry, scriptService)."
+            );
+        }
+
+        Map<String, Object> params = Map.of("query_string", queryText);
+
+        Script script = new Script(ScriptType.INLINE, "mustache", template, params);
+
+        String compiledQuery = SCRIPT_SERVICE.compile(script, TemplateScript.CONTEXT).newInstance(params).execute();
+
+        return compiledQuery;
     }
 
     /**
@@ -71,8 +104,15 @@ public class SearchRequestBuilder {
         SearchRequest searchRequest = new SearchRequest(index);
 
         try {
-            // Replace placeholder with actual query text
-            String processedQuery = query.replace(WILDCARD_QUERY_TEXT, queryText);
+            // Process query with template engine (Mustache or legacy string replacement)
+            String processedQuery;
+            if (query.contains("{{")) {
+                // Use Mustache templating for queries containing {{
+                processedQuery = processMustacheTemplate(query, queryText);
+            } else {
+                // Fallback to legacy %SearchText% replacement
+                processedQuery = query.replace(WILDCARD_QUERY_TEXT, queryText);
+            }
 
             // Parse to map (using EMPTY registry) for validation/log-only purposes such as size check
             XContentParser tempParser = JsonXContent.jsonXContent.createParser(
@@ -142,8 +182,15 @@ public class SearchRequestBuilder {
         SearchRequest searchRequest = new SearchRequest(index);
 
         try {
-            // Replace placeholder with actual query text
-            String processedQuery = query.replace(WILDCARD_QUERY_TEXT, queryText);
+            // Process query with template engine (Mustache or legacy string replacement)
+            String processedQuery;
+            if (query.contains("{{")) {
+                // Use Mustache templating for queries containing {{
+                processedQuery = processMustacheTemplate(query, queryText);
+            } else {
+                // Fallback to legacy %SearchText% replacement
+                processedQuery = query.replace(WILDCARD_QUERY_TEXT, queryText);
+            }
 
             // Parse to map (using EMPTY registry) for validation/log-only purposes (hybrid validation, size check)
             XContentParser tempParser = JsonXContent.jsonXContent.createParser(

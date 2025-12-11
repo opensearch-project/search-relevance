@@ -31,7 +31,9 @@ public class SearchRequestBuilderTests extends OpenSearchTestCase {
         NamedXContentRegistry reg = new NamedXContentRegistry(
             new SearchModule(Settings.EMPTY, java.util.Collections.emptyList()).getNamedXContents()
         );
-        SearchRequestBuilder.initialize(reg);
+        // Pass null for ScriptService since these tests only use legacy %SearchText%
+        // queries
+        SearchRequestBuilder.initialize(reg, null);
     }
 
     private static final String TEST_INDEX = "test_index";

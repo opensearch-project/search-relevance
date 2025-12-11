@@ -72,6 +72,7 @@ import org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager;
 import org.opensearch.searchrelevance.metrics.MetricsHelper;
 import org.opensearch.searchrelevance.ml.MLAccessor;
 import org.opensearch.searchrelevance.model.ScheduledJob;
+import org.opensearch.searchrelevance.model.builder.SearchRequestBuilder;
 import org.opensearch.searchrelevance.rest.RestCreateQuerySetAction;
 import org.opensearch.searchrelevance.rest.RestDeleteExperimentAction;
 import org.opensearch.searchrelevance.rest.RestDeleteJudgmentAction;
@@ -163,6 +164,7 @@ public class SearchRelevancePlugin extends Plugin
     private SearchRelevanceSettingsAccessor settingsAccessor;
     private ClusterUtil clusterUtil;
     private CronUtil cronUtil;
+    private ScriptService scriptService;
     private InfoStatsManager infoStatsManager;
 
     @Override
@@ -189,6 +191,7 @@ public class SearchRelevancePlugin extends Plugin
     ) {
         this.client = client;
         this.clusterService = clusterService;
+        this.scriptService = scriptService;
         this.searchRelevanceIndicesManager = new SearchRelevanceIndicesManager(clusterService, client);
         this.experimentDao = new ExperimentDao(searchRelevanceIndicesManager);
         this.experimentVariantDao = new ExperimentVariantDao(searchRelevanceIndicesManager);
@@ -202,6 +205,7 @@ public class SearchRelevancePlugin extends Plugin
         MachineLearningNodeClient mlClient = new MachineLearningNodeClient(client);
         this.mlAccessor = new MLAccessor(mlClient);
         SearchRelevanceExecutor.initialize(threadPool);
+        SearchRequestBuilder.initialize(xContentRegistry, scriptService);
         ExperimentTaskManager experimentTaskManager = new ExperimentTaskManager(
             client,
             evaluationResultDao,
