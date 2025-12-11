@@ -90,6 +90,13 @@ ext {
     licenseFile = rootProject.file('LICENSE.txt')
     noticeFile = rootProject.file('NOTICE.txt')
 
+    // BWC test configuration
+    default_bwc_version = System.getProperty("bwc.version")
+    default_bwc_bundle_version= System.getProperty("bwc.bundle.version")
+    bwcBundleTest = (project.findProperty('customDistributionDownloadType') != null && project.properties['customDistributionDownloadType'] == "bundle")
+    search_relevance_bwc_version = bwcBundleTest ? System.getProperty("tests.bwc.bundle.version",rootProject.ext.default_bwc_bundle_version): System.getProperty("tests.bwc.version", rootProject.ext.default_bwc_version)
+    currentBundleVersion = opensearch_version.replace("-SNAPSHOT","")
+
     runIntegTestWithSecurityPlugin= System.getProperty("security")
     if (runIntegTestWithSecurityPlugin == "true") {
         ['esnode.pem', 'esnode-key.pem', 'kirk.pem', 'kirk-key.pem', 'root-ca.pem', 'sample.pem', 'test-kirk.jks'].forEach { file ->
@@ -530,6 +537,8 @@ opensearch_tmp_dir.mkdirs()
 integTest {
     systemProperty 'tests.security.manager', 'false'
     systemProperty 'java.io.tmpdir', opensearch_tmp_dir.absolutePath
+    // allows integration test classes to access test resource from project root path
+    systemProperty 'project.root', project.rootDir.absolutePath
     systemProperty 'buildDir', buildDir.path
     systemProperty "https", securityEnabled
     systemProperty "security", securityEnabled

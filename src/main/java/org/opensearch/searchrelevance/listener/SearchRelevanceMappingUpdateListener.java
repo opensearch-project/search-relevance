@@ -20,8 +20,12 @@ import org.opensearch.threadpool.ThreadPool;
 import lombok.extern.log4j.Log4j2;
 
 /**
- * Listener that updates search relevance index mappings when indices are restored from snapshots.
- * This ensures that restored indices get the latest mapping definitions.
+ * Listener that updates search relevance index mappings in response to cluster events:
+ * 1. When this node becomes the cluster manager - updates all existing indices
+ * 2. When indices are restored from snapshots - updates restored indices
+ *
+ * This ensures that indices always have the latest mapping definitions after upgrades
+ * or snapshot restores.
  */
 @Log4j2
 public class SearchRelevanceMappingUpdateListener implements ClusterStateListener {
@@ -46,6 +50,38 @@ public class SearchRelevanceMappingUpdateListener implements ClusterStateListene
             return;
         }
 
+        // Check if this node just became cluster manager
+        if (!event.previousState().nodes().isLocalNodeElectedClusterManager()) {
+            log.info("This node just became cluster manager, scheduling mapping updates for all existing indices");
+            updateAllExistingIndicesMappings();
+        }
+
+        // Handle snapshot restore events
+        handleSnapshotRestore(event);
+    }
+
+    /**
+     * Updates mappings for all existing search relevance indices.
+     * Called when this node becomes cluster manager.
+     */
+    private void updateAllExistingIndicesMappings() {
+        threadPool.generic().execute(() -> {
+            for (SearchRelevanceIndices index : SearchRelevanceIndices.values()) {
+                try {
+                    log.info("Updating mapping for index [{}] after becoming cluster manager", index.getIndexName());
+                    indicesManager.updateMappingIfExistsSync(index);
+                } catch (Exception e) {
+                    log.error("Failed to update mapping for index [{}] after becoming cluster manager", index.getIndexName(), e);
+                }
+            }
+            log.info("Completed mapping updates for all search relevance indices");
+        });
+    }
+
+    /**
+     * Handles snapshot restore events by updating mappings for restored search relevance indices.
+     */
+    private void handleSnapshotRestore(ClusterChangedEvent event) {
         RestoreInProgress restoreInProgress = event.state().custom(RestoreInProgress.TYPE);
         if (restoreInProgress == null) {
             return;

@@ -8,3 +8,7 @@
  */
 
 rootProject.name = 'opensearch-search-relevance'
+
+// Include BWC (Backward Compatibility) test modules
+include ':qa'
+include ':qa:rolling-upgrade'
