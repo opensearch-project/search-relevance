@@ -69,6 +69,7 @@ import org.opensearch.searchrelevance.executors.SearchRelevanceExecutor;
 import org.opensearch.searchrelevance.experiment.HybridOptimizerExperimentProcessor;
 import org.opensearch.searchrelevance.experiment.PointwiseExperimentProcessor;
 import org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager;
+import org.opensearch.searchrelevance.listener.SearchRelevanceMappingUpdateListener;
 import org.opensearch.searchrelevance.metrics.MetricsHelper;
 import org.opensearch.searchrelevance.ml.MLAccessor;
 import org.opensearch.searchrelevance.model.ScheduledJob;
@@ -193,6 +194,13 @@ public class SearchRelevancePlugin extends Plugin
         this.client = client;
         this.clusterService = clusterService;
         this.searchRelevanceIndicesManager = new SearchRelevanceIndicesManager(clusterService, client);
+
+        // Register listener for mapping updates on snapshot restore
+        SearchRelevanceMappingUpdateListener mappingUpdateListener = new SearchRelevanceMappingUpdateListener(
+            searchRelevanceIndicesManager,
+            threadPool
+        );
+        clusterService.addListener(mappingUpdateListener);
 
         this.experimentDao = new ExperimentDao(searchRelevanceIndicesManager);
         this.experimentVariantDao = new ExperimentVariantDao(searchRelevanceIndicesManager);
