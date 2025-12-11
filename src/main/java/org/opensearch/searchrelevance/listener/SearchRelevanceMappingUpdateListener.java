@@ -63,18 +63,46 @@ public class SearchRelevanceMappingUpdateListener implements ClusterStateListene
     /**
      * Updates mappings for all existing search relevance indices.
      * Called when this node becomes cluster manager.
+     *
+     * We delay the mapping update slightly to allow the cluster state to fully propagate
+     * after a node becomes cluster manager, especially important during restart upgrades
+     * when all nodes restart simultaneously.
      */
     private void updateAllExistingIndicesMappings() {
+        // Schedule with a small delay to allow cluster state to stabilize
         threadPool.generic().execute(() -> {
+            try {
+                // Wait for cluster state to stabilize after becoming cluster manager
+                // This is important during restart upgrades when all nodes restart simultaneously
+                Thread.sleep(5000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.warn("Interrupted while waiting for cluster state to stabilize");
+                return;
+            }
+
+            int updatedCount = 0;
+            int skippedCount = 0;
             for (SearchRelevanceIndices index : SearchRelevanceIndices.values()) {
                 try {
-                    log.info("Updating mapping for index [{}] after becoming cluster manager", index.getIndexName());
-                    indicesManager.updateMappingIfExistsSync(index);
+                    log.info("Checking mapping update for index [{}] after becoming cluster manager", index.getIndexName());
+                    Object result = indicesManager.updateMappingIfExistsSync(index);
+                    if (result != null) {
+                        log.info("Successfully updated mapping for index [{}]", index.getIndexName());
+                        updatedCount++;
+                    } else {
+                        log.debug("Index [{}] does not exist, skipping mapping update", index.getIndexName());
+                        skippedCount++;
+                    }
                 } catch (Exception e) {
                     log.error("Failed to update mapping for index [{}] after becoming cluster manager", index.getIndexName(), e);
                 }
             }
-            log.info("Completed mapping updates for all search relevance indices");
+            log.info(
+                "Completed mapping updates for search relevance indices: {} updated, {} skipped (not exist)",
+                updatedCount,
+                skippedCount
+            );
         });
     }
 

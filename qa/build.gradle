@@ -1,0 +1,262 @@
+/*
+ *  Copyright OpenSearch Contributors
+ *  SPDX-License-Identifier: Apache-2.0
+ */
+
+import org.apache.tools.ant.taskdefs.condition.Os
+
+import java.util.concurrent.Callable
+import java.nio.file.Path
+
+apply plugin: 'opensearch.testclusters'
+apply plugin: 'opensearch.build'
+apply plugin: 'opensearch.rest-test'
+apply plugin: 'io.freefair.lombok'
+apply plugin: 'opensearch.java-agent'
+
+// Disable a few tasks that come with build
+build.enabled = false
+integTest.enabled = false
+test.enabled = false
+assemble.enabled = false
+dependenciesInfo.enabled = false
+dependencyLicenses.enabled = false
+thirdPartyAudit.enabled = false
+validateNebulaPom.enabled = false
+loggerUsageCheck.enabled = false
+
+java {
+    targetCompatibility = JavaVersion.VERSION_21
+    sourceCompatibility = JavaVersion.VERSION_21
+}
+
+configurations {
+    zipArchive
+}
+
+repositories {
+    mavenLocal()
+    maven { url "https://ci.opensearch.org/ci/dbc/snapshots/maven/" }
+    mavenCentral()
+    maven { url "https://plugins.gradle.org/m2/" }
+}
+
+def knnJarDirectory = "$rootDir/build/dependencies/opensearch-knn"
+
+dependencies {
+    api "org.opensearch:opensearch:${opensearch_version}"
+    zipArchive group: 'org.opensearch.plugin', name:'opensearch-job-scheduler', version: "${opensearch_build}"
+    zipArchive group: 'org.opensearch.plugin', name:'opensearch-knn', version: "${opensearch_build}"
+    zipArchive group: 'org.opensearch.plugin', name:'opensearch-ml-plugin', version: "${opensearch_build}"
+    compileOnly fileTree(dir: knnJarDirectory, include: ["opensearch-knn-${opensearch_build}.jar", "remote-index-build-client-${opensearch_build}.jar"])
+    compileOnly group: 'com.google.guava', name: 'guava', version:'33.4.8-jre'
+    compileOnly group: 'org.apache.commons', name: 'commons-lang3', version: '3.20.0'
+    // json-path 2.10.0 depends on slf4j 2.0.11, which conflicts with the version used by OpenSearch core.
+    // Excluding slf4j here since json-path is only used for testing, and logging failures in this context are acceptable.
+    testRuntimeOnly('com.jayway.jsonpath:json-path:2.10.0') {
+        // OpenSearch core is using slf4j 1.7.36. Therefore, we cannot change the version here.
+        exclude group: 'org.slf4j', module: 'slf4j-api'
+        exclude group: 'net.minidev', module: 'json-smart'
+    }
+    testRuntimeOnly group: 'net.minidev', name:'json-smart', version: "${versions.json_smart}"
+    api "org.apache.logging.log4j:log4j-api:${versions.log4j}"
+    api "org.apache.logging.log4j:log4j-core:${versions.log4j}"
+    api "junit:junit:${versions.junit}"
+    testImplementation "org.opensearch.test:framework:${opensearch_version}"
+    testImplementation(testFixtures(rootProject))
+}
+
+ext {
+    licenseFile = rootProject.file('LICENSE.txt')
+    noticeFile = rootProject.file('NOTICE.txt')
+}
+
+def tmp_dir = project.file('build/private/artifact_tmp').absoluteFile
+tmp_dir.mkdirs()
+String default_bwc_version = System.getProperty("bwc.version", rootProject.ext.default_bwc_version)
+String search_relevance_bwc_version = System.getProperty("tests.bwc.version", default_bwc_version)
+boolean isSnapshot = search_relevance_bwc_version.contains("-SNAPSHOT")
+String search_relevance_bwc_version_no_qualifier = isSnapshot ? search_relevance_bwc_version - "-SNAPSHOT" : search_relevance_bwc_version
+
+String os_platform = "linux"
+String artifact_type = "tar"
+String file_ext = "tar.gz"
+
+if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+    os_platform = "windows"
+    artifact_type = "zip"
+    file_ext = "zip"
+}
+
+ext{
+    plugins = [provider(new Callable<RegularFile>(){
+        @Override
+        RegularFile call() throws Exception {
+            return new RegularFile() {
+                @Override
+                File getAsFile() {
+                    return configurations.zipArchive.asFileTree.matching{include "**/opensearch-job-scheduler-${opensearch_build}.zip"}.getSingleFile()
+                }
+            }
+        }
+    }), provider(new Callable<RegularFile>(){
+        @Override
+        RegularFile call() throws Exception {
+            return new RegularFile() {
+                @Override
+                File getAsFile() {
+                    return configurations.zipArchive.asFileTree.matching{include "**/opensearch-ml-plugin-${opensearch_build}.zip"}.getSingleFile()
+                }
+            }
+        }
+    }), provider(new Callable<RegularFile>(){
+        @Override
+        RegularFile call() throws Exception {
+            return new RegularFile() {
+                @Override
+                File getAsFile() {
+                    return configurations.zipArchive.asFileTree.matching{include "**/opensearch-knn-${opensearch_build}.zip"}.getSingleFile()
+                }
+            }
+        }
+    }), rootProject.tasks.bundlePlugin.archiveFile]
+}
+
+task deleteTempDirectories {
+    doFirst {
+        if (tmp_dir.exists()) {
+            File[] tempFiles = tmp_dir.listFiles()
+            if (tempFiles != null) {
+                for (File child : tempFiles) {
+                    if (child.exists() && child.toString().contains("opensearch-")) {
+                        project.delete(child)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Task to pull opensearch artifact from archive
+task pullOpensearchArtifact {
+    dependsOn "deleteTempDirectories"
+
+    doLast{
+        ext{
+            if (isSnapshot) {
+                srcUrl = "https://ci.opensearch.org/ci/dbc/distribution-build-opensearch/${search_relevance_bwc_version_no_qualifier}/latest/${os_platform}/x64/${artifact_type}/dist/opensearch/opensearch-${search_relevance_bwc_version_no_qualifier}-${os_platform}-x64.${file_ext}"
+            } else {
+                srcUrl = "https://artifacts.opensearch.org/releases/bundle/opensearch/${search_relevance_bwc_version}/opensearch-${search_relevance_bwc_version}-${os_platform}-x64.${file_ext}"
+            }
+        }
+        ant.get(
+                src: srcUrl,
+                dest: tmp_dir.absolutePath,
+                httpusecaches: false
+        )
+        copy {
+            if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+                from zipTree(Path.of(tmp_dir.absolutePath, "opensearch-${search_relevance_bwc_version_no_qualifier}-${os_platform}-x64.${file_ext}"))
+            } else {
+                from tarTree(Path.of(tmp_dir.absolutePath, "opensearch-${search_relevance_bwc_version_no_qualifier}-${os_platform}-x64.${file_ext}"))
+            }
+            into tmp_dir.absolutePath
+        }
+    }
+}
+
+// Task to pull ml plugin from archive
+task pullMlCommonsBwcPlugin {
+    doLast {
+        copy {
+            from(Path.of(tmp_dir.absolutePath, "opensearch-${search_relevance_bwc_version_no_qualifier}", "plugins", "opensearch-ml"))
+            into Path.of(tmp_dir.absolutePath, "opensearch-ml")
+        }
+    }
+}
+
+// Task to pull KNN plugin from archive
+task pullKnnBwcPlugin {
+    dependsOn "pullOpensearchArtifact"
+
+    doLast {
+        copy {
+            from(Path.of(tmp_dir.absolutePath, "opensearch-${search_relevance_bwc_version_no_qualifier}", "plugins", "opensearch-knn"))
+            into Path.of(tmp_dir.absolutePath, "opensearch-knn")
+        }
+    }
+}
+
+// Task to pull job scheduler plugin from archive
+task pullJobSchedulerBwcPlugin {
+    dependsOn "pullKnnBwcPlugin"
+    doLast {
+        copy {
+            from(Path.of(tmp_dir.absolutePath, "opensearch-${search_relevance_bwc_version_no_qualifier}", "plugins", "opensearch-job-scheduler"))
+            into Path.of(tmp_dir.absolutePath, "opensearch-job-scheduler")
+        }
+    }
+}
+
+// Task to pull search relevance plugin from archive
+task pullBwcPlugin {
+    doLast {
+        copy {
+            from(Path.of(tmp_dir.absolutePath, "opensearch-${search_relevance_bwc_version_no_qualifier}", "plugins", "opensearch-search-relevance"))
+            into Path.of(tmp_dir.absolutePath, "opensearch-search-relevance")
+        }
+        delete Path.of(tmp_dir.absolutePath, "opensearch-${search_relevance_bwc_version_no_qualifier}"), java.nio.file.Path.of(tmp_dir.absolutePath, "opensearch-${search_relevance_bwc_version_no_qualifier}-${os_platform}-x64.${file_ext}")
+    }
+}
+
+// Task to zip opensearch-job-scheduler plugin from archive
+task zipBwcJobSchedulerPlugin(type: Zip) {
+    dependsOn "pullJobSchedulerBwcPlugin"
+    from(Path.of(tmp_dir.absolutePath, "opensearch-job-scheduler"))
+    destinationDirectory = tmp_dir
+    archiveFileName = "opensearch-job-scheduler-${search_relevance_bwc_version_no_qualifier}.zip"
+    doLast {
+        delete Path.of(tmp_dir.absolutePath, "opensearch-job-scheduler")
+    }
+}
+
+// Task to zip ml-commons plugin from archive
+task zipBwcMlCommonsPlugin(type: Zip) {
+    dependsOn "pullMlCommonsBwcPlugin"
+    dependsOn "zipBwcJobSchedulerPlugin"
+    from(Path.of(tmp_dir.absolutePath, "opensearch-ml"))
+    destinationDirectory = tmp_dir
+    archiveFileName = "opensearch-ml-${search_relevance_bwc_version_no_qualifier}.zip"
+    doLast {
+        delete Path.of(tmp_dir.absolutePath, "opensearch-ml")
+    }
+}
+
+// Task to zip knn plugin from archive
+task zipBwcKnnPlugin(type: Zip) {
+    dependsOn "pullKnnBwcPlugin"
+    dependsOn "zipBwcMlCommonsPlugin"
+    from(Path.of(tmp_dir.absolutePath, "opensearch-knn"))
+    destinationDirectory = tmp_dir
+    archiveFileName = "opensearch-knn-${search_relevance_bwc_version_no_qualifier}.zip"
+    doLast {
+        delete Path.of(tmp_dir.absolutePath, "opensearch-knn")
+    }
+}
+
+// Task to zip search relevance plugin from archive
+task zipBwcPlugin(type: Zip) {
+    dependsOn "zipBwcKnnPlugin"
+    dependsOn "pullBwcPlugin"
+    from(Path.of(tmp_dir.absolutePath, "opensearch-search-relevance"))
+    destinationDirectory = tmp_dir
+    archiveFileName = "opensearch-search-relevance-${search_relevance_bwc_version_no_qualifier}.zip"
+    doLast {
+        delete Path.of(tmp_dir.absolutePath, "opensearch-search-relevance")
+    }
+}
+
+
+task bwcTestSuite {
+    dependsOn ":qa:rolling-upgrade:testRollingUpgrade"
+}
