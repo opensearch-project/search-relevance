@@ -11,13 +11,11 @@ import static org.junit.Assert.assertEquals;
 
 import java.util.Map;
 
-import org.junit.Test;
 import org.opensearch.client.Response;
 import org.opensearch.searchrelevance.BaseSearchRelevanceIT;
 
 public class AutoExpandReplicasIT extends BaseSearchRelevanceIT {
 
-    @Test
     public void testAutoExpandReplicasSettingPresent() throws Exception {
         // Create an index via plugin flow by creating a search configuration that references it
         String userIndexName = "test-auto-expand-replicas-index";
@@ -44,6 +42,34 @@ public class AutoExpandReplicasIT extends BaseSearchRelevanceIT {
         @SuppressWarnings("unchecked")
         Map<String, Object> index = (Map<String, Object>) indexSettings.get("index");
         assertEquals("0-1", index.get("auto_expand_replicas").toString());
+
+        // Verify the system index is healthy (green) on a single-node cluster and has no unassigned shards
+        Response healthResp = makeRequest(
+            client(),
+            "GET",
+            "/_cluster/health/" + systemIndex + "?wait_for_status=green&timeout=30s",
+            null,
+            null,
+            null
+        );
+        Map<String, Object> healthMap = convertToMap(healthResp);
+        assertEquals("green", healthMap.get("status").toString());
+        Object unassigned = healthMap.get("unassigned_shards");
+        int unassignedInt = Integer.parseInt(unassigned.toString());
+        assertEquals(0, unassignedInt);
+    }
+
+    public void testControlIndexReplicas1IsYellowOnSingleNode() throws Exception {
+        // Create a control index with number_of_replicas: 1 which should be yellow on single-node
+        String controlIndex = "control-replicas-1";
+        String indexConfig = "{ \"settings\": { \"number_of_shards\": 1, \"number_of_replicas\": 1 } }";
+
+        createIndexWithConfiguration(controlIndex, indexConfig);
+
+        // Check index-level cluster health (no wait for green) - it should report yellow on single node
+        Response healthResp = makeRequest(client(), "GET", "/_cluster/health/" + controlIndex + "?timeout=30s", null, null, null);
+        Map<String, Object> healthMap = convertToMap(healthResp);
+        assertEquals("yellow", healthMap.get("status").toString());
     }
 
     private String readTemplate(String path) throws Exception {
