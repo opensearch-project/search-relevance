@@ -37,7 +37,6 @@ import org.opensearch.action.index.IndexRequestBuilder;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.support.WriteRequest;
-import org.opensearch.action.support.clustermanager.AcknowledgedResponse;
 import org.opensearch.cluster.ClusterState;
 import org.opensearch.cluster.metadata.IndexMetadata;
 import org.opensearch.cluster.metadata.MappingMetadata;
@@ -534,16 +533,16 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
     }
 
     /**
-     * Test that when index exists with null mapping (legacy index, version 0),
-     * NO mapping update occurs when current version is also 0.
+     * Test that when index exists with null mapping (unexpected state),
+     * an exception is thrown.
      */
-    public void testCreateIndexIfAbsentSync_IndexExistsWithNullMapping_NoUpdate() throws IOException {
-        // Setup: index exists but has no mapping (legacy index = version 0)
+    public void testCreateIndexIfAbsentSync_IndexExistsWithNullMapping_ThrowsException() throws IOException {
+        // Setup: index exists but has no mapping - unexpected state, should throw exception
         when(metadata.hasIndex(QUERY_SET.getIndexName())).thenReturn(true);
 
         IndexMetadata indexMetadata = mock(IndexMetadata.class);
         when(metadata.index(QUERY_SET.getIndexName())).thenReturn(indexMetadata);
-        when(indexMetadata.mapping()).thenReturn(null); // No mapping = version 0
+        when(indexMetadata.mapping()).thenReturn(null); // No mapping = unexpected state
 
         // Execute via putDoc
         QuerySet querySet = new QuerySet("test_id", "test_name", "test_description", "test_timestamp", "test_sampling", List.of());
@@ -558,11 +557,13 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
 
         @SuppressWarnings("unchecked")
         ActionListener<SearchResponse> listener = mock(ActionListener.class);
-        indicesManager.putDoc("test_id", xContentBuilder, QUERY_SET, listener);
 
-        // Verify: putMapping NOT called (version 0 >= 0)
-        verify(indicesAdminClient, never()).create(any(CreateIndexRequest.class), any(ActionListener.class));
-        verify(indicesAdminClient, never()).putMapping(any(PutMappingRequest.class));
+        // Expect exception when mapping is null
+        SearchRelevanceException exception = assertThrows(SearchRelevanceException.class, () -> {
+            indicesManager.putDoc("test_id", xContentBuilder, QUERY_SET, listener);
+        });
+
+        assertTrue(exception.getMessage().contains("exists but has no mapping"));
     }
 
     /**
@@ -671,13 +672,6 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         mappingSource.put("properties", new HashMap<>());
         when(mappingMetadata.sourceAsMap()).thenReturn(mappingSource);
 
-        // Mock successful putMapping response
-        AcknowledgedResponse acknowledgedResponse = new AcknowledgedResponse(true);
-        org.opensearch.action.support.PlainActionFuture<AcknowledgedResponse> actionFuture =
-            new org.opensearch.action.support.PlainActionFuture<>();
-        actionFuture.onResponse(acknowledgedResponse);
-        when(indicesAdminClient.putMapping(any(PutMappingRequest.class))).thenReturn(actionFuture);
-
         // Execute via putDoc
         QuerySet querySet = new QuerySet("test_id", "test_name", "test_description", "test_timestamp", "test_sampling", List.of());
         XContentBuilder xContentBuilder = querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
@@ -696,54 +690,6 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         // Verify: putMapping WAS called (version -2 < current version 0)
         verify(indicesAdminClient, never()).create(any(CreateIndexRequest.class), any(ActionListener.class));
         verify(indicesAdminClient).putMapping(any(PutMappingRequest.class));
-    }
-
-    /**
-     * Test that when mapping update is not acknowledged, an exception is thrown.
-     */
-    public void testCreateIndexIfAbsentSync_MappingUpdateNotAcknowledged_ThrowsException() throws IOException {
-        // Setup: index exists with older version to trigger update
-        when(metadata.hasIndex(QUERY_SET.getIndexName())).thenReturn(true);
-
-        IndexMetadata indexMetadata = mock(IndexMetadata.class);
-        MappingMetadata mappingMetadata = mock(MappingMetadata.class);
-        when(metadata.index(QUERY_SET.getIndexName())).thenReturn(indexMetadata);
-        when(indexMetadata.mapping()).thenReturn(mappingMetadata);
-
-        // Set explicit schema_version = -2 (older than current version 0)
-        Map<String, Object> metaMap = new HashMap<>();
-        metaMap.put(SearchRelevanceIndices.META_SCHEMA_VERSION_KEY, -2);
-        Map<String, Object> mappingSource = new HashMap<>();
-        mappingSource.put("_meta", metaMap);
-        when(mappingMetadata.sourceAsMap()).thenReturn(mappingSource);
-
-        // Mock NOT acknowledged putMapping response
-        AcknowledgedResponse acknowledgedResponse = new AcknowledgedResponse(false);
-        org.opensearch.action.support.PlainActionFuture<AcknowledgedResponse> actionFuture =
-            new org.opensearch.action.support.PlainActionFuture<>();
-        actionFuture.onResponse(acknowledgedResponse);
-        when(indicesAdminClient.putMapping(any(PutMappingRequest.class))).thenReturn(actionFuture);
-
-        // Execute and expect exception
-        QuerySet querySet = new QuerySet("test_id", "test_name", "test_description", "test_timestamp", "test_sampling", List.of());
-        XContentBuilder xContentBuilder = querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
-
-        IndexRequestBuilder indexRequestBuilder = mock(IndexRequestBuilder.class);
-        when(client.prepareIndex(QUERY_SET.getIndexName())).thenReturn(indexRequestBuilder);
-        when(indexRequestBuilder.setId("test_id")).thenReturn(indexRequestBuilder);
-        when(indexRequestBuilder.setOpType(DocWriteRequest.OpType.CREATE)).thenReturn(indexRequestBuilder);
-        when(indexRequestBuilder.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)).thenReturn(indexRequestBuilder);
-        when(indexRequestBuilder.setSource(xContentBuilder)).thenReturn(indexRequestBuilder);
-
-        @SuppressWarnings("unchecked")
-        ActionListener<SearchResponse> listener = mock(ActionListener.class);
-
-        SearchRelevanceException exception = assertThrows(SearchRelevanceException.class, () -> {
-            indicesManager.putDoc("test_id", xContentBuilder, QUERY_SET, listener);
-        });
-
-        assertTrue(exception.getMessage().contains("Mapping update for index"));
-        assertTrue(exception.getMessage().contains("was not acknowledged"));
     }
 
 }

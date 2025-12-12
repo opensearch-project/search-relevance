@@ -137,8 +137,6 @@ public enum SearchRelevanceIndices {
                 "Mapping JSON for index [" + indexName + "] must have _meta.schema_version defined as a number",
                 RestStatus.INTERNAL_SERVER_ERROR
             );
-        } catch (SearchRelevanceException e) {
-            throw e;
         } catch (Exception e) {
             throw new SearchRelevanceException(
                 "Failed to parse schema_version from mapping JSON for index: " + indexName,

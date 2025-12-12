@@ -13,9 +13,9 @@ import static org.opensearch.searchrelevance.common.PluginConstants.PROCEED;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 
 import org.opensearch.ResourceAlreadyExistsException;
@@ -31,7 +31,6 @@ import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.search.ShardSearchFailure;
 import org.opensearch.action.support.WriteRequest;
-import org.opensearch.action.support.clustermanager.AcknowledgedResponse;
 import org.opensearch.cluster.metadata.MappingMetadata;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.io.Streams;
@@ -106,11 +105,6 @@ public class SearchRelevanceIndicesManager {
     }
 
     /**
-     * Timeout in seconds for synchronous mapping update operations
-     */
-    private static final int MAPPING_UPDATE_TIMEOUT_SECONDS = 30;
-
-    /**
      * Create a search relevance index if not exists, or update mapping if index exists but has older schema version.
      * Uses synchronous calls.
      * @param index the index to create or update
@@ -132,8 +126,8 @@ public class SearchRelevanceIndicesManager {
         int existingVersion = getExistingSchemaVersion(indexName);
         int currentVersion = index.getSchemaVersion();
 
-        // Skip update if already up-to-date or error reading version (-1)
-        if (existingVersion == -1 || existingVersion >= currentVersion) {
+        // Skip update if already up-to-date
+        if (existingVersion >= currentVersion) {
             return;
         }
 
@@ -144,21 +138,28 @@ public class SearchRelevanceIndicesManager {
 
     /**
      * Get the schema version from an existing index's _meta field.
-     * Returns 0 for legacy indices without _meta.schema_version.
-     * Returns -1 if there was an error reading the version.
+     * Returns 0 for legacy indices without _meta.schema_version OR initial version.
+     * Throws exception if there was an error reading the mapping.
      * @param indexName the name of the index
-     * @return the schema version (0 for legacy), or -1 on error
+     * @return the schema version (0 for legacy or initial)
+     * @throws SearchRelevanceException if mapping cannot be read
      */
     private int getExistingSchemaVersion(final String indexName) {
         try {
             MappingMetadata mappingMetadata = clusterService.state().metadata().index(indexName).mapping();
             if (mappingMetadata == null) {
-                return 0; // Legacy index
+                throw new SearchRelevanceException(
+                    String.format(Locale.ROOT, "Index [%s] exists but has no mapping", indexName),
+                    RestStatus.INTERNAL_SERVER_ERROR
+                );
             }
 
             Map<String, Object> mappingSource = mappingMetadata.sourceAsMap();
             if (mappingSource == null) {
-                return 0; // Legacy index
+                throw new SearchRelevanceException(
+                    String.format(Locale.ROOT, "Index [%s] exists but mapping source is null", indexName),
+                    RestStatus.INTERNAL_SERVER_ERROR
+                );
             }
 
             Object metaObj = mappingSource.get("_meta");
@@ -172,9 +173,14 @@ public class SearchRelevanceIndicesManager {
                 return ((Number) versionObj).intValue();
             }
             return 0; // Legacy index - no schema_version in _meta
+        } catch (SearchRelevanceException e) {
+            throw e;
         } catch (Exception e) {
-            log.warn("Failed to get schema version for index [{}]", indexName, e);
-            return -1; // Error - skip update to be safe
+            throw new SearchRelevanceException(
+                String.format(Locale.ROOT, "Failed to get schema version for index [%s]", indexName),
+                e,
+                RestStatus.INTERNAL_SERVER_ERROR
+            );
         }
     }
 
@@ -187,19 +193,7 @@ public class SearchRelevanceIndicesManager {
             index.getMapping(),
             org.opensearch.common.xcontent.XContentType.JSON
         );
-        StashedThreadContext.run(client, () -> {
-            AcknowledgedResponse response = client.admin()
-                .indices()
-                .putMapping(putMappingRequest)
-                .actionGet(MAPPING_UPDATE_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-            if (!response.isAcknowledged()) {
-                throw new SearchRelevanceException(
-                    String.format(java.util.Locale.ROOT, "Mapping update for index [%s] was not acknowledged", index.getIndexName()),
-                    RestStatus.INTERNAL_SERVER_ERROR
-                );
-            }
-            log.info("Successfully updated mapping for index [{}] to schema version [{}]", index.getIndexName(), index.getSchemaVersion());
-        });
+        StashedThreadContext.run(client, () -> client.admin().indices().putMapping(putMappingRequest));
     }
 
     public SearchResponse getDocByDocIdSync(final String docId, final SearchRelevanceIndices index) {
