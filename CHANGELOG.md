@@ -17,7 +17,6 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 * Fixed hybrid optimizer experiments stuck in `PROCESSING` after judgment deletion by correcting failure handling. [#292](https://github.com/opensearch-project/search-relevance/pull/292)
 * Fix query serialization for plugins (e.g., Learning to Rank) that extend OpenSearch's DSL. ([#260](https://github.com/opensearch-project/search-relevance/pull/260))
 * Fix NullPointerException if `ubi.available` system property is not defined by setting it as `false`. [#338](https://github.com/opensearch-project/search-relevance/pull/338)
-* Fix yellow cluster status on single-node clusters ([#329](https://github.com/opensearch-project/search-relevance/issues/329))
 
 ### Infrastructure
 
