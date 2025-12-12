@@ -78,7 +78,8 @@ public class SearchRelevanceIndicesManager {
             return;
         }
 
-        final CreateIndexRequest createIndexRequest = new CreateIndexRequest(indexName).mapping(mapping);
+        final CreateIndexRequest createIndexRequest = new CreateIndexRequest(indexName).mapping(mapping)
+            .settings(org.opensearch.common.settings.Settings.builder().put("index.auto_expand_replicas", "0-1").build());
         StashedThreadContext.run(client, () -> client.admin().indices().create(createIndexRequest, new ActionListener<>() {
             @Override
             public void onResponse(final CreateIndexResponse createIndexResponse) {
@@ -111,7 +112,8 @@ public class SearchRelevanceIndicesManager {
             log.debug("Index [{}] already exists, skipping creation", indexName);
             return;
         }
-        final CreateIndexRequest createIndexRequest = new CreateIndexRequest(indexName).mapping(mapping);
+        final CreateIndexRequest createIndexRequest = new CreateIndexRequest(indexName).mapping(mapping)
+            .settings(org.opensearch.common.settings.Settings.builder().put("index.auto_expand_replicas", "0-1").build());
         StashedThreadContext.run(client, () -> client.admin().indices().create(createIndexRequest));
     }
 
