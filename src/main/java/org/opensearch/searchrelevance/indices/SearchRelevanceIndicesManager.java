@@ -117,7 +117,7 @@ public class SearchRelevanceIndicesManager {
             // Index does not exist - create new index
             log.info("Creating new index [{}] with schema version [{}]", indexName, index.getSchemaVersion());
             final CreateIndexRequest createIndexRequest = new CreateIndexRequest(indexName).mapping(mapping)
-                    .settings(org.opensearch.common.settings.Settings.builder().put("index.auto_expand_replicas", "0-1").build());
+                .settings(org.opensearch.common.settings.Settings.builder().put("index.auto_expand_replicas", "0-1").build());
             StashedThreadContext.run(client, () -> client.admin().indices().create(createIndexRequest));
             return;
         }
@@ -173,8 +173,6 @@ public class SearchRelevanceIndicesManager {
                 return ((Number) versionObj).intValue();
             }
             return 0; // Legacy index - no schema_version in _meta
-        } catch (SearchRelevanceException e) {
-            throw e;
         } catch (Exception e) {
             throw new SearchRelevanceException(
                 String.format(Locale.ROOT, "Failed to get schema version for index [%s]", indexName),
