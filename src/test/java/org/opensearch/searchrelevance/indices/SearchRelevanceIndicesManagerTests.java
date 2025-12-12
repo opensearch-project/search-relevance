@@ -563,7 +563,7 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
             indicesManager.putDoc("test_id", xContentBuilder, QUERY_SET, listener);
         });
 
-        assertTrue(exception.getMessage().contains("exists but has no mapping"));
+        assertTrue(exception.getMessage().contains("Failed to get schema version for index"));
     }
 
     /**
