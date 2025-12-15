@@ -154,9 +154,12 @@ public class RestPutJudgmentAction extends BaseRestHandler {
                         llmJudgmentRatingType = LLMJudgmentRatingType.valueOf(llmJudgmentRatingTypeStr);
                     } catch (IllegalArgumentException e) {
                         throw new SearchRelevanceException(
-                            String.format(Locale.ROOT, "Invalid RatingType: '%s'. Valid values are: %s",
+                            String.format(
+                                Locale.ROOT,
+                                "Invalid RatingType: '%s'. Valid values are: %s",
                                 llmJudgmentRatingTypeStr,
-                                LLMJudgmentRatingType.getValidValues()),
+                                LLMJudgmentRatingType.getValidValues()
+                            ),
                             RestStatus.BAD_REQUEST
                         );
                     }
