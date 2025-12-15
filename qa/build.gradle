@@ -51,7 +51,7 @@ dependencies {
     compileOnly fileTree(dir: knnJarDirectory, include: ["opensearch-knn-${opensearch_build}.jar", "remote-index-build-client-${opensearch_build}.jar"])
     compileOnly group: 'com.google.guava', name: 'guava', version:'33.4.8-jre'
     compileOnly group: 'org.apache.commons', name: 'commons-lang3', version: '3.20.0'
-    // json-path 2.9.0 depends on slf4j 2.0.11, which conflicts with the version used by OpenSearch core.
+    // json-path 2.10.0 depends on slf4j 2.0.11, which conflicts with the version used by OpenSearch core.
     // Excluding slf4j here since json-path is only used for testing, and logging failures in this context are acceptable.
     testRuntimeOnly('com.jayway.jsonpath:json-path:2.10.0') {
         // OpenSearch core is using slf4j 1.7.36. Therefore, we cannot change the version here.

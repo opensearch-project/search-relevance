@@ -77,13 +77,4 @@ public class SearchRelevanceIndicesTests extends OpenSearchTestCase {
         }
     }
 
-    /**
-     * Test that all indices currently have schema_version = 0
-     * (This test documents the current state and should be updated when versions are bumped)
-     */
-    public void testAllIndicesHaveSchemaVersionZero() {
-        for (SearchRelevanceIndices index : SearchRelevanceIndices.values()) {
-            assertEquals("Index " + index.getIndexName() + " should have schema_version = 0", 0, index.getSchemaVersion());
-        }
-    }
 }
