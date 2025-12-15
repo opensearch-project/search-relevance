@@ -1,6 +1,6 @@
 {
   "_meta": {
-    "schema_version": 0
+    "schema_version": 1
   },
   "properties": {
     "id": { "type": "keyword" },
