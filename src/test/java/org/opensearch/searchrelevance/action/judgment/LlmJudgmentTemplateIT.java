@@ -121,13 +121,11 @@ public class LlmJudgmentTemplateIT extends BaseSearchRelevanceIT {
         // Verify metadata contains structured context
         Map<String, Object> metadata = (Map<String, Object>) source.get("metadata");
         assertNotNull(metadata);
-        Map<String, Object> context = (Map<String, Object>) metadata.get("llmJudgmentContext");
-        assertNotNull(context);
-        assertNotNull(context.get("promptTemplate"));
-        assertTrue(((String) context.get("promptTemplate")).contains("{{queryText}}"));
-        assertNotNull(context.get("ratingType"));
-        assertEquals("SCORE0_1", context.get("ratingType"));
-        assertNotNull(context.get("overwriteCache"));
+        assertNotNull(metadata.get("promptTemplate"));
+        assertTrue(((String) metadata.get("promptTemplate")).contains("{{queryText}}"));
+        assertNotNull(metadata.get("llmJudgmentRatingType"));
+        assertEquals("SCORE0_1", metadata.get("llmJudgmentRatingType").toString());
+        assertNotNull(metadata.get("overwriteCache"));
 
         // Verify judgmentRatings format
         List<Map<String, Object>> judgmentRatings = (List<Map<String, Object>>) source.get("judgmentRatings");
@@ -204,8 +202,7 @@ public class LlmJudgmentTemplateIT extends BaseSearchRelevanceIT {
         Map<String, Object> judgment01Doc = entityAsMap(getJudgment01Response);
         Map<String, Object> source01 = (Map<String, Object>) judgment01Doc.get("_source");
         Map<String, Object> metadata01 = (Map<String, Object>) source01.get("metadata");
-        Map<String, Object> context01 = (Map<String, Object>) metadata01.get("llmJudgmentContext");
-        assertEquals("SCORE0_1", context01.get("ratingType"));
+        assertEquals("SCORE0_1", metadata01.get("llmJudgmentRatingType").toString());
 
         // Test RELEVANT_IRRELEVANT rating type
         String binaryBody = Files.readString(Path.of(classLoader.getResource("llmjudgment/CreateLlmJudgmentBinary.json").toURI()));
@@ -237,8 +234,7 @@ public class LlmJudgmentTemplateIT extends BaseSearchRelevanceIT {
         Map<String, Object> judgmentBinaryDoc = entityAsMap(getJudgmentBinaryResponse);
         Map<String, Object> sourceBinary = (Map<String, Object>) judgmentBinaryDoc.get("_source");
         Map<String, Object> metadataBinary = (Map<String, Object>) sourceBinary.get("metadata");
-        Map<String, Object> contextBinary = (Map<String, Object>) metadataBinary.get("llmJudgmentContext");
-        assertEquals("RELEVANT_IRRELEVANT", contextBinary.get("ratingType"));
+        assertEquals("RELEVANT_IRRELEVANT", metadataBinary.get("llmJudgmentRatingType").toString());
     }
 
     @SneakyThrows
@@ -302,8 +298,7 @@ public class LlmJudgmentTemplateIT extends BaseSearchRelevanceIT {
         Map<String, Object> judgmentTrueDoc = entityAsMap(getJudgmentTrueResponse);
         Map<String, Object> sourceTrue = (Map<String, Object>) judgmentTrueDoc.get("_source");
         Map<String, Object> metadataTrue = (Map<String, Object>) sourceTrue.get("metadata");
-        Map<String, Object> contextTrue = (Map<String, Object>) metadataTrue.get("llmJudgmentContext");
-        assertEquals(true, contextTrue.get("overwriteCache"));
+        assertEquals(true, metadataTrue.get("overwriteCache"));
 
         // Test with overwriteCache = false
         String overwriteFalseBody = Files.readString(
@@ -337,8 +332,7 @@ public class LlmJudgmentTemplateIT extends BaseSearchRelevanceIT {
         Map<String, Object> judgmentFalseDoc = entityAsMap(getJudgmentFalseResponse);
         Map<String, Object> sourceFalse = (Map<String, Object>) judgmentFalseDoc.get("_source");
         Map<String, Object> metadataFalse = (Map<String, Object>) sourceFalse.get("metadata");
-        Map<String, Object> contextFalse = (Map<String, Object>) metadataFalse.get("llmJudgmentContext");
-        assertEquals(false, contextFalse.get("overwriteCache"));
+        assertEquals(false, metadataFalse.get("overwriteCache"));
     }
 
     @SneakyThrows
@@ -400,20 +394,19 @@ public class LlmJudgmentTemplateIT extends BaseSearchRelevanceIT {
         Map<String, Object> judgmentDoc = entityAsMap(getJudgmentResponse);
         Map<String, Object> source = (Map<String, Object>) judgmentDoc.get("_source");
         Map<String, Object> metadata = (Map<String, Object>) source.get("metadata");
-        Map<String, Object> context = (Map<String, Object>) metadata.get("llmJudgmentContext");
 
         // promptTemplate should have the default value when not provided
-        Object promptTemplate = context.get("promptTemplate");
+        Object promptTemplate = metadata.get("promptTemplate");
         assertNotNull("promptTemplate should not be null when not provided", promptTemplate);
         assertEquals("promptTemplate should have default value", DEFAULT_PROMPT_TEMPLATE, promptTemplate);
 
         // ratingType should have a default value
-        Object ratingType = context.get("ratingType");
+        Object ratingType = metadata.get("llmJudgmentRatingType");
         assertNotNull("ratingType should not be null", ratingType);
-        assertEquals("ratingType should have default value", "SCORE0_1", ratingType);
+        assertEquals("ratingType should have default value", "SCORE0_1", ratingType.toString());
 
         // overwriteCache should default to false
-        Object overwriteCache = context.get("overwriteCache");
+        Object overwriteCache = metadata.get("overwriteCache");
         assertNotNull("overwriteCache should not be null", overwriteCache);
         assertEquals("overwriteCache should default to false", false, overwriteCache);
     }

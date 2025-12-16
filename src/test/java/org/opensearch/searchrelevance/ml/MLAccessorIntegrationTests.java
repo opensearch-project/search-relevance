@@ -174,6 +174,7 @@ public class MLAccessorIntegrationTests extends OpenSearchTestCase {
 
             // Execute prediction
             Map<String, String> hits = Map.of("doc1", "test content");
+            AtomicReference<ChunkResult> result = new AtomicReference<>();
             mlAccessor.predict(
                 "test-model",
                 4000,
@@ -185,7 +186,7 @@ public class MLAccessorIntegrationTests extends OpenSearchTestCase {
                 connectorType,
                 1000L,
                 ActionListener.wrap((ChunkResult chunkResult) -> {
-                    // Should not succeed
+                    result.set(chunkResult);
                     latch.countDown();
                 }, e -> {
                     error.set(e);
@@ -195,8 +196,11 @@ public class MLAccessorIntegrationTests extends OpenSearchTestCase {
 
             assertTrue("Should complete for " + connectorType, latch.await(15, TimeUnit.SECONDS));
 
-            // Verify failure occurred (as expected)
-            assertNotNull("Should have failed for " + connectorType, error.get());
+            // Verify all chunks failed (as expected)
+            ChunkResult chunkResult = result.get();
+            assertNotNull("Should have result for " + connectorType, chunkResult);
+            assertEquals("All chunks should have failed for " + connectorType, 0, chunkResult.getSuccessfulChunksCount());
+            assertTrue("Should have failed chunks for " + connectorType, chunkResult.getFailedChunksCount() > 0);
 
             // Key assertion: For non-OpenAI connectors, should attempt regular retries but not response_format retry
             // The fix ensures that only OpenAI connectors attempt the response_format fallback

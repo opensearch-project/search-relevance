@@ -33,6 +33,7 @@ import org.opensearch.ml.common.output.MLOutput;
 import org.opensearch.ml.common.output.model.ModelTensor;
 import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.output.model.ModelTensors;
+import org.opensearch.searchrelevance.ml.connector.ConnectorType;
 import org.opensearch.searchrelevance.ml.connector.LLMConnector;
 import org.opensearch.searchrelevance.ml.connector.OpenAIConnector;
 import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
@@ -144,8 +145,8 @@ public class MLInputOutputTransformer {
         String paramName = connector.getMessageParameterName();
         parameters.put(paramName, messagesArray);
 
-        // Only add response_format if requested (for models that support it)
-        if (includeResponseFormat) {
+        // Only add response_format if requested and connector is OpenAI (only OpenAI supports response_format)
+        if (includeResponseFormat && connector.getType() == ConnectorType.OPENAI) {
             String responseFormat = getResponseFormat(ratingType);
             parameters.put("response_format", responseFormat);
         }
