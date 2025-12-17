@@ -19,7 +19,7 @@ jobs:
     needs: Get-CI-Image-Tag
     strategy:
       matrix:
-        java: [21, 24]
+        java: [21, 25]
         os: [ubuntu-latest]
         bwc_version: ["3.3.0"]
         opensearch_version: ["3.4.0-SNAPSHOT"]
@@ -52,7 +52,7 @@ jobs:
     needs: Get-CI-Image-Tag
     strategy:
       matrix:
-        java: [21, 24]
+        java: [21, 25]
         os: [ubuntu-latest]
         bwc_version: ["3.3.0"]
         opensearch_version: ["3.4.0-SNAPSHOT"]
