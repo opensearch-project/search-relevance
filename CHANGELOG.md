@@ -8,9 +8,10 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ### Features
 - adds version-based index mapping update support to the Search Relevance plugin [#344](https://github.com/opensearch-project/search-relevance/pull/344)
-* LLM Judgement Customized Prompt Template Implementation  [#264](https://github.com/opensearch-project/search-relevance/pull/264)
+- LLM Judgement Customized Prompt Template Implementation  [#264](https://github.com/opensearch-project/search-relevance/pull/264)
 
 ### Enhancements
+- Add BWC and Integration Tests for Index Mapping Update with Schema Version [#349](https://github.com/opensearch-project/search-relevance/pull/349)
 
 ### Bug Fixes
 * Fix yellow cluster status on single-node clusters ([#329](https://github.com/opensearch-project/search-relevance/issues/329))
