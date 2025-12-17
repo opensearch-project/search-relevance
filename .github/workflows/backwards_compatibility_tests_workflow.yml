@@ -19,9 +19,9 @@ jobs:
     needs: Get-CI-Image-Tag
     strategy:
       matrix:
-        java: [21]
+        java: [21, 24]
         os: [ubuntu-latest]
-        bwc_version: ["3.3.0-SNAPSHOT"]
+        bwc_version: ["3.3.0"]
         opensearch_version: ["3.4.0-SNAPSHOT"]
 
     name: SearchRelevance Rolling-Upgrade BWC Tests
@@ -52,9 +52,9 @@ jobs:
     needs: Get-CI-Image-Tag
     strategy:
       matrix:
-        java: [21]
+        java: [21, 24]
         os: [ubuntu-latest]
-        bwc_version: ["3.3.0-SNAPSHOT"]
+        bwc_version: ["3.3.0"]
         opensearch_version: ["3.4.0-SNAPSHOT"]
 
     name: SearchRelevance Restart-Upgrade BWC Tests

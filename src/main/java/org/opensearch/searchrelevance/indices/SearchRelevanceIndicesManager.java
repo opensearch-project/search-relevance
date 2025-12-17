@@ -67,6 +67,8 @@ public class SearchRelevanceIndicesManager {
         this.client = client;
     }
 
+    private static final int MAX_MAPPING_UPDATE_RETRIES = 3;
+
     /**
      * Create a search relevance index if not exists, or update mapping if index exists but has older schema version.
      * @param index - index to be created or updated
@@ -88,13 +90,18 @@ public class SearchRelevanceIndicesManager {
                     return;
                 }
 
-                // Existing version is older - update mapping synchronously
+                // Existing version is older - update mapping with retry
                 log.info("Updating index [{}] mapping from schema version [{}] to [{}]", indexName, existingVersion, currentVersion);
-                updateMappingSync(index);
-                stepListener.onResponse(null);
+                updateMappingWithRetry(index, MAX_MAPPING_UPDATE_RETRIES, stepListener);
             } catch (Exception e) {
-                log.warn("Failed to check/update schema version for index [{}]: {}", indexName, e.getMessage());
-                stepListener.onResponse(null);
+                log.error("Failed to check schema version for index [{}]: {}", indexName, e.getMessage());
+                stepListener.onFailure(
+                    new SearchRelevanceException(
+                        String.format(Locale.ROOT, "Failed to check schema version for index [%s]", indexName),
+                        e,
+                        RestStatus.INTERNAL_SERVER_ERROR
+                    )
+                );
             }
             return;
         }
@@ -209,6 +216,48 @@ public class SearchRelevanceIndicesManager {
             org.opensearch.common.xcontent.XContentType.JSON
         );
         StashedThreadContext.run(client, () -> client.admin().indices().putMapping(putMappingRequest));
+    }
+
+    /**
+     * Update the mapping for an existing index with retry logic.
+     * Retries up to maxRetries times before failing.
+     * @param index the index whose mapping should be updated
+     * @param maxRetries maximum number of retry attempts
+     * @param stepListener listener to notify on success or failure
+     */
+    private void updateMappingWithRetry(final SearchRelevanceIndices index, final int maxRetries, final StepListener<Void> stepListener) {
+        String indexName = index.getIndexName();
+        Exception lastException = null;
+
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                updateMappingSync(index);
+                log.info("Successfully updated mapping for index [{}] on attempt {}", indexName, attempt);
+                stepListener.onResponse(null);
+                return;
+            } catch (Exception e) {
+                lastException = e;
+                log.warn("Failed to update mapping for index [{}] on attempt {}/{}: {}", indexName, attempt, maxRetries, e.getMessage());
+                if (attempt < maxRetries) {
+                    try {
+                        Thread.sleep(1000L * attempt); // Exponential backoff: 1s, 2s, 3s
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
+            }
+        }
+
+        // All retries exhausted - fail the service
+        log.error("Failed to update mapping for index [{}] after {} attempts", indexName, maxRetries);
+        stepListener.onFailure(
+            new SearchRelevanceException(
+                String.format(Locale.ROOT, "Failed to update mapping for index [%s] after %d attempts", indexName, maxRetries),
+                lastException,
+                RestStatus.INTERNAL_SERVER_ERROR
+            )
+        );
     }
 
     public SearchResponse getDocByDocIdSync(final String docId, final SearchRelevanceIndices index) {

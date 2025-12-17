@@ -54,45 +54,19 @@ public class IndexMappingVersionIT extends BaseSearchRelevanceIT {
     }
 
     /**
-     * Test that judgment cache index has correct schema_version.
-     * The judgment_cache index was updated to schema_version=1 with new fields
-     * (modelId, encodedPromptTemplate).
+     * Test that query set index has correct schema_version.
+     * This test creates a query set which triggers the query_set index creation.
      */
-    public void testJudgmentCacheIndexHasSchemaVersion() throws Exception {
-        // First, we need to trigger judgment cache index creation
-        // Create necessary resources: index, search config, query set, and judgment
-
+    public void testQuerySetIndexHasSchemaVersion() throws Exception {
         // Create test index
-        String testIndexName = "test-judgment-cache-schema";
+        String testIndexName = "test-queryset-schema";
         String indexConfig = "{ \"settings\": { \"number_of_shards\": 1, \"number_of_replicas\": 0 }, "
             + "\"mappings\": { \"properties\": { \"text\": { \"type\": \"text\" } } } }";
         createIndexWithConfiguration(testIndexName, indexConfig);
 
-        // Create search configuration
-        String searchConfigBody = "{"
-            + "\"name\": \"test-judgment-cache-config\","
-            + "\"description\": \"Test search config\","
-            + "\"index\": \""
-            + testIndexName
-            + "\","
-            + "\"query\": \"{\\\"match_all\\\": {}}\""
-            + "}";
-
-        Response searchConfigResp = makeRequest(
-            client(),
-            "PUT",
-            org.opensearch.searchrelevance.common.PluginConstants.SEARCH_CONFIGURATIONS_URL,
-            null,
-            toHttpEntity(searchConfigBody),
-            null
-        );
-        assertEquals(200, searchConfigResp.getStatusLine().getStatusCode());
-        Map<String, Object> searchConfigMap = convertToMap(searchConfigResp);
-        String searchConfigId = (String) searchConfigMap.get("search_configuration_id");
-
         // Create query set
         String querySetBody = "{"
-            + "\"name\": \"test-judgment-cache-queryset\","
+            + "\"name\": \"test-queryset-schema\","
             + "\"description\": \"Test query set\","
             + "\"sampling\": \"manual\","
             + "\"querySetQueries\": ["
@@ -109,12 +83,6 @@ public class IndexMappingVersionIT extends BaseSearchRelevanceIT {
             null
         );
         assertEquals(200, querySetResp.getStatusLine().getStatusCode());
-        Map<String, Object> querySetMap = convertToMap(querySetResp);
-        String querySetId = (String) querySetMap.get("query_set_id");
-
-        // Note: Creating an LLM judgment would trigger judgment cache index creation,
-        // but that requires a valid ML model ID. For this test, we just verify
-        // the other system indices have correct schema versions.
 
         // Verify query set index has schema_version
         String querySetIndex = org.opensearch.searchrelevance.common.PluginConstants.QUERY_SET_INDEX;

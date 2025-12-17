@@ -10,6 +10,11 @@ import org.opensearch.gradle.testclusters.StandaloneRestIntegTestTask
 
 apply from : "$rootDir/qa/build.gradle"
 
+// Add qa module's test classes to this submodule's classpath
+dependencies {
+    testImplementation project(path: ':qa', configuration: 'testArtifacts')
+}
+
 def ext=rootProject.ext
 String baseName = "searchRelevanceBwcCluster-restart"
 
