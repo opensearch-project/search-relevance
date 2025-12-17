@@ -68,8 +68,8 @@ public class SearchRelevanceIndicesManager {
     }
 
     /**
-     * Create a search relevance index if not exists
-     * @param index - index to be created
+     * Create a search relevance index if not exists, or update mapping if index exists but has older schema version.
+     * @param index - index to be created or updated
      * @param stepListener - step listener
      */
     public void createIndexIfAbsent(final SearchRelevanceIndices index, final StepListener<Void> stepListener) {
@@ -77,8 +77,25 @@ public class SearchRelevanceIndicesManager {
         String mapping = index.getMapping();
 
         if (clusterService.state().metadata().hasIndex(indexName)) {
-            log.debug("Index [{}] already exists, skipping creation", indexName);
-            stepListener.onResponse(null);
+            // Index exists - check if we need to update the mapping
+            try {
+                int existingVersion = getExistingSchemaVersion(indexName);
+                int currentVersion = index.getSchemaVersion();
+
+                if (existingVersion >= currentVersion) {
+                    log.debug("Index [{}] already exists with schema version [{}], skipping update", indexName, existingVersion);
+                    stepListener.onResponse(null);
+                    return;
+                }
+
+                // Existing version is older - update mapping synchronously
+                log.info("Updating index [{}] mapping from schema version [{}] to [{}]", indexName, existingVersion, currentVersion);
+                updateMappingSync(index);
+                stepListener.onResponse(null);
+            } catch (Exception e) {
+                log.warn("Failed to check/update schema version for index [{}]: {}", indexName, e.getMessage());
+                stepListener.onResponse(null);
+            }
             return;
         }
 

@@ -259,4 +259,5 @@ task zipBwcPlugin(type: Zip) {
 
 task bwcTestSuite {
     dependsOn ":qa:rolling-upgrade:testRollingUpgrade"
+    dependsOn ":qa:restart-upgrade:testRestartUpgrade"
 }
