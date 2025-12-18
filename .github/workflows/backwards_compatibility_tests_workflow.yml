@@ -22,7 +22,7 @@ jobs:
         java: [21, 25]
         os: [ubuntu-latest]
         bwc_version: ["3.3.0"]
-        opensearch_version: ["3.4.0-SNAPSHOT"]
+        opensearch_version: ["3.4.0"]
 
     name: SearchRelevance Rolling-Upgrade BWC Tests
     runs-on: ${{ matrix.os }}
@@ -55,7 +55,7 @@ jobs:
         java: [21, 25]
         os: [ubuntu-latest]
         bwc_version: ["3.3.0"]
-        opensearch_version: ["3.4.0-SNAPSHOT"]
+        opensearch_version: ["3.4.0"]
 
     name: SearchRelevance Restart-Upgrade BWC Tests
     runs-on: ${{ matrix.os }}
