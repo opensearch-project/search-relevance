@@ -9,7 +9,7 @@ package org.opensearch.searchrelevance.bwc.rolling;
 
 import static org.opensearch.searchrelevance.bwc.IndexMappingTestHelper.BWC_CLUSTER_TYPE_PROPERTY;
 import static org.opensearch.searchrelevance.bwc.IndexMappingTestHelper.BWC_VERSION_PROPERTY;
-import static org.opensearch.searchrelevance.bwc.IndexMappingTestHelper.CLIENT_SOCKET_TIMEOUT;
+import static org.opensearch.searchrelevance.bwc.IndexMappingTestHelper.CLIENT_TIMEOUT_VALUE;
 import static org.opensearch.searchrelevance.bwc.IndexMappingTestHelper.FIRST_ROUND_PROPERTY;
 import static org.opensearch.searchrelevance.bwc.IndexMappingTestHelper.MIXED_CLUSTER;
 import static org.opensearch.searchrelevance.bwc.IndexMappingTestHelper.OLD_CLUSTER;
@@ -72,7 +72,7 @@ public abstract class AbstractSearchRelevanceRollingUpgradeTestCase extends Open
     protected final Settings restClientSettings() {
         return Settings.builder()
             .put(super.restClientSettings())
-            .put(OpenSearchRestTestCase.CLIENT_SOCKET_TIMEOUT, CLIENT_SOCKET_TIMEOUT)
+            .put(OpenSearchRestTestCase.CLIENT_SOCKET_TIMEOUT, CLIENT_TIMEOUT_VALUE)
             .build();
     }
 

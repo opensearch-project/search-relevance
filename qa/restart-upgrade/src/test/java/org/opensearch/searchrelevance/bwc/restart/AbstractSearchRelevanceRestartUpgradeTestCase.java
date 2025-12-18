@@ -9,7 +9,7 @@ package org.opensearch.searchrelevance.bwc.restart;
 
 import static org.opensearch.searchrelevance.bwc.IndexMappingTestHelper.BWC_CLUSTER_TYPE_PROPERTY;
 import static org.opensearch.searchrelevance.bwc.IndexMappingTestHelper.BWC_VERSION_PROPERTY;
-import static org.opensearch.searchrelevance.bwc.IndexMappingTestHelper.CLIENT_SOCKET_TIMEOUT;
+import static org.opensearch.searchrelevance.bwc.IndexMappingTestHelper.CLIENT_TIMEOUT_VALUE;
 import static org.opensearch.searchrelevance.bwc.IndexMappingTestHelper.OLD_CLUSTER;
 import static org.opensearch.searchrelevance.bwc.IndexMappingTestHelper.RESTART_UPGRADE_BWC_PREFIX;
 import static org.opensearch.searchrelevance.bwc.IndexMappingTestHelper.RESTART_UPGRADE_JUDGMENT_PREFIX;
@@ -72,7 +72,7 @@ public abstract class AbstractSearchRelevanceRestartUpgradeTestCase extends Open
     protected final Settings restClientSettings() {
         return Settings.builder()
             .put(super.restClientSettings())
-            .put(OpenSearchRestTestCase.CLIENT_SOCKET_TIMEOUT, CLIENT_SOCKET_TIMEOUT)
+            .put(OpenSearchRestTestCase.CLIENT_SOCKET_TIMEOUT, CLIENT_TIMEOUT_VALUE)
             .build();
     }
 

@@ -38,11 +38,11 @@ public final class IndexMappingTestHelper {
     // ==================== Client Configuration ====================
 
     /**
-     * Client socket timeout for BWC tests.
+     * Client socket timeout value for BWC tests.
      * Extended timeout (120s) to accommodate delays during cluster transitions
      * such as node upgrades, shard rebalancing, and cluster state propagation.
      */
-    public static final String CLIENT_SOCKET_TIMEOUT = "120s";
+    public static final String CLIENT_TIMEOUT_VALUE = "120s";
 
     // ==================== System Property Keys ====================
 
