@@ -7,8 +7,13 @@
  */
 package org.opensearch.searchrelevance.bwc;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.apache.hc.core5.http.ParseException;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
@@ -25,55 +30,139 @@ import org.opensearch.core.xcontent.XContentParser;
 
 /**
  * Utility class for index mapping BWC tests.
- * Provides common helper methods for creating, validating, and updating index mappings
- * during backward compatibility tests.
+ * Provides common helper methods, constants, and configuration values
+ * for backward compatibility tests.
  */
 public final class IndexMappingTestHelper {
 
+    // ==================== Client Configuration ====================
+
+    /**
+     * Client socket timeout for BWC tests.
+     * Extended timeout (120s) to accommodate delays during cluster transitions
+     * such as node upgrades, shard rebalancing, and cluster state propagation.
+     */
+    public static final String CLIENT_SOCKET_TIMEOUT = "120s";
+
+    // ==================== System Property Keys ====================
+
+    /** System property key for BWC suite cluster type (old_cluster, mixed_cluster, upgraded_cluster) */
+    public static final String BWC_CLUSTER_TYPE_PROPERTY = "tests.rest.bwcsuite_cluster";
+
+    /** System property key for first round flag in mixed cluster phase */
+    public static final String FIRST_ROUND_PROPERTY = "tests.rest.first_round";
+
+    /** System property key for the BWC plugin version being tested */
+    public static final String BWC_VERSION_PROPERTY = "tests.plugin_bwc_version";
+
+    // ==================== Cluster Type Values ====================
+
+    /** Value for old cluster type in system property */
+    public static final String OLD_CLUSTER = "old_cluster";
+
+    /** Value for mixed cluster type in system property */
+    public static final String MIXED_CLUSTER = "mixed_cluster";
+
+    /** Value for upgraded cluster type in system property */
+    public static final String UPGRADED_CLUSTER = "upgraded_cluster";
+
+    // ==================== BWC Test Prefixes ====================
+
+    /** Prefix for rolling upgrade BWC test index names */
+    public static final String ROLLING_UPGRADE_BWC_PREFIX = "search-relevance-bwc-";
+
+    /** Prefix for restart upgrade BWC test index names */
+    public static final String RESTART_UPGRADE_BWC_PREFIX = "search-relevance-bwc-restart-";
+
+    /** Prefix for rolling upgrade query set names */
+    public static final String ROLLING_UPGRADE_QUERYSET_PREFIX = "bwc-queryset-";
+
+    /** Prefix for restart upgrade query set names */
+    public static final String RESTART_UPGRADE_QUERYSET_PREFIX = "bwc-restart-queryset-";
+
+    /** Prefix for rolling upgrade judgment names */
+    public static final String ROLLING_UPGRADE_JUDGMENT_PREFIX = "bwc-judgment-";
+
+    /** Prefix for restart upgrade judgment names */
+    public static final String RESTART_UPGRADE_JUDGMENT_PREFIX = "bwc-restart-judgment-";
+
+    /** Prefix for rolling upgrade search config names */
+    public static final String ROLLING_UPGRADE_SEARCH_CONFIG_PREFIX = "bwc-search-config-";
+
+    /** Prefix for restart upgrade search config names */
+    public static final String RESTART_UPGRADE_SEARCH_CONFIG_PREFIX = "bwc-restart-search-config-";
+
+    // ==================== Index and Mapping Configuration ====================
+
     public static final String JUDGMENT_CACHE_INDEX = ".plugins-search-relevance-judgment-cache";
 
-    // Old schema (version 0) - without modelId and encodedPromptTemplate fields
-    public static final String OLD_MAPPING = "{"
-        + "\"_meta\": { \"schema_version\": 0 },"
-        + "\"properties\": {"
-        + "  \"id\": { \"type\": \"keyword\" },"
-        + "  \"timestamp\": { \"type\": \"date\", \"format\": \"strict_date_time\" },"
-        + "  \"querySet\": { \"type\": \"keyword\" },"
-        + "  \"documentId\": { \"type\": \"keyword\" },"
-        + "  \"contextFieldsStr\": { \"type\": \"keyword\" },"
-        + "  \"rating\": { \"type\": \"keyword\" }"
-        + "}"
-        + "}";
+    /** Resource path for old mapping (schema version 0) */
+    public static final String OLD_MAPPING_RESOURCE = "mappings/judgment_cache_v0.json";
 
-    // New schema (version 1) - with modelId and encodedPromptTemplate fields
-    public static final String NEW_MAPPING = "{"
-        + "\"_meta\": { \"schema_version\": 1 },"
-        + "\"properties\": {"
-        + "  \"id\": { \"type\": \"keyword\" },"
-        + "  \"timestamp\": { \"type\": \"date\", \"format\": \"strict_date_time\" },"
-        + "  \"querySet\": { \"type\": \"keyword\" },"
-        + "  \"documentId\": { \"type\": \"keyword\" },"
-        + "  \"contextFieldsStr\": { \"type\": \"keyword\" },"
-        + "  \"rating\": { \"type\": \"keyword\" },"
-        + "  \"modelId\": { \"type\": \"keyword\" },"
-        + "  \"encodedPromptTemplate\": { \"type\": \"keyword\" }"
-        + "}"
-        + "}";
+    /** Resource path for new mapping (schema version 1) */
+    public static final String NEW_MAPPING_RESOURCE = "mappings/judgment_cache_v1.json";
 
-    public static final String TEST_DOCUMENT = "{"
-        + "\"id\": \"test-cache-entry\","
-        + "\"timestamp\": \"2024-01-01T00:00:00.000Z\","
-        + "\"querySet\": \"test-query-set\","
-        + "\"documentId\": \"doc-1\","
-        + "\"contextFieldsStr\": \"field1,field2\","
-        + "\"rating\": \"0.85\""
-        + "}";
+    /** Resource path for test document */
+    public static final String TEST_DOCUMENT_RESOURCE = "mappings/test_document.json";
 
+    /** Test document ID for BWC tests */
     public static final String TEST_DOC_ID = "test-doc-1";
 
     private IndexMappingTestHelper() {
         // Utility class - prevent instantiation
     }
+
+    // ==================== Resource Loading Methods ====================
+
+    /**
+     * Reads a mapping file from the classpath resources.
+     *
+     * @param resourcePath Path to the resource file (e.g., "mappings/judgment_cache_v0.json")
+     * @return The content of the file as a String
+     * @throws IOException if the resource cannot be read
+     */
+    public static String readMappingResource(String resourcePath) throws IOException {
+        try (InputStream inputStream = IndexMappingTestHelper.class.getClassLoader().getResourceAsStream(resourcePath)) {
+            if (inputStream == null) {
+                throw new IOException("Resource not found: " + resourcePath);
+            }
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
+                return reader.lines().collect(Collectors.joining("\n"));
+            }
+        }
+    }
+
+    /**
+     * Gets the old mapping (schema version 0) from resources.
+     *
+     * @return The old mapping JSON string
+     * @throws IOException if the resource cannot be read
+     */
+    public static String getOldMapping() throws IOException {
+        return readMappingResource(OLD_MAPPING_RESOURCE);
+    }
+
+    /**
+     * Gets the new mapping (schema version 1) from resources.
+     *
+     * @return The new mapping JSON string
+     * @throws IOException if the resource cannot be read
+     */
+    public static String getNewMapping() throws IOException {
+        return readMappingResource(NEW_MAPPING_RESOURCE);
+    }
+
+    /**
+     * Gets the test document from resources.
+     *
+     * @return The test document JSON string
+     * @throws IOException if the resource cannot be read
+     */
+    public static String getTestDocument() throws IOException {
+        return readMappingResource(TEST_DOCUMENT_RESOURCE);
+    }
+
+    // ==================== Index Operations ====================
 
     /**
      * Creates an index with the specified mapping.

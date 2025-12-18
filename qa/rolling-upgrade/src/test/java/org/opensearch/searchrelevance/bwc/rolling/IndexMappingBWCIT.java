@@ -8,9 +8,6 @@
 package org.opensearch.searchrelevance.bwc.rolling;
 
 import static org.opensearch.searchrelevance.bwc.IndexMappingTestHelper.JUDGMENT_CACHE_INDEX;
-import static org.opensearch.searchrelevance.bwc.IndexMappingTestHelper.NEW_MAPPING;
-import static org.opensearch.searchrelevance.bwc.IndexMappingTestHelper.OLD_MAPPING;
-import static org.opensearch.searchrelevance.bwc.IndexMappingTestHelper.TEST_DOCUMENT;
 import static org.opensearch.searchrelevance.bwc.IndexMappingTestHelper.TEST_DOC_ID;
 
 import java.util.Map;
@@ -60,7 +57,8 @@ public class IndexMappingBWCIT extends AbstractSearchRelevanceRollingUpgradeTest
      */
     private void testCreateIndexWithOldMappingInOldCluster() throws Exception {
         // Create the judgment_cache index with old mapping (version 0)
-        IndexMappingTestHelper.createIndexWithMapping(client(), JUDGMENT_CACHE_INDEX, OLD_MAPPING, logger);
+        String oldMapping = IndexMappingTestHelper.getOldMapping();
+        IndexMappingTestHelper.createIndexWithMapping(client(), JUDGMENT_CACHE_INDEX, oldMapping, logger);
 
         // Wait for cluster to propagate the index creation
         Thread.sleep(2000);
@@ -85,7 +83,8 @@ public class IndexMappingBWCIT extends AbstractSearchRelevanceRollingUpgradeTest
         assertEquals("Schema version should be 0 in OLD cluster", 0, ((Number) meta.get("schema_version")).intValue());
 
         // Insert a test document to ensure the index has data
-        IndexMappingTestHelper.insertTestDocument(client(), JUDGMENT_CACHE_INDEX, TEST_DOC_ID, TEST_DOCUMENT);
+        String testDocument = IndexMappingTestHelper.getTestDocument();
+        IndexMappingTestHelper.insertTestDocument(client(), JUDGMENT_CACHE_INDEX, TEST_DOC_ID, testDocument);
 
         logger.info("OLD cluster: Created judgment_cache index with schema_version=0");
     }
@@ -136,7 +135,8 @@ public class IndexMappingBWCIT extends AbstractSearchRelevanceRollingUpgradeTest
         assertNotNull("Test document should still be accessible after upgrade", doc);
 
         // Update the mapping directly to add new fields (simulates what createIndexIfAbsent does)
-        IndexMappingTestHelper.updateMapping(client(), JUDGMENT_CACHE_INDEX, NEW_MAPPING, logger);
+        String newMapping = IndexMappingTestHelper.getNewMapping();
+        IndexMappingTestHelper.updateMapping(client(), JUDGMENT_CACHE_INDEX, newMapping, logger);
 
         // Wait for mapping update to complete
         IndexMappingTestHelper.waitForMappingUpdate(
