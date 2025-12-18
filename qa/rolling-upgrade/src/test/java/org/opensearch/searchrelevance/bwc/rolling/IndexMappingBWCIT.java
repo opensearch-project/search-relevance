@@ -60,9 +60,6 @@ public class IndexMappingBWCIT extends AbstractSearchRelevanceRollingUpgradeTest
         String oldMapping = IndexMappingTestHelper.getOldMapping();
         IndexMappingTestHelper.createIndexWithMapping(client(), JUDGMENT_CACHE_INDEX, oldMapping, logger);
 
-        // Wait for cluster to propagate the index creation
-        Thread.sleep(2000);
-
         // Verify the index was created
         assertTrue("Judgment cache index should exist", IndexMappingTestHelper.checkIndexExists(client(), JUDGMENT_CACHE_INDEX, logger));
 
