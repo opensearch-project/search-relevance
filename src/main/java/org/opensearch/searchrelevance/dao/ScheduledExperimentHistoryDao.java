@@ -7,6 +7,7 @@
  */
 package org.opensearch.searchrelevance.dao;
 
+import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_ID;
 import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.SCHEDULED_EXPERIMENT_HISTORY;
 
 import java.io.IOException;
@@ -21,6 +22,7 @@ import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.core.xcontent.ToXContent;
 import org.opensearch.index.query.QueryBuilders;
+import org.opensearch.index.reindex.BulkByScrollResponse;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager;
@@ -41,7 +43,7 @@ public class ScheduledExperimentHistoryDao {
 
     /**
      * Create scheduled experiment history index if not exists
-     * @param stepListener - step lister for async operation
+     * @param stepListener - step listener for async operation
      */
     public void createIndexIfAbsent(final StepListener<Void> stepListener) {
         searchRelevanceIndicesManager.createIndexIfAbsent(SCHEDULED_EXPERIMENT_HISTORY, stepListener);
@@ -50,7 +52,7 @@ public class ScheduledExperimentHistoryDao {
     /**
      * Stores scheduled experiment result in the system index
      * @param scheduledExperimentResult - Scheduled experiment result content to be stored
-     * @param listener - action lister for async operation
+     * @param listener - action listener for async operation
      */
     public void putScheduledExperimentResult(final ScheduledExperimentResult scheduledExperimentResult, final ActionListener listener) {
         if (scheduledExperimentResult == null) {
@@ -89,16 +91,28 @@ public class ScheduledExperimentHistoryDao {
     /**
      * Delete scheduled experiment result by scheduledExperimentResultId
      * @param scheduledExperimentResultId - id to be deleted
-     * @param listener - action lister for async operation
+     * @param listener - action listener for async operation
      */
     public void deleteScheduledExperimentResult(final String scheduledExperimentResultId, final ActionListener<DeleteResponse> listener) {
         searchRelevanceIndicesManager.deleteDocByDocId(scheduledExperimentResultId, SCHEDULED_EXPERIMENT_HISTORY, listener);
     }
 
     /**
+     * Delete scheduled experiment history by experimentId
+     * @param experimentId - id to be deleted
+     * @param listener - action listener for async operation
+     */
+    public void deleteScheduledExperimentHistoryByExperimentId(
+        final String experimentId,
+        final ActionListener<BulkByScrollResponse> listener
+    ) {
+        searchRelevanceIndicesManager.deleteByQuery(experimentId, EXPERIMENT_ID, SCHEDULED_EXPERIMENT_HISTORY, listener);
+    }
+
+    /**
      * Get scheduled experiment result by scheduledExperimentResultId
      * @param scheduledExperimentResultId - id to be deleted
-     * @param listener - action lister for async operation
+     * @param listener - action listener for async operation
      */
     public SearchResponse getScheduledExperimentResult(String scheduledExperimentResultId, ActionListener<SearchResponse> listener) {
         if (scheduledExperimentResultId == null || scheduledExperimentResultId.isEmpty()) {
@@ -113,7 +127,7 @@ public class ScheduledExperimentHistoryDao {
     /**
      * List scheduled experiment result by source builder
      * @param sourceBuilder - source builder to be searched
-     * @param listener - action lister for async operation
+     * @param listener - action listener for async operation
      */
     public SearchResponse listScheduledExperimentResult(SearchSourceBuilder sourceBuilder, ActionListener<SearchResponse> listener) {
         // Apply default values if not set

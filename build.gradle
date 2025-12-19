@@ -86,6 +86,13 @@ java {
 }
 
 ext {
+
+    default_bwc_version = System.getProperty("bwc.version")
+    default_bwc_bundle_version= System.getProperty("bwc.bundle.version")
+    bwcBundleTest = (project.findProperty('customDistributionDownloadType') != null && project.properties['customDistributionDownloadType'] == "bundle")
+    search_relevance_bwc_version = bwcBundleTest ? System.getProperty("tests.bwc.bundle.version",rootProject.ext.default_bwc_bundle_version): System.getProperty("tests.bwc.version", rootProject.ext.default_bwc_version)
+    currentBundleVersion = opensearch_version.replace("-SNAPSHOT","")
+
     projectSubstitutions = [:]
     licenseFile = rootProject.file('LICENSE.txt')
     noticeFile = rootProject.file('NOTICE.txt')
@@ -200,7 +207,7 @@ configurations {
 configurations.all {
     resolutionStrategy {
         force("com.google.guava:guava:33.4.8-jre") // CVE for 31.1
-        force("com.google.errorprone:error_prone_annotations:2.43.0") // Fix version conflict
+        force("com.google.errorprone:error_prone_annotations:2.45.0") // Fix version conflict
     }
     exclude group: 'org.slf4j', module: 'slf4j-log4j12'
 }
@@ -211,8 +218,8 @@ dependencies {
     api group: 'org.opensearch', name:'opensearch-ml-client', version: "${opensearch_build}"
     compileOnly "org.opensearch:opensearch-job-scheduler-spi:${opensearch_build}"
     implementation group: 'com.google.guava', name: 'guava', version:'33.4.8-jre'
-    compileOnly group: 'org.apache.commons', name: 'commons-lang3', version: '3.19.0'
-    implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.19.0'
+    compileOnly group: 'org.apache.commons', name: 'commons-lang3', version: '3.20.0'
+    implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.20.0'
     implementation group: 'org.apache.commons', name: 'commons-math3', version: '3.6.1'
     implementation "org.opensearch:common-utils:${common_utils_version}"
     implementation "com.fasterxml.jackson.core:jackson-annotations:${versions.jackson}"
@@ -224,12 +231,12 @@ dependencies {
     runtimeOnly group: 'org.reflections', name: 'reflections', version: '0.9.12'  // Note the version change
     runtimeOnly group: 'org.javassist', name: 'javassist', version: '3.30.2-GA'
     runtimeOnly group: 'org.opensearch', name: 'common-utils', version: "${opensearch_build}"
-    runtimeOnly group: 'org.apache.commons', name: 'commons-text', version: '1.14.0'
+    runtimeOnly group: 'org.apache.commons', name: 'commons-text', version: '1.15.0'
     runtimeOnly group: 'com.google.code.gson', name: 'gson', version: '2.13.1'
     runtimeOnly group: 'org.json', name: 'json', version: '20250517'
     // json-path 2.9.0 depends on slf4j 2.0.11, which conflicts with the version used by OpenSearch core.
     // Excluding slf4j here since json-path is only used for testing, and logging failures in this context are acceptable.
-    runtimeOnly('com.jayway.jsonpath:json-path:2.9.0') {
+    runtimeOnly('com.jayway.jsonpath:json-path:2.10.0') {
         // OpenSearch core is using slf4j 1.7.36. Therefore, we cannot change the version here.
         exclude group: 'org.slf4j', module: 'slf4j-api'
         exclude group: 'net.minidev', module: 'json-smart'
@@ -530,6 +537,8 @@ opensearch_tmp_dir.mkdirs()
 integTest {
     systemProperty 'tests.security.manager', 'false'
     systemProperty 'java.io.tmpdir', opensearch_tmp_dir.absolutePath
+    // allows integration test classes to access test resource from project root path
+    systemProperty 'project.root', project.rootDir.absolutePath
     systemProperty 'buildDir', buildDir.path
     systemProperty "https", securityEnabled
     systemProperty "security", securityEnabled

@@ -39,7 +39,7 @@ import lombok.SneakyThrows;
 @OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.SUITE)
 public class CalculateJudgmentsIT extends BaseSearchRelevanceIT {
     public void initializeUBIIndices() throws IOException, URISyntaxException {
-        if (System.getProperty("ubi.available").equals("true")) {
+        if (System.getProperty("ubi.available", "false").equals("true")) {
             makeRequest(
                 client(),
                 RestRequest.Method.POST.name(),

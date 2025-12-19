@@ -50,27 +50,27 @@ public class LlmJudgmentTaskManager {
     }
 
     public void scheduleTasksAsync(
-        List<String> queryTextWithReferences,
+        List<String> queryTextsWithCustomInput,
         Function<String, Map<String, Object>> queryProcessor,
         boolean ignoreFailure,
         ActionListener<List<Map<String, Object>>> listener
     ) {
-        int totalQueries = queryTextWithReferences.size();
+        int totalQueries = queryTextsWithCustomInput.size();
         log.info("Scheduling {} query text tasks for concurrent processing", totalQueries);
 
         try {
-            List<CompletableFuture<Map<String, Object>>> futures = queryTextWithReferences.stream()
-                .map(queryTextWithReference -> CompletableFuture.supplyAsync(() -> {
+            List<CompletableFuture<Map<String, Object>>> futures = queryTextsWithCustomInput.stream()
+                .map(queryTextWithCustomInput -> CompletableFuture.supplyAsync(() -> {
                     try {
                         rateLimiter.acquire();
                         try {
-                            return queryProcessor.apply(queryTextWithReference);
+                            return queryProcessor.apply(queryTextWithCustomInput);
                         } finally {
                             rateLimiter.release();
                         }
                     } catch (Exception e) {
-                        log.warn("Query processing failed, returning empty result for: {}", queryTextWithReference, e);
-                        return JudgmentDataTransformer.createJudgmentResult(queryTextWithReference, Map.of());
+                        log.warn("Query processing failed, returning empty result for: {}", queryTextWithCustomInput, e);
+                        return JudgmentDataTransformer.createJudgmentResult(queryTextWithCustomInput, Map.of());
                     }
                 }, threadPool.executor(THREAD_POOL_EXECUTOR_NAME)))
                 .collect(Collectors.toList());

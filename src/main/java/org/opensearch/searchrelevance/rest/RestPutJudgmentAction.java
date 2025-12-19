@@ -9,6 +9,10 @@ package org.opensearch.searchrelevance.rest;
 
 import static java.util.Collections.singletonList;
 import static org.opensearch.rest.RestRequest.Method.PUT;
+import static org.opensearch.searchrelevance.common.MLConstants.DEFAULT_PROMPT_TEMPLATE;
+import static org.opensearch.searchrelevance.common.MLConstants.LLM_JUDGMENT_RATING_TYPE;
+import static org.opensearch.searchrelevance.common.MLConstants.OVERWRITE_CACHE;
+import static org.opensearch.searchrelevance.common.MLConstants.PROMPT_TEMPLATE;
 import static org.opensearch.searchrelevance.common.MLConstants.validateTokenLimit;
 import static org.opensearch.searchrelevance.common.MetricsConstants.MODEL_ID;
 import static org.opensearch.searchrelevance.common.PluginConstants.CLICK_MODEL;
@@ -28,6 +32,7 @@ import static org.opensearch.searchrelevance.common.PluginConstants.TYPE;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
@@ -44,6 +49,7 @@ import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.model.JudgmentType;
+import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.searchrelevance.transport.judgment.PutImportJudgmentRequest;
 import org.opensearch.searchrelevance.transport.judgment.PutJudgmentAction;
@@ -126,6 +132,40 @@ public class RestPutJudgmentAction extends BaseRestHandler {
 
                 int tokenLimit = validateTokenLimit(source);
                 List<String> contextFields = ParserUtils.convertObjToList(source, CONTEXT_FIELDS);
+
+                // Prompt template - validate and use simple default if not provided
+                String promptTemplate = (String) source.get(PROMPT_TEMPLATE);
+
+                // Validate prompt template contains required {{hits}} or {{results}} placeholder
+                TextValidationUtil.ValidationResult promptValidation = TextValidationUtil.validatePromptTemplate(promptTemplate);
+                if (!promptValidation.isValid()) {
+                    throw new SearchRelevanceException(promptValidation.getErrorMessage(), RestStatus.BAD_REQUEST);
+                }
+
+                if (promptTemplate == null || promptTemplate.trim().isEmpty()) {
+                    promptTemplate = DEFAULT_PROMPT_TEMPLATE;
+                }
+
+                // Rating type - can be null, will be validated at processor level
+                String llmJudgmentRatingTypeStr = (String) source.get(LLM_JUDGMENT_RATING_TYPE);
+                LLMJudgmentRatingType llmJudgmentRatingType = null;
+                if (llmJudgmentRatingTypeStr != null) {
+                    try {
+                        llmJudgmentRatingType = LLMJudgmentRatingType.valueOf(llmJudgmentRatingTypeStr);
+                    } catch (IllegalArgumentException e) {
+                        throw new SearchRelevanceException(
+                            String.format(
+                                Locale.ROOT,
+                                "Invalid RatingType: '%s'. Valid values are: %s",
+                                llmJudgmentRatingTypeStr,
+                                LLMJudgmentRatingType.getValidValues()
+                            ),
+                            RestStatus.BAD_REQUEST
+                        );
+                    }
+                }
+                boolean overwriteCache = Optional.ofNullable((Boolean) source.get(OVERWRITE_CACHE)).orElse(Boolean.FALSE);
+
                 createRequest = new PutLlmJudgmentRequest(
                     type,
                     name,
@@ -136,7 +176,10 @@ public class RestPutJudgmentAction extends BaseRestHandler {
                     size,
                     tokenLimit,
                     contextFields,
-                    ignoreFailure
+                    ignoreFailure,
+                    promptTemplate,
+                    llmJudgmentRatingType,
+                    overwriteCache
                 );
             }
             case UBI_JUDGMENT -> {

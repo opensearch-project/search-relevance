@@ -13,6 +13,7 @@ import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_IND
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import org.apache.hc.core5.http.HttpHeaders;
@@ -31,6 +32,45 @@ import lombok.SneakyThrows;
 @ThreadLeakScope(ThreadLeakScope.Scope.NONE)
 @OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.SUITE)
 public class JudgmentsIT extends BaseSearchRelevanceIT {
+
+    @SuppressWarnings("unchecked")
+    private List<String> extractStatuses(Map<String, Object> result) {
+        Map<String, Object> hitsObj = (Map<String, Object>) result.get("hits");
+        List<Map<String, Object>> hits = (List<Map<String, Object>>) hitsObj.get("hits");
+
+        return hits.stream().map(h -> (Map<String, Object>) h.get("_source")).map(src -> (String) src.get("status")).toList();
+    }
+
+    @SneakyThrows
+    private void createJudgment(String body) {
+        makeRequest(
+            client(),
+            "PUT",
+            JUDGMENTS_URL,
+            null,
+            toHttpEntity(body),
+            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
+        );
+    }
+
+    @SneakyThrows
+    private void assertStatusFilter() {
+        Map<String, Object> result = entityAsMap(
+            makeRequest(
+                client(),
+                "GET",
+                JUDGMENTS_URL,
+                Map.of("status", "COMPLETED"),
+                null,
+                ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
+            )
+        );
+
+        List<String> statuses = extractStatuses(result);
+
+        // Expect COMPLETED judgment
+        assertEquals(List.of("COMPLETED"), statuses);
+    }
 
     @SneakyThrows
     public void testMainActions_whenImportReadJudgments_thenSuccessful() {
@@ -120,4 +160,30 @@ public class JudgmentsIT extends BaseSearchRelevanceIT {
             )
         );
     }
+
+    @SneakyThrows
+    public void testListJudgments_filteringByStatus_thenSuccessful() {
+        String createBase = """
+            {
+              "name": "FilterTest",
+              "type": "IMPORT_JUDGMENT",
+              "judgmentRatings": [
+                {
+                  "query": "shoes",
+                  "ratings": [
+                    { "docId": "abc", "rating": "1.0" }
+                  ]
+                }
+              ]
+            }
+            """;
+
+        // Create judgment
+        createJudgment(createBase);
+        Thread.sleep(DEFAULT_INTERVAL_MS);
+
+        // Asserts
+        assertStatusFilter();
+    }
+
 }

@@ -1,0 +1,6 @@
+{
+  "name": "Products Multi-Field Search",
+  "description": "Search both name and description fields",
+  "index": "{{index}}",
+  "query": "{\"query\": {\"multi_match\": {\"query\": \"%SearchText%\", \"fields\": [\"name\", \"description\"]}}}"
+}

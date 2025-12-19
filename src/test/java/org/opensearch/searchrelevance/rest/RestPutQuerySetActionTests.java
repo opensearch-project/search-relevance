@@ -12,6 +12,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import java.io.IOException;
+import java.util.Map;
 
 import org.mockito.ArgumentCaptor;
 import org.opensearch.action.index.IndexResponse;
@@ -189,6 +190,161 @@ public class RestPutQuerySetActionTests extends SearchRelevanceRestTestCase {
         verify(channel).sendResponse(responseCaptor.capture());
         assertEquals(RestStatus.BAD_REQUEST, responseCaptor.getValue().status());
         String response = responseCaptor.getValue().content().utf8ToString();
-        assertTrue("Response should contain 'Invalid referenceAnswer': " + response, response.contains("Invalid referenceAnswer"));
+        assertTrue(
+            "Response should contain error about invalid referenceAnswer value: " + response,
+            response.contains("referenceAnswer") && response.contains("invalid characters")
+        );
+    }
+
+    public void testPrepareRequest_WithNumericExpectedScore() throws Exception {
+        // Test that numeric values like expectedScore are properly converted to strings
+        String content = "{"
+            + "\"name\": \"test_name\","
+            + "\"description\": \"test_description\","
+            + "\"sampling\": \"manual\","
+            + "\"querySetQueries\": ["
+            + "  {\"queryText\": \"test\", \"expectedScore\": 1.0}"
+            + "]"
+            + "}";
+
+        // Setup
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        when(settingsAccessor.getMaxQuerySetAllowed()).thenReturn(1000);
+        RestRequest request = createPutRestRequestWithContent(content, "query_sets");
+        when(channel.request()).thenReturn(request);
+
+        // Mock index response
+        IndexResponse mockIndexResponse = mock(IndexResponse.class);
+        when(mockIndexResponse.getId()).thenReturn("test_id");
+
+        ArgumentCaptor<PutQuerySetRequest> requestCaptor = ArgumentCaptor.forClass(PutQuerySetRequest.class);
+
+        doAnswer(invocation -> {
+            ActionListener<IndexResponse> listener = invocation.getArgument(2);
+            listener.onResponse(mockIndexResponse);
+            return null;
+        }).when(client).execute(eq(PutQuerySetAction.INSTANCE), requestCaptor.capture(), any());
+
+        // Execute
+        restPutQuerySetAction.handleRequest(request, channel, client);
+
+        // Verify the expectedScore was converted to string "1.0"
+        PutQuerySetRequest capturedRequest = requestCaptor.getValue();
+        assertEquals("1.0", capturedRequest.getQuerySetQueries().get(0).getCustomizedKeyValueMap().get("expectedScore"));
+    }
+
+    public void testPrepareRequest_WithBooleanValue() throws Exception {
+        // Test that boolean values are properly converted to strings
+        String content = "{"
+            + "\"name\": \"test_name\","
+            + "\"description\": \"test_description\","
+            + "\"sampling\": \"manual\","
+            + "\"querySetQueries\": ["
+            + "  {\"queryText\": \"test\", \"isRelevant\": true}"
+            + "]"
+            + "}";
+
+        // Setup
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        when(settingsAccessor.getMaxQuerySetAllowed()).thenReturn(1000);
+        RestRequest request = createPutRestRequestWithContent(content, "query_sets");
+        when(channel.request()).thenReturn(request);
+
+        // Mock index response
+        IndexResponse mockIndexResponse = mock(IndexResponse.class);
+        when(mockIndexResponse.getId()).thenReturn("test_id");
+
+        ArgumentCaptor<PutQuerySetRequest> requestCaptor = ArgumentCaptor.forClass(PutQuerySetRequest.class);
+
+        doAnswer(invocation -> {
+            ActionListener<IndexResponse> listener = invocation.getArgument(2);
+            listener.onResponse(mockIndexResponse);
+            return null;
+        }).when(client).execute(eq(PutQuerySetAction.INSTANCE), requestCaptor.capture(), any());
+
+        // Execute
+        restPutQuerySetAction.handleRequest(request, channel, client);
+
+        // Verify the boolean was converted to string "true"
+        PutQuerySetRequest capturedRequest = requestCaptor.getValue();
+        assertEquals("true", capturedRequest.getQuerySetQueries().get(0).getCustomizedKeyValueMap().get("isRelevant"));
+    }
+
+    public void testPrepareRequest_WithIntegerValue() throws Exception {
+        // Test that integer values are properly converted to strings
+        String content = "{"
+            + "\"name\": \"test_name\","
+            + "\"description\": \"test_description\","
+            + "\"sampling\": \"manual\","
+            + "\"querySetQueries\": ["
+            + "  {\"queryText\": \"test\", \"rank\": 5}"
+            + "]"
+            + "}";
+
+        // Setup
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        when(settingsAccessor.getMaxQuerySetAllowed()).thenReturn(1000);
+        RestRequest request = createPutRestRequestWithContent(content, "query_sets");
+        when(channel.request()).thenReturn(request);
+
+        // Mock index response
+        IndexResponse mockIndexResponse = mock(IndexResponse.class);
+        when(mockIndexResponse.getId()).thenReturn("test_id");
+
+        ArgumentCaptor<PutQuerySetRequest> requestCaptor = ArgumentCaptor.forClass(PutQuerySetRequest.class);
+
+        doAnswer(invocation -> {
+            ActionListener<IndexResponse> listener = invocation.getArgument(2);
+            listener.onResponse(mockIndexResponse);
+            return null;
+        }).when(client).execute(eq(PutQuerySetAction.INSTANCE), requestCaptor.capture(), any());
+
+        // Execute
+        restPutQuerySetAction.handleRequest(request, channel, client);
+
+        // Verify the integer was converted to string "5"
+        PutQuerySetRequest capturedRequest = requestCaptor.getValue();
+        assertEquals("5", capturedRequest.getQuerySetQueries().get(0).getCustomizedKeyValueMap().get("rank"));
+    }
+
+    public void testPrepareRequest_WithMixedTypes() throws Exception {
+        // Test that multiple different types are all properly converted to strings
+        String content = "{"
+            + "\"name\": \"test_name\","
+            + "\"description\": \"test_description\","
+            + "\"sampling\": \"manual\","
+            + "\"querySetQueries\": ["
+            + "  {\"queryText\": \"test\", \"expectedScore\": 1.5, \"rank\": 3, \"isRelevant\": true, \"category\": \"product\"}"
+            + "]"
+            + "}";
+
+        // Setup
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        when(settingsAccessor.getMaxQuerySetAllowed()).thenReturn(1000);
+        RestRequest request = createPutRestRequestWithContent(content, "query_sets");
+        when(channel.request()).thenReturn(request);
+
+        // Mock index response
+        IndexResponse mockIndexResponse = mock(IndexResponse.class);
+        when(mockIndexResponse.getId()).thenReturn("test_id");
+
+        ArgumentCaptor<PutQuerySetRequest> requestCaptor = ArgumentCaptor.forClass(PutQuerySetRequest.class);
+
+        doAnswer(invocation -> {
+            ActionListener<IndexResponse> listener = invocation.getArgument(2);
+            listener.onResponse(mockIndexResponse);
+            return null;
+        }).when(client).execute(eq(PutQuerySetAction.INSTANCE), requestCaptor.capture(), any());
+
+        // Execute
+        restPutQuerySetAction.handleRequest(request, channel, client);
+
+        // Verify all types were converted to strings
+        PutQuerySetRequest capturedRequest = requestCaptor.getValue();
+        Map<String, String> customMap = capturedRequest.getQuerySetQueries().get(0).getCustomizedKeyValueMap();
+        assertEquals("1.5", customMap.get("expectedScore"));
+        assertEquals("3", customMap.get("rank"));
+        assertEquals("true", customMap.get("isRelevant"));
+        assertEquals("product", customMap.get("category"));
     }
 }

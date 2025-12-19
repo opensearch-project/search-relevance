@@ -17,9 +17,9 @@ import java.util.stream.Collectors;
  */
 public class JudgmentDataTransformer {
 
-    public static Map<String, Object> createJudgmentResult(String queryTextWithReference, Map<String, String> docIdToScore) {
+    public static Map<String, Object> createJudgmentResult(String queryTextWithCustomInput, Map<String, String> docIdToScore) {
         Map<String, Object> judgmentForQuery = new HashMap<>();
-        judgmentForQuery.put("query", queryTextWithReference);
+        judgmentForQuery.put("query", queryTextWithCustomInput);
 
         List<Map<String, String>> docIdRatings = docIdToScore == null
             ? List.of()
@@ -32,7 +32,7 @@ public class JudgmentDataTransformer {
         return judgmentForQuery;
     }
 
-    public static String extractQueryText(String queryTextWithReference, String delimiter) {
-        return queryTextWithReference.split(delimiter, 2)[0];
+    public static String extractQueryText(String queryTextWithCustomInput, String delimiter) {
+        return queryTextWithCustomInput.split(delimiter, 2)[0];
     }
 }

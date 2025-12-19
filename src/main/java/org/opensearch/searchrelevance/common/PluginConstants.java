@@ -97,4 +97,7 @@ public class PluginConstants {
 
     public static final int DEFAULTED_QUERY_SET_SIZE = 10;
     public static final String MANUAL = "manual";
+    public static final String PROCEED = "proceed";
+    public static final String ABORT = "abort";
+    public static final int BATCH_SIZE_FOR_DELETE_BY_QUERY = 1000;
 }

@@ -30,6 +30,7 @@ import org.opensearch.action.DocWriteResponse;
 import org.opensearch.action.StepListener;
 import org.opensearch.action.admin.indices.create.CreateIndexRequest;
 import org.opensearch.action.admin.indices.create.CreateIndexResponse;
+import org.opensearch.action.admin.indices.mapping.put.PutMappingRequest;
 import org.opensearch.action.delete.DeleteRequestBuilder;
 import org.opensearch.action.delete.DeleteResponse;
 import org.opensearch.action.index.IndexRequestBuilder;
@@ -37,6 +38,8 @@ import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.support.WriteRequest;
 import org.opensearch.cluster.ClusterState;
+import org.opensearch.cluster.metadata.IndexMetadata;
+import org.opensearch.cluster.metadata.MappingMetadata;
 import org.opensearch.cluster.metadata.Metadata;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.settings.Settings;
@@ -412,6 +415,281 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         assertTrue(capturedException instanceof SearchRelevanceException);
         assertEquals("Failed to delete doc", capturedException.getMessage());
         assertEquals(RestStatus.INTERNAL_SERVER_ERROR, ((SearchRelevanceException) capturedException).status());
+    }
+
+    // ==================== Schema Version-Based Mapping Update Tests ====================
+
+    /**
+     * Test that when index does not exist, it is created (no mapping update)
+     */
+    public void testCreateIndexIfAbsentSync_IndexDoesNotExist_CreatesIndex() throws IOException {
+        // Setup: index does not exist
+        when(metadata.hasIndex(QUERY_SET.getIndexName())).thenReturn(false);
+
+        // Mock the sync create index call (createIndexIfAbsentSync uses sync version without listener)
+        org.opensearch.action.support.PlainActionFuture<CreateIndexResponse> createFuture =
+            new org.opensearch.action.support.PlainActionFuture<>();
+        createFuture.onResponse(new CreateIndexResponse(true, true, QUERY_SET.getIndexName()));
+        when(indicesAdminClient.create(any(CreateIndexRequest.class))).thenReturn(createFuture);
+
+        // Execute via putDoc (which calls executeWithIndexCreationSynchronizedMode -> createIndexIfAbsentSync)
+        QuerySet querySet = new QuerySet("test_id", "test_name", "test_description", "test_timestamp", "test_sampling", List.of());
+        XContentBuilder xContentBuilder = querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
+
+        IndexRequestBuilder indexRequestBuilder = mock(IndexRequestBuilder.class);
+        when(client.prepareIndex(QUERY_SET.getIndexName())).thenReturn(indexRequestBuilder);
+        when(indexRequestBuilder.setId("test_id")).thenReturn(indexRequestBuilder);
+        when(indexRequestBuilder.setOpType(DocWriteRequest.OpType.CREATE)).thenReturn(indexRequestBuilder);
+        when(indexRequestBuilder.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)).thenReturn(indexRequestBuilder);
+        when(indexRequestBuilder.setSource(xContentBuilder)).thenReturn(indexRequestBuilder);
+
+        @SuppressWarnings("unchecked")
+        ActionListener<SearchResponse> listener = mock(ActionListener.class);
+        indicesManager.putDoc("test_id", xContentBuilder, QUERY_SET, listener);
+
+        // Verify: create index was called (sync version), putMapping was NOT called
+        verify(indicesAdminClient).create(any(CreateIndexRequest.class));
+        verify(indicesAdminClient, never()).putMapping(any(PutMappingRequest.class));
+    }
+
+    /**
+     * Test that when index exists with same schema version, no mapping update occurs
+     */
+    public void testCreateIndexIfAbsentSync_IndexExistsWithSameVersion_NoUpdate() throws IOException {
+        // Setup: index exists with same schema version as current
+        when(metadata.hasIndex(QUERY_SET.getIndexName())).thenReturn(true);
+
+        // Mock IndexMetadata with schema version matching current
+        IndexMetadata indexMetadata = mock(IndexMetadata.class);
+        MappingMetadata mappingMetadata = mock(MappingMetadata.class);
+        when(metadata.index(QUERY_SET.getIndexName())).thenReturn(indexMetadata);
+        when(indexMetadata.mapping()).thenReturn(mappingMetadata);
+
+        // Create mapping source with current schema version
+        Map<String, Object> metaMap = new HashMap<>();
+        metaMap.put(SearchRelevanceIndices.META_SCHEMA_VERSION_KEY, QUERY_SET.getSchemaVersion());
+        Map<String, Object> mappingSource = new HashMap<>();
+        mappingSource.put("_meta", metaMap);
+        when(mappingMetadata.sourceAsMap()).thenReturn(mappingSource);
+
+        // Execute via putDoc
+        QuerySet querySet = new QuerySet("test_id", "test_name", "test_description", "test_timestamp", "test_sampling", List.of());
+        XContentBuilder xContentBuilder = querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
+
+        IndexRequestBuilder indexRequestBuilder = mock(IndexRequestBuilder.class);
+        when(client.prepareIndex(QUERY_SET.getIndexName())).thenReturn(indexRequestBuilder);
+        when(indexRequestBuilder.setId("test_id")).thenReturn(indexRequestBuilder);
+        when(indexRequestBuilder.setOpType(DocWriteRequest.OpType.CREATE)).thenReturn(indexRequestBuilder);
+        when(indexRequestBuilder.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)).thenReturn(indexRequestBuilder);
+        when(indexRequestBuilder.setSource(xContentBuilder)).thenReturn(indexRequestBuilder);
+
+        @SuppressWarnings("unchecked")
+        ActionListener<SearchResponse> listener = mock(ActionListener.class);
+        indicesManager.putDoc("test_id", xContentBuilder, QUERY_SET, listener);
+
+        // Verify: create index NOT called, putMapping NOT called (version is same)
+        verify(indicesAdminClient, never()).create(any(CreateIndexRequest.class), any(ActionListener.class));
+        verify(indicesAdminClient, never()).putMapping(any(PutMappingRequest.class));
+    }
+
+    /**
+     * Test that when index exists without _meta.schema_version (legacy index, version 0),
+     * NO mapping update occurs when current version is also 0.
+     */
+    public void testCreateIndexIfAbsentSync_LegacyIndexWithoutSchemaVersion_NoUpdate() throws IOException {
+        // Setup: index exists with no schema version (legacy index = version 0)
+        // Current JSON schema_version is also 0, so no update needed
+        when(metadata.hasIndex(QUERY_SET.getIndexName())).thenReturn(true);
+
+        // Mock IndexMetadata with no _meta field (legacy index)
+        IndexMetadata indexMetadata = mock(IndexMetadata.class);
+        MappingMetadata mappingMetadata = mock(MappingMetadata.class);
+        when(metadata.index(QUERY_SET.getIndexName())).thenReturn(indexMetadata);
+        when(indexMetadata.mapping()).thenReturn(mappingMetadata);
+
+        // No _meta field in mapping source (simulating legacy index = version 0)
+        Map<String, Object> mappingSource = new HashMap<>();
+        mappingSource.put("properties", new HashMap<>());
+        when(mappingMetadata.sourceAsMap()).thenReturn(mappingSource);
+
+        // Execute via putDoc
+        QuerySet querySet = new QuerySet("test_id", "test_name", "test_description", "test_timestamp", "test_sampling", List.of());
+        XContentBuilder xContentBuilder = querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
+
+        IndexRequestBuilder indexRequestBuilder = mock(IndexRequestBuilder.class);
+        when(client.prepareIndex(QUERY_SET.getIndexName())).thenReturn(indexRequestBuilder);
+        when(indexRequestBuilder.setId("test_id")).thenReturn(indexRequestBuilder);
+        when(indexRequestBuilder.setOpType(DocWriteRequest.OpType.CREATE)).thenReturn(indexRequestBuilder);
+        when(indexRequestBuilder.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)).thenReturn(indexRequestBuilder);
+        when(indexRequestBuilder.setSource(xContentBuilder)).thenReturn(indexRequestBuilder);
+
+        @SuppressWarnings("unchecked")
+        ActionListener<SearchResponse> listener = mock(ActionListener.class);
+        indicesManager.putDoc("test_id", xContentBuilder, QUERY_SET, listener);
+
+        // Verify: create index NOT called, putMapping NOT called (version 0 >= 0)
+        verify(indicesAdminClient, never()).create(any(CreateIndexRequest.class), any(ActionListener.class));
+        verify(indicesAdminClient, never()).putMapping(any(PutMappingRequest.class));
+    }
+
+    /**
+     * Test that when index exists with null mapping (unexpected state),
+     * an exception is thrown.
+     */
+    public void testCreateIndexIfAbsentSync_IndexExistsWithNullMapping_ThrowsException() throws IOException {
+        // Setup: index exists but has no mapping - unexpected state, should throw exception
+        when(metadata.hasIndex(QUERY_SET.getIndexName())).thenReturn(true);
+
+        IndexMetadata indexMetadata = mock(IndexMetadata.class);
+        when(metadata.index(QUERY_SET.getIndexName())).thenReturn(indexMetadata);
+        when(indexMetadata.mapping()).thenReturn(null); // No mapping = unexpected state
+
+        // Execute via putDoc
+        QuerySet querySet = new QuerySet("test_id", "test_name", "test_description", "test_timestamp", "test_sampling", List.of());
+        XContentBuilder xContentBuilder = querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
+
+        IndexRequestBuilder indexRequestBuilder = mock(IndexRequestBuilder.class);
+        when(client.prepareIndex(QUERY_SET.getIndexName())).thenReturn(indexRequestBuilder);
+        when(indexRequestBuilder.setId("test_id")).thenReturn(indexRequestBuilder);
+        when(indexRequestBuilder.setOpType(DocWriteRequest.OpType.CREATE)).thenReturn(indexRequestBuilder);
+        when(indexRequestBuilder.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)).thenReturn(indexRequestBuilder);
+        when(indexRequestBuilder.setSource(xContentBuilder)).thenReturn(indexRequestBuilder);
+
+        @SuppressWarnings("unchecked")
+        ActionListener<SearchResponse> listener = mock(ActionListener.class);
+
+        // Expect exception when mapping is null
+        SearchRelevanceException exception = assertThrows(SearchRelevanceException.class, () -> {
+            indicesManager.putDoc("test_id", xContentBuilder, QUERY_SET, listener);
+        });
+
+        assertTrue(exception.getMessage().contains("Failed to get schema version for index"));
+    }
+
+    /**
+     * Test that when index exists with explicit schema_version matching current version,
+     * NO mapping update occurs.
+     */
+    public void testCreateIndexIfAbsentSync_IndexExistsWithSameExplicitVersion_NoUpdate() throws IOException {
+        // Setup: index exists with explicit schema version 0 (same as current)
+        when(metadata.hasIndex(QUERY_SET.getIndexName())).thenReturn(true);
+
+        IndexMetadata indexMetadata = mock(IndexMetadata.class);
+        MappingMetadata mappingMetadata = mock(MappingMetadata.class);
+        when(metadata.index(QUERY_SET.getIndexName())).thenReturn(indexMetadata);
+        when(indexMetadata.mapping()).thenReturn(mappingMetadata);
+
+        // Set explicit schema_version = 0 (same as current JSON version)
+        Map<String, Object> metaMap = new HashMap<>();
+        metaMap.put(SearchRelevanceIndices.META_SCHEMA_VERSION_KEY, 0);
+        Map<String, Object> mappingSource = new HashMap<>();
+        mappingSource.put("_meta", metaMap);
+        mappingSource.put("properties", new HashMap<>());
+        when(mappingMetadata.sourceAsMap()).thenReturn(mappingSource);
+
+        // Execute via putDoc
+        QuerySet querySet = new QuerySet("test_id", "test_name", "test_description", "test_timestamp", "test_sampling", List.of());
+        XContentBuilder xContentBuilder = querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
+
+        IndexRequestBuilder indexRequestBuilder = mock(IndexRequestBuilder.class);
+        when(client.prepareIndex(QUERY_SET.getIndexName())).thenReturn(indexRequestBuilder);
+        when(indexRequestBuilder.setId("test_id")).thenReturn(indexRequestBuilder);
+        when(indexRequestBuilder.setOpType(DocWriteRequest.OpType.CREATE)).thenReturn(indexRequestBuilder);
+        when(indexRequestBuilder.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)).thenReturn(indexRequestBuilder);
+        when(indexRequestBuilder.setSource(xContentBuilder)).thenReturn(indexRequestBuilder);
+
+        @SuppressWarnings("unchecked")
+        ActionListener<SearchResponse> listener = mock(ActionListener.class);
+        indicesManager.putDoc("test_id", xContentBuilder, QUERY_SET, listener);
+
+        // Verify: putMapping NOT called (explicit version 0 >= current version 0)
+        verify(indicesAdminClient, never()).create(any(CreateIndexRequest.class), any(ActionListener.class));
+        verify(indicesAdminClient, never()).putMapping(any(PutMappingRequest.class));
+    }
+
+    /**
+     * Test that when index exists with newer schema_version than current,
+     * NO mapping update occurs (future-proofing for downgrades).
+     */
+    public void testCreateIndexIfAbsentSync_IndexExistsWithNewerVersion_NoUpdate() throws IOException {
+        // Setup: index exists with schema version 5 (newer than current 0)
+        when(metadata.hasIndex(QUERY_SET.getIndexName())).thenReturn(true);
+
+        IndexMetadata indexMetadata = mock(IndexMetadata.class);
+        MappingMetadata mappingMetadata = mock(MappingMetadata.class);
+        when(metadata.index(QUERY_SET.getIndexName())).thenReturn(indexMetadata);
+        when(indexMetadata.mapping()).thenReturn(mappingMetadata);
+
+        // Set explicit schema_version = 5 (newer than current)
+        Map<String, Object> metaMap = new HashMap<>();
+        metaMap.put(SearchRelevanceIndices.META_SCHEMA_VERSION_KEY, 5);
+        Map<String, Object> mappingSource = new HashMap<>();
+        mappingSource.put("_meta", metaMap);
+        mappingSource.put("properties", new HashMap<>());
+        when(mappingMetadata.sourceAsMap()).thenReturn(mappingSource);
+
+        // Execute via putDoc
+        QuerySet querySet = new QuerySet("test_id", "test_name", "test_description", "test_timestamp", "test_sampling", List.of());
+        XContentBuilder xContentBuilder = querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
+
+        IndexRequestBuilder indexRequestBuilder = mock(IndexRequestBuilder.class);
+        when(client.prepareIndex(QUERY_SET.getIndexName())).thenReturn(indexRequestBuilder);
+        when(indexRequestBuilder.setId("test_id")).thenReturn(indexRequestBuilder);
+        when(indexRequestBuilder.setOpType(DocWriteRequest.OpType.CREATE)).thenReturn(indexRequestBuilder);
+        when(indexRequestBuilder.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)).thenReturn(indexRequestBuilder);
+        when(indexRequestBuilder.setSource(xContentBuilder)).thenReturn(indexRequestBuilder);
+
+        @SuppressWarnings("unchecked")
+        ActionListener<SearchResponse> listener = mock(ActionListener.class);
+        indicesManager.putDoc("test_id", xContentBuilder, QUERY_SET, listener);
+
+        // Verify: putMapping NOT called (version 5 >= current version 0)
+        verify(indicesAdminClient, never()).create(any(CreateIndexRequest.class), any(ActionListener.class));
+        verify(indicesAdminClient, never()).putMapping(any(PutMappingRequest.class));
+    }
+
+    /**
+     * Test that when index exists with older schema_version than current,
+     * mapping update IS triggered.
+     * Note: This test simulates the scenario by setting index version to -2 (older than any valid version).
+     * In real usage, this would happen when JSON schema_version is bumped (e.g., 0 -> 1).
+     */
+    public void testCreateIndexIfAbsentSync_IndexExistsWithOlderVersion_UpdatesMapping() throws IOException {
+        // Setup: index exists with schema version -2 (older than current 0)
+        // This simulates what happens when we bump JSON version from 0 to 1 and index still has 0
+        when(metadata.hasIndex(QUERY_SET.getIndexName())).thenReturn(true);
+
+        IndexMetadata indexMetadata = mock(IndexMetadata.class);
+        MappingMetadata mappingMetadata = mock(MappingMetadata.class);
+        when(metadata.index(QUERY_SET.getIndexName())).thenReturn(indexMetadata);
+        when(indexMetadata.mapping()).thenReturn(mappingMetadata);
+
+        // Set explicit schema_version = -2 (older than current version 0)
+        Map<String, Object> metaMap = new HashMap<>();
+        metaMap.put(SearchRelevanceIndices.META_SCHEMA_VERSION_KEY, -2);
+        Map<String, Object> mappingSource = new HashMap<>();
+        mappingSource.put("_meta", metaMap);
+        mappingSource.put("properties", new HashMap<>());
+        when(mappingMetadata.sourceAsMap()).thenReturn(mappingSource);
+
+        // Execute via putDoc
+        QuerySet querySet = new QuerySet("test_id", "test_name", "test_description", "test_timestamp", "test_sampling", List.of());
+        XContentBuilder xContentBuilder = querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
+
+        IndexRequestBuilder indexRequestBuilder = mock(IndexRequestBuilder.class);
+        when(client.prepareIndex(QUERY_SET.getIndexName())).thenReturn(indexRequestBuilder);
+        when(indexRequestBuilder.setId("test_id")).thenReturn(indexRequestBuilder);
+        when(indexRequestBuilder.setOpType(DocWriteRequest.OpType.CREATE)).thenReturn(indexRequestBuilder);
+        when(indexRequestBuilder.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)).thenReturn(indexRequestBuilder);
+        when(indexRequestBuilder.setSource(xContentBuilder)).thenReturn(indexRequestBuilder);
+
+        @SuppressWarnings("unchecked")
+        ActionListener<SearchResponse> listener = mock(ActionListener.class);
+        indicesManager.putDoc("test_id", xContentBuilder, QUERY_SET, listener);
+
+        // Verify: putMapping WAS called (version -2 < current version 0)
+        verify(indicesAdminClient, never()).create(any(CreateIndexRequest.class), any(ActionListener.class));
+        verify(indicesAdminClient).putMapping(any(PutMappingRequest.class));
     }
 
 }

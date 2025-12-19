@@ -25,14 +25,14 @@ public class JudgmentDataTransformerTests extends OpenSearchTestCase {
 
     public void testCreateJudgmentResultWithRatings() {
         // Arrange
-        String queryTextWithReference = "laptop||Professional laptop for business";
+        String queryTextWithCustomInput = "laptop||Professional laptop for business";
         Map<String, String> docIdToScore = Map.of("doc1", "0.9", "doc2", "0.7", "doc3", "0.5");
 
         // Act
-        Map<String, Object> result = transformer.createJudgmentResult(queryTextWithReference, docIdToScore);
+        Map<String, Object> result = transformer.createJudgmentResult(queryTextWithCustomInput, docIdToScore);
 
         // Assert
-        assertEquals(queryTextWithReference, result.get("query"));
+        assertEquals(queryTextWithCustomInput, result.get("query"));
 
         List<Map<String, Object>> ratings = (List<Map<String, Object>>) result.get("ratings");
         assertEquals(3, ratings.size());
@@ -54,14 +54,14 @@ public class JudgmentDataTransformerTests extends OpenSearchTestCase {
 
     public void testCreateJudgmentResultWithEmptyRatings() {
         // Arrange
-        String queryTextWithReference = "laptop||Professional laptop for business";
+        String queryTextWithCustomInput = "laptop||Professional laptop for business";
         Map<String, String> docIdToScore = Map.of();
 
         // Act
-        Map<String, Object> result = transformer.createJudgmentResult(queryTextWithReference, docIdToScore);
+        Map<String, Object> result = transformer.createJudgmentResult(queryTextWithCustomInput, docIdToScore);
 
         // Assert
-        assertEquals(queryTextWithReference, result.get("query"));
+        assertEquals(queryTextWithCustomInput, result.get("query"));
 
         List<Map<String, Object>> ratings = (List<Map<String, Object>>) result.get("ratings");
         assertEquals(0, ratings.size());
@@ -69,14 +69,14 @@ public class JudgmentDataTransformerTests extends OpenSearchTestCase {
 
     public void testCreateJudgmentResultWithNullRatings() {
         // Arrange
-        String queryTextWithReference = "laptop||Professional laptop for business";
+        String queryTextWithCustomInput = "laptop||Professional laptop for business";
         Map<String, String> docIdToScore = null;
 
         // Act
-        Map<String, Object> result = transformer.createJudgmentResult(queryTextWithReference, docIdToScore);
+        Map<String, Object> result = transformer.createJudgmentResult(queryTextWithCustomInput, docIdToScore);
 
         // Assert
-        assertEquals(queryTextWithReference, result.get("query"));
+        assertEquals(queryTextWithCustomInput, result.get("query"));
 
         List<Map<String, Object>> ratings = (List<Map<String, Object>>) result.get("ratings");
         assertEquals(0, ratings.size());
@@ -84,14 +84,14 @@ public class JudgmentDataTransformerTests extends OpenSearchTestCase {
 
     public void testCreateJudgmentResultWithQueryOnly() {
         // Arrange
-        String queryTextWithReference = "laptop";
+        String queryTextWithCustomInput = "laptop";
         Map<String, String> docIdToScore = Map.of("doc1", "0.8");
 
         // Act
-        Map<String, Object> result = transformer.createJudgmentResult(queryTextWithReference, docIdToScore);
+        Map<String, Object> result = transformer.createJudgmentResult(queryTextWithCustomInput, docIdToScore);
 
         // Assert
-        assertEquals(queryTextWithReference, result.get("query"));
+        assertEquals(queryTextWithCustomInput, result.get("query"));
 
         List<Map<String, Object>> ratings = (List<Map<String, Object>>) result.get("ratings");
         assertEquals(1, ratings.size());
@@ -101,11 +101,11 @@ public class JudgmentDataTransformerTests extends OpenSearchTestCase {
 
     public void testCreateJudgmentResultRatingStructure() {
         // Arrange
-        String queryTextWithReference = "test query";
+        String queryTextWithCustomInput = "test query";
         Map<String, String> docIdToScore = Map.of("testDoc", "0.95");
 
         // Act
-        Map<String, Object> result = transformer.createJudgmentResult(queryTextWithReference, docIdToScore);
+        Map<String, Object> result = transformer.createJudgmentResult(queryTextWithCustomInput, docIdToScore);
 
         // Assert
         List<Map<String, Object>> ratings = (List<Map<String, Object>>) result.get("ratings");
@@ -120,11 +120,11 @@ public class JudgmentDataTransformerTests extends OpenSearchTestCase {
 
     public void testCreateJudgmentResultMultipleRatingsOrder() {
         // Arrange
-        String queryTextWithReference = "test query";
+        String queryTextWithCustomInput = "test query";
         Map<String, String> docIdToScore = Map.of("docA", "0.1", "docB", "0.2", "docC", "0.3");
 
         // Act
-        Map<String, Object> result = transformer.createJudgmentResult(queryTextWithReference, docIdToScore);
+        Map<String, Object> result = transformer.createJudgmentResult(queryTextWithCustomInput, docIdToScore);
 
         // Assert
         List<Map<String, Object>> ratings = (List<Map<String, Object>>) result.get("ratings");
@@ -140,14 +140,14 @@ public class JudgmentDataTransformerTests extends OpenSearchTestCase {
 
     public void testCreateJudgmentResultWithSpecialCharacters() {
         // Arrange
-        String queryTextWithReference = "special||query with \"quotes\" and 'apostrophes'";
+        String queryTextWithCustomInput = "special||query with \"quotes\" and 'apostrophes'";
         Map<String, String> docIdToScore = Map.of("doc-with-dash", "0.6");
 
         // Act
-        Map<String, Object> result = transformer.createJudgmentResult(queryTextWithReference, docIdToScore);
+        Map<String, Object> result = transformer.createJudgmentResult(queryTextWithCustomInput, docIdToScore);
 
         // Assert
-        assertEquals(queryTextWithReference, result.get("query"));
+        assertEquals(queryTextWithCustomInput, result.get("query"));
 
         List<Map<String, Object>> ratings = (List<Map<String, Object>>) result.get("ratings");
         assertEquals(1, ratings.size());
@@ -157,11 +157,11 @@ public class JudgmentDataTransformerTests extends OpenSearchTestCase {
 
     public void testCreateJudgmentResultWithZeroRating() {
         // Arrange
-        String queryTextWithReference = "test query";
+        String queryTextWithCustomInput = "test query";
         Map<String, String> docIdToScore = Map.of("doc1", "0.0");
 
         // Act
-        Map<String, Object> result = transformer.createJudgmentResult(queryTextWithReference, docIdToScore);
+        Map<String, Object> result = transformer.createJudgmentResult(queryTextWithCustomInput, docIdToScore);
 
         // Assert
         List<Map<String, Object>> ratings = (List<Map<String, Object>>) result.get("ratings");
@@ -172,11 +172,11 @@ public class JudgmentDataTransformerTests extends OpenSearchTestCase {
 
     public void testCreateJudgmentResultWithMaxRating() {
         // Arrange
-        String queryTextWithReference = "test query";
+        String queryTextWithCustomInput = "test query";
         Map<String, String> docIdToScore = Map.of("doc1", "1.0");
 
         // Act
-        Map<String, Object> result = transformer.createJudgmentResult(queryTextWithReference, docIdToScore);
+        Map<String, Object> result = transformer.createJudgmentResult(queryTextWithCustomInput, docIdToScore);
 
         // Assert
         List<Map<String, Object>> ratings = (List<Map<String, Object>>) result.get("ratings");
