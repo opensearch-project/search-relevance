@@ -25,6 +25,8 @@ import java.util.Map;
 import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.hc.core5.http.message.BasicHeader;
 import org.opensearch.client.Response;
+import org.opensearch.common.xcontent.XContentFactory;
+import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.searchrelevance.BaseSearchRelevanceIT;
 
@@ -229,6 +231,30 @@ public abstract class BaseExperimentIT extends BaseSearchRelevanceIT {
         // Assert that we have a valid experiment status
         assertEquals("Experiment status must be COMPLETED", "COMPLETED", status);
         return source;
+    }
+
+    protected int findExperimentResultCount(String index, String experimentId) throws IOException {
+        String getExperimentVariantCountByIdUrl = String.format(Locale.ROOT, "/%s/_count", index);
+        XContentBuilder builder = XContentFactory.jsonBuilder()
+            .startObject()
+            .startObject("query")
+            .startObject("term")
+            .field("experimentId", experimentId)
+            .endObject()
+            .endObject()
+            .endObject();
+        Response getCountResponse = makeRequest(
+            adminClient(),
+            RestRequest.Method.GET.name(),
+            getExperimentVariantCountByIdUrl,
+            null,
+            toHttpEntity(builder.toString()),
+            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
+        );
+
+        Map<String, Object> entityMap = entityAsMap(getCountResponse);
+        assertNotNull(entityMap);
+        return (int) entityMap.get("count");
     }
 
     protected void assertListsHaveSameElements(List<String> expected, List<String> actual) {

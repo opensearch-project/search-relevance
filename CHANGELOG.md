@@ -7,23 +7,19 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 ### Breaking Changes
 
 ### Features
-* Added APIs and components to implement running scheduled experiments ([#220](https://github.com/opensearch-project/search-relevance/pull/220))
+- adds version-based index mapping update support to the Search Relevance plugin [#344](https://github.com/opensearch-project/search-relevance/pull/344)
+* LLM Judgement Customized Prompt Template Implementation  [#264](https://github.com/opensearch-project/search-relevance/pull/264)
 
 ### Enhancements
 
 ### Bug Fixes
 * Added `status` filter support to judgment listing API to prevent incomplete judgment groups from appearing in create experiment workflow ([#304](https://github.com/opensearch-project/search-relevance/pull/304))
-* Fixed floating-point precision issues in Hybrid Optimizer weight generation by switching to step-based iteration and rounding, ensuring clean and consistent weight pairs. ([#308](https://github.com/opensearch-project/search-relevance/pull/308))
-* Fixed hybrid optimizer experiments stuck in `PROCESSING` after judgment deletion by correcting failure handling. [#292](https://github.com/opensearch-project/search-relevance/pull/292)
+* Fix yellow cluster status on single-node clusters ([#329](https://github.com/opensearch-project/search-relevance/issues/329))
 
 ### Infrastructure
-
-* Use a system property to control run integ test with security plugin. [#287](https://github.com/opensearch-project/search-relevance/pull/287)
 
 ### Documentation
 
 ### Maintenance
-* Fixed duplicate JDWP configuration in the `integTest` Gradle task that caused `Cannot load this JVM TI agent twice` errors when running with `-Dtest.debug=1`. ([#296](https://github.com/opensearch-project/search-relevance/pull/296))
-* Removed deprecated `AccessController.doPrivileged()` usage in `JsonUtils` to prevent warnings and ensure compatibility with newer Java versions. ([#307](https://github.com/opensearch-project/search-relevance/pull/307))
 
 ### Refactoring

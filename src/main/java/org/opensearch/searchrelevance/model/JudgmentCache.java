@@ -23,6 +23,7 @@ public class JudgmentCache implements ToXContentObject {
     public static final String TIME_STAMP = "timestamp";
     public static final String RATING = "rating";
     public static final String MODEL_ID = "modelId";
+    public static final String PROMPT_TEMPLATE_ID = "encodedPromptTemplate";
 
     /**
      * Identifier of the system index
@@ -34,6 +35,7 @@ public class JudgmentCache implements ToXContentObject {
     private String contextFieldsStr;
     private String rating;
     private String modelId;
+    private String promptTemplateId;
 
     public JudgmentCache(
         String id,
@@ -42,7 +44,8 @@ public class JudgmentCache implements ToXContentObject {
         String documentId,
         List<String> contextFields,
         String rating,
-        String modelId
+        String modelId,
+        String promptTemplateId
     ) {
         this.id = id;
         this.timestamp = timestamp;
@@ -51,6 +54,7 @@ public class JudgmentCache implements ToXContentObject {
         this.contextFieldsStr = convertListToSortedStr(contextFields);
         this.rating = rating;
         this.modelId = modelId;
+        this.promptTemplateId = promptTemplateId;
     }
 
     @Override
@@ -63,6 +67,7 @@ public class JudgmentCache implements ToXContentObject {
         xContentBuilder.field(CONTEXT_FIELDS_STR, this.contextFieldsStr);
         xContentBuilder.field(RATING, this.rating.trim());
         xContentBuilder.field(MODEL_ID, this.modelId.trim());
+        xContentBuilder.field(PROMPT_TEMPLATE_ID, this.promptTemplateId.trim());
         return xContentBuilder.endObject();
     }
 

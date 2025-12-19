@@ -13,6 +13,7 @@ import java.util.List;
 import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.core.common.io.stream.StreamOutput;
 import org.opensearch.searchrelevance.model.JudgmentType;
+import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
 
 import reactor.util.annotation.NonNull;
 
@@ -41,6 +42,21 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
      */
     private boolean ignoreFailure;
 
+    /**
+     * Customized prompt template input by customers.
+     */
+    private String promptTemplate;  // contains place_holder with vals defined in QuerySet
+
+    /**
+     * Output type defined for prefilled prompt and JSON output processor
+     */
+    private LLMJudgmentRatingType llmJudgmentRatingType;
+
+    /**
+     * Flag to indicate whether to use judgment cache
+     */
+    private boolean overwriteCache;
+
     public PutLlmJudgmentRequest(
         @NonNull JudgmentType type,
         @NonNull String name,
@@ -51,7 +67,10 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         int size,
         int tokenLimit,
         List<String> contextFields,
-        boolean ignoreFailure
+        boolean ignoreFailure,
+        String promptTemplate,
+        LLMJudgmentRatingType llmJudgmentRatingType,
+        boolean overwriteCache
     ) {
         super(type, name, description);
         this.modelId = modelId;
@@ -61,6 +80,9 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         this.tokenLimit = tokenLimit;
         this.contextFields = contextFields;
         this.ignoreFailure = ignoreFailure;
+        this.promptTemplate = promptTemplate;
+        this.llmJudgmentRatingType = llmJudgmentRatingType;
+        this.overwriteCache = overwriteCache;
     }
 
     public PutLlmJudgmentRequest(StreamInput in) throws IOException {
@@ -72,6 +94,9 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         this.tokenLimit = in.readOptionalInt();
         this.contextFields = in.readOptionalStringList();
         this.ignoreFailure = Boolean.TRUE.equals(in.readOptionalBoolean()); // by defaulted as false if not provided
+        this.promptTemplate = in.readOptionalString();
+        this.llmJudgmentRatingType = in.readOptionalWriteable(LLMJudgmentRatingType::readFromStream);
+        this.overwriteCache = Boolean.TRUE.equals(in.readOptionalBoolean());
     }
 
     @Override
@@ -84,6 +109,9 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         out.writeOptionalInt(tokenLimit);
         out.writeOptionalStringArray(contextFields.toArray(new String[0]));
         out.writeOptionalBoolean(ignoreFailure);
+        out.writeOptionalString(promptTemplate);
+        out.writeOptionalWriteable(llmJudgmentRatingType);
+        out.writeOptionalBoolean(overwriteCache);
     }
 
     public String getModelId() {
@@ -112,6 +140,18 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
 
     public boolean isIgnoreFailure() {
         return ignoreFailure;
+    }
+
+    public String getPromptTemplate() {
+        return promptTemplate;
+    }
+
+    public LLMJudgmentRatingType getLlmJudgmentRatingType() {
+        return llmJudgmentRatingType;
+    }
+
+    public boolean isOverwriteCache() {
+        return overwriteCache;
     }
 
 }

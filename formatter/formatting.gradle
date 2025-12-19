@@ -1,4 +1,5 @@
 allprojects {
+    apply plugin: "com.diffplug.spotless"
     spotless {
         java {
             // Normally this isn't necessary, but we have Java sources in

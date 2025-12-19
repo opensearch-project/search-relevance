@@ -22,7 +22,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.unit.TimeValue;
 import org.opensearch.common.util.concurrent.OpenSearchExecutors;
@@ -43,7 +42,6 @@ import org.opensearch.transport.client.Client;
 public class ExperimentTaskManagerTests extends OpenSearchTestCase {
 
     private Client client;
-    private ClusterService clusterService;
     private EvaluationResultDao evaluationResultDao;
     private ExperimentVariantDao experimentVariantDao;
     private ThreadPool threadPool;
@@ -53,7 +51,6 @@ public class ExperimentTaskManagerTests extends OpenSearchTestCase {
     public void setUp() throws Exception {
         super.setUp();
         client = mock(Client.class);
-        clusterService = mock(ClusterService.class);
         evaluationResultDao = mock(EvaluationResultDao.class);
         experimentVariantDao = mock(ExperimentVariantDao.class);
         threadPool = mock(ThreadPool.class);
@@ -267,7 +264,7 @@ public class ExperimentTaskManagerTests extends OpenSearchTestCase {
         }
     }
 
-    public void testConfigMapInitialization() throws Exception {
+    public void testConfigMapInitialization() {
         // Arrange
         ExperimentTaskManager taskManager = new ExperimentTaskManager(client, evaluationResultDao, experimentVariantDao, threadPool);
         String experimentId = "test-experiment";

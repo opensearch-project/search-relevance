@@ -1,0 +1,14 @@
+{
+  "name": "LLM Judgment with Prompt Template",
+  "type": "LLM_JUDGMENT",
+  "querySetId": "{{querySetId}}",
+  "searchConfigurationList": ["{{searchConfigId}}"],
+  "modelId": "test_model_id",
+  "size": 5,
+  "tokenLimit": 4000,
+  "contextFields": ["name", "description"],
+  "ignoreFailure": false,
+  "llmJudgmentRatingType": "SCORE0_1",
+  "promptTemplate": "Given the query {{queryText}} and reference answer {{referenceAnswer}}, rate the relevance of these search results {{hits}} on a scale of 0-1.",
+  "overwriteCache": false
+}

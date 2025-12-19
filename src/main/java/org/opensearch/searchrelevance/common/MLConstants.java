@@ -10,6 +10,8 @@ package org.opensearch.searchrelevance.common;
 import java.util.Locale;
 import java.util.Map;
 
+import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
+
 /**
  * ML related constants.
  */
@@ -21,6 +23,25 @@ public class MLConstants {
      * ML input field names
      */
     public static final String PARAM_MESSAGES_FIELD = "messages";
+    public static final String PROMPT_TEMPLATE = "promptTemplate";
+    public static final String LLM_JUDGMENT_RATING_TYPE = "llmJudgmentRatingType";
+    public static final String OVERWRITE_CACHE = "overwriteCache";
+
+    /**
+     * Prompt template placeholder names.
+     * These are the special variables that can be used in custom prompt templates.
+     */
+    public static final String PLACEHOLDER_QUERY_TEXT = "queryText";
+    public static final String PLACEHOLDER_SEARCH_TEXT = "searchText";
+    public static final String PLACEHOLDER_HITS = "hits";
+    public static final String PLACEHOLDER_RESULTS = "results";
+    public static final String PLACEHOLDER_REFERENCE = "reference";
+    public static final String PLACEHOLDER_REFERENCE_ANSWER = "referenceAnswer";
+
+    /**
+     * Default prompt template for LLM judgments (simple format without reference data)
+     */
+    public static final String DEFAULT_PROMPT_TEMPLATE = "SearchText: {{searchText}}; Hits: {{hits}}";
 
     /**
      * ML response field names
@@ -30,31 +51,91 @@ public class MLConstants {
     public static final String RESPONSE_CONTENT_FIELD = "content";
 
     /**
+     * LLM RELEVANT/IRRELEVANT String
+     */
+    public static final String RELEVANT_DECISION_STRING = "RELEVANT";
+    public static final String IRRELEVANT_DECISION_STRING = "IRRELEVANT";
+
+    /**
      * LLM defaulted token limits
      */
     public static final Integer DEFAULTED_TOKEN_LIMIT = 4000;
     public static final Integer MAXIMUM_TOKEN_LIMIT = 500000;
     public static final Integer MINIMUM_TOKEN_LIMIT = 1000;
 
-    /**
-     * Prompt strings that specific for llm-as-a-judge use case.
-     * TODO: need benchmark for final prompt definition.
-     */
-    public static final String PROMPT_SEARCH_RELEVANCE = escapeJson(
+    public static final String PROMPT_SEARCH_RELEVANCE_SCORE_0_1_START = escapeJson(
         "You are an expert search relevance rater. Your task is to evaluate the relevance between search query and results with these criteria:\n"
             + "- Score 1.0: Perfect match, highly relevant\n"
             + "- Score 0.7-0.9: Very relevant with minor variations\n"
             + "- Score 0.4-0.6: Moderately relevant\n"
             + "- Score 0.1-0.3: Slightly relevant\n"
             + "- Score 0.0: Completely irrelevant\n"
-            + "Evaluate based on: exact matches, semantic relevance, and overall context between the SearchText and content in Hits.\n"
-            + "When a reference is provided, evaluate based on the relevance to both SearchText and its reference.\n\n"
-            + "IMPORTANT: Provide your response ONLY as a JSON array of objects, each with \"id\" and \"rating_score\" fields. "
-            + "You MUST include a rating for EVERY hit provided, even if the rating is 0. "
-            + "Do not include any explanation or additional text."
     );
+
+    public static final String PROMPT_SEARCH_RELEVANCE_SCORE_BINARY = escapeJson(
+        "You are an expert search relevance rater. Your task is to evaluate the relevance between search query and results with these criteria:\n"
+            + "RELEVANT: Perfect match, highly relevant\n"
+            + "IRRELEVANT: Completely irrelevant\n"
+    );
+
+    public static final String PROMPT_SEARCH_RELEVANCE_SCORE_END = escapeJson(
+        "\nEvaluate based on: exact matches, semantic relevance, and overall context between the SearchText and content in Hits.\n"
+            + "When a reference is provided, evaluate based on the relevance to both SearchText and its reference.\n\n"
+            + "IMPORTANT: You MUST include a rating for EVERY hit provided.\n\n"
+            + "Return ONLY a JSON object in this EXACT format:\n"
+            + "{\"ratings\": [{\"id\": \"doc_id_here\", \"rating_score\": <score/RELEVANT/IRRELEVANT>}]}\n"
+            + "Do not include any explanation, commentary, or markdown formatting. Return only the JSON object."
+    );
+
+    /**
+     * JSON Schema definitions for OpenAI structured output.
+     * These schemas enforce the output format at the model level.
+     */
+    public static final String RATING_SCORE_NUMERIC_SCHEMA = "{"
+        + "\"type\":\"object\","
+        + "\"properties\":{"
+        + "\"id\":{\"type\":\"string\"},"
+        + "\"rating_score\":{\"type\":\"number\"}"
+        + "},"
+        + "\"required\":[\"id\",\"rating_score\"],"
+        + "\"additionalProperties\":false"
+        + "}";
+
+    public static final String RATING_SCORE_BINARY_SCHEMA = "{"
+        + "\"type\":\"object\","
+        + "\"properties\":{"
+        + "\"id\":{\"type\":\"string\"},"
+        + "\"rating_score\":{\"type\":\"string\",\"enum\":[\"RELEVANT\",\"IRRELEVANT\"]}"
+        + "},"
+        + "\"required\":[\"id\",\"rating_score\"],"
+        + "\"additionalProperties\":false"
+        + "}";
+
+    public static final String RESPONSE_FORMAT_TEMPLATE = "{"
+        + "\"type\":\"json_schema\","
+        + "\"json_schema\":{"
+        + "\"name\":\"rating_response\","
+        + "\"strict\":true,"
+        + "\"schema\":{"
+        + "\"type\":\"object\","
+        + "\"properties\":{"
+        + "\"ratings\":{"
+        + "\"type\":\"array\","
+        + "\"items\":%s"
+        + "}"
+        + "},"
+        + "\"required\":[\"ratings\"],"
+        + "\"additionalProperties\":false"
+        + "}"
+        + "}"
+        + "}";
+
     public static final String PROMPT_JSON_MESSAGES_SHELL = "[{\"role\":\"system\",\"content\":\"%s\"},"
         + "{\"role\":\"user\",\"content\":\"%s\"}]";
+    public static final String PROMPT_JSON_MESSAGES_WITH_SCHEMA_SHELL = "{"
+        + "\"messages\":[{\"role\":\"system\",\"content\":\"%s\"},{\"role\":\"user\",\"content\":\"%s\"}],"
+        + "\"response_format\":%s"
+        + "}";
     public static final String INPUT_FORMAT_SEARCH = "SearchText - %s; Hits - %s";
     public static final String INPUT_FORMAT_SEARCH_WITH_REFERENCE = "SearchText: %s; Reference: %s; Hits: %s";
 
@@ -65,15 +146,19 @@ public class MLConstants {
         return str.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t");
     }
 
-    public static String sanitizeLLMResponse(String response) {
-        if (response == null) return "";
-
-        // Remove special characters that might cause parsing issues
-        String cleaned = response.replaceAll("``json", "").replace("`", "").replace("\n", " ").trim();
-        if (!cleaned.startsWith("[")) {
-            cleaned = "[" + cleaned + "]";
+    /**
+     * Get the appropriate response format schema based on rating type.
+     * @param ratingType The rating type to get the schema for
+     * @return The complete response_format JSON string with the appropriate schema
+     */
+    public static String getResponseFormatSchema(LLMJudgmentRatingType ratingType) {
+        String itemSchema;
+        if (ratingType == LLMJudgmentRatingType.RELEVANT_IRRELEVANT) {
+            itemSchema = RATING_SCORE_BINARY_SCHEMA;
+        } else {
+            itemSchema = RATING_SCORE_NUMERIC_SCHEMA;
         }
-        return cleaned;
+        return String.format(Locale.ROOT, RESPONSE_FORMAT_TEMPLATE, itemSchema);
     }
 
     public static int validateTokenLimit(Map<String, Object> source) {

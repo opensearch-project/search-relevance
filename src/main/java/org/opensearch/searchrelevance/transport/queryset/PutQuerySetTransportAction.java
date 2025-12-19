@@ -29,7 +29,11 @@ import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 public class PutQuerySetTransportAction extends HandledTransportAction<PutQuerySetRequest, IndexResponse> {
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private final ClusterService clusterService;
     private final QuerySetDao querySetDao;
 
@@ -72,24 +76,37 @@ public class PutQuerySetTransportAction extends HandledTransportAction<PutQueryS
     }
 
     /**
-     * Query set input is a list of queryText and referenceAnswer pair.
+     * Query set input is a list of queryText and customizedKeyValueMap pair.
+     * Converts to format: "queryText#json_format"
      * e.g:
+     * Input:
      * {
      *     "queryText": "What is OpenSearch?",
      *     "referenceAnswer": "OpenSearch is a community-driven, open source search and analytics suite"
      * }
-     * @param queryWithReferenceList - list of queryText and referenceAnswer pair
+     * Output: "What is OpenSearch?#{"referenceAnswer":"OpenSearch is a community-driven, open source search and analytics suite"}"
+     *
+     * @param queryWithReferenceList - list of queryText and customizedKeyValueMap pair
      * @return - querySetQueries as a list of QuerySetEntry objects
      */
     private List<QuerySetEntry> convertQuerySetQueriesList(List<QueryWithReference> queryWithReferenceList) {
         return queryWithReferenceList.stream().map(queryWithReference -> {
-            String queryText;
-            if (queryWithReference.getReferenceAnswer() != null && !queryWithReference.getReferenceAnswer().isEmpty()) {
-                queryText = String.join(DELIMITER, queryWithReference.getQueryText(), queryWithReference.getReferenceAnswer());
-            } else {
-                queryText = queryWithReference.getQueryText();
+            StringBuilder queryTextBuilder = new StringBuilder(queryWithReference.getQueryText());
+
+            // Append customizedKeyValueMap as JSON format
+            if (queryWithReference.getCustomizedKeyValueMap() != null && !queryWithReference.getCustomizedKeyValueMap().isEmpty()) {
+                try {
+                    queryTextBuilder.append(DELIMITER);
+                    queryTextBuilder.append(OBJECT_MAPPER.writeValueAsString(queryWithReference.getCustomizedKeyValueMap()));
+                } catch (JsonProcessingException e) {
+                    throw new SearchRelevanceException(
+                        "Failed to serialize custom fields to JSON: " + e.getMessage(),
+                        RestStatus.INTERNAL_SERVER_ERROR
+                    );
+                }
             }
-            return QuerySetEntry.Builder.builder().queryText(queryText).build();
+
+            return QuerySetEntry.Builder.builder().queryText(queryTextBuilder.toString()).build();
         }).collect(Collectors.toList());
     }
 }

@@ -16,7 +16,7 @@ jobs:
     needs: Get-CI-Image-Tag
     strategy:
       matrix:
-        java: [21, 24]
+        java: [21, 25]
         os: [ubuntu-latest]
 
     name: Gradle Check Linux
@@ -32,7 +32,7 @@ jobs:
       - name: Run start commands
         run: ${{ needs.Get-CI-Image-Tag.outputs.ci-image-start-command }}
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Setup Java ${{ matrix.java }}
         uses: actions/setup-java@v5
@@ -54,14 +54,14 @@ jobs:
   Check-search-relevance-windows:
     strategy:
       matrix:
-        java: [21, 24]
+        java: [21, 25]
         os: [windows-latest]
 
     name: Gradle Check Windows
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Setup Java ${{ matrix.java }}
         uses: actions/setup-java@v5
@@ -77,7 +77,7 @@ jobs:
     needs: Get-CI-Image-Tag
     strategy:
       matrix:
-        java: [21, 24]
+        java: [21, 25]
         os: [ubuntu-latest]
 
     name: Pre-commit Linux
@@ -93,7 +93,7 @@ jobs:
       - name: Run start commands
         run: ${{ needs.Get-CI-Image-Tag.outputs.ci-image-start-command }}
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Setup Java ${{ matrix.java }}
         uses: actions/setup-java@v5
@@ -106,7 +106,7 @@ jobs:
           chown -R 1000:1000 `pwd`
           su `id -un 1000` -c "./gradlew precommit --parallel && ./gradlew jacocoTestReport && cp -v build/reports/jacoco/test/jacocoTestReport.xml ./jacocoTestReport.xml"
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v6
         if: ${{ matrix.os }} == "ubuntu-latest"
         with:
           name: coverage-report-${{ matrix.os }}-${{ matrix.java }}
@@ -116,11 +116,11 @@ jobs:
     needs: Precommit-search-relevance-linux
     strategy:
       matrix:
-        java: [21, 24]
+        java: [21, 25]
         os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v7
         with:
           name: coverage-report-${{ matrix.os }}-${{ matrix.java }}
           path: ./

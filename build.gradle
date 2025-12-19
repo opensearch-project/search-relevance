@@ -19,7 +19,7 @@ import java.util.stream.Collectors
 
 buildscript {
     ext {
-        opensearch_version = System.getProperty("opensearch.version", "3.3.0-SNAPSHOT")
+        opensearch_version = System.getProperty("opensearch.version", "3.4.0-SNAPSHOT")
         isSnapshot = "true" == System.getProperty("build.snapshot", "true")
         buildVersionQualifier = System.getProperty("build.version_qualifier", "")
         // 2.2.0-SNAPSHOT -> 2.2.0.0-SNAPSHOT
@@ -47,9 +47,10 @@ buildscript {
 
     dependencies {
         classpath "org.opensearch.gradle:build-tools:${opensearch_version}"
-        classpath "com.diffplug.spotless:spotless-plugin-gradle:8.0.0"
+        classpath "com.diffplug.spotless:spotless-plugin-gradle:8.1.0"
         classpath "com.github.form-com.diff-coverage-gradle:diff-coverage:0.9.5"
-        classpath "io.freefair.gradle:lombok-plugin:9.0.0"
+        classpath "io.freefair.gradle:lombok-plugin:9.1.0"
+        classpath "de.thetaphi:forbiddenapis:3.10" // Upgrade for JDK 25 support
     }
 }
 
@@ -85,6 +86,13 @@ java {
 }
 
 ext {
+
+    default_bwc_version = System.getProperty("bwc.version")
+    default_bwc_bundle_version= System.getProperty("bwc.bundle.version")
+    bwcBundleTest = (project.findProperty('customDistributionDownloadType') != null && project.properties['customDistributionDownloadType'] == "bundle")
+    search_relevance_bwc_version = bwcBundleTest ? System.getProperty("tests.bwc.bundle.version",rootProject.ext.default_bwc_bundle_version): System.getProperty("tests.bwc.version", rootProject.ext.default_bwc_version)
+    currentBundleVersion = opensearch_version.replace("-SNAPSHOT","")
+
     projectSubstitutions = [:]
     licenseFile = rootProject.file('LICENSE.txt')
     noticeFile = rootProject.file('NOTICE.txt')
@@ -116,8 +124,10 @@ allprojects {
     }
 
     plugins.withId('java') {
-        targetCompatibility = JavaVersion.VERSION_21
-        sourceCompatibility = JavaVersion.VERSION_21
+        java {
+            sourceCompatibility = JavaVersion.VERSION_21
+            targetCompatibility = JavaVersion.VERSION_21
+        }
     }
 }
 
@@ -192,7 +202,14 @@ validateNebulaPom.enabled = false
 configurations {
     zipArchive
     opensearchPlugin
-    all*.exclude group: 'org.slf4j', module: 'slf4j-log4j12'
+}
+
+configurations.all {
+    resolutionStrategy {
+        force("com.google.guava:guava:33.4.8-jre") // CVE for 31.1
+        force("com.google.errorprone:error_prone_annotations:2.45.0") // Fix version conflict
+    }
+    exclude group: 'org.slf4j', module: 'slf4j-log4j12'
 }
 
 dependencies {
@@ -201,8 +218,8 @@ dependencies {
     api group: 'org.opensearch', name:'opensearch-ml-client', version: "${opensearch_build}"
     compileOnly "org.opensearch:opensearch-job-scheduler-spi:${opensearch_build}"
     implementation group: 'com.google.guava', name: 'guava', version:'33.4.8-jre'
-    compileOnly group: 'org.apache.commons', name: 'commons-lang3', version: '3.19.0'
-    implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.19.0'
+    compileOnly group: 'org.apache.commons', name: 'commons-lang3', version: '3.20.0'
+    implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.20.0'
     implementation group: 'org.apache.commons', name: 'commons-math3', version: '3.6.1'
     implementation "org.opensearch:common-utils:${common_utils_version}"
     implementation "com.fasterxml.jackson.core:jackson-annotations:${versions.jackson}"
@@ -214,12 +231,12 @@ dependencies {
     runtimeOnly group: 'org.reflections', name: 'reflections', version: '0.9.12'  // Note the version change
     runtimeOnly group: 'org.javassist', name: 'javassist', version: '3.30.2-GA'
     runtimeOnly group: 'org.opensearch', name: 'common-utils', version: "${opensearch_build}"
-    runtimeOnly group: 'org.apache.commons', name: 'commons-text', version: '1.14.0'
+    runtimeOnly group: 'org.apache.commons', name: 'commons-text', version: '1.15.0'
     runtimeOnly group: 'com.google.code.gson', name: 'gson', version: '2.13.1'
     runtimeOnly group: 'org.json', name: 'json', version: '20250517'
     // json-path 2.9.0 depends on slf4j 2.0.11, which conflicts with the version used by OpenSearch core.
     // Excluding slf4j here since json-path is only used for testing, and logging failures in this context are acceptable.
-    runtimeOnly('com.jayway.jsonpath:json-path:2.9.0') {
+    runtimeOnly('com.jayway.jsonpath:json-path:2.10.0') {
         // OpenSearch core is using slf4j 1.7.36. Therefore, we cannot change the version here.
         exclude group: 'org.slf4j', module: 'slf4j-api'
         exclude group: 'net.minidev', module: 'json-smart'
@@ -236,13 +253,6 @@ dependencies {
     zipArchive group: 'org.opensearch.plugin', name:'opensearch-ubi', version: "${opensearch_build}"
     opensearchPlugin "org.opensearch.plugin:opensearch-security:${opensearch_build}@zip"
     opensearchPlugin "org.opensearch.plugin:opensearch-job-scheduler:${opensearch_build}@zip"
-
-    configurations.all {
-        resolutionStrategy {
-            force("com.google.guava:guava:33.4.8-jre") // CVE for 31.1
-            force("com.google.errorprone:error_prone_annotations:2.43.0") // Fix version conflict
-        }
-    }
 }
 
 def _numNodes = findProperty('numNodes') as Integer ?: 1
@@ -257,6 +267,12 @@ repositories {
 test {
     include '**/*Tests.class'
     systemProperty 'tests.security.manager', 'false'
+
+    if (System.getProperty("test.debug") != null) {
+        // Limit forks to one to avoid JDWP port conflicts
+        maxParallelForks = 1
+        jvmArgs '-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:8000'
+    }
 }
 
 jacocoTestReport {
@@ -273,6 +289,15 @@ task integTest(type: RestIntegTestTask) {
     classpath = sourceSets.test.runtimeClasspath
 }
 tasks.named("check").configure { dependsOn(integTest) }
+
+integTest {
+    // The --debug-jvm command-line option makes the cluster debuggable; this makes the tests debuggable
+    if (System.getProperty("test.debug") != null) {
+        jvmArgs '-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:5005'
+    }
+    // Pass ubi.available as configurable property via -Dubi.available=false
+    systemProperty 'ubi.available', System.getProperty('ubi.available', 'true')
+}
 
 ext.resolvePluginFile = { pluginId ->
     return new Callable<RegularFile>() {
@@ -512,6 +537,8 @@ opensearch_tmp_dir.mkdirs()
 integTest {
     systemProperty 'tests.security.manager', 'false'
     systemProperty 'java.io.tmpdir', opensearch_tmp_dir.absolutePath
+    // allows integration test classes to access test resource from project root path
+    systemProperty 'project.root', project.rootDir.absolutePath
     systemProperty 'buildDir', buildDir.path
     systemProperty "https", securityEnabled
     systemProperty "security", securityEnabled
@@ -579,10 +606,9 @@ ext.createDiffFile = { ->
     // Only run locally
     if (!System.getenv('CI')) {
         file.withOutputStream { out ->
-            exec {
-                commandLine 'git', 'diff', '--no-color', '--minimal', diffBase
-                standardOutput = out
-            }
+            providers.exec {
+                commandLine('git', 'diff', '--no-color', '--minimal', diffBase)
+            }.standardOutput.asText.get().bytes.each { out.write(it) }
         }
     }
     return file

@@ -159,7 +159,7 @@ public class RestSearchRelevanceStatsActionTests extends SearchRelevanceRestTest
 
         SearchRelevanceStatsInput capturedInput = argumentCaptor.getValue().getSearchRelevanceStatsInput();
 
-        // Since we we set individual nodes and all nodes to false, we shouldn't fetch any stats
+        // Since we set individual nodes and all nodes to false, we shouldn't fetch any stats
         assertEquals(capturedInput.getEventStatNames(), EnumSet.noneOf(EventStatName.class));
         assertEquals(capturedInput.getInfoStatNames(), EnumSet.noneOf(InfoStatName.class));
         assertTrue(capturedInput.isFlatten());
@@ -263,7 +263,7 @@ public class RestSearchRelevanceStatsActionTests extends SearchRelevanceRestTest
         assertEquals(capturedInput.getInfoStatNames(), EnumSet.noneOf(InfoStatName.class));
     }
 
-    public void test_handleRequest_invalidStatParameter() throws Exception {
+    public void test_handleRequest_invalidStatParameter() {
         RestSearchRelevanceStatsAction restSearchRelevanceStatsAction = new RestSearchRelevanceStatsAction(settingsAccessor, clusterUtil);
 
         // Create request with invalid stat parameter

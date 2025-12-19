@@ -21,7 +21,6 @@ import org.apache.logging.log4j.Logger;
 import org.opensearch.action.StepListener;
 import org.opensearch.action.delete.DeleteResponse;
 import org.opensearch.action.search.SearchResponse;
-import org.opensearch.common.inject.Inject;
 import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
@@ -42,14 +41,13 @@ public class QuerySetDao {
     private static final Logger LOGGER = LogManager.getLogger(QuerySetDao.class);
     private final SearchRelevanceIndicesManager searchRelevanceIndicesManager;
 
-    @Inject
     public QuerySetDao(SearchRelevanceIndicesManager searchRelevanceIndicesManager) {
         this.searchRelevanceIndicesManager = searchRelevanceIndicesManager;
     }
 
     /**
      * Create query set index if not exists
-     * @param stepListener - step lister for async operation
+     * @param stepListener - step listener for async operation
      */
     public void createIndexIfAbsent(final StepListener<Void> stepListener) {
         searchRelevanceIndicesManager.createIndexIfAbsent(QUERY_SET, stepListener);
@@ -58,7 +56,7 @@ public class QuerySetDao {
     /**
      * Stores query set to in the system index
      * @param querySet - QuerySet content to be stored
-     * @param listener - action lister for async operation
+     * @param listener - action listener for async operation
      */
     public void putQuerySet(final QuerySet querySet, final ActionListener listener) {
         if (querySet == null) {
@@ -80,7 +78,7 @@ public class QuerySetDao {
     /**
      * Delete query set by querySetID
      * @param querySetId - id to be deleted
-     * @param listener - action lister for async operation
+     * @param listener - action listener for async operation
      */
     public void deleteQuerySet(final String querySetId, final ActionListener<DeleteResponse> listener) {
         searchRelevanceIndicesManager.deleteDocByDocId(querySetId, QUERY_SET, listener);
@@ -89,7 +87,7 @@ public class QuerySetDao {
     /**
      * Get query set by querySetID
      * @param querySetId - id to be deleted
-     * @param listener - action lister for async operation
+     * @param listener - action listener for async operation
      */
     public SearchResponse getQuerySet(String querySetId, ActionListener<SearchResponse> listener) {
         if (querySetId == null || querySetId.isEmpty()) {
@@ -110,7 +108,7 @@ public class QuerySetDao {
     /**
      * List query set by source builder
      * @param sourceBuilder - source builder to be searched
-     * @param listener - action lister for async operation
+     * @param listener - action listener for async operation
      */
     public SearchResponse listQuerySet(SearchSourceBuilder sourceBuilder, ActionListener<SearchResponse> listener) {
         // Apply default values if not set
@@ -130,7 +128,7 @@ public class QuerySetDao {
      * Get a queryset given a step stepListener and put it back to results mapping.
      * @param querySetId - id to be searched
      * @param results - the results map
-     * @param stepListener - step lister
+     * @param stepListener - step listener
      */
     public void getQuerySetWithStepListener(
         String querySetId,

@@ -29,6 +29,7 @@ public class Experiment implements ToXContentObject {
     public static final String JUDGMENT_LIST = "judgmentList";
     public static final String SIZE = "size";
     public static final String IS_SCHEDULED = "isScheduled";
+    public static final String SCHEDULED_EXPERIMENT_JOB_ID = "scheduledExperimentJobId";
     public static final String RESULTS = "results";
     private static final int DEFAULTED_SIZE = 10;
 
@@ -44,6 +45,7 @@ public class Experiment implements ToXContentObject {
     private final List<String> judgmentList;
     private final int size;
     private final boolean isScheduled;
+    private final String scheduledExperimentJobId;
     private final List<Map<String, Object>> results;
 
     public Experiment(
@@ -66,10 +68,11 @@ public class Experiment implements ToXContentObject {
         this.judgmentList = judgmentList;
         this.size = size;
         this.isScheduled = false;
+        this.scheduledExperimentJobId = null;
         this.results = results;
     }
 
-    public Experiment(Experiment previousExperiment, boolean isScheduled) {
+    public Experiment(Experiment previousExperiment, boolean isScheduled, String scheduledExperimentJobId) {
         this.id = previousExperiment.id();
         this.timestamp = previousExperiment.timestamp();
         this.type = previousExperiment.type();
@@ -79,6 +82,7 @@ public class Experiment implements ToXContentObject {
         this.judgmentList = previousExperiment.judgmentList();
         this.size = previousExperiment.size();
         this.isScheduled = isScheduled;
+        this.scheduledExperimentJobId = scheduledExperimentJobId;
         this.results = previousExperiment.results();
     }
 
@@ -97,6 +101,7 @@ public class Experiment implements ToXContentObject {
         xContentBuilder.field(JUDGMENT_LIST, this.judgmentList == null ? new ArrayList<>() : this.judgmentList);
         xContentBuilder.field(SIZE, Optional.of(this.size).orElse(DEFAULTED_SIZE));
         xContentBuilder.field(IS_SCHEDULED, isScheduled);
+        xContentBuilder.field(SCHEDULED_EXPERIMENT_JOB_ID, scheduledExperimentJobId);
         xContentBuilder.field(RESULTS, this.results);
         return xContentBuilder.endObject();
     }
@@ -135,6 +140,10 @@ public class Experiment implements ToXContentObject {
 
     public boolean isScheduled() {
         return isScheduled;
+    }
+
+    public String scheduledExperimentJobId() {
+        return scheduledExperimentJobId;
     }
 
     public List<Map<String, Object>> results() {

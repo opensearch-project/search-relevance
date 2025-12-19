@@ -76,7 +76,7 @@ public class PostScheduledExperimentTransportAction extends HandledTransportActi
 
             experimentDao.getExperiment(experimentId, ActionListener.wrap(experimentResponse -> {
                 Experiment updatedExperiment = convertToExperiment(experimentResponse);
-                final Experiment finalUpdatedExperiment = new Experiment(updatedExperiment, true);
+                final Experiment finalUpdatedExperiment = new Experiment(updatedExperiment, true, job.getId());
                 scheduledJobsDao.putScheduledJob(job, ActionListener.wrap(indexResponse -> {
                     experimentDao.updateExperiment(finalUpdatedExperiment, ActionListener.wrap(experimentIndexResponse -> {
                         // Return response immediately

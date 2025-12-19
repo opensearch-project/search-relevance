@@ -91,27 +91,18 @@ public class RestPutQuerySetAction extends BaseRestHandler {
             if (rawQueries.size() > settingsAccessor.getMaxQuerySetAllowed()) {
                 return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.FORBIDDEN, "Query Set Limit Exceeded."));
             }
+
+            // Validate and parse each query using the utility method
             try {
                 querySetQueries = rawQueries.stream().map(obj -> {
-                    Map<String, String> queryMap = (Map<String, String>) obj;
-                    String queryText = queryMap.get("queryText");
-                    String referenceAnswer = queryMap.getOrDefault("referenceAnswer", "");
+                    Map<String, Object> queryMap = (Map<String, Object>) obj;
+                    TextValidationUtil.QueryValidationResult validationResult = TextValidationUtil.validateAndParseQuery(queryMap);
 
-                    // Validate queryText
-                    TextValidationUtil.ValidationResult queryTextValidation = TextValidationUtil.validateText(queryText);
-                    if (!queryTextValidation.isValid()) {
-                        throw new IllegalArgumentException("Invalid queryText: " + queryTextValidation.getErrorMessage());
+                    if (!validationResult.isValid()) {
+                        throw new IllegalArgumentException(validationResult.getErrorMessage());
                     }
 
-                    // Validate referenceAnswer if it's not empty
-                    if (!referenceAnswer.isEmpty()) {
-                        TextValidationUtil.ValidationResult referenceAnswerValidation = TextValidationUtil.validateText(referenceAnswer);
-                        if (!referenceAnswerValidation.isValid()) {
-                            throw new IllegalArgumentException("Invalid referenceAnswer: " + referenceAnswerValidation.getErrorMessage());
-                        }
-                    }
-
-                    return new QueryWithReference(queryText, referenceAnswer);
+                    return validationResult.getQueryWithReference();
                 }).collect(Collectors.toList());
             } catch (IllegalArgumentException e) {
                 return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.BAD_REQUEST, e.getMessage()));

@@ -43,6 +43,22 @@ public class RestPutJudgmentActionTests extends SearchRelevanceRestTestCase {
         + "\"ignoreFailure\": false"
         + "}";
 
+    private static final String LLM_JUDGMENT_CONTENT_WITH_NEW_FIELDS = "{"
+        + "\"name\": \"test_name\","
+        + "\"description\": \"test_description\","
+        + "\"type\": \"LLM_JUDGMENT\","
+        + "\"modelId\": \"test_model_id\","
+        + "\"querySetId\": \"test_query_set_id\","
+        + "\"searchConfigurationList\": [\"config1\", \"config2\"],"
+        + "\"size\": 10,"
+        + "\"tokenLimit\": 1000,"
+        + "\"contextFields\": [\"field1\", \"field2\"],"
+        + "\"ignoreFailure\": false,"
+        + "\"promptTemplate\": \"Query: {{queryText}}\\\\n\\\\nDocuments: {{hits}}\","
+        + "\"llmJudgmentRatingType\": \"SCORE0_1\","
+        + "\"overwriteCache\": true"
+        + "}";
+
     private static final String UBI_JUDGMENT_CONTENT = "{"
         + "\"name\": \"test_name\","
         + "\"description\": \"test_description\","
@@ -77,26 +93,6 @@ public class RestPutJudgmentActionTests extends SearchRelevanceRestTestCase {
             }
           ]
         }""";
-
-    private static final String IMPORT_JUDGMENT_CONTENT_INVALID_RATING = "{"
-        + "\"name\": \"test_name\","
-        + "\"description\": \"test_description\","
-        + "\"type\": \"IMPORT_JUDGMENT\","
-        + "\"judgmentRatings\": {"
-        + "    \"red shoes\": ["
-        + "      {"
-        + "        \"docId\": \"B077ZJXCTS\","
-        + "        \"rating\": \"0.000\""
-        + "      }"
-        + "    ],"
-        + "    \"blue jeans\": ["
-        + "      {"
-        + "        \"docId\": \"B071S6LTJJ\","
-        + "        \"rating\": \"AWESOME\""
-        + "      }"
-        + "    ]"
-        + "  }"
-        + "}";
 
     private static final String INVALID_TYPE_CONTENT = "{"
         + "\"name\": \"test_name\","
@@ -203,10 +199,10 @@ public class RestPutJudgmentActionTests extends SearchRelevanceRestTestCase {
         assertEquals(RestStatus.OK, responseCaptor.getValue().status());
     }
 
-    public void testPutJudgment_InvalidType() throws Exception {
+    public void testPutJudgment_InvalidType() {
         // Setup
         when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
-        RestRequest request = createPutRestRequestWithContent(INVALID_TYPE_CONTENT, "judgmentents");
+        RestRequest request = createPutRestRequestWithContent(INVALID_TYPE_CONTENT, "judgments");
         when(channel.request()).thenReturn(request);
 
         // Execute and verify
@@ -217,7 +213,7 @@ public class RestPutJudgmentActionTests extends SearchRelevanceRestTestCase {
         assertTrue(exception.getMessage().contains("Invalid or missing judgment type"));
     }
 
-    public void testPutLlmJudgment_MissingModelId() throws Exception {
+    public void testPutLlmJudgment_MissingModelId() {
         // Setup
         when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
         String content = "{" + "\"name\": \"test_name\"," + "\"description\": \"test_description\"," + "\"type\": \"LLM_JUDGMENT\"" + "}";
@@ -252,5 +248,100 @@ public class RestPutJudgmentActionTests extends SearchRelevanceRestTestCase {
         ArgumentCaptor<BytesRestResponse> responseCaptor = ArgumentCaptor.forClass(BytesRestResponse.class);
         verify(channel).sendResponse(responseCaptor.capture());
         assertEquals(RestStatus.INTERNAL_SERVER_ERROR, responseCaptor.getValue().status());
+    }
+
+    public void testPutLlmJudgment_WithNewFields_Success() throws Exception {
+        // Setup
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        RestRequest request = createPutRestRequestWithContent(LLM_JUDGMENT_CONTENT_WITH_NEW_FIELDS, "judgment");
+        when(channel.request()).thenReturn(request);
+
+        // Mock index response
+        IndexResponse mockIndexResponse = mock(IndexResponse.class);
+        when(mockIndexResponse.getId()).thenReturn("test_id");
+
+        // Capture the request to verify new fields
+        ArgumentCaptor<PutLlmJudgmentRequest> requestCaptor = ArgumentCaptor.forClass(PutLlmJudgmentRequest.class);
+
+        doAnswer(invocation -> {
+            ActionListener<IndexResponse> listener = invocation.getArgument(2);
+            listener.onResponse(mockIndexResponse);
+            return null;
+        }).when(client).execute(eq(PutJudgmentAction.INSTANCE), requestCaptor.capture(), any());
+
+        // Execute
+        restPutJudgmentAction.handleRequest(request, channel, client);
+
+        // Verify response
+        ArgumentCaptor<BytesRestResponse> responseCaptor = ArgumentCaptor.forClass(BytesRestResponse.class);
+        verify(channel).sendResponse(responseCaptor.capture());
+        assertEquals(RestStatus.OK, responseCaptor.getValue().status());
+
+        // Verify new fields in the captured request
+        PutLlmJudgmentRequest capturedRequest = requestCaptor.getValue();
+        assertEquals("Query: {{queryText}}\\n\\nDocuments: {{hits}}", capturedRequest.getPromptTemplate());
+        assertEquals("SCORE0_1", capturedRequest.getLlmJudgmentRatingType().name());
+        assertEquals(true, capturedRequest.isOverwriteCache());
+    }
+
+    public void testPutLlmJudgment_InvalidRatingType() throws Exception {
+        // Setup
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        String content = "{"
+            + "\"name\": \"test_name\","
+            + "\"description\": \"test_description\","
+            + "\"type\": \"LLM_JUDGMENT\","
+            + "\"modelId\": \"test_model_id\","
+            + "\"querySetId\": \"test_query_set_id\","
+            + "\"searchConfigurationList\": [\"config1\", \"config2\"],"
+            + "\"size\": 10,"
+            + "\"tokenLimit\": 1000,"
+            + "\"contextFields\": [\"field1\", \"field2\"],"
+            + "\"ignoreFailure\": false,"
+            + "\"llmJudgmentRatingType\": \"INVALID_RATING_TYPE\""
+            + "}";
+        RestRequest request = createPutRestRequestWithContent(content, "judgment");
+        when(channel.request()).thenReturn(request);
+
+        // Execute and verify
+        SearchRelevanceException exception = expectThrows(
+            SearchRelevanceException.class,
+            () -> restPutJudgmentAction.handleRequest(request, channel, client)
+        );
+        assertTrue(exception.getMessage().contains("Invalid RatingType"));
+        assertTrue(exception.getMessage().contains("INVALID_RATING_TYPE"));
+        assertTrue(exception.getMessage().contains("Valid values are"));
+        assertTrue(exception.getMessage().contains("SCORE0_1"));
+        assertTrue(exception.getMessage().contains("RELEVANT_IRRELEVANT"));
+        assertEquals(RestStatus.BAD_REQUEST, exception.status());
+    }
+
+    public void testPutLlmJudgment_InvalidPromptTemplate_MissingHitsPlaceholder() throws Exception {
+        // Setup
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        String content = "{"
+            + "\"name\": \"test_name\","
+            + "\"description\": \"test_description\","
+            + "\"type\": \"LLM_JUDGMENT\","
+            + "\"modelId\": \"test_model_id\","
+            + "\"querySetId\": \"test_query_set_id\","
+            + "\"searchConfigurationList\": [\"config1\", \"config2\"],"
+            + "\"size\": 10,"
+            + "\"tokenLimit\": 1000,"
+            + "\"contextFields\": [\"field1\", \"field2\"],"
+            + "\"ignoreFailure\": false,"
+            + "\"promptTemplate\": \"Query: {{queryText}}\\\\nRate relevance from 0.0 to 1.0\""
+            + "}";
+        RestRequest request = createPutRestRequestWithContent(content, "judgment");
+        when(channel.request()).thenReturn(request);
+
+        // Execute and verify
+        SearchRelevanceException exception = expectThrows(
+            SearchRelevanceException.class,
+            () -> restPutJudgmentAction.handleRequest(request, channel, client)
+        );
+        assertTrue(exception.getMessage().contains("must include either {{hits}} or {{results}} placeholder"));
+        assertTrue(exception.getMessage().contains("Example:"));
+        assertEquals(RestStatus.BAD_REQUEST, exception.status());
     }
 }

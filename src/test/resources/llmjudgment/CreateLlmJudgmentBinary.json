@@ -1,0 +1,14 @@
+{
+  "name": "LLM Judgment Binary",
+  "type": "LLM_JUDGMENT",
+  "querySetId": "{{querySetId}}",
+  "searchConfigurationList": ["{{searchConfigId}}"],
+  "modelId": "test_model_id",
+  "size": 5,
+  "tokenLimit": 4000,
+  "contextFields": ["name", "description"],
+  "ignoreFailure": false,
+  "llmJudgmentRatingType": "RELEVANT_IRRELEVANT",
+  "promptTemplate": "Query: {{queryText}}\n\nDocuments: {{hits}}\n\nIs this document relevant? Answer RELEVANT or IRRELEVANT.",
+  "overwriteCache": false
+}

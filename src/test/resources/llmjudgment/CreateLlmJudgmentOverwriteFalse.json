@@ -1,0 +1,14 @@
+{
+  "name": "LLM Judgment Overwrite Cache False",
+  "type": "LLM_JUDGMENT",
+  "querySetId": "{{querySetId}}",
+  "searchConfigurationList": ["{{searchConfigId}}"],
+  "modelId": "test_model_id",
+  "size": 5,
+  "tokenLimit": 4000,
+  "contextFields": ["name", "description"],
+  "ignoreFailure": false,
+  "llmJudgmentRatingType": "SCORE0_1",
+  "promptTemplate": "Query: {{queryText}}\n\nDocuments: {{hits}}\n\nRate relevance 0-1",
+  "overwriteCache": false
+}
