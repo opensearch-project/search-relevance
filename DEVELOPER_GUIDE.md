@@ -311,6 +311,21 @@ Refer to the [design documentation guide](docs/README.md) for detailed instructi
 
 SRW is unusual that it has a large number of indices that it uses to maintain the state of the information.  It's reasonable to think of them like you would database tables, but without the full capablities of a relational database of course!
 
+| Index | System | Purpose |
+|-------|--------|---------|
+| `.plugins-search-relevance-experiment` | Yes | Core experiment metadata and status |
+| `search-relevance-search-config` | No | Search configuration to be evaluated |
+| `search-relevance-queryset` | No | Query sets for evaluation |
+| `search-relevance-judgment` | No | Relevance judgments (manual/LLM/UBI) |
+| `search-relevance-experiment-variant` | No | Track variants generated from a single experiment. |
+| `search-relevance-judgment-cache` | No | Relevance judgments (manual/LLM/UBI) |
+| `.search-relevance-scheduled-experiment-jobs` | Yes | Specify an experiment to be run periodically |
+| `.search-relevance-scheduled-experiment-history` | Yes | Track experiment results run periodically |
+| `search-relevance-evaluation-result` | No | Flattened table of Experiment results suitable for dashboarding |
+
+> [!NOTE]  
+> Authoritative schema definitions are in `src/main/resources/mappings/`
+
 #### Core SRW Indices
 
 ```mermaid
@@ -324,8 +339,9 @@ erDiagram
         keyword status
         keyword querySetId FK
         list[keyword] searchConfigurationList FK
-        list[keyword] judgementList FK
+        list[keyword] judgmentList FK
         keyword size
+        keyword scheduledExperimentJobId FK 
         keyword isScheduled
         object[] results
     }
@@ -403,7 +419,7 @@ erDiagram
     ".plugins-search-relevance-experiment" ||--o{ search-relevance-queryset : has
     ".plugins-search-relevance-experiment" ||--o{ search-relevance-search-config : "has many"
     search-relevance-search-config ||--o{ search-relevance-evaluation-result : "referenced by"
-    search-relevance-experiment-variant ||--o{ ".plugins-search-relevance-experiment" : "hybrid optimizer only"
+    ".plugins-search-relevance-experiment" ||--o{ search-relevance-experiment-variant : "hybrid optimizer only"
     search-relevance-experiment-variant ||--o{ search-relevance-evaluation-result : "referenced by"
     ".search-relevance-scheduled-experiment-history" ||--o{ search-relevance-evaluation-result : "referenced by"
     search-relevance-evaluation-result }o--o{ search-relevance-judgment : includes
