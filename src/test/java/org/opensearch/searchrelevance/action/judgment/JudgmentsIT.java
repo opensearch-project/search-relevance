@@ -13,7 +13,6 @@ import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_IND
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 import org.apache.hc.core5.http.HttpHeaders;
