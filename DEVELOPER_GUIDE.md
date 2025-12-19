@@ -317,8 +317,8 @@ SRW is unusual that it has a large number of indices that it uses to maintain th
 | `search-relevance-search-config` | No | Search configuration to be evaluated |
 | `search-relevance-queryset` | No | Query sets for evaluation |
 | `search-relevance-judgment` | No | Relevance judgments (manual/LLM/UBI) |
-| `search-relevance-experiment-variant` | No | Track variants generated from a single experiment. |
-| `search-relevance-judgment-cache` | No | Relevance judgments (manual/LLM/UBI) |
+| `search-relevance-judgment-cache` | No | Working table for LLM as a Judge |
+| `search-relevance-experiment-variant` | No | Track variants generated from a single experiment |
 | `.search-relevance-scheduled-experiment-jobs` | Yes | Specify an experiment to be run periodically |
 | `.search-relevance-scheduled-experiment-history` | Yes | Track experiment results run periodically |
 | `search-relevance-evaluation-result` | No | Flattened table of Experiment results suitable for dashboarding |
