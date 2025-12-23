@@ -43,8 +43,11 @@ public class IndexMappingBWCIT extends AbstractSearchRelevanceRollingUpgradeTest
                 testValidateIndexInMixedCluster();
                 break;
             case UPGRADED:
-                testValidateMappingUpdateInUpgradedCluster();
-                IndexMappingTestHelper.deleteIndex(client(), JUDGMENT_CACHE_INDEX, logger);
+                try {
+                    testValidateMappingUpdateInUpgradedCluster();
+                } finally {
+                    wipeOfTestResources(JUDGMENT_CACHE_INDEX);
+                }
                 break;
             default:
                 throw new IllegalStateException("Unknown cluster type: " + getClusterType());

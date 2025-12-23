@@ -19,7 +19,10 @@ import static org.opensearch.searchrelevance.bwc.IndexMappingTestHelper.UPGRADED
 
 import java.util.Locale;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.opensearch.common.settings.Settings;
+import org.opensearch.searchrelevance.bwc.IndexMappingTestHelper;
 import org.opensearch.test.rest.OpenSearchRestTestCase;
 
 /**
@@ -30,6 +33,8 @@ import org.opensearch.test.rest.OpenSearchRestTestCase;
  * with the new version. This tests a different upgrade path that some users may take.
  */
 public abstract class AbstractSearchRelevanceRestartUpgradeTestCase extends OpenSearchRestTestCase {
+
+    private static final Logger logger = LogManager.getLogger(AbstractSearchRelevanceRestartUpgradeTestCase.class);
 
     /**
      * Enum representing the different cluster states during a restart upgrade.
@@ -147,5 +152,18 @@ public abstract class AbstractSearchRelevanceRestartUpgradeTestCase extends Open
     @Override
     protected boolean preserveTemplatesUponCompletion() {
         return true;
+    }
+
+    /**
+     * Cleans up test resources after test completion.
+     * This method should be called in a finally block to ensure cleanup happens
+     * even if the test fails.
+     *
+     * @param indexName The name of the index to delete, or null to skip
+     */
+    protected void wipeOfTestResources(final String indexName) {
+        if (indexName != null) {
+            IndexMappingTestHelper.deleteIndex(client(), indexName, logger);
+        }
     }
 }

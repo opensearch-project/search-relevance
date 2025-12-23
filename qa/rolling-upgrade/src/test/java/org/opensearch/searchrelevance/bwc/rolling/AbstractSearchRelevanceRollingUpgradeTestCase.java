@@ -21,7 +21,10 @@ import static org.opensearch.searchrelevance.bwc.IndexMappingTestHelper.UPGRADED
 
 import java.util.Locale;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.opensearch.common.settings.Settings;
+import org.opensearch.searchrelevance.bwc.IndexMappingTestHelper;
 import org.opensearch.test.rest.OpenSearchRestTestCase;
 
 /**
@@ -29,6 +32,8 @@ import org.opensearch.test.rest.OpenSearchRestTestCase;
  * Provides common utilities and cluster state management for testing compatibility across versions.
  */
 public abstract class AbstractSearchRelevanceRollingUpgradeTestCase extends OpenSearchRestTestCase {
+
+    private static final Logger logger = LogManager.getLogger(AbstractSearchRelevanceRollingUpgradeTestCase.class);
 
     /**
      * Enum representing the different cluster states during a rolling upgrade.
@@ -158,5 +163,18 @@ public abstract class AbstractSearchRelevanceRollingUpgradeTestCase extends Open
     @Override
     protected boolean preserveTemplatesUponCompletion() {
         return true;
+    }
+
+    /**
+     * Cleans up test resources after test completion.
+     * This method should be called in a finally block to ensure cleanup happens
+     * even if the test fails.
+     *
+     * @param indexName The name of the index to delete, or null to skip
+     */
+    protected void wipeOfTestResources(final String indexName) {
+        if (indexName != null) {
+            IndexMappingTestHelper.deleteIndex(client(), indexName, logger);
+        }
     }
 }
