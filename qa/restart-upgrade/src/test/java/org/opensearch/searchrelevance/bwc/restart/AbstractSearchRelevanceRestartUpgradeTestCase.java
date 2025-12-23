@@ -34,7 +34,7 @@ import org.opensearch.test.rest.OpenSearchRestTestCase;
  */
 public abstract class AbstractSearchRelevanceRestartUpgradeTestCase extends OpenSearchRestTestCase {
 
-    private static final Logger logger = LogManager.getLogger(AbstractSearchRelevanceRestartUpgradeTestCase.class);
+    protected static final Logger logger = LogManager.getLogger(AbstractSearchRelevanceRestartUpgradeTestCase.class);
 
     /**
      * Enum representing the different cluster states during a restart upgrade.

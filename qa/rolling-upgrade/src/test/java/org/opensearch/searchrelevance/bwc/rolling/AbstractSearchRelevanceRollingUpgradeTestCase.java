@@ -33,7 +33,7 @@ import org.opensearch.test.rest.OpenSearchRestTestCase;
  */
 public abstract class AbstractSearchRelevanceRollingUpgradeTestCase extends OpenSearchRestTestCase {
 
-    private static final Logger logger = LogManager.getLogger(AbstractSearchRelevanceRollingUpgradeTestCase.class);
+    protected static final Logger logger = LogManager.getLogger(AbstractSearchRelevanceRollingUpgradeTestCase.class);
 
     /**
      * Enum representing the different cluster states during a rolling upgrade.
