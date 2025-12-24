@@ -21,8 +21,8 @@ jobs:
       matrix:
         java: [21, 25]
         os: [ubuntu-latest]
-        bwc_version: ["3.3.0", "3.4.0"]
-        opensearch_version: ["3.5.0-SNAPSHOT"]
+        bwc_version: ["3.3.0"]
+        opensearch_version: ["3.4.0"]
 
     name: SearchRelevance Rolling-Upgrade BWC Tests
     runs-on: ${{ matrix.os }}
@@ -46,7 +46,7 @@ jobs:
         run: |
           chown -R 1000:1000 `pwd`
           echo "Running rolling-upgrade backwards compatibility tests..."
-          su `id -un 1000` -c "./gradlew :qa:rolling-upgrade:testRollingUpgrade -Dtests.bwc.version=${{ matrix.bwc_version }} --refresh-dependencies --no-daemon"
+          su `id -un 1000` -c "./gradlew :qa:rolling-upgrade:testRollingUpgrade -Dtests.bwc.version=${{ matrix.bwc_version }} --no-daemon"
 
   Restart-Upgrade-BWCTests-SearchRelevance:
     needs: Get-CI-Image-Tag
@@ -54,8 +54,8 @@ jobs:
       matrix:
         java: [21, 25]
         os: [ubuntu-latest]
-        bwc_version: ["3.3.0", "3.4.0"]
-        opensearch_version: ["3.5.0-SNAPSHOT"]
+        bwc_version: ["3.3.0"]
+        opensearch_version: ["3.4.0"]
 
     name: SearchRelevance Restart-Upgrade BWC Tests
     runs-on: ${{ matrix.os }}
@@ -79,4 +79,4 @@ jobs:
         run: |
           chown -R 1000:1000 `pwd`
           echo "Running restart-upgrade backwards compatibility tests..."
-          su `id -un 1000` -c "./gradlew :qa:restart-upgrade:testRestartUpgrade -Dtests.bwc.version=${{ matrix.bwc_version }} --refresh-dependencies --no-daemon"
+          su `id -un 1000` -c "./gradlew :qa:restart-upgrade:testRestartUpgrade -Dtests.bwc.version=${{ matrix.bwc_version }} --no-daemon"
