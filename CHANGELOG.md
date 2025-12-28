@@ -9,6 +9,7 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 ### Features
 - adds version-based index mapping update support to the Search Relevance plugin [#344](https://github.com/opensearch-project/search-relevance/pull/344)
 * LLM Judgement Customized Prompt Template Implementation  [#264](https://github.com/opensearch-project/search-relevance/pull/264)
+* Backend support for Mustache templates in search queries [#342](https://github.com/opensearch-project/search-relevance/pull/342)
 
 ### Enhancements
 

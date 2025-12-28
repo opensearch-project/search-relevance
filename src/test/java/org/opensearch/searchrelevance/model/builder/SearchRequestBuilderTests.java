@@ -304,4 +304,131 @@ public class SearchRequestBuilderTests extends OpenSearchTestCase {
         assertNotNull(rescoreQuery);
         assertTrue(rescoreQuery.containsKey("match"));
     }
+
+    // ==================== Mustache Template Tests ====================
+
+    /**
+     * Test that Mustache template throws error when ScriptService is null
+     * This is the critical error handling case we can test without a real
+     * ScriptService
+     */
+    public void testMustacheWithNullScriptService() {
+        // Ensure ScriptService is null (as set in @Before)
+        NamedXContentRegistry reg = new NamedXContentRegistry(
+            new SearchModule(Settings.EMPTY, java.util.Collections.emptyList()).getNamedXContents()
+        );
+        SearchRequestBuilder.initialize(reg, null);
+
+        String mustacheQuery = "{\"query\":{\"match\":{\"title\":\"{{query_string}}\"}}}";
+
+        try {
+            SearchRequestBuilder.buildSearchRequest(TEST_INDEX, mustacheQuery, TEST_QUERY_TEXT, null, TEST_SIZE);
+            fail("Should have thrown IllegalStateException when ScriptService is null");
+        } catch (IllegalStateException e) {
+            // Expected - verify error message mentions ScriptService
+            String errorMsg = e.getMessage() != null ? e.getMessage() : "";
+            String causeMsg = (e.getCause() != null && e.getCause().getMessage() != null) ? e.getCause().getMessage() : "";
+            assertTrue(
+                "Error message should mention ScriptService",
+                errorMsg.contains("ScriptService") || causeMsg.contains("ScriptService")
+            );
+        }
+    }
+
+    /**
+     * Test legacy %SearchText% still works for backward compatibility
+     * This confirms that queries without {{ use the old string replacement
+     */
+    public void testLegacyWildcardStillWorks() {
+        String legacyQuery = "{\"query\":{\"match\":{\"title\":\"" + WILDCARD_QUERY_TEXT + "\"}}}";
+
+        SearchRequest searchRequest = SearchRequestBuilder.buildSearchRequest(TEST_INDEX, legacyQuery, TEST_QUERY_TEXT, null, TEST_SIZE);
+
+        assertNotNull(searchRequest);
+        assertNotNull(searchRequest.source());
+        // The main test is that no exception is thrown - legacy replacement works
+    }
+
+    /**
+     * Test that queries without {{ use legacy replacement even if ScriptService is
+     * null
+     * This verifies the detection logic works correctly
+     */
+    public void testDetectionLogicUsesLegacyForNonMustache() {
+        SearchRequestBuilder.initialize(
+            new NamedXContentRegistry(new SearchModule(Settings.EMPTY, java.util.Collections.emptyList()).getNamedXContents()),
+            null
+        );
+
+        // Query WITHOUT {{ should use legacy replacement and not fail
+        String legacyQuery = "{\"query\":{\"match\":{\"title\":\"" + WILDCARD_QUERY_TEXT + "\"}}}";
+        SearchRequest sr = SearchRequestBuilder.buildSearchRequest(TEST_INDEX, legacyQuery, "test", null, TEST_SIZE);
+        assertNotNull("Legacy query should work without ScriptService", sr);
+
+        // Query WITH {{ should fail with null ScriptService
+        String mustacheQuery = "{\"query\":{\"match\":{\"title\":\"{{query_string}}\"}}}";
+        try {
+            SearchRequestBuilder.buildSearchRequest(TEST_INDEX, mustacheQuery, "test", null, TEST_SIZE);
+            fail("Mustache query should fail without ScriptService");
+        } catch (IllegalStateException e) {
+            // Expected
+            assertTrue(
+                "Error should mention ScriptService",
+                e.getMessage().contains("ScriptService") || e.getCause() != null && e.getCause().getMessage().contains("ScriptService")
+            );
+        }
+    }
+
+    /**
+     * Test that buildRequestForHybridSearch also handles Mustache detection
+     */
+    public void testHybridSearchMustacheDetection() {
+        SearchRequestBuilder.initialize(
+            new NamedXContentRegistry(new SearchModule(Settings.EMPTY, java.util.Collections.emptyList()).getNamedXContents()),
+            null
+        );
+
+        // Legacy query should work in hybrid search
+        String legacyQuery = "{\"query\":{\"hybrid\":{\"queries\":["
+            + "{\"match\":{\"title\":\""
+            + WILDCARD_QUERY_TEXT
+            + "\"}},"
+            + "{\"match\":{\"description\":\""
+            + WILDCARD_QUERY_TEXT
+            + "\"}}"
+            + "]}}}";
+        Map<String, Object> temporarySearchPipeline = Map.of();
+        SearchRequest sr = SearchRequestBuilder.buildRequestForHybridSearch(
+            TEST_INDEX,
+            legacyQuery,
+            temporarySearchPipeline,
+            "test",
+            TEST_SIZE
+        );
+        assertNotNull("Legacy hybrid query should work", sr);
+        assertNotNull(sr.source());
+
+        // Mustache query should fail without ScriptService
+        String mustacheQuery = "{\"query\":{\"hybrid\":{\"queries\":["
+            + "{\"match\":{\"title\":\"{{query_string}}\"}},"
+            + "{\"match\":{\"description\":\"{{query_string}}\"}}"
+            + "]}}}";
+        try {
+            SearchRequestBuilder.buildRequestForHybridSearch(TEST_INDEX, mustacheQuery, temporarySearchPipeline, "test", TEST_SIZE);
+            fail("Mustache hybrid query should fail without ScriptService");
+        } catch (IllegalStateException e) {
+            // Expected
+        }
+    }
+
+    /*
+     * NOTE: Tests for actual Mustache templating functionality require integration
+     * tests
+     * with a real ScriptService. These tests focus on:
+     * 1. Error handling when ScriptService is missing
+     * 2. Detection logic ({{ triggers Mustache path)
+     * 3. Backward compatibility (legacy %SearchText% still works)
+     *
+     * For full end-to-end Mustache substitution tests, see integration tests.
+     */
 }
