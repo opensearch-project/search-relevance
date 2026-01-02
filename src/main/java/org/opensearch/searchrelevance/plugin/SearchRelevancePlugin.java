@@ -88,6 +88,7 @@ import org.opensearch.searchrelevance.rest.RestPutExperimentAction;
 import org.opensearch.searchrelevance.rest.RestPutJudgmentAction;
 import org.opensearch.searchrelevance.rest.RestPutQuerySetAction;
 import org.opensearch.searchrelevance.rest.RestPutSearchConfigurationAction;
+import org.opensearch.searchrelevance.rest.RestSearchQuerySetAction;
 import org.opensearch.searchrelevance.rest.RestSearchRelevanceStatsAction;
 import org.opensearch.searchrelevance.scheduler.ScheduledExperimentRunnerManager;
 import org.opensearch.searchrelevance.scheduler.SearchRelevanceJobParameters;
@@ -115,6 +116,8 @@ import org.opensearch.searchrelevance.transport.queryset.PostQuerySetAction;
 import org.opensearch.searchrelevance.transport.queryset.PostQuerySetTransportAction;
 import org.opensearch.searchrelevance.transport.queryset.PutQuerySetAction;
 import org.opensearch.searchrelevance.transport.queryset.PutQuerySetTransportAction;
+import org.opensearch.searchrelevance.transport.queryset.SearchQuerySetAction;
+import org.opensearch.searchrelevance.transport.queryset.SearchQuerySetTransportAction;
 import org.opensearch.searchrelevance.transport.scheduledJob.DeleteScheduledExperimentAction;
 import org.opensearch.searchrelevance.transport.scheduledJob.DeleteScheduledExperimentTransportAction;
 import org.opensearch.searchrelevance.transport.scheduledJob.GetScheduledExperimentAction;
@@ -273,6 +276,7 @@ public class SearchRelevancePlugin extends Plugin
             new RestPutQuerySetAction(settingsAccessor),
             new RestDeleteQuerySetAction(settingsAccessor),
             new RestGetQuerySetAction(settingsAccessor),
+            new RestSearchQuerySetAction(settingsAccessor),
             new RestPutJudgmentAction(settingsAccessor),
             new RestDeleteJudgmentAction(settingsAccessor),
             new RestGetJudgmentAction(settingsAccessor),
@@ -296,6 +300,7 @@ public class SearchRelevancePlugin extends Plugin
             new ActionHandler<>(PutQuerySetAction.INSTANCE, PutQuerySetTransportAction.class),
             new ActionHandler<>(DeleteQuerySetAction.INSTANCE, DeleteQuerySetTransportAction.class),
             new ActionHandler<>(GetQuerySetAction.INSTANCE, GetQuerySetTransportAction.class),
+            new ActionHandler<>(SearchQuerySetAction.INSTANCE, SearchQuerySetTransportAction.class),
             new ActionHandler<>(PutJudgmentAction.INSTANCE, PutJudgmentTransportAction.class),
             new ActionHandler<>(DeleteJudgmentAction.INSTANCE, DeleteJudgmentTransportAction.class),
             new ActionHandler<>(GetJudgmentAction.INSTANCE, GetJudgmentTransportAction.class),

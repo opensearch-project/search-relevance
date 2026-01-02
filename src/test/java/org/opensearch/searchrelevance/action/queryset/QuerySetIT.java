@@ -12,6 +12,7 @@ import static org.opensearch.searchrelevance.common.PluginConstants.QUERY_SET_IN
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.hc.core5.http.HttpHeaders;
@@ -65,6 +66,24 @@ public class QuerySetIT extends BaseSearchRelevanceIT {
         assertNotNull(source.get("id"));
         assertEquals("query_set", source.get("name"));
         assertEquals("Test query set", source.get("description"));
+
+        String searchBody = "{" + "\"query\": {" + "\"term\": {" + "\"id\": \"" + querySetId + "\"" + "}" + "}" + "}";
+        Response searchResponse = makeRequest(
+            client(),
+            RestRequest.Method.POST.name(),
+            QUERYSETS_URL + "/_search",
+            null,
+            toHttpEntity(searchBody),
+            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
+        );
+        Map<String, Object> searchResultJson = entityAsMap(searchResponse);
+        Map<String, Object> hits = (Map<String, Object>) searchResultJson.get("hits");
+        List<Map<String, Object>> hitList = (List<Map<String, Object>>) hits.get("hits");
+        assertFalse(hitList.isEmpty());
+        Map<String, Object> firstHit = hitList.get(0);
+        assertEquals(querySetId, firstHit.get("_id"));
+        Map<String, Object> firstHitSource = (Map<String, Object>) firstHit.get("_source");
+        assertEquals("query_set", firstHitSource.get("name"));
 
         Response deleteQuerySetResponse = makeRequest(
             client(),
