@@ -31,7 +31,7 @@ import org.opensearch.searchrelevance.dao.ExperimentVariantDao;
 import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.model.ExperimentVariant;
-import org.opensearch.searchrelevance.scheduler.ExperimentCancellationToken;
+import org.opensearch.searchrelevance.scheduler.ScheduledExperimentCancellationToken;
 import org.opensearch.test.OpenSearchTestCase;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.client.Client;
@@ -304,7 +304,7 @@ public class ExperimentTaskManagerTests extends OpenSearchTestCase {
         Map<String, Object> initialConfigMap = new HashMap<>();
         initialConfigMap.put("existing-key", "existing-value");
         String scheduledExperimentResultId = "scheduled-experiment-result";
-        ExperimentCancellationToken cancellationToken = new ExperimentCancellationToken(scheduledExperimentResultId);
+        ScheduledExperimentCancellationToken cancellationToken = new ScheduledExperimentCancellationToken(scheduledExperimentResultId);
         cancellationToken.cancel();
 
         CompletableFuture<Map<String, Object>> future = taskManager.scheduleTasksAsync(

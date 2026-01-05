@@ -30,7 +30,7 @@ import org.opensearch.core.action.ActionListener;
 import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.executors.ExperimentTaskManager;
 import org.opensearch.searchrelevance.model.SearchConfigurationDetails;
-import org.opensearch.searchrelevance.scheduler.ExperimentCancellationToken;
+import org.opensearch.searchrelevance.scheduler.ScheduledExperimentCancellationToken;
 import org.opensearch.test.OpenSearchTestCase;
 
 import lombok.SneakyThrows;
@@ -95,7 +95,7 @@ public class HybridOptimizerExperimentProcessorTests extends OpenSearchTestCase 
             judgmentList,
             10,
             "run1",
-            new ExperimentCancellationToken(experimentId),
+            new ScheduledExperimentCancellationToken(experimentId),
             new ConcurrentHashMap<>(),
             listener
         );
@@ -145,7 +145,7 @@ public class HybridOptimizerExperimentProcessorTests extends OpenSearchTestCase 
             judgmentList,
             10,
             "run2",
-            new ExperimentCancellationToken(experimentId),
+            new ScheduledExperimentCancellationToken(experimentId),
             new ConcurrentHashMap<>(),
             listener
         );
@@ -177,7 +177,7 @@ public class HybridOptimizerExperimentProcessorTests extends OpenSearchTestCase 
             }
         };
 
-        ExperimentCancellationToken cancellationToken = new ExperimentCancellationToken(experimentId);
+        ScheduledExperimentCancellationToken cancellationToken = new ScheduledExperimentCancellationToken(experimentId);
         cancellationToken.cancel();
         processor.processSearchConfigurationsAsync(
             experimentId,

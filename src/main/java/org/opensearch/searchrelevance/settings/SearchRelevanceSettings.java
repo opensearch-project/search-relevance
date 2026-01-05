@@ -91,4 +91,15 @@ public class SearchRelevanceSettings {
         Setting.Property.NodeScope,
         Setting.Property.Dynamic
     );
+
+    /**
+     * When a search evaluation is to be run, there will be an amount of
+     * time to wait before automatically cancelling that experiment.
+     */
+    public static final Setting<TimeValue> SEARCH_RELEVANCE_EXPERIMENTS_TIMEOUT = Setting.positiveTimeSetting(
+        "plugins.search_relevance.experiments_timeout",
+        TimeValue.timeValueMinutes(60),
+        Setting.Property.NodeScope,
+        Setting.Property.Dynamic
+    );
 }

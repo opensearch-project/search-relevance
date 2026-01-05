@@ -43,7 +43,7 @@ import org.opensearch.searchrelevance.experiment.PointwiseExperimentProcessor;
 import org.opensearch.searchrelevance.metrics.MetricsHelper;
 import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.model.ScheduledExperimentResult;
-import org.opensearch.searchrelevance.scheduler.ExperimentCancellationToken;
+import org.opensearch.searchrelevance.scheduler.ScheduledExperimentCancellationToken;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.searchrelevance.transport.experiment.PutExperimentRequest;
 import org.opensearch.test.OpenSearchTestCase;
@@ -106,7 +106,7 @@ public class ExperimentRunningManagerTests extends OpenSearchTestCase {
         CountDownLatch actuallyFinished = new CountDownLatch(1);
         PutExperimentRequest request = createExperimentRequest();
 
-        ExperimentCancellationToken cancellationToken = new ExperimentCancellationToken("scheduled-experiment-result-id");
+        ScheduledExperimentCancellationToken cancellationToken = new ScheduledExperimentCancellationToken("scheduled-experiment-result-id");
         cancellationToken.cancel();
         experimentRunningManager.fetchSearchConfigurationsAsync(
             "experimentId",
@@ -123,7 +123,7 @@ public class ExperimentRunningManagerTests extends OpenSearchTestCase {
         CountDownLatch actuallyFinished = new CountDownLatch(1);
         PutExperimentRequest request = createExperimentRequest();
 
-        ExperimentCancellationToken cancellationToken = new ExperimentCancellationToken("scheduled-experiment-result-id");
+        ScheduledExperimentCancellationToken cancellationToken = new ScheduledExperimentCancellationToken("scheduled-experiment-result-id");
         SearchResponse searchConfigResponse = mock(SearchResponse.class);
         doAnswer(invocation -> {
             ActionListener<SearchResponse> listener = invocation.getArgument(1);
@@ -147,7 +147,7 @@ public class ExperimentRunningManagerTests extends OpenSearchTestCase {
         PutExperimentRequest request = createExperimentRequest();
         CountDownLatch actuallyFinished = new CountDownLatch(1);
 
-        ExperimentCancellationToken cancellationToken = new ExperimentCancellationToken("scheduled-experiment-result-id");
+        ScheduledExperimentCancellationToken cancellationToken = new ScheduledExperimentCancellationToken("scheduled-experiment-result-id");
         cancellationToken.cancel();
         experimentRunningManager.executeExperimentEvaluation(
             "experimentId",
@@ -171,7 +171,7 @@ public class ExperimentRunningManagerTests extends OpenSearchTestCase {
     public void testConcurrentFutureMapUpdates() {
         PutExperimentRequest request = createExperimentRequest();
         Map<String, List<Future<?>>> runningFutures = new ConcurrentHashMap<>();
-        ExperimentCancellationToken cancellationToken = new ExperimentCancellationToken("scheduled-experiment-result-id");
+        ScheduledExperimentCancellationToken cancellationToken = new ScheduledExperimentCancellationToken("scheduled-experiment-result-id");
         runningFutures.compute(request.getScheduledExperimentResultId(), (key, existingList) -> {
             List<Future<?>> list = existingList != null ? existingList : new CopyOnWriteArrayList<>();
             return list;
@@ -195,7 +195,9 @@ public class ExperimentRunningManagerTests extends OpenSearchTestCase {
 
         doAnswer(invocation -> { return null; }).when(querySetDao).getQuerySet(any(String.class), any(ActionListener.class));
 
-        ExperimentCancellationToken cancellationToken1 = new ExperimentCancellationToken("scheduled-experiment-result-id");
+        ScheduledExperimentCancellationToken cancellationToken1 = new ScheduledExperimentCancellationToken(
+            "scheduled-experiment-result-id"
+        );
         experimentRunningManager.startExperimentRun("experimentId", request, cancellationToken1, actuallyFinished1);
 
         assertEquals(1, actuallyFinished1.getCount());
@@ -204,7 +206,9 @@ public class ExperimentRunningManagerTests extends OpenSearchTestCase {
 
         // Try running a second experiment and make sure that it does not run successfully
         CountDownLatch actuallyFinished2 = new CountDownLatch(1);
-        ExperimentCancellationToken cancellationToken2 = new ExperimentCancellationToken("scheduled-experiment-result-id");
+        ScheduledExperimentCancellationToken cancellationToken2 = new ScheduledExperimentCancellationToken(
+            "scheduled-experiment-result-id"
+        );
 
         experimentRunningManager.startExperimentRun("experimentId", request, cancellationToken2, actuallyFinished2);
 

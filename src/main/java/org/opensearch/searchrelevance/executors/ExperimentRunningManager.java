@@ -44,7 +44,7 @@ import org.opensearch.searchrelevance.model.QuerySet;
 import org.opensearch.searchrelevance.model.ScheduledExperimentResult;
 import org.opensearch.searchrelevance.model.SearchConfiguration;
 import org.opensearch.searchrelevance.model.SearchConfigurationDetails;
-import org.opensearch.searchrelevance.scheduler.ExperimentCancellationToken;
+import org.opensearch.searchrelevance.scheduler.AbstractCancellationToken;
 import org.opensearch.searchrelevance.scheduler.ScheduledExperimentRunnerManager;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.searchrelevance.transport.experiment.PutExperimentRequest;
@@ -108,7 +108,7 @@ public class ExperimentRunningManager {
     public void startExperimentRun(
         String experimentId,
         PutExperimentRequest request,
-        ExperimentCancellationToken cancellationToken,
+        AbstractCancellationToken cancellationToken,
         CountDownLatch actuallyFinished
     ) {
         List<Future<?>> futures = new ArrayList<>();
@@ -130,10 +130,31 @@ public class ExperimentRunningManager {
             });
 
             // register cancellation callback
-            // If the
             cancellationToken.onCancel(() -> {
                 runningFutures.get(request.getScheduledExperimentResultId()).forEach(f -> FutureUtils.cancel(f));
                 runningFutures.remove(request.getScheduledExperimentResultId());
+            });
+        } else {
+            if (runningFutures.containsKey(experimentId)) {
+                handleAsyncFailure(
+                    experimentId,
+                    request,
+                    "There is a running single experiment run with the same experiment id",
+                    new Exception("Cannot run experiment!"),
+                    actuallyFinished
+                );
+                log.error("Cannot run experiment as there is another run with the same experiment id, {}", experimentId);
+                return;
+            }
+            runningFutures.compute(experimentId, (key, existingList) -> {
+                List<Future<?>> list = existingList != null ? existingList : new CopyOnWriteArrayList<>();
+                return list;
+            });
+
+            // register cancellation callback
+            cancellationToken.onCancel(() -> {
+                runningFutures.get(experimentId).forEach(f -> FutureUtils.cancel(f));
+                runningFutures.remove(experimentId);
             });
         }
         // First, get QuerySet asynchronously
@@ -165,7 +186,7 @@ public class ExperimentRunningManager {
         String experimentId,
         PutExperimentRequest request,
         List<String> queryTextWithReferences,
-        ExperimentCancellationToken cancellationToken,
+        AbstractCancellationToken cancellationToken,
         CountDownLatch actuallyFinished
     ) {
         Map<String, SearchConfigurationDetails> searchConfigurations = new HashMap<>();
@@ -193,6 +214,13 @@ public class ExperimentRunningManager {
                         configId,
                         experimentId
                     );
+                }
+            } else {
+                // This should be synchronized.
+                try {
+                    runningFutures.get(experimentId).add(singleSearchConfigurationFuture);
+                } catch (Exception e) {
+                    log.info("Fetching search configuration, {} for single experiment {} cannot be completed", configId, experimentId);
                 }
             }
             configFutures.add(singleSearchConfigurationFuture);
@@ -234,7 +262,7 @@ public class ExperimentRunningManager {
         );
     }
 
-    private boolean checkIfCancelled(ExperimentCancellationToken cancellationToken) {
+    private boolean checkIfCancelled(AbstractCancellationToken cancellationToken) {
         if (cancellationToken != null && cancellationToken.isCancelled()) {
             return true;
         }
@@ -247,7 +275,7 @@ public class ExperimentRunningManager {
         List<String> queryTextWithReferences,
         AtomicBoolean hasFailure,
         String configId,
-        ExperimentCancellationToken cancellationToken,
+        AbstractCancellationToken cancellationToken,
         CountDownLatch actuallyFinished
     ) {
         CompletableFuture<Entry<String, Object>> future = new CompletableFuture<>();
@@ -382,7 +410,7 @@ public class ExperimentRunningManager {
         AtomicInteger pendingQueries,
         AtomicBoolean hasFailure,
         List<String> judgmentList,
-        ExperimentCancellationToken cancellationToken,
+        AbstractCancellationToken cancellationToken,
         CountDownLatch actuallyFinished
     ) {
         int completedQueries = 0;
@@ -492,7 +520,7 @@ public class ExperimentRunningManager {
         PutExperimentRequest request,
         AtomicBoolean hasFailure,
         List<String> judgmentList,
-        ExperimentCancellationToken cancellationToken,
+        AbstractCancellationToken cancellationToken,
         CountDownLatch actuallyFinished
     ) {
         if (hasFailure.get() || checkIfCancelled(cancellationToken)) {

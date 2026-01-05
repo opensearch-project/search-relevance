@@ -51,7 +51,7 @@ public class ScheduledExperimentRunnerManagerTests extends OpenSearchTestCase {
 
     public void testRunScheduledExperimentSuccess() {
         CountDownLatch actuallyFinished = new CountDownLatch(1);
-        ExperimentCancellationToken cancellationToken = new ExperimentCancellationToken(scheduledExperimentId);
+        ScheduledExperimentCancellationToken cancellationToken = new ScheduledExperimentCancellationToken(scheduledExperimentId);
         doAnswer(invocation -> {
             ActionListener<SearchResponse> listener = invocation.getArgument(1);
             actuallyFinished.countDown();
@@ -65,7 +65,7 @@ public class ScheduledExperimentRunnerManagerTests extends OpenSearchTestCase {
 
     public void testRunScheduledExperimentError() {
         CountDownLatch actuallyFinished = new CountDownLatch(1);
-        ExperimentCancellationToken cancellationToken = new ExperimentCancellationToken(scheduledExperimentId);
+        ScheduledExperimentCancellationToken cancellationToken = new ScheduledExperimentCancellationToken(scheduledExperimentId);
         doAnswer(invocation -> {
             ActionListener<SearchResponse> listener = invocation.getArgument(1);
             listener.onFailure(new Exception("Experiment not found!"));
@@ -79,7 +79,7 @@ public class ScheduledExperimentRunnerManagerTests extends OpenSearchTestCase {
 
     public void testRunScheduledExperimentCancelledBeforeExperimentSearch() {
         CountDownLatch actuallyFinished = new CountDownLatch(1);
-        ExperimentCancellationToken cancellationToken = new ExperimentCancellationToken(scheduledExperimentId);
+        ScheduledExperimentCancellationToken cancellationToken = new ScheduledExperimentCancellationToken(scheduledExperimentId);
         cancellationToken.cancel();
         SearchResponse searchResponse = mock(SearchResponse.class);
         doAnswer(invocation -> {

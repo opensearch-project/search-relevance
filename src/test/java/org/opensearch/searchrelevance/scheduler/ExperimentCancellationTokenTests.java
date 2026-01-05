@@ -17,7 +17,7 @@ import org.opensearch.test.OpenSearchTestCase;
 public class ExperimentCancellationTokenTests extends OpenSearchTestCase {
     public void testCancellationToken() {
         String scheduledExperimentResultId = "test-experiment-result-id";
-        ExperimentCancellationToken token = new ExperimentCancellationToken(scheduledExperimentResultId);
+        ScheduledExperimentCancellationToken token = new ScheduledExperimentCancellationToken(scheduledExperimentResultId);
 
         // Verify initial state
         assertEquals(scheduledExperimentResultId, token.getScheduledExperimentResultId());

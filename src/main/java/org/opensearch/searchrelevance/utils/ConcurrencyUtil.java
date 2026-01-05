@@ -16,7 +16,7 @@ import java.util.concurrent.TimeoutException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opensearch.common.util.concurrent.FutureUtils;
-import org.opensearch.searchrelevance.scheduler.ExperimentCancellationToken;
+import org.opensearch.searchrelevance.scheduler.AbstractCancellationToken;
 import org.opensearch.searchrelevance.scheduler.SearchRelevanceJobRunner;
 import org.opensearch.threadpool.ThreadPool;
 
@@ -30,7 +30,7 @@ public class ConcurrencyUtil {
     public static <T> CompletableFuture<T> withTimeout(
         CompletableFuture<T> future,
         long timeoutSeconds,
-        ExperimentCancellationToken cancellationToken,
+        AbstractCancellationToken cancellationToken,
         CountDownLatch actuallyFinished,
         ThreadPool threadPool
     ) {

@@ -128,7 +128,7 @@ public class SearchRelevanceJobRunnerTests extends OpenSearchTestCase {
             .runScheduledExperiment(
                 any(SearchRelevanceJobParameters.class),
                 any(String.class),
-                any(ExperimentCancellationToken.class),
+                any(ScheduledExperimentCancellationToken.class),
                 any(CountDownLatch.class)
             );
         doAnswer(invocation -> {
@@ -144,12 +144,12 @@ public class SearchRelevanceJobRunnerTests extends OpenSearchTestCase {
         verify(manager, times(1)).runScheduledExperiment(
             any(SearchRelevanceJobParameters.class),
             any(String.class),
-            any(ExperimentCancellationToken.class),
+            any(ScheduledExperimentCancellationToken.class),
             any(CountDownLatch.class)
         );
 
         // Verify that the cleanup stage was actually reached.
-        verify(manager, times(1)).cleanupResources(any(String.class), any(String.class), any(ExperimentCancellationToken.class));
+        verify(manager, times(1)).cleanupResources(any(String.class), any(String.class), any(ScheduledExperimentCancellationToken.class));
         verify(lockService, times(1)).release(any(), any());
     }
 
@@ -158,7 +158,7 @@ public class SearchRelevanceJobRunnerTests extends OpenSearchTestCase {
             .runScheduledExperiment(
                 any(SearchRelevanceJobParameters.class),
                 any(String.class),
-                any(ExperimentCancellationToken.class),
+                any(ScheduledExperimentCancellationToken.class),
                 any(CountDownLatch.class)
             );
         doAnswer(invocation -> {
@@ -174,12 +174,12 @@ public class SearchRelevanceJobRunnerTests extends OpenSearchTestCase {
         verify(manager, times(1)).runScheduledExperiment(
             any(SearchRelevanceJobParameters.class),
             any(String.class),
-            any(ExperimentCancellationToken.class),
+            any(ScheduledExperimentCancellationToken.class),
             any(CountDownLatch.class)
         );
 
         // Verify that the cleanup stage was actually reached.
-        verify(manager, times(1)).cleanupResources(any(String.class), any(String.class), any(ExperimentCancellationToken.class));
+        verify(manager, times(1)).cleanupResources(any(String.class), any(String.class), any(ScheduledExperimentCancellationToken.class));
         verify(lockService, times(1)).release(any(), any());
     }
 
@@ -192,7 +192,7 @@ public class SearchRelevanceJobRunnerTests extends OpenSearchTestCase {
             .runScheduledExperiment(
                 any(SearchRelevanceJobParameters.class),
                 any(String.class),
-                any(ExperimentCancellationToken.class),
+                any(ScheduledExperimentCancellationToken.class),
                 any(CountDownLatch.class)
             );
         doAnswer(invocation -> {
@@ -204,6 +204,6 @@ public class SearchRelevanceJobRunnerTests extends OpenSearchTestCase {
         searchRelevanceJobRunner.runJob(jobParameters, jobExecutionContext);
 
         // Verify that the cleanup stage was actually reached.
-        verify(manager, times(1)).cleanupResources(any(String.class), any(String.class), any(ExperimentCancellationToken.class));
+        verify(manager, times(1)).cleanupResources(any(String.class), any(String.class), any(ScheduledExperimentCancellationToken.class));
     }
 }

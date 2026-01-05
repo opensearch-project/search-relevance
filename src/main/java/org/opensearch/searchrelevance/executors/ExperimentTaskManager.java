@@ -36,7 +36,7 @@ import org.opensearch.searchrelevance.experiment.QuerySourceUtil;
 import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.model.ExperimentVariant;
 import org.opensearch.searchrelevance.model.builder.SearchRequestBuilder;
-import org.opensearch.searchrelevance.scheduler.ExperimentCancellationToken;
+import org.opensearch.searchrelevance.scheduler.AbstractCancellationToken;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.client.Client;
 
@@ -112,7 +112,7 @@ public class ExperimentTaskManager {
         AtomicBoolean hasFailure,
         String scheduledRunId,
         Map<String, List<Future<?>>> runningFutures,
-        ExperimentCancellationToken cancellationToken
+        AbstractCancellationToken cancellationToken
     ) {
         // Create a CompletableFuture to track the overall completion
         CompletableFuture<Map<String, Object>> resultFuture = new CompletableFuture<>();
@@ -190,7 +190,7 @@ public class ExperimentTaskManager {
         Map<String, String> docIdToScores,
         ExperimentTaskContext taskContext,
         String scheduledRunId,
-        ExperimentCancellationToken cancellationToken,
+        AbstractCancellationToken cancellationToken,
         Map<String, List<Future<?>>> runningFutures
     ) {
         if (experimentType == ExperimentType.POINTWISE_EVALUATION) {
@@ -237,7 +237,7 @@ public class ExperimentTaskManager {
         return (String) variant.getParameters().get("searchPipeline");
     }
 
-    private boolean checkIfCancelled(ExperimentCancellationToken cancellationToken) {
+    private boolean checkIfCancelled(AbstractCancellationToken cancellationToken) {
         if (cancellationToken != null && cancellationToken.isCancelled()) {
             return true;
         }

@@ -70,7 +70,7 @@ public class ScheduledExperimentRunnerManager {
     public void runScheduledExperiment(
         SearchRelevanceJobParameters parameter,
         String scheduledExperimentResultId,
-        ExperimentCancellationToken cancellationToken,
+        AbstractCancellationToken cancellationToken,
         CountDownLatch actuallyFinished
     ) {
         String experimentId = parameter.getExperimentId();
@@ -157,7 +157,7 @@ public class ScheduledExperimentRunnerManager {
         }
     }
 
-    private boolean checkIfCancelled(ExperimentCancellationToken cancellationToken) {
+    private boolean checkIfCancelled(AbstractCancellationToken cancellationToken) {
         if (cancellationToken != null && cancellationToken.isCancelled()) {
             return true;
         }
@@ -231,7 +231,7 @@ public class ScheduledExperimentRunnerManager {
      * @param scheduledExperimentResultId Id of scheduled experiment result
      * @param cancellationToken The token to indicate whether this scheduled experiment run has been cancelled
      */
-    public void cleanupResources(String experimentId, String scheduledExperimentResultId, ExperimentCancellationToken cancellationToken) {
+    public void cleanupResources(String experimentId, String scheduledExperimentResultId, AbstractCancellationToken cancellationToken) {
         log.info("Cleaning up all resources for {}", experimentId);
         ScheduledExperimentResult finalExperiment = new ScheduledExperimentResult(
             scheduledExperimentResultId,

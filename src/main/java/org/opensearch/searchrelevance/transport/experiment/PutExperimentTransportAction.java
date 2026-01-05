@@ -9,6 +9,10 @@ package org.opensearch.searchrelevance.transport.experiment;
 
 import java.util.ArrayList;
 import java.util.UUID;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.CountDownLatch;
 
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.support.ActionFilters;
@@ -28,7 +32,10 @@ import org.opensearch.searchrelevance.experiment.PointwiseExperimentProcessor;
 import org.opensearch.searchrelevance.metrics.MetricsHelper;
 import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.Experiment;
+import org.opensearch.searchrelevance.scheduler.AbstractCancellationToken;
+import org.opensearch.searchrelevance.scheduler.ExperimentCancellationToken;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
+import org.opensearch.searchrelevance.utils.ConcurrencyUtil;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.tasks.Task;
 import org.opensearch.threadpool.ThreadPool;
@@ -49,6 +56,8 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
     private final HybridOptimizerExperimentProcessor hybridOptimizerExperimentProcessor;
     private final PointwiseExperimentProcessor pointwiseExperimentProcessor;
     private final ExperimentRunningManager experimentRunningManager;
+    private final ThreadPool threadPool;
+    private final SearchRelevanceSettingsAccessor settingsAccessor;
 
     @Inject
     public PutExperimentTransportAction(
@@ -72,6 +81,8 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
         this.hybridOptimizerExperimentProcessor = new HybridOptimizerExperimentProcessor(judgmentDao, experimentTaskManager);
         this.pointwiseExperimentProcessor = new PointwiseExperimentProcessor(judgmentDao, experimentTaskManager);
         this.experimentRunningManager = experimentRunningManager;
+        this.threadPool = threadPool;
+        this.settingsAccessor = settingsAccessor;
     }
 
     @Override
@@ -100,8 +111,61 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
                 // Return response immediately
                 listener.onResponse((IndexResponse) response);
 
-                // Start experiment with async processing
-                experimentRunningManager.startExperimentRun(id, request, null, null);
+                ExperimentCancellationToken cancellationToken = new ExperimentCancellationToken(id);
+                CountDownLatch actuallyFinished = new CountDownLatch(1);
+                Runnable experimentRunTask = () -> {
+                    // Start experiment with async processing
+                    experimentRunningManager.startExperimentRun(id, request, cancellationToken, actuallyFinished);
+                    log.info("Experiment {} is finished.", id);
+                };
+
+                Runnable timeoutJobWithCleanup = () -> {
+                    CompletableFuture<Void> searchEvaluationTask = null;
+                    try {
+                        // Schedule the experiment to run then also schedule a timeout to cancel experiment after some time.
+                        long timeoutAmount = settingsAccessor.getExperimentsTimeout().getSeconds();
+                        CompletableFuture<Void> originalExperimentStart;
+                        try {
+                            originalExperimentStart = CompletableFuture.runAsync(experimentRunTask, threadPool.generic());
+                            searchEvaluationTask = ConcurrencyUtil.withTimeout(
+                                originalExperimentStart,
+                                timeoutAmount,
+                                cancellationToken,
+                                actuallyFinished,
+                                threadPool
+                            );
+                        } catch (Exception e) {
+                            actuallyFinished.countDown();
+                            log.error("Experiment never started " + e.getMessage());
+                        }
+
+                        // Wait until all asynchronous operations or timeout complete before cleanup
+                        searchEvaluationTask.join();
+                    } catch (CancellationException e) {
+                        log.error("Timeout for experiment has occured!");
+                    } catch (CompletionException e) {
+                        log.error("Experiment has timed out. Moving onto cleanup");
+                    } finally {
+                        // All threads except this current running one should be released if we got to this point.
+                        // This is if join somehow failed, but the thread should be waiting at the join call and only
+                        // be released when the actuallyFinished latch is counted down.
+                        while (actuallyFinished.getCount() > 0) {
+                            actuallyFinished.countDown();
+                        }
+                        if (cancellationToken.isCancelled()) {
+                            log.info("Search evaluation task has concluded through cancellation.");
+                        } else {
+                            log.info("Search evaluation task has concluded without cancellation");
+                        }
+                        cleanupResources(id, request, cancellationToken);
+                        // This will clean up the future map in ExperimentRunningManager
+                        cancellationToken.cancel();
+                    }
+                };
+
+                // The logic of the experiment run should not block this calling thread, so it will be scheduled
+                // into a threadpool.
+                threadPool.generic().execute(timeoutJobWithCleanup);
             }, e -> {
                 log.error("Failed to create initial experiment", e);
                 listener.onFailure(
@@ -112,6 +176,36 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
         } catch (Exception e) {
             log.error("Failed to process experiment request", e);
             listener.onFailure(new SearchRelevanceException("Failed to process experiment request", e, RestStatus.INTERNAL_SERVER_ERROR));
+        }
+    }
+
+    /**
+     *
+     * @param experimentId Id of experiment that is scheduled to run
+     * @param cancellationToken The token to indicate whether this scheduled experiment run has been cancelled
+     */
+    public void cleanupResources(String experimentId, PutExperimentRequest request, AbstractCancellationToken cancellationToken) {
+        log.info("Cleaning up all resources for {}", experimentId);
+        Experiment finalExperiment = new Experiment(
+            experimentId,
+            TimeUtils.getTimestamp(),
+            request.getType(),
+            AsyncStatus.TIMEOUT,
+            request.getQuerySetId(),
+            request.getSearchConfigurationList(),
+            request.getJudgmentList(),
+            request.getSize(),
+            null
+        );
+
+        if (cancellationToken.isCancelled()) {
+            experimentDao.updateExperiment(
+                finalExperiment,
+                ActionListener.wrap(
+                    response -> log.info("Updated experiment {} status to TIMEOUT", experimentId),
+                    e -> log.error("Failed to update error status for experiment: {}", experimentId, e)
+                )
+            );
         }
     }
 }

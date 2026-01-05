@@ -12,7 +12,7 @@ import java.util.Map;
 import java.util.concurrent.Future;
 
 import org.opensearch.searchrelevance.model.ExperimentVariant;
-import org.opensearch.searchrelevance.scheduler.ExperimentCancellationToken;
+import org.opensearch.searchrelevance.scheduler.AbstractCancellationToken;
 
 import lombok.Getter;
 import lombok.experimental.SuperBuilder;
@@ -34,6 +34,6 @@ public class VariantTaskParameters {
     private final Map<String, String> docIdToScores;
     private final ExperimentTaskContext taskContext;
     private final String scheduledRunId;
-    private ExperimentCancellationToken cancellationToken;
+    private final AbstractCancellationToken cancellationToken;
     Map<String, List<Future<?>>> runningFutures;
 }

@@ -68,7 +68,7 @@ public enum SearchRelevanceJobRunner implements ScheduledJobRunner {
         String scheduledExperimentResultId = UUID.randomUUID().toString();
         SearchRelevanceJobParameters parameter = (SearchRelevanceJobParameters) jobParameter;
 
-        ExperimentCancellationToken cancellationToken = new ExperimentCancellationToken(scheduledExperimentResultId);
+        ScheduledExperimentCancellationToken cancellationToken = new ScheduledExperimentCancellationToken(scheduledExperimentResultId);
         CountDownLatch actuallyFinished = new CountDownLatch(1);
 
         Runnable jobRunTask = () -> {

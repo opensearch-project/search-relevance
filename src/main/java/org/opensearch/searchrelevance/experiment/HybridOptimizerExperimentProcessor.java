@@ -32,7 +32,7 @@ import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.model.ExperimentVariant;
 import org.opensearch.searchrelevance.model.SearchConfigurationDetails;
-import org.opensearch.searchrelevance.scheduler.ExperimentCancellationToken;
+import org.opensearch.searchrelevance.scheduler.AbstractCancellationToken;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -70,7 +70,7 @@ public class HybridOptimizerExperimentProcessor {
         List<String> judgmentList,
         int size,
         String scheduledRunId,
-        ExperimentCancellationToken cancellationToken,
+        AbstractCancellationToken cancellationToken,
         Map<String, List<Future<?>>> runningFutures,
         ActionListener<Map<String, Object>> listener
     ) {
@@ -204,7 +204,7 @@ public class HybridOptimizerExperimentProcessor {
         }
     }
 
-    private boolean checkIfCancelled(ExperimentCancellationToken cancellationToken) {
+    private boolean checkIfCancelled(AbstractCancellationToken cancellationToken) {
         if (cancellationToken != null && cancellationToken.isCancelled()) {
             return true;
         }
@@ -225,7 +225,7 @@ public class HybridOptimizerExperimentProcessor {
         Map<String, String> docIdToScores,
         AtomicBoolean hasFailure,
         String scheduledRunId,
-        ExperimentCancellationToken cancellationToken,
+        AbstractCancellationToken cancellationToken,
         Map<String, List<Future<?>>> runningFutures,
         ActionListener<Map<String, Object>> finalListener
     ) {
