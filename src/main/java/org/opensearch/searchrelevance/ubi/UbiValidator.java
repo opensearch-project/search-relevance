@@ -7,41 +7,12 @@
  */
 package org.opensearch.searchrelevance.ubi;
 
-import static org.opensearch.searchrelevance.common.PluginConstants.UBI_EVENTS_INDEX;
-import static org.opensearch.searchrelevance.common.PluginConstants.UBI_QUERIES_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.USER_QUERY_FIELD;
 
 import org.opensearch.cluster.metadata.MappingMetadata;
 import org.opensearch.cluster.service.ClusterService;
 
 public class UbiValidator {
-
-    /**
-     * Checks if both UBI indices exist in the cluster
-     * @param clusterService opensearch cluster instance
-     * @return true if both indices exist, false otherwise
-     */
-    public static boolean checkUbiIndicesExist(ClusterService clusterService) {
-        return checkUbiIndicesExist(clusterService, UBI_QUERIES_INDEX, UBI_EVENTS_INDEX);
-    }
-
-    /**
-     * Checks if specified UBI indices exist in the cluster
-     * @param clusterService opensearch cluster instance
-     * @param ubiQueriesIndex the UBI queries index name
-     * @param ubiEventsIndex the UBI events index name
-     * @return true if both indices exist, false otherwise
-     */
-    public static boolean checkUbiIndicesExist(ClusterService clusterService, String ubiQueriesIndex, String ubiEventsIndex) {
-        if (clusterService == null) {
-            return false;
-        }
-
-        boolean queriesIndexExists = clusterService.state().metadata().hasIndex(ubiQueriesIndex);
-        boolean eventsIndexExists = clusterService.state().metadata().hasIndex(ubiEventsIndex);
-
-        return queriesIndexExists && eventsIndexExists;
-    }
 
     /**
      * Checks if UBI queries index exists in the cluster and has required fields
