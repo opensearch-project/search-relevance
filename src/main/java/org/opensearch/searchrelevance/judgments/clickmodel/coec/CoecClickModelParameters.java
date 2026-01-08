@@ -7,6 +7,8 @@
  */
 package org.opensearch.searchrelevance.judgments.clickmodel.coec;
 
+import static org.opensearch.searchrelevance.common.PluginConstants.UBI_EVENTS_INDEX;
+
 import org.opensearch.searchrelevance.judgments.clickmodel.ClickModelParameters;
 
 /**
@@ -19,6 +21,7 @@ public class CoecClickModelParameters extends ClickModelParameters {
 
     private String startDate;
     private String endDate;
+    private String ubiEventsIndex;
 
     /**
      * Creates new parameters.
@@ -26,6 +29,7 @@ public class CoecClickModelParameters extends ClickModelParameters {
      */
     public CoecClickModelParameters(final int maxRank) {
         this.maxRank = maxRank;
+        this.ubiEventsIndex = UBI_EVENTS_INDEX;
     }
 
     /**
@@ -38,6 +42,21 @@ public class CoecClickModelParameters extends ClickModelParameters {
         this.maxRank = maxRank;
         this.startDate = startDate;
         this.endDate = endDate;
+        this.ubiEventsIndex = UBI_EVENTS_INDEX;
+    }
+
+    /**
+     * Creates new parameters which includes the UBI event dates and custom index names.
+     * @param maxRank The max rank to use when calculating the judgments.
+     * @param startDate The start date for filtered date range.
+     * @param endDate The end date for filtered date range.
+     * @param ubiEventsIndex The custom UBI events index name.
+     */
+    public CoecClickModelParameters(final int maxRank, final String startDate, final String endDate, final String ubiEventsIndex) {
+        this.maxRank = maxRank;
+        this.startDate = startDate;
+        this.endDate = endDate;
+        this.ubiEventsIndex = ubiEventsIndex != null ? ubiEventsIndex : UBI_EVENTS_INDEX;
     }
 
     /**
@@ -48,6 +67,7 @@ public class CoecClickModelParameters extends ClickModelParameters {
     public CoecClickModelParameters(final int maxRank, final int roundingDigits) {
         this.maxRank = maxRank;
         this.roundingDigits = roundingDigits;
+        this.ubiEventsIndex = UBI_EVENTS_INDEX;
     }
 
     /**
@@ -80,6 +100,14 @@ public class CoecClickModelParameters extends ClickModelParameters {
      */
     public String getEndDate() {
         return endDate;
+    }
+
+    /**
+     * Gets the UBI events index name.
+     * @return The UBI events index name.
+     */
+    public String getUbiEventsIndex() {
+        return ubiEventsIndex;
     }
 
 }

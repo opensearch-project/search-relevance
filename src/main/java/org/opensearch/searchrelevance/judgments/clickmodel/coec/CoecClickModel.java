@@ -7,8 +7,6 @@
  */
 package org.opensearch.searchrelevance.judgments.clickmodel.coec;
 
-import static org.opensearch.searchrelevance.common.PluginConstants.UBI_EVENTS_INDEX;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -101,7 +99,7 @@ public class CoecClickModel extends ClickModel {
 
         searchSourceBuilder.aggregation(actionAgg);
 
-        SearchRequest searchRequest = new SearchRequest(UBI_EVENTS_INDEX).source(searchSourceBuilder);
+        SearchRequest searchRequest = new SearchRequest(parameters.getUbiEventsIndex()).source(searchSourceBuilder);
 
         client.search(searchRequest, ActionListener.wrap(response -> {
             try {
@@ -191,7 +189,7 @@ public class CoecClickModel extends ClickModel {
                 null
             );
 
-        SearchRequest searchRequest = new SearchRequest(UBI_EVENTS_INDEX).source(searchSourceBuilder).scroll(SCROLL_TIMEOUT);
+        SearchRequest searchRequest = new SearchRequest(parameters.getUbiEventsIndex()).source(searchSourceBuilder).scroll(SCROLL_TIMEOUT);
 
         processClickthroughSearch(searchRequest, queriesToClickthroughRates, listener);
     }
@@ -277,7 +275,7 @@ public class CoecClickModel extends ClickModel {
 
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder().query(queryBuilder).size(SCROLL_SIZE).timeout(SEARCH_TIMEOUT);
 
-        SearchRequest searchRequest = new SearchRequest(UBI_EVENTS_INDEX).source(searchSourceBuilder).scroll(SCROLL_TIMEOUT);
+        SearchRequest searchRequest = new SearchRequest(parameters.getUbiEventsIndex()).source(searchSourceBuilder).scroll(SCROLL_TIMEOUT);
 
         LOGGER.debug("Starting click events scroll search");
         scrollEvents(searchRequest, null, clickCounts, "click", listener);
@@ -294,7 +292,7 @@ public class CoecClickModel extends ClickModel {
 
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder().query(queryBuilder).size(SCROLL_SIZE).timeout(SEARCH_TIMEOUT);
 
-        SearchRequest searchRequest = new SearchRequest(UBI_EVENTS_INDEX).source(searchSourceBuilder).scroll(SCROLL_TIMEOUT);
+        SearchRequest searchRequest = new SearchRequest(parameters.getUbiEventsIndex()).source(searchSourceBuilder).scroll(SCROLL_TIMEOUT);
 
         LOGGER.debug("Starting impression events scroll search");
         scrollEvents(searchRequest, null, impressionCounts, "impression", ActionListener.wrap(impressionCountsResult -> {
@@ -672,7 +670,7 @@ public class CoecClickModel extends ClickModel {
 
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder().query(queryBuilder).trackTotalHits(true).size(0);
 
-        SearchRequest searchRequest = new SearchRequest(UBI_EVENTS_INDEX).source(searchSourceBuilder);
+        SearchRequest searchRequest = new SearchRequest(parameters.getUbiEventsIndex()).source(searchSourceBuilder);
 
         client.search(
             searchRequest,
