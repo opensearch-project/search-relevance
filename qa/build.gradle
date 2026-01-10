@@ -66,6 +66,21 @@ dependencies {
     testImplementation(testFixtures(rootProject))
 }
 
+// Create a configuration for sharing test classes with subprojects
+configurations {
+    testArtifacts.extendsFrom testRuntimeClasspath
+}
+
+// Task to create a jar from test classes for sharing with subprojects
+task testJar(type: Jar) {
+    archiveClassifier = 'tests'
+    from sourceSets.test.output
+}
+
+artifacts {
+    testArtifacts testJar
+}
+
 ext {
     licenseFile = rootProject.file('LICENSE.txt')
     noticeFile = rootProject.file('NOTICE.txt')
@@ -259,4 +274,5 @@ task zipBwcPlugin(type: Zip) {
 
 task bwcTestSuite {
     dependsOn ":qa:rolling-upgrade:testRollingUpgrade"
+    dependsOn ":qa:restart-upgrade:testRestartUpgrade"
 }

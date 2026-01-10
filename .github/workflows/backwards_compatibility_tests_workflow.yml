@@ -19,10 +19,10 @@ jobs:
     needs: Get-CI-Image-Tag
     strategy:
       matrix:
-        java: [21]
+        java: [21, 25]
         os: [ubuntu-latest]
-        bwc_version: ["3.3.0-SNAPSHOT"]
-        opensearch_version: ["3.4.0-SNAPSHOT"]
+        bwc_version: ["3.3.0"]
+        opensearch_version: ["3.4.0"]
 
     name: SearchRelevance Rolling-Upgrade BWC Tests
     runs-on: ${{ matrix.os }}
@@ -46,4 +46,37 @@ jobs:
         run: |
           chown -R 1000:1000 `pwd`
           echo "Running rolling-upgrade backwards compatibility tests..."
-          su `id -un 1000` -c "./gradlew :qa:rolling-upgrade:testRollingUpgrade -Dtests.bwc.version=${{ matrix.bwc_version }} --refresh-dependencies --no-daemon"
+          su `id -un 1000` -c "./gradlew :qa:rolling-upgrade:testRollingUpgrade -Dtests.bwc.version=${{ matrix.bwc_version }} --no-daemon"
+
+  Restart-Upgrade-BWCTests-SearchRelevance:
+    needs: Get-CI-Image-Tag
+    strategy:
+      matrix:
+        java: [21, 25]
+        os: [ubuntu-latest]
+        bwc_version: ["3.3.0"]
+        opensearch_version: ["3.4.0"]
+
+    name: SearchRelevance Restart-Upgrade BWC Tests
+    runs-on: ${{ matrix.os }}
+    container:
+      image: ${{ needs.Get-CI-Image-Tag.outputs.ci-image-version-linux }}
+      options: ${{ needs.Get-CI-Image-Tag.outputs.ci-image-start-options }}
+    env:
+      BWC_VERSION_RESTART_UPGRADE: ${{ matrix.bwc_version }}
+
+    steps:
+      - name: Run start commands
+        run: ${{ needs.Get-CI-Image-Tag.outputs.ci-image-start-command }}
+      - name: Checkout search-relevance
+        uses: actions/checkout@v4
+      - name: Setup Java ${{ matrix.java }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ matrix.java }}
+      - name: Run SearchRelevance Restart-Upgrade BWC Tests
+        run: |
+          chown -R 1000:1000 `pwd`
+          echo "Running restart-upgrade backwards compatibility tests..."
+          su `id -un 1000` -c "./gradlew :qa:restart-upgrade:testRestartUpgrade -Dtests.bwc.version=${{ matrix.bwc_version }} --no-daemon"

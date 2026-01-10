@@ -4,6 +4,8 @@ This directory contains:
 
 2) Queries (`esci_us_queryset.json`) and matching Judgments (`esci_us_judgments.json`) sourced from the ESCI data set.
 
+3) ESCI source ecommerce data (`esci_us_ecommerce_shrunk.ndjson.zip`) which is a subset of ESCI dataset that has images and overlap with the judgments in `esci_us_judgments.json`.
+
 https://github.com/amazon-science/esci-data
 
 @article{reddy2022shopping,

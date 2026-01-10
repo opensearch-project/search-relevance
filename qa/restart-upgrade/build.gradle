@@ -16,9 +16,9 @@ dependencies {
 }
 
 def ext=rootProject.ext
-String baseName = "searchRelevanceBwcCluster-rolling"
+String baseName = "searchRelevanceBwcCluster-restart"
 
-// Creates a test cluster of previous version and loads k-NN plugin of bwcVersion
+// Creates a test cluster of previous version and loads plugins
 testClusters {
     "${baseName}" {
         testDistribution = "ARCHIVE"
@@ -75,65 +75,19 @@ task testAgainstOldCluster(type: StandaloneRestIntegTestTask) {
     testClassesDirs = sourceSets.test.output.classesDirs
     classpath = sourceSets.test.runtimeClasspath
     systemProperty 'tests.rest.bwcsuite_cluster', 'old_cluster'
+    systemProperty 'tests.is_old_cluster', 'true'
     systemProperty 'tests.plugin_bwc_version', ext.search_relevance_bwc_version
     systemProperty 'tests.skip_delete_model_index', 'true'
 
     nonInputProperties.systemProperty('tests.rest.cluster', "${-> testClusters."${baseName}".allHttpSocketURI.join(",")}")
     nonInputProperties.systemProperty('tests.clustername', "${-> testClusters."${baseName}".getName()}")
     systemProperty 'tests.security.manager', 'false'
-
-    // Excluding LLM Judgment tests because we introduced this feature in 3.3.0
-    if (versionsBelow3_3.any { ext.search_relevance_bwc_version.startsWith(it) }) {
-        filter {
-            excludeTestsMatching "org.opensearch.searchrelevance.bwc.rolling.LlmJudgmentBWCIT.*"
-        }
-    }
 }
 
-// Part of rolling upgrade. Upgrades one node of the old cluster to new OpenSearch version with upgraded plugin version
-// This results in a mixed cluster with 2 nodes on the old version and 1 upgraded node.
-task testAgainstOneThirdUpgradedCluster(type: StandaloneRestIntegTestTask) {
-    useCluster testClusters."${baseName}"
-    testClassesDirs = sourceSets.test.output.classesDirs
-    classpath = sourceSets.test.runtimeClasspath
-    dependsOn rootProject.tasks.assemble
+// All nodes are upgraded to latest version and run the tests
+task testRestartUpgrade(type: StandaloneRestIntegTestTask) {
     dependsOn "testAgainstOldCluster"
-
-    doFirst {
-        println "${ext.bwcBundleTest}"
-        // This is added to prevent the cluster from getting stuck in yellow state
-        println "Waiting for cluster to stabilize after previous test, including data synchronization on replica shards"
-        println "BWC Test: Upgrading from ${ext.search_relevance_bwc_version} to ${opensearch_version}"
-        Thread.sleep(10000) // 10 seconds delay
-
-        if(ext.bwcBundleTest){
-            testClusters."${baseName}".nextNodeToNextVersion()
-        }else{
-            testClusters."${baseName}".upgradeNodeAndPluginToNextVersion(project.ext.plugins)
-        }
-    }
-
-    systemProperty 'tests.rest.bwcsuite_cluster', 'mixed_cluster'
-    systemProperty 'tests.rest.first_round', 'true'
-    systemProperty 'tests.skip_delete_model_index', 'true'
-    systemProperty 'tests.plugin_bwc_version', ext.search_relevance_bwc_version
-
-    nonInputProperties.systemProperty('tests.rest.cluster', "${-> testClusters."${baseName}".allHttpSocketURI.join(",")}")
-    nonInputProperties.systemProperty('tests.clustername', "${-> testClusters."${baseName}".getName()}")
-    systemProperty 'tests.security.manager', 'false'
-
-    // Excluding LLM Judgment tests because we introduced this feature in 3.3.0
-    if (versionsBelow3_3.any { ext.search_relevance_bwc_version.startsWith(it) }) {
-        filter {
-            excludeTestsMatching "org.opensearch.searchrelevance.bwc.rolling.LlmJudgmentBWCIT.*"
-        }
-    }
-}
-
-// Part of rolling upgrade. Upgrades the second node to new OpenSearch version with upgraded plugin version after the
-// first node is upgraded. This results in a mixed cluster with 1 node on the old version and 2 upgraded nodes.
-task testAgainstTwoThirdsUpgradedCluster(type: StandaloneRestIntegTestTask) {
-    dependsOn "testAgainstOneThirdUpgradedCluster"
+    dependsOn rootProject.tasks.assemble
     useCluster testClusters."${baseName}"
     testClassesDirs = sourceSets.test.output.classesDirs
     classpath = sourceSets.test.runtimeClasspath
@@ -141,65 +95,21 @@ task testAgainstTwoThirdsUpgradedCluster(type: StandaloneRestIntegTestTask) {
     doFirst {
         // This is added to prevent the cluster from getting stuck in yellow state
         println "Waiting for cluster to stabilize after previous test, including data synchronization on replica shards"
-        println "BWC Test: Upgrading from ${ext.search_relevance_bwc_version} to ${opensearch_version}"
+        println "BWC Test: Upgrading all nodes from ${ext.search_relevance_bwc_version} to ${opensearch_version}"
         Thread.sleep(10000) // 10 seconds delay
 
         if(ext.bwcBundleTest){
-            testClusters."${baseName}".nextNodeToNextVersion()
+            testClusters."${baseName}".goToNextVersion()
         }else{
-            testClusters."${baseName}".upgradeNodeAndPluginToNextVersion(project.ext.plugins)
+            testClusters."${baseName}".upgradeAllNodesAndPluginsToNextVersion(project.ext.plugins)
         }
     }
-    systemProperty 'tests.rest.bwcsuite_cluster', 'mixed_cluster'
-    systemProperty 'tests.rest.first_round', 'false'
-    systemProperty 'tests.skip_delete_model_index', 'true'
-    systemProperty 'tests.plugin_bwc_version', ext.search_relevance_bwc_version
-
-    nonInputProperties.systemProperty('tests.rest.cluster', "${-> testClusters."${baseName}".allHttpSocketURI.join(",")}")
-    nonInputProperties.systemProperty('tests.clustername', "${-> testClusters."${baseName}".getName()}")
-    systemProperty 'tests.security.manager', 'false'
-
-    // Excluding LLM Judgment tests because we introduced this feature in 3.3.0
-    if (versionsBelow3_3.any { ext.search_relevance_bwc_version.startsWith(it) }) {
-        filter {
-            excludeTestsMatching "org.opensearch.searchrelevance.bwc.rolling.LlmJudgmentBWCIT.*"
-        }
-    }
-}
-
-// Part of rolling upgrade. Upgrades the third node to new OpenSearch version with upgraded plugin version after the
-// second node is upgraded. This results in a fully upgraded cluster.
-task testRollingUpgrade(type: StandaloneRestIntegTestTask) {
-    dependsOn "testAgainstTwoThirdsUpgradedCluster"
-    useCluster testClusters."${baseName}"
-    testClassesDirs = sourceSets.test.output.classesDirs
-    classpath = sourceSets.test.runtimeClasspath
-
-    doFirst {
-        // This is added to prevent the cluster from getting stuck in yellow state
-        println "Waiting for cluster to stabilize after previous test, including data synchronization on replica shards"
-        Thread.sleep(10000) // 10 seconds delay
-
-        if(ext.bwcBundleTest){
-            testClusters."${baseName}".nextNodeToNextVersion()
-        }else{
-            testClusters."${baseName}".upgradeNodeAndPluginToNextVersion(project.ext.plugins)
-        }
-    }
-
-    mustRunAfter "testAgainstOneThirdUpgradedCluster"
     systemProperty 'tests.rest.bwcsuite_cluster', 'upgraded_cluster'
     systemProperty 'tests.skip_delete_model_index', 'true'
+    systemProperty 'tests.is_old_cluster', 'false'
     systemProperty 'tests.plugin_bwc_version', ext.search_relevance_bwc_version
 
     nonInputProperties.systemProperty('tests.rest.cluster', "${-> testClusters."${baseName}".allHttpSocketURI.join(",")}")
     nonInputProperties.systemProperty('tests.clustername', "${-> testClusters."${baseName}".getName()}")
     systemProperty 'tests.security.manager', 'false'
-
-    // Excluding LLM Judgment tests because we introduced this feature in 3.3.0
-    if (versionsBelow3_3.any { ext.search_relevance_bwc_version.startsWith(it) }) {
-        filter {
-            excludeTestsMatching "org.opensearch.searchrelevance.bwc.rolling.LlmJudgmentBWCIT.*"
-        }
-    }
 }
