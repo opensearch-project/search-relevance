@@ -64,7 +64,7 @@ public class RestSearchExperimentAction extends BaseRestHandler {
         if (request.hasContentOrSourceParam()) {
             searchSourceBuilder.parseXContent(request.contentOrSourceParamParser());
         } else {
-            searchSourceBuilder.query(QueryBuilders.matchAllQuery());
+            searchSourceBuilder.query(QueryBuilders.matchAllQuery()).size(10);
         }
 
         SearchRequest searchRequest = new SearchRequest().source(searchSourceBuilder);

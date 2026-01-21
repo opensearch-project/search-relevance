@@ -7,6 +7,8 @@
  */
 package org.opensearch.searchrelevance.transport.experiment;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.support.ActionFilters;
@@ -26,6 +28,8 @@ import org.opensearch.transport.TransportService;
 public class SearchExperimentTransportAction extends HandledTransportAction<SearchRequest, SearchResponse> {
     private final ExperimentDao experimentDao;
 
+    private static final Logger LOGGER = LogManager.getLogger(SearchExperimentTransportAction.class);
+
     @Inject
     public SearchExperimentTransportAction(TransportService transportService, ActionFilters actionFilters, ExperimentDao experimentDao) {
         super(SearchExperimentAction.NAME, transportService, actionFilters, SearchRequest::new);
@@ -38,6 +42,7 @@ public class SearchExperimentTransportAction extends HandledTransportAction<Sear
             SearchSourceBuilder sourceBuilder = request.source() == null ? new SearchSourceBuilder() : request.source();
             experimentDao.listExperiment(sourceBuilder, listener);
         } catch (Exception e) {
+            LOGGER.error("Failed to process search experiment request", e);
             listener.onFailure(new SearchRelevanceException("Failed to search Experiment", e, RestStatus.INTERNAL_SERVER_ERROR));
         }
     }
