@@ -88,6 +88,7 @@ import org.opensearch.searchrelevance.rest.RestPutExperimentAction;
 import org.opensearch.searchrelevance.rest.RestPutJudgmentAction;
 import org.opensearch.searchrelevance.rest.RestPutQuerySetAction;
 import org.opensearch.searchrelevance.rest.RestPutSearchConfigurationAction;
+import org.opensearch.searchrelevance.rest.RestSearchExperimentAction;
 import org.opensearch.searchrelevance.rest.RestSearchRelevanceStatsAction;
 import org.opensearch.searchrelevance.scheduler.ScheduledExperimentRunnerManager;
 import org.opensearch.searchrelevance.scheduler.SearchRelevanceJobParameters;
@@ -101,6 +102,8 @@ import org.opensearch.searchrelevance.transport.experiment.GetExperimentAction;
 import org.opensearch.searchrelevance.transport.experiment.GetExperimentTransportAction;
 import org.opensearch.searchrelevance.transport.experiment.PutExperimentAction;
 import org.opensearch.searchrelevance.transport.experiment.PutExperimentTransportAction;
+import org.opensearch.searchrelevance.transport.experiment.SearchExperimentAction;
+import org.opensearch.searchrelevance.transport.experiment.SearchExperimentTransportAction;
 import org.opensearch.searchrelevance.transport.judgment.DeleteJudgmentAction;
 import org.opensearch.searchrelevance.transport.judgment.DeleteJudgmentTransportAction;
 import org.opensearch.searchrelevance.transport.judgment.GetJudgmentAction;
@@ -282,6 +285,7 @@ public class SearchRelevancePlugin extends Plugin
             new RestPutExperimentAction(settingsAccessor),
             new RestGetExperimentAction(settingsAccessor),
             new RestDeleteExperimentAction(settingsAccessor),
+            new RestSearchExperimentAction(settingsAccessor),
             new RestSearchRelevanceStatsAction(settingsAccessor, clusterUtil),
             new RestPostScheduledExperimentAction(settingsAccessor, cronUtil),
             new RestDeleteScheduledExperimentAction(settingsAccessor),
@@ -305,6 +309,7 @@ public class SearchRelevancePlugin extends Plugin
             new ActionHandler<>(PutExperimentAction.INSTANCE, PutExperimentTransportAction.class),
             new ActionHandler<>(DeleteExperimentAction.INSTANCE, DeleteExperimentTransportAction.class),
             new ActionHandler<>(GetExperimentAction.INSTANCE, GetExperimentTransportAction.class),
+            new ActionHandler<>(SearchExperimentAction.INSTANCE, SearchExperimentTransportAction.class),
             new ActionHandler<>(SearchRelevanceStatsAction.INSTANCE, SearchRelevanceStatsTransportAction.class),
             new ActionHandler<>(PostScheduledExperimentAction.INSTANCE, PostScheduledExperimentTransportAction.class),
             new ActionHandler<>(DeleteScheduledExperimentAction.INSTANCE, DeleteScheduledExperimentTransportAction.class),
