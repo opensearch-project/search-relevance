@@ -12,6 +12,8 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ### Enhancements
 
+* Add `/experiments/_search` endpoint to allow searching for experiments using OpenSearch query DSL ([#369](https://github.com/opensearch-project/search-relevance/pull/369))
+
 ### Bug Fixes
 * Added `status` filter support to judgment listing API to prevent incomplete judgment groups from appearing in create experiment workflow ([#304](https://github.com/opensearch-project/search-relevance/pull/304))
 * Fix yellow cluster status on single-node clusters ([#329](https://github.com/opensearch-project/search-relevance/issues/329))
