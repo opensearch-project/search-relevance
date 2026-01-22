@@ -28,8 +28,11 @@ import static org.opensearch.searchrelevance.common.PluginConstants.SEARCH_CONFI
 import static org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager.getIndexMappings;
 
 import java.io.IOException;
+import java.util.Map;
 import java.util.Objects;
 
+import org.opensearch.common.xcontent.XContentHelper;
+import org.opensearch.common.xcontent.XContentType;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 
@@ -82,14 +85,21 @@ public enum SearchRelevanceIndices {
      */
     SCHEDULED_EXPERIMENT_HISTORY(SCHEDULED_EXPERIMENT_HISTORY_INDEX, SCHEDULED_EXPERIMENT_HISTORY_INDEX_MAPPING, false);
 
+    /**
+     * Key for schema_version in the _meta section of index mappings
+     */
+    public static final String META_SCHEMA_VERSION_KEY = "schema_version";
+
     private final String indexName;
     private final String mapping;
     private final boolean isProtected;
+    private final int schemaVersion;
 
     SearchRelevanceIndices(String indexName, String mappingPath, boolean isProtected) {
         this.indexName = Objects.requireNonNull(indexName, "Index name cannot be null.");
         this.mapping = loadMapping(mappingPath);
         this.isProtected = isProtected;
+        this.schemaVersion = parseSchemaVersionFromMapping(this.mapping);
     }
 
     private String loadMapping(String mappingPath) {
@@ -97,6 +107,42 @@ public enum SearchRelevanceIndices {
             return getIndexMappings(mappingPath);
         } catch (IOException e) {
             throw new SearchRelevanceException("Failed to load mapping under path: " + mappingPath, e, RestStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Parse the schema_version from the _meta field in the mapping JSON.
+     * This ensures the schema version is defined in a single place (the JSON file).
+     * All mapping JSON files MUST have _meta.schema_version defined.
+     * @param mappingJson the mapping JSON string
+     * @return the schema version
+     * @throws SearchRelevanceException if schema_version is not found in the mapping
+     */
+    private int parseSchemaVersionFromMapping(String mappingJson) {
+        try {
+            Map<String, Object> mappingMap = XContentHelper.convertToMap(XContentType.JSON.xContent(), mappingJson, false);
+            Object metaObj = mappingMap.get("_meta");
+            if (!(metaObj instanceof Map<?, ?>)) {
+                throw new SearchRelevanceException(
+                    "Mapping JSON for index [" + indexName + "] must have _meta.schema_version defined",
+                    RestStatus.INTERNAL_SERVER_ERROR
+                );
+            }
+            Map<?, ?> meta = (Map<?, ?>) metaObj;
+            Object versionObj = meta.get(META_SCHEMA_VERSION_KEY);
+            if (versionObj instanceof Number) {
+                return ((Number) versionObj).intValue();
+            }
+            throw new SearchRelevanceException(
+                "Mapping JSON for index [" + indexName + "] must have _meta.schema_version defined as a number",
+                RestStatus.INTERNAL_SERVER_ERROR
+            );
+        } catch (Exception e) {
+            throw new SearchRelevanceException(
+                "Failed to parse schema_version from mapping JSON for index: " + indexName,
+                e,
+                RestStatus.INTERNAL_SERVER_ERROR
+            );
         }
     }
 }

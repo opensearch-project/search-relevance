@@ -1,0 +1,10 @@
+{"index":{"_index":"test_llm_products","_id":"1"}}
+{"name":"Dell Laptop","description":"High performance laptop for professionals","category":"electronics","price":1200.00}
+{"index":{"_index":"test_llm_products","_id":"2"}}
+{"name":"Office Chair","description":"Ergonomic office chair with lumbar support","category":"furniture","price":299.99}
+{"index":{"_index":"test_llm_products","_id":"3"}}
+{"name":"Espresso Machine","description":"Premium coffee maker for home baristas","category":"kitchen","price":499.99}
+{"index":{"_index":"test_llm_products","_id":"4"}}
+{"name":"Running Shoes","description":"Comfortable athletic shoes for runners","category":"sports","price":129.99}
+{"index":{"_index":"test_llm_products","_id":"5"}}
+{"name":"MacBook Pro","description":"Apple laptop with M3 chip for developers","category":"electronics","price":2499.00}

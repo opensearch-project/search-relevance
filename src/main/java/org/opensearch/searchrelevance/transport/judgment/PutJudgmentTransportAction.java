@@ -7,6 +7,9 @@
  */
 package org.opensearch.searchrelevance.transport.judgment;
 
+import static org.opensearch.searchrelevance.common.MLConstants.LLM_JUDGMENT_RATING_TYPE;
+import static org.opensearch.searchrelevance.common.MLConstants.OVERWRITE_CACHE;
+import static org.opensearch.searchrelevance.common.MLConstants.PROMPT_TEMPLATE;
 import static org.opensearch.searchrelevance.common.MetricsConstants.MODEL_ID;
 import static org.opensearch.searchrelevance.ubi.UbiValidator.checkUbiIndicesExist;
 
@@ -103,6 +106,9 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
                 metadata.put("tokenLimit", llmRequest.getTokenLimit());
                 metadata.put("contextFields", llmRequest.getContextFields());
                 metadata.put("ignoreFailure", llmRequest.isIgnoreFailure());
+                metadata.put(PROMPT_TEMPLATE, llmRequest.getPromptTemplate());
+                metadata.put(LLM_JUDGMENT_RATING_TYPE, llmRequest.getLlmJudgmentRatingType());
+                metadata.put(OVERWRITE_CACHE, llmRequest.isOverwriteCache());
             }
             case UBI_JUDGMENT -> {
                 if (!checkUbiIndicesExist(clusterService)) {

@@ -53,9 +53,30 @@
           "parameters": {}
         }
       },
-      "bullets": {
+      "bullet_points": {
         "type": "text",
         "analyzer": "english_stemmed"
+      },
+      "brand": {
+        "type": "keyword"
+      },
+      "color": {
+        "type": "keyword"
+      },
+      "image": {
+        "type": "keyword"
+      },
+      "rating": {
+        "type": "float"
+      },
+      "rating_count": {
+        "type": "integer"
+      },
+      "is_book": {
+        "type": "boolean"
+      },
+      "query_id": {
+        "type": "keyword"
       },
       "description": {
         "type": "text",

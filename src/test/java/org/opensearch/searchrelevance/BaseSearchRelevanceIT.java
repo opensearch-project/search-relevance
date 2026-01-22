@@ -33,7 +33,6 @@ import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.HttpEntity;
 import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.hc.core5.http.HttpHost;
-import org.apache.hc.core5.http.ParseException;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.apache.hc.core5.http.message.BasicHeader;
@@ -162,7 +161,7 @@ public class BaseSearchRelevanceIT extends OpenSearchRestTestCase {
     protected boolean isHttps() {
         boolean isHttps = Optional.ofNullable(System.getProperty("https")).map("true"::equalsIgnoreCase).orElse(false);
         if (isHttps) {
-            // currently only external cluster is supported for security enabled testing
+            // currently, only external cluster is supported for security enabled testing
             if (!Optional.ofNullable(System.getProperty("tests.rest.cluster")).isPresent()) {
                 throw new RuntimeException("cluster url should be provided for security enabled testing");
             }
@@ -272,7 +271,7 @@ public class BaseSearchRelevanceIT extends OpenSearchRestTestCase {
     }
 
     @After
-    public void deleteExternalIndices() throws IOException, ParseException {
+    public void deleteExternalIndices() throws IOException {
         final Response response = client().performRequest(new Request("GET", "/_cat/indices?format=json" + "&expand_wildcards=all"));
         final MediaType xContentType = MediaType.fromMediaType(response.getEntity().getContentType());
         try (

@@ -58,11 +58,14 @@ public class ExperimentOptionsForHybridSearch implements ExperimentOptions {
                             queryWeightForCombination = min + (i * increment);
                         }
 
+                        float w1 = Math.round(queryWeightForCombination * 10) / 10.0f;
+                        float w2 = Math.round((1.0f - w1) * 10) / 10.0f;
+
                         allPossibleParameterCombinations.add(
                             ExperimentVariantHybridSearchDTO.builder()
                                 .normalizationTechnique(normalizationTechnique)
                                 .combinationTechnique(combinationTechnique)
-                                .queryWeightsForCombination(new float[] { queryWeightForCombination, 1.0f - queryWeightForCombination })
+                                .queryWeightsForCombination(new float[] { w1, w2 })
                                 .build()
                         );
                     }

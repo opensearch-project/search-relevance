@@ -10,6 +10,7 @@ package org.opensearch.searchrelevance.dao;
 import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.JUDGMENT_CACHE;
 import static org.opensearch.searchrelevance.model.JudgmentCache.CONTEXT_FIELDS_STR;
 import static org.opensearch.searchrelevance.model.JudgmentCache.DOCUMENT_ID;
+import static org.opensearch.searchrelevance.model.JudgmentCache.PROMPT_TEMPLATE_ID;
 import static org.opensearch.searchrelevance.model.JudgmentCache.QUERY_TEXT;
 import static org.opensearch.searchrelevance.utils.ParserUtils.convertListToSortedStr;
 
@@ -20,7 +21,6 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opensearch.action.StepListener;
 import org.opensearch.action.search.SearchResponse;
-import org.opensearch.common.inject.Inject;
 import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
@@ -38,14 +38,13 @@ public class JudgmentCacheDao {
     private static final Logger LOGGER = LogManager.getLogger(JudgmentCacheDao.class);
     private final SearchRelevanceIndicesManager searchRelevanceIndicesManager;
 
-    @Inject
     public JudgmentCacheDao(SearchRelevanceIndicesManager searchRelevanceIndicesManager) {
         this.searchRelevanceIndicesManager = searchRelevanceIndicesManager;
     }
 
     /**
      * Create judgment cache index if not exists
-     * @param stepListener - step lister for async operation
+     * @param stepListener - step listener for async operation
      */
     public void createIndexIfAbsent(final StepListener<Void> stepListener) {
         searchRelevanceIndicesManager.createIndexIfAbsent(JUDGMENT_CACHE, stepListener);
@@ -54,7 +53,7 @@ public class JudgmentCacheDao {
     /**
      * Stores judgment cache to in the system index
      * @param judgmentCache - Judgment cache content to be stored
-     * @param listener - action lister for async operation
+     * @param listener - action listener for async operation
      */
     public void putJudgementCache(final JudgmentCache judgmentCache, final ActionListener listener) {
         if (judgmentCache == null) {
@@ -117,22 +116,25 @@ public class JudgmentCacheDao {
      * @param queryText - queryText to be searched
      * @param documentId - documentId to be searched
      * @param contextFields - contextFields to be searched
+     * @param promptTemplateCode - hash of promptTemplate and ratingType
      * @param listener - async operation
      */
     public SearchResponse getJudgmentCache(
         String queryText,
         String documentId,
         List<String> contextFields,
+        String promptTemplateCode,
         ActionListener<SearchResponse> listener
     ) {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         String contextFieldsStr = contextFields != null ? convertListToSortedStr(contextFields) : "";
 
         LOGGER.debug(
-            "Building cache search query - queryText: '{}', documentId: '{}', contextFields: '{}'",
+            "Building cache search query - queryText: '{}', documentId: '{}', contextFields: '{}', promptTemplateCode: '{}'",
             queryText,
             documentId,
-            contextFieldsStr
+            contextFieldsStr,
+            promptTemplateCode
         );
 
         BoolQueryBuilder boolQuery = QueryBuilders.boolQuery()
@@ -141,6 +143,10 @@ public class JudgmentCacheDao {
 
         if (contextFields != null && !contextFields.isEmpty()) {
             boolQuery.must(QueryBuilders.matchQuery(CONTEXT_FIELDS_STR, contextFieldsStr));
+        }
+
+        if (promptTemplateCode != null && !promptTemplateCode.isEmpty()) {
+            boolQuery.must(QueryBuilders.termQuery(PROMPT_TEMPLATE_ID, promptTemplateCode));
         }
 
         searchSourceBuilder.query(boolQuery);

@@ -24,9 +24,6 @@ public class EventStatsManagerTests extends OpenSearchTestCase {
     @Mock
     private SearchRelevanceSettingsAccessor mockSettingsAccessor;
 
-    @Mock
-    private TimestampedEventStat mockEventStat;
-
     private EventStatsManager eventStatsManager;
 
     @Before

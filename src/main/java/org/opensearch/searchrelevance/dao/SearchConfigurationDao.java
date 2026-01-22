@@ -45,7 +45,7 @@ public class SearchConfigurationDao {
 
     /**
      * Create search configuration index if not exists
-     * @param stepListener - step lister for async operation
+     * @param stepListener - step listener for async operation
      */
     public void createIndexIfAbsent(final StepListener<Void> stepListener) {
         searchRelevanceIndicesManager.createIndexIfAbsent(SEARCH_CONFIGURATION, stepListener);
@@ -54,7 +54,7 @@ public class SearchConfigurationDao {
     /**
      * Stores search configuration to in the system index
      * @param searchConfiguration - searchConfiguration content to be stored
-     * @param listener - action lister for async operation
+     * @param listener - action listener for async operation
      */
     public void putSearchConfiguration(final SearchConfiguration searchConfiguration, final ActionListener listener) {
         if (searchConfiguration == null) {
@@ -76,7 +76,7 @@ public class SearchConfigurationDao {
     /**
      * Delete searchConfigurationId by judgmentID
      * @param searchConfigurationId - id to be deleted
-     * @param listener - action lister for async operation
+     * @param listener - action listener for async operation
      */
     public void deleteSearchConfiguration(final String searchConfigurationId, final ActionListener<DeleteResponse> listener) {
         searchRelevanceIndicesManager.deleteDocByDocId(searchConfigurationId, SEARCH_CONFIGURATION, listener);
@@ -85,7 +85,7 @@ public class SearchConfigurationDao {
     /**
      * Get searchConfiguration by searchConfigurationId
      * @param searchConfigurationId - id to be deleted
-     * @param listener - action lister for async operation
+     * @param listener - action listener for async operation
      */
     public SearchResponse getSearchConfiguration(String searchConfigurationId, ActionListener<SearchResponse> listener) {
         if (searchConfigurationId == null || searchConfigurationId.isEmpty()) {
@@ -106,7 +106,7 @@ public class SearchConfigurationDao {
     /**
      * List searchConfigurationId by source builder
      * @param sourceBuilder - source builder to be searched
-     * @param listener - action lister for async operation
+     * @param listener - action listener for async operation
      */
     public SearchResponse listSearchConfiguration(SearchSourceBuilder sourceBuilder, ActionListener<SearchResponse> listener) {
         // Apply default values if not set
@@ -126,7 +126,7 @@ public class SearchConfigurationDao {
      * Get list of search configuration given a step stepListener and put it back to results mapping.
      * @param searchConfigurationList - ids to be searched
      * @param results - the results map
-     * @param stepListener - step lister
+     * @param stepListener - step listener
      */
     public void getSearchConfigsWithStepListener(
         List<String> searchConfigurationList,

@@ -25,16 +25,20 @@ import org.mockito.ArgumentCaptor;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.common.settings.Settings;
 import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.bytes.BytesArray;
 import org.opensearch.core.common.bytes.BytesReference;
+import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.search.SearchHit;
 import org.opensearch.search.SearchHits;
+import org.opensearch.search.SearchModule;
 import org.opensearch.searchrelevance.dao.EvaluationResultDao;
 import org.opensearch.searchrelevance.dao.ExperimentVariantDao;
 import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.model.SearchConfigurationDetails;
+import org.opensearch.searchrelevance.model.builder.SearchRequestBuilder;
 import org.opensearch.test.OpenSearchTestCase;
 import org.opensearch.transport.client.Client;
 
@@ -56,6 +60,12 @@ public class MetricsHelperTests extends OpenSearchTestCase {
         evaluationResultDao = mock(EvaluationResultDao.class);
         experimentVariantDao = mock(ExperimentVariantDao.class);
         metricsHelper = new MetricsHelper(clusterService, client, judgmentDao, evaluationResultDao, experimentVariantDao);
+
+        // Initialize SearchRequestBuilder NamedXContentRegistry for tests
+        NamedXContentRegistry reg = new NamedXContentRegistry(
+            new SearchModule(Settings.EMPTY, java.util.Collections.emptyList()).getNamedXContents()
+        );
+        SearchRequestBuilder.initialize(reg);
     }
 
     public void testProcessPairwiseMetricsWithPipeline() {

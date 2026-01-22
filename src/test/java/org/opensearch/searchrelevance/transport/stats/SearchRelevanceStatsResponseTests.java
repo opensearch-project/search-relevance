@@ -309,7 +309,7 @@ public class SearchRelevanceStatsResponseTests extends OpenSearchTestCase {
         nodeStats.put("test.stat", mockSnapshot);
         nodeIdToNodeEventStats.put("node1", nodeStats);
 
-        // This is a mock aggregated node stats
+        // This is a mocked aggregated node stats
         aggregatedNodeStats.put("test.stat", mockSnapshot);
 
         SearchRelevanceStatsResponse response = new SearchRelevanceStatsResponse(
@@ -353,7 +353,7 @@ public class SearchRelevanceStatsResponseTests extends OpenSearchTestCase {
         nodeStats.put("test.stat", mockSnapshot);
         nodeIdToNodeEventStats.put("node1", nodeStats);
 
-        // This is a mock aggregated node stats
+        // This is a mocked aggregated node stats
         aggregatedNodeStats.put("test.stat", mockSnapshot);
 
         SearchRelevanceStatsResponse response = new SearchRelevanceStatsResponse(

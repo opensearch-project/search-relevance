@@ -346,6 +346,20 @@ public class ExperimentTaskManager {
         final String evaluationId = UUID.randomUUID().toString();
         SearchRequest searchRequest = buildSearchRequest(params, evaluationId);
 
+        // Instrumentation: log final serialized search request body for debugging (e.g., LTR rescore_query)
+        try {
+            String source = searchRequest.source() != null ? searchRequest.source().toString() : null;
+            log.debug(
+                "Experiment search request body (experimentId={}, variantId={}, evaluationId={}): {}",
+                params.getExperimentId(),
+                params.getExperimentVariant().getId(),
+                evaluationId,
+                source
+            );
+        } catch (Exception e) {
+            log.warn("Failed to serialize search request body for logging: {}", e.getMessage());
+        }
+
         // Convert ActionListener to CompletableFuture
         CompletableFuture<Void> searchFuture = new CompletableFuture<>();
 
