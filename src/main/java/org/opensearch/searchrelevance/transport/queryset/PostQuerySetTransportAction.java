@@ -46,7 +46,7 @@ public class PostQuerySetTransportAction extends HandledTransportAction<PostQuer
         Client client,
         QuerySetDao querySetDao
     ) {
-        super(PostQuerySetAction.NAME, transportService, actionFilters, PostQuerySetRequest::new);
+        super(PostQuerySetAction.NAME, transportService, actionFilters, PostUbiQuerySetRequest::new);
         this.client = client;
         this.clusterService = clusterService;
         this.querySetDao = querySetDao;
@@ -64,7 +64,11 @@ public class PostQuerySetTransportAction extends HandledTransportAction<PostQuer
         String name = request.getName();
         String description = request.getDescription();
 
-        String ubiQueriesIndex = request.getUbiQueriesIndex();
+        // Currently only UBI-based query sets are supported. Cast to access UBI-specific fields.
+        // Future implementations may introduce other types (e.g., LLM-generated)
+        // which would require type checking before casting, similar to PutJudgmentTransportAction.
+        PostUbiQuerySetRequest ubiRequest = (PostUbiQuerySetRequest) request;
+        String ubiQueriesIndex = ubiRequest.getUbiQueriesIndex();
 
         if (!checkUbiQueriesIndexExists(clusterService, ubiQueriesIndex)) {
             throw new SearchRelevanceException("UBI queries index does not exist", RestStatus.CONFLICT);

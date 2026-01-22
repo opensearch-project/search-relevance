@@ -7,8 +7,6 @@
  */
 package org.opensearch.searchrelevance.transport.queryset;
 
-import static org.opensearch.searchrelevance.common.PluginConstants.UBI_QUERIES_INDEX;
-
 import java.io.IOException;
 import java.util.Objects;
 
@@ -22,18 +20,16 @@ import org.opensearch.core.common.io.stream.StreamOutput;
  * Create Request supports sampling from ubi queries.
  */
 public class PostQuerySetRequest extends ActionRequest {
-    private String name;
-    private String description;
-    private String sampling;
-    private int querySetSize;
-    private String ubiQueriesIndex;
+    private final String name;
+    private final String description;
+    private final String sampling;
+    private final int querySetSize;
 
-    public PostQuerySetRequest(String name, String description, String sampling, int querySetSize, String ubiQueriesIndex) {
+    public PostQuerySetRequest(String name, String description, String sampling, int querySetSize) {
         this.name = Objects.requireNonNull(name, "name cannot be null.");
         this.description = description;
         this.sampling = Objects.requireNonNull(sampling, "sampling cannot be null.");
         this.querySetSize = Objects.requireNonNull(querySetSize, "querySetSize cannot be null.");
-        this.ubiQueriesIndex = ubiQueriesIndex != null ? ubiQueriesIndex : UBI_QUERIES_INDEX;
     }
 
     public PostQuerySetRequest(StreamInput in) throws IOException {
@@ -42,7 +38,6 @@ public class PostQuerySetRequest extends ActionRequest {
         this.description = in.readString();
         this.sampling = in.readString();
         this.querySetSize = in.readInt();
-        this.ubiQueriesIndex = in.readString();
     }
 
     @Override
@@ -52,7 +47,6 @@ public class PostQuerySetRequest extends ActionRequest {
         out.writeString(description);
         out.writeString(sampling);
         out.writeInt(querySetSize);
-        out.writeString(ubiQueriesIndex);
     }
 
     public String getName() {
@@ -70,10 +64,6 @@ public class PostQuerySetRequest extends ActionRequest {
 
     public int getQuerySetSize() {
         return querySetSize;
-    }
-
-    public String getUbiQueriesIndex() {
-        return ubiQueriesIndex;
     }
 
     @Override

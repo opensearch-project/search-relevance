@@ -34,7 +34,7 @@ import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.searchrelevance.transport.queryset.PostQuerySetAction;
-import org.opensearch.searchrelevance.transport.queryset.PostQuerySetRequest;
+import org.opensearch.searchrelevance.transport.queryset.PostUbiQuerySetRequest;
 import org.opensearch.searchrelevance.ubi.ProbabilityProportionalToSizeQuerySampler;
 import org.opensearch.searchrelevance.utils.TextValidationUtil;
 import org.opensearch.transport.client.node.NodeClient;
@@ -95,7 +95,7 @@ public class RestCreateQuerySetAction extends BaseRestHandler {
 
         String ubiQueriesIndex = (String) source.get(UBI_QUERIES_INDEX_PARAM);
 
-        PostQuerySetRequest createRequest = new PostQuerySetRequest(name, description, sampling, querySetSize, ubiQueriesIndex);
+        PostUbiQuerySetRequest createRequest = new PostUbiQuerySetRequest(name, description, sampling, querySetSize, ubiQueriesIndex);
 
         return channel -> client.execute(PostQuerySetAction.INSTANCE, createRequest, new ActionListener<IndexResponse>() {
             @Override

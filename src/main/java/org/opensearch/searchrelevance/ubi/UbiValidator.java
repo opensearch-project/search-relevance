@@ -51,18 +51,11 @@ public class UbiValidator {
 
         return hasField(mappingMetadata, "query_id")
             && hasField(mappingMetadata, "action_name")
-            && hasNestedField(mappingMetadata, "event_attributes", "object", "object_id");
+            && hasField(mappingMetadata, "event_attributes.object.object_id");
     }
 
     @SuppressWarnings("unchecked")
-    private static boolean hasField(MappingMetadata mappingMetadata, String fieldName) {
-        var sourceAsMap = mappingMetadata.sourceAsMap();
-        var properties = (java.util.Map<String, Object>) sourceAsMap.get("properties");
-        return properties != null && properties.containsKey(fieldName);
-    }
-
-    @SuppressWarnings("unchecked")
-    private static boolean hasNestedField(MappingMetadata mappingMetadata, String... fieldPath) {
+    private static boolean hasField(MappingMetadata mappingMetadata, String fieldPath) {
         var sourceAsMap = mappingMetadata.sourceAsMap();
         var properties = (java.util.Map<String, Object>) sourceAsMap.get("properties");
 
@@ -70,14 +63,16 @@ public class UbiValidator {
             return false;
         }
 
+        String[] pathParts = fieldPath.split("\\.");
         java.util.Map<String, Object> current = properties;
-        for (int i = 0; i < fieldPath.length; i++) {
-            if (!current.containsKey(fieldPath[i])) {
+
+        for (int i = 0; i < pathParts.length; i++) {
+            if (!current.containsKey(pathParts[i])) {
                 return false;
             }
 
-            if (i < fieldPath.length - 1) {
-                var fieldDef = (java.util.Map<String, Object>) current.get(fieldPath[i]);
+            if (i < pathParts.length - 1) {
+                var fieldDef = (java.util.Map<String, Object>) current.get(pathParts[i]);
                 current = (java.util.Map<String, Object>) fieldDef.get("properties");
                 if (current == null) {
                     return false;

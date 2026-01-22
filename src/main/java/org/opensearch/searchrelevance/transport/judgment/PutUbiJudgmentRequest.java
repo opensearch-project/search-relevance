@@ -39,6 +39,9 @@ public class PutUbiJudgmentRequest extends PutJudgmentRequest {
         this.maxRank = maxRank;
         this.startDate = startDate;
         this.endDate = endDate;
+        // Default to standard UBI events index if not specified.
+        // Index existence and required fields (query_id, action_name, event_attributes.object.object_id)
+        // are validated at cluster level in PutJudgmentTransportAction before judgment processing begins.
         this.ubiEventsIndex = ubiEventsIndex != null ? ubiEventsIndex : UBI_EVENTS_INDEX;
     }
 

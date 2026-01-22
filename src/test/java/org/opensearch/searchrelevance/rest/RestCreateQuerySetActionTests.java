@@ -22,7 +22,7 @@ import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.searchrelevance.plugin.SearchRelevanceRestTestCase;
 import org.opensearch.searchrelevance.transport.queryset.PostQuerySetAction;
-import org.opensearch.searchrelevance.transport.queryset.PostQuerySetRequest;
+import org.opensearch.searchrelevance.transport.queryset.PostUbiQuerySetRequest;
 
 public class RestCreateQuerySetActionTests extends SearchRelevanceRestTestCase {
 
@@ -75,13 +75,13 @@ public class RestCreateQuerySetActionTests extends SearchRelevanceRestTestCase {
             ActionListener<IndexResponse> listener = invocation.getArgument(2);
             listener.onResponse(mockIndexResponse);
             return null;
-        }).when(client).execute(eq(PostQuerySetAction.INSTANCE), any(PostQuerySetRequest.class), any());
+        }).when(client).execute(eq(PostQuerySetAction.INSTANCE), any(PostUbiQuerySetRequest.class), any());
 
         // Execute
         restCreateQuerySetAction.handleRequest(request, channel, client);
 
         // Verify
-        verify(client).execute(eq(PostQuerySetAction.INSTANCE), any(PostQuerySetRequest.class), any());
+        verify(client).execute(eq(PostQuerySetAction.INSTANCE), any(PostUbiQuerySetRequest.class), any());
         verify(channel).sendResponse(any(BytesRestResponse.class));
     }
 
@@ -96,7 +96,7 @@ public class RestCreateQuerySetActionTests extends SearchRelevanceRestTestCase {
             ActionListener<IndexResponse> listener = invocation.getArgument(2);
             listener.onFailure(new IOException("Test exception"));
             return null;
-        }).when(client).execute(eq(PostQuerySetAction.INSTANCE), any(PostQuerySetRequest.class), any());
+        }).when(client).execute(eq(PostQuerySetAction.INSTANCE), any(PostUbiQuerySetRequest.class), any());
 
         // Execute
         restCreateQuerySetAction.handleRequest(request, channel, client);
@@ -114,7 +114,7 @@ public class RestCreateQuerySetActionTests extends SearchRelevanceRestTestCase {
         RestRequest request = createPutRestRequestWithContent(MINIMAL_TEST_CONTENT, "query_sets");
         when(channel.request()).thenReturn(request);
 
-        ArgumentCaptor<PostQuerySetRequest> requestCaptor = ArgumentCaptor.forClass(PostQuerySetRequest.class);
+        ArgumentCaptor<PostUbiQuerySetRequest> requestCaptor = ArgumentCaptor.forClass(PostUbiQuerySetRequest.class);
 
         doAnswer(invocation -> {
             ActionListener<IndexResponse> listener = invocation.getArgument(2);
@@ -127,7 +127,7 @@ public class RestCreateQuerySetActionTests extends SearchRelevanceRestTestCase {
         restCreateQuerySetAction.handleRequest(request, channel, client);
 
         // Verify default values
-        PostQuerySetRequest capturedRequest = requestCaptor.getValue();
+        PostUbiQuerySetRequest capturedRequest = requestCaptor.getValue();
         assertEquals("pptss", capturedRequest.getSampling());
         assertEquals(10, capturedRequest.getQuerySetSize());
     }
