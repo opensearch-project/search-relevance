@@ -7,6 +7,8 @@
  */
 package org.opensearch.searchrelevance.transport.queryset;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.support.ActionFilters;
@@ -26,6 +28,8 @@ import org.opensearch.transport.TransportService;
 public class SearchQuerySetTransportAction extends HandledTransportAction<SearchRequest, SearchResponse> {
     private final QuerySetDao querySetDao;
 
+    private static final Logger LOGGER = LogManager.getLogger(SearchQuerySetTransportAction.class);
+
     @Inject
     public SearchQuerySetTransportAction(TransportService transportService, ActionFilters actionFilters, QuerySetDao querySetDao) {
         super(SearchQuerySetAction.NAME, transportService, actionFilters, SearchRequest::new);
@@ -38,6 +42,7 @@ public class SearchQuerySetTransportAction extends HandledTransportAction<Search
             SearchSourceBuilder sourceBuilder = request.source() == null ? new SearchSourceBuilder() : request.source();
             querySetDao.listQuerySet(sourceBuilder, listener);
         } catch (Exception e) {
+            LOGGER.error("Failed to process search QuerySet request", e);
             listener.onFailure(new SearchRelevanceException("Failed to search QuerySet", e, RestStatus.INTERNAL_SERVER_ERROR));
         }
     }
