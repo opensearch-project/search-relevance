@@ -145,6 +145,82 @@ public class RestSearchExperimentActionTests extends OpenSearchTestCase {
         assertEquals(RestStatus.FORBIDDEN, responseCaptor.getValue().status());
     }
 
+    public void testHandleRequest_whenNoContent_excludesResultsFieldByDefault() throws Exception {
+        RestRequest request = new FakeRestRequest.Builder(NamedXContentRegistry.EMPTY).withMethod(RestRequest.Method.GET)
+            .withPath(EXPERIMENTS_URI + "/_search")
+            .build();
+
+        restAction.handleRequest(request, channel, client);
+
+        ArgumentCaptor<SearchRequest> requestCaptor = ArgumentCaptor.forClass(SearchRequest.class);
+        verify(client, times(1)).execute(eq(SearchExperimentAction.INSTANCE), requestCaptor.capture(), any());
+        SearchRequest captured = requestCaptor.getValue();
+        SearchSourceBuilder source = captured.source();
+        assertNotNull(source);
+        assertNotNull(source.fetchSource());
+        assertNotNull(source.fetchSource().excludes());
+        assertEquals(1, source.fetchSource().excludes().length);
+        assertEquals("results", source.fetchSource().excludes()[0]);
+    }
+
+    public void testHandleRequest_whenQueryWithoutSourceFilter_excludesResultsFieldByDefault() throws Exception {
+        RestRequest request = new FakeRestRequest.Builder(xContentRegistry).withMethod(RestRequest.Method.POST)
+            .withPath(EXPERIMENTS_URI + "/_search")
+            .withContent(new BytesArray("{\"query\":{\"term\":{\"status\":\"COMPLETED\"}}}"), XContentType.JSON)
+            .build();
+
+        restAction.handleRequest(request, channel, client);
+
+        ArgumentCaptor<SearchRequest> requestCaptor = ArgumentCaptor.forClass(SearchRequest.class);
+        verify(client, times(1)).execute(eq(SearchExperimentAction.INSTANCE), requestCaptor.capture(), any());
+        SearchRequest captured = requestCaptor.getValue();
+        SearchSourceBuilder source = captured.source();
+        assertNotNull(source);
+        assertNotNull(source.fetchSource());
+        assertNotNull(source.fetchSource().excludes());
+        assertEquals(1, source.fetchSource().excludes().length);
+        assertEquals("results", source.fetchSource().excludes()[0]);
+    }
+
+    public void testHandleRequest_whenQueryWithExplicitSourceFilter_respectsUserPreference() throws Exception {
+        RestRequest request = new FakeRestRequest.Builder(xContentRegistry).withMethod(RestRequest.Method.POST)
+            .withPath(EXPERIMENTS_URI + "/_search")
+            .withContent(new BytesArray("{\"query\":{\"match_all\":{}},\"_source\":{\"includes\":[\"*\"]}}"), XContentType.JSON)
+            .build();
+
+        restAction.handleRequest(request, channel, client);
+
+        ArgumentCaptor<SearchRequest> requestCaptor = ArgumentCaptor.forClass(SearchRequest.class);
+        verify(client, times(1)).execute(eq(SearchExperimentAction.INSTANCE), requestCaptor.capture(), any());
+        SearchRequest captured = requestCaptor.getValue();
+        SearchSourceBuilder source = captured.source();
+        assertNotNull(source);
+        assertNotNull(source.fetchSource());
+        // User specified includes, so our default exclusion should not be applied
+        assertNotNull(source.fetchSource().includes());
+        assertEquals(1, source.fetchSource().includes().length);
+        assertEquals("*", source.fetchSource().includes()[0]);
+    }
+
+    public void testHandleRequest_whenQueryExplicitlyIncludesResults_respectsUserPreference() throws Exception {
+        RestRequest request = new FakeRestRequest.Builder(xContentRegistry).withMethod(RestRequest.Method.POST)
+            .withPath(EXPERIMENTS_URI + "/_search")
+            .withContent(new BytesArray("{\"query\":{\"match_all\":{}},\"_source\":[\"id\",\"type\",\"results\"]}"), XContentType.JSON)
+            .build();
+
+        restAction.handleRequest(request, channel, client);
+
+        ArgumentCaptor<SearchRequest> requestCaptor = ArgumentCaptor.forClass(SearchRequest.class);
+        verify(client, times(1)).execute(eq(SearchExperimentAction.INSTANCE), requestCaptor.capture(), any());
+        SearchRequest captured = requestCaptor.getValue();
+        SearchSourceBuilder source = captured.source();
+        assertNotNull(source);
+        assertNotNull(source.fetchSource());
+        // User specified specific fields including results
+        assertNotNull(source.fetchSource().includes());
+        assertEquals(3, source.fetchSource().includes().length);
+    }
+
     private SearchResponse buildSearchResponse() {
         SearchHit hit = new SearchHit(0);
         hit.sourceRef(new BytesArray("{\"id\":\"exp-1\"}"));

@@ -63,8 +63,12 @@ public class RestSearchExperimentAction extends BaseRestHandler {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         if (request.hasContentOrSourceParam()) {
             searchSourceBuilder.parseXContent(request.contentOrSourceParamParser());
+            // If _source was not explicitly set, exclude results field by default
+            if (searchSourceBuilder.fetchSource() == null) {
+                searchSourceBuilder.fetchSource(null, new String[] { "results" });
+            }
         } else {
-            searchSourceBuilder.query(QueryBuilders.matchAllQuery()).size(10);
+            searchSourceBuilder.query(QueryBuilders.matchAllQuery()).size(10).fetchSource(null, new String[] { "results" });
         }
 
         SearchRequest searchRequest = new SearchRequest().source(searchSourceBuilder);
