@@ -8,6 +8,7 @@
     "name": { "type": "keyword" },
     "index": { "type": "keyword" },
     "queryBody": { "type": "text" },
-    "searchPipeline": { "type": "keyword" }
+    "searchPipeline": { "type": "keyword" },
+    "description": {"type": "text"}
   }
 }
