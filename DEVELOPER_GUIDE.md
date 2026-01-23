@@ -323,7 +323,7 @@ SRW is unusual that it has a large number of indices that it uses to maintain th
 | `.search-relevance-scheduled-experiment-history` | Yes | Track experiment results run periodically |
 | `search-relevance-evaluation-result` | No | Flattened table of Experiment results suitable for dashboarding |
 
-> [!NOTE]  
+> [!NOTE]
 > Authoritative schema definitions are in `src/main/resources/mappings/`
 
 #### Core SRW Indices
@@ -341,7 +341,7 @@ erDiagram
         list[keyword] searchConfigurationList FK
         list[keyword] judgmentList FK
         keyword size
-        keyword scheduledExperimentJobId FK 
+        keyword scheduledExperimentJobId FK
         keyword isScheduled
         object[] results
     }
@@ -356,7 +356,7 @@ erDiagram
         keyword searchText
         keyword judgmentList FK
         keyword documentIds
-        nested metrics        
+        nested metrics
     }
     search-relevance-judgment {
       keyword id PK
@@ -426,7 +426,7 @@ erDiagram
     search-relevance-evaluation-result }o--o{ search-relevance-judgment : includes
     ".plugins-search-relevance-experiment" }o--|| ".search-relevance-scheduled-experiment-jobs" : "schedule opt link"
     ".plugins-search-relevance-experiment" ||--o{ ".search-relevance-scheduled-experiment-history" : "has histories"
-    
+
 ```
 
 #### UBI Plugin provided Indices
@@ -458,9 +458,9 @@ erDiagram
       keyword client_id
       keyword application
     }
-    
+
     ubi_queries ||--o{ ubi_events : "referenced by"
-    
+
 ```
 
 ## Explanation on Scheduled Experiment Indices
