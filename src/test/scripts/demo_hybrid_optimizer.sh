@@ -237,7 +237,7 @@ curl -XPUT "http://localhost:9200/_cluster/settings" -H 'Content-Type: applicati
 }
 '
 
-echo Deleting queryset, search config, judgment and experiment indexes
+echo "Deleting queryset, search config, judgment and experiment indexes"
 (curl -s -X DELETE "http://localhost:9200/search-relevance-search-config" > /dev/null) || true
 (curl -s -X DELETE "http://localhost:9200/search-relevance-queryset" > /dev/null) || true
 (curl -s -X DELETE "http://localhost:9200/search-relevance-judgment" > /dev/null) || true
@@ -247,19 +247,19 @@ echo Deleting queryset, search config, judgment and experiment indexes
 
 sleep 2
 
-echo Deleting UBI indexes
+echo "Deleting UBI indexes"
 (curl -s -X DELETE "http://localhost:9200/ubi_queries" > /dev/null) || true
 (curl -s -X DELETE "http://localhost:9200/ubi_events" > /dev/null) || true
 
-echo Creating UBI indexes using mappings
+echo "Creating UBI indexes using mappings"
 curl -s -X POST http://localhost:9200/_plugins/ubi/initialize
 
-echo Loading sample UBI data
+echo "Loading sample UBI data"
 curl  -X POST 'http://localhost:9200/index-name/_bulk?pretty' --data-binary @../data-esci/ubi_queries_events.ndjson -H "Content-Type: application/x-ndjson"
 
-echo Refreshing UBI indexes to make indexed data available for query sampling
+echo "Refreshing UBI indexes to make indexed data available for query sampling"
 curl -XPOST "http://localhost:9200/ubi_queries/_refresh"
-echo
+echo ""
 curl -XPOST "http://localhost:9200/ubi_events/_refresh"
 
 QUERY_BODY=$(cat << 'EOF'
@@ -283,8 +283,8 @@ NUMBER_OF_EVENTS=$(curl -s -XGET "http://localhost:9200/ubi_events/_search" \
 echo
 echo "Indexed UBI data: $NUMBER_OF_QUERIES queries and $NUMBER_OF_EVENTS events"
 
-echo
-echo Create Query Sets by Sampling UBI Data
+echo ""
+echo "Create Query Sets by Sampling UBI Data"
 exe curl -s -X POST "localhost:9200/_plugins/_search_relevance/query_sets" \
 -H "Content-type: application/json" \
 -d'{
@@ -296,8 +296,8 @@ exe curl -s -X POST "localhost:9200/_plugins/_search_relevance/query_sets" \
 
 QUERY_SET_UBI=`jq -r '.query_set_id' < RES`
 
-echo
-echo Upload ESCI Query Set
+echo ""
+echo "Upload ESCI Query Set"
 
 exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/query_sets" \
 -H "Content-type: application/json" \
@@ -307,8 +307,8 @@ exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/query_sets" \
 
 QUERY_SET_ESCI=`jq -r '.query_set_id' < RES`
 
-echo
-echo Create Implicit Judgments
+echo ""
+echo "Create Implicit Judgments"
 exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/judgments" \
 -H "Content-type: application/json" \
 -d'{
@@ -323,8 +323,8 @@ UBI_JUDGMENT_LIST_ID=`jq -r '.judgment_id' < RES`
 # wait for judgments to be created in the background
 sleep 2
 
-echo
-echo List experiments
+echo ""
+echo "List experiments"
 exe curl -s -X GET "http://localhost:9200/_plugins/_search_relevance/experiments" \
 -H "Content-type: application/json" \
 -d'{
@@ -336,8 +336,8 @@ exe curl -s -X GET "http://localhost:9200/_plugins/_search_relevance/experiments
      "size": 3
    }'
 
-echo
-echo Upload ESCI Judgments
+echo ""
+echo "Upload ESCI Judgments"
 
 exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/judgments" \
 -H "Content-type: application/json" \
@@ -347,11 +347,11 @@ exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/judgments" \
 
 ESCI_JUDGMENT_LIST_ID=`jq -r '.judgment_id' < RES`
 
-echo
-echo
-echo BEGIN HYBRID OPTIMIZER DEMO
-echo
-echo Creating Search Pipeline for Hybrid Query Normalization
+echo ""
+echo ""
+echo "BEGIN HYBRID OPTIMIZER DEMO"
+echo ""
+echo "Creating Search Pipeline for Hybrid Query Normalization"
 curl -s -X PUT "http://localhost:9200/_search/pipeline/normalization-pipeline" \
 -H "Content-Type: application/json" \
 -d"{
@@ -369,22 +369,22 @@ curl -s -X PUT "http://localhost:9200/_search/pipeline/normalization-pipeline" \
         }
     ]
 }"
-echo
-echo Creating Hybrid Query to be Optimized with model $model_id
+echo ""
+echo "Creating Hybrid Query to be Optimized with model $model_id"
 
 exe curl -s -X PUT "http://localhost:9200/_plugins/_search_relevance/search_configurations" \
 -H "Content-type: application/json" \
 -d"{
       \"name\": \"hybrid_query\",
-      \"query\": \"{\\\"query\\\":{\\\"hybrid\\\":{\\\"queries\\\":[{\\\"multi_match\\\":{\\\"query\\\":\\\"%SearchText%\\\",\\\"fields\\\":[\\\"id\\\",\\\"title\\\",\\\"category\\\",\\\"bullets\\\",\\\"description\\\",\\\"attrs.Brand\\\",\\\"attrs.Color\\\"]}},{\\\"neural\\\":{\\\"title_embedding\\\":{\\\"query_text\\\":\\\"%SearchText%\\\",\\\"k\\\":100,\\\"model_id\\\":\\\"${model_id}\\\"}}}]}},\\\"size\\\":10}\",
+      \"query\": \"{\\\"query\\\":{\\\"hybrid\\\":{\\\"queries\\\":[{\\\"multi_match\\\":{\\\"query\\\":\\\"%SearchText%\\\",\\\"fields\\\":[\\\"asin\\\",\\\"title\\\",\\\"category\\\",\\\"bullet_points\\\",\\\"description\\\",\\\"brand\\\",\\\"color\\\"]}},{\\\"neural\\\":{\\\"title_embedding\\\":{\\\"query_text\\\":\\\"%SearchText%\\\",\\\"k\\\":100,\\\"model_id\\\":\\\"${model_id}\\\"}}}]}},\\\"size\\\":10}\",
       \"index\": \"ecommerce\",
       \"searchPipeline\": \"normalization-pipeline\"
 }"
 
 SC_HYBRID=`jq -r '.search_configuration_id' < RES`
 
-echo
-echo Create HYBRID OPTIMIZER Experiment
+echo ""
+echo "Create HYBRID OPTIMIZER Experiment"
 
 exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/experiments" \
 -H "Content-type: application/json" \
@@ -398,9 +398,9 @@ exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/experiments" \
 
 EX_HO=`jq -r '.experiment_id' < RES`
 
-echo
-echo Experiment id: $EX_HO
+echo ""
+echo "Experiment id: $EX_HO"
 
-echo
-echo Show HYBRID OPTIMIZER Experiment
+echo ""
+echo "Show HYBRID OPTIMIZER Experiment"
 exe curl -s -X GET localhost:9200/_plugins/_search_relevance/experiments/$EX_HO

@@ -692,4 +692,137 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         verify(indicesAdminClient).putMapping(any(PutMappingRequest.class));
     }
 
+    // ==================== Async createIndexIfAbsent with Retry Tests ====================
+
+    /**
+     * Test that when index exists with older version, mapping update succeeds on first attempt.
+     */
+    public void testCreateIndexIfAbsent_MappingUpdateSucceedsOnFirstAttempt() {
+        // Setup: index exists with older schema version
+        when(metadata.hasIndex(QUERY_SET.getIndexName())).thenReturn(true);
+
+        IndexMetadata indexMetadata = mock(IndexMetadata.class);
+        MappingMetadata mappingMetadata = mock(MappingMetadata.class);
+        when(metadata.index(QUERY_SET.getIndexName())).thenReturn(indexMetadata);
+        when(indexMetadata.mapping()).thenReturn(mappingMetadata);
+
+        // Set explicit schema_version = -1 (older than current version 0)
+        Map<String, Object> metaMap = new HashMap<>();
+        metaMap.put(SearchRelevanceIndices.META_SCHEMA_VERSION_KEY, -1);
+        Map<String, Object> mappingSource = new HashMap<>();
+        mappingSource.put("_meta", metaMap);
+        when(mappingMetadata.sourceAsMap()).thenReturn(mappingSource);
+
+        // Mock successful putMapping
+        org.opensearch.action.support.PlainActionFuture<
+            org.opensearch.action.support.clustermanager.AcknowledgedResponse> putMappingFuture =
+                new org.opensearch.action.support.PlainActionFuture<>();
+        putMappingFuture.onResponse(new org.opensearch.action.support.clustermanager.AcknowledgedResponse(true));
+        when(indicesAdminClient.putMapping(any(PutMappingRequest.class))).thenReturn(putMappingFuture);
+
+        StepListener<Void> stepListener = new StepListener<>();
+        indicesManager.createIndexIfAbsent(QUERY_SET, stepListener);
+
+        // Verify: putMapping was called once
+        verify(indicesAdminClient).putMapping(any(PutMappingRequest.class));
+
+        // Verify: stepListener was called with success (no exception)
+        assertNull(stepListener.result());
+    }
+
+    /**
+     * Test that when mapping update fails all 3 retries, stepListener.onFailure is called.
+     */
+    public void testCreateIndexIfAbsent_MappingUpdateFailsAfterRetries_ServiceFails() {
+        // Setup: index exists with older schema version
+        when(metadata.hasIndex(QUERY_SET.getIndexName())).thenReturn(true);
+
+        IndexMetadata indexMetadata = mock(IndexMetadata.class);
+        MappingMetadata mappingMetadata = mock(MappingMetadata.class);
+        when(metadata.index(QUERY_SET.getIndexName())).thenReturn(indexMetadata);
+        when(indexMetadata.mapping()).thenReturn(mappingMetadata);
+
+        // Set explicit schema_version = -1 (older than current version 0)
+        Map<String, Object> metaMap = new HashMap<>();
+        metaMap.put(SearchRelevanceIndices.META_SCHEMA_VERSION_KEY, -1);
+        Map<String, Object> mappingSource = new HashMap<>();
+        mappingSource.put("_meta", metaMap);
+        when(mappingMetadata.sourceAsMap()).thenReturn(mappingSource);
+
+        // Mock putMapping to always fail
+        when(indicesAdminClient.putMapping(any(PutMappingRequest.class))).thenThrow(new RuntimeException("Mapping update failed"));
+
+        StepListener<Void> stepListener = new StepListener<>();
+        indicesManager.createIndexIfAbsent(QUERY_SET, stepListener);
+
+        // Verify: putMapping was called 3 times (initial + 2 retries)
+        verify(indicesAdminClient, org.mockito.Mockito.times(3)).putMapping(any(PutMappingRequest.class));
+
+        // Verify: stepListener was called with failure
+        try {
+            stepListener.result();
+            fail("Expected exception from stepListener");
+        } catch (Exception e) {
+            assertTrue(e instanceof SearchRelevanceException);
+            assertTrue(e.getMessage().contains("Failed to update mapping"));
+            assertTrue(e.getMessage().contains("after 3 attempts"));
+        }
+    }
+
+    /**
+     * Test that when schema version check fails, stepListener.onFailure is called.
+     */
+    public void testCreateIndexIfAbsent_SchemaVersionCheckFails_ServiceFails() {
+        // Setup: index exists but getExistingSchemaVersion throws exception
+        when(metadata.hasIndex(QUERY_SET.getIndexName())).thenReturn(true);
+
+        IndexMetadata indexMetadata = mock(IndexMetadata.class);
+        when(metadata.index(QUERY_SET.getIndexName())).thenReturn(indexMetadata);
+        when(indexMetadata.mapping()).thenReturn(null); // This will cause exception in getExistingSchemaVersion
+
+        StepListener<Void> stepListener = new StepListener<>();
+        indicesManager.createIndexIfAbsent(QUERY_SET, stepListener);
+
+        // Verify: putMapping was NOT called (failed before getting there)
+        verify(indicesAdminClient, never()).putMapping(any(PutMappingRequest.class));
+
+        // Verify: stepListener was called with failure
+        try {
+            stepListener.result();
+            fail("Expected exception from stepListener");
+        } catch (Exception e) {
+            assertTrue(e instanceof SearchRelevanceException);
+            assertTrue(e.getMessage().contains("Failed to check schema version"));
+        }
+    }
+
+    /**
+     * Test that when index exists with same version, no mapping update and stepListener succeeds.
+     */
+    public void testCreateIndexIfAbsent_SameVersion_NoUpdateAndSucceeds() {
+        // Setup: index exists with same schema version as current
+        when(metadata.hasIndex(QUERY_SET.getIndexName())).thenReturn(true);
+
+        IndexMetadata indexMetadata = mock(IndexMetadata.class);
+        MappingMetadata mappingMetadata = mock(MappingMetadata.class);
+        when(metadata.index(QUERY_SET.getIndexName())).thenReturn(indexMetadata);
+        when(indexMetadata.mapping()).thenReturn(mappingMetadata);
+
+        // Set explicit schema_version = 0 (same as current)
+        Map<String, Object> metaMap = new HashMap<>();
+        metaMap.put(SearchRelevanceIndices.META_SCHEMA_VERSION_KEY, QUERY_SET.getSchemaVersion());
+        Map<String, Object> mappingSource = new HashMap<>();
+        mappingSource.put("_meta", metaMap);
+        when(mappingMetadata.sourceAsMap()).thenReturn(mappingSource);
+
+        StepListener<Void> stepListener = new StepListener<>();
+        indicesManager.createIndexIfAbsent(QUERY_SET, stepListener);
+
+        // Verify: putMapping was NOT called (versions are same)
+        verify(indicesAdminClient, never()).putMapping(any(PutMappingRequest.class));
+
+        // Verify: stepListener was called with success
+        assertNull(stepListener.result());
+    }
+
 }

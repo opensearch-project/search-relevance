@@ -49,7 +49,7 @@ buildscript {
         classpath "org.opensearch.gradle:build-tools:${opensearch_version}"
         classpath "com.diffplug.spotless:spotless-plugin-gradle:8.1.0"
         classpath "com.github.form-com.diff-coverage-gradle:diff-coverage:0.9.5"
-        classpath "io.freefair.gradle:lombok-plugin:9.1.0"
+        classpath "io.freefair.gradle:lombok-plugin:9.2.0"
         classpath "de.thetaphi:forbiddenapis:3.10" // Upgrade for JDK 25 support
     }
 }
@@ -207,7 +207,7 @@ configurations {
 configurations.all {
     resolutionStrategy {
         force("com.google.guava:guava:33.4.8-jre") // CVE for 31.1
-        force("com.google.errorprone:error_prone_annotations:2.45.0") // Fix version conflict
+        force("com.google.errorprone:error_prone_annotations:2.46.0") // Fix version conflict
     }
     exclude group: 'org.slf4j', module: 'slf4j-log4j12'
 }
