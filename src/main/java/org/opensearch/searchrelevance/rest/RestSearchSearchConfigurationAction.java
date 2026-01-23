@@ -28,6 +28,7 @@ import org.opensearch.rest.BaseRestHandler;
 import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.search.builder.SearchSourceBuilder;
+import org.opensearch.searchrelevance.common.PluginConstants;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.searchrelevance.transport.searchConfiguration.SearchSearchConfigurationAction;
 import org.opensearch.transport.client.node.NodeClient;
@@ -64,7 +65,7 @@ public class RestSearchSearchConfigurationAction extends BaseRestHandler {
         if (request.hasContentOrSourceParam()) {
             searchSourceBuilder.parseXContent(request.contentOrSourceParamParser());
         } else {
-            searchSourceBuilder.query(QueryBuilders.matchAllQuery()).size(10);
+            searchSourceBuilder.query(QueryBuilders.matchAllQuery()).size(PluginConstants.DEFAULTED_QUERY_SET_SIZE);
         }
 
         SearchRequest searchRequest = new SearchRequest().source(searchSourceBuilder);
