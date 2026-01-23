@@ -3,20 +3,24 @@
         - [Fork OpenSearch search-relevance Repo](#fork-opensearch-search-relevance-repo)
         - [Install Prerequisites](#install-prerequisites)
             - [JDK 21](#jdk-21)
-            - [Environment](#Environment)
     - [Use an Editor](#use-an-editor)
         - [IntelliJ IDEA](#intellij-idea)
+    - [Java Language Formatting Guidelines](#java-language-formatting-guidelines)
     - [Build](#build)
     - [Run OpenSearch search-relevance](#run-opensearch-search-relevance)
         - [Run Single-node Cluster Locally](#run-single-node-cluster-locally)
         - [Run SRW in Demo Mode](#run-srw-in-demo-mode)
-        - [Run remote cluster](#run-remote-clusters-with-search-relevance)
+        - [Run SRW in Hybrid Search Optimizer Demo Mode](#run-srw-in-hybrid-search-optimizer-demo-mode)
+        - [Run remote clusters with search-relevance](#run-remote-clusters-with-search-relevance)
     - [Debugging](#debugging)
+    - [Design Documentation](#design-documentation)
+        - [SRW Indices Layout](#srw-indices-layout)
+    - [Explanation on Scheduled Experiment Indices](#explanation-on-scheduled-experiment-indices)
 
 # Developer Guide
 
 ## Getting Started
-Please define the OpenSearch version in `build.gradle`. By default, we're developing with `3.1.0-SNAPSHOT`
+Please define the OpenSearch version in `build.gradle`.
 
 ### Fork OpenSearch search-relevance Repo
 
@@ -302,6 +306,162 @@ The template is particularly valuable for:
 - Changes affecting security or backward compatibility
 
 Refer to the [design documentation guide](docs/README.md) for detailed instructions, examples, and best practices on using the template effectively.
+
+### SRW Indices Layout
+
+SRW is unusual that it has a large number of indices that it uses to maintain the state of the information.  It's reasonable to think of them like you would database tables, but without the full capablities of a relational database of course!
+
+| Index | System | Purpose |
+|-------|--------|---------|
+| `.plugins-search-relevance-experiment` | Yes | Core experiment metadata and status |
+| `search-relevance-search-config` | No | Search configuration to be evaluated |
+| `search-relevance-queryset` | No | Query sets for evaluation |
+| `search-relevance-judgment` | No | Relevance judgments (manual/LLM/UBI) |
+| `.plugins-search-relevance-judgment-cache` | Yes | Working table for LLM as a Judge |
+| `search-relevance-experiment-variant` | No | Track variants generated from a single experiment |
+| `.search-relevance-scheduled-experiment-jobs` | Yes | Specify an experiment to be run periodically |
+| `.search-relevance-scheduled-experiment-history` | Yes | Track experiment results run periodically |
+| `search-relevance-evaluation-result` | No | Flattened table of Experiment results suitable for dashboarding |
+
+> [!NOTE]  
+> Authoritative schema definitions are in `src/main/resources/mappings/`
+
+#### Core SRW Indices
+
+```mermaid
+erDiagram
+    direction TB
+
+    ".plugins-search-relevance-experiment" {
+        keyword id PK
+        date timestamp
+        keyword type
+        keyword status
+        keyword querySetId FK
+        list[keyword] searchConfigurationList FK
+        list[keyword] judgmentList FK
+        keyword size
+        keyword scheduledExperimentJobId FK 
+        keyword isScheduled
+        object[] results
+    }
+    search-relevance-evaluation-result {
+        keyword id PK
+        date timestamp
+        keyword searchConfigurationId FK
+        keyword experimentId FK
+        keyword experimentVariantId FK
+        keyword experimentVariantParameters
+        keyword scheduledRunId FK
+        keyword searchText
+        keyword judgmentList FK
+        keyword documentIds
+        nested metrics        
+    }
+    search-relevance-judgment {
+      keyword id PK
+      date timestamp
+      keyword name
+      keyword type
+      object metadata
+      nested judgmentRatings
+    }
+    ".plugins-search-relevance-judgment-cache" {
+      keyword id PK
+      date timestamp
+      keyword querySet
+      keyword documentId
+      keyword contextFieldsStr
+      keyword rating
+    }
+    search-relevance-search-config {
+      keyword id PK
+      date timestamp
+      keyword name
+      keyword index
+      text queryBody
+      keyword searchPipeline
+    }
+    search-relevance-queryset {
+      keyword id PK
+      date timestamp
+      keyword name
+      text description
+      nested querySetQueries
+      keyword sampling
+    }
+    search-relevance-experiment-variant {
+      keyword id PK
+      date timestamp
+      keyword type
+      keyword status
+      keyword experimentId FK
+      object parameters
+      nested results
+    }
+    ".search-relevance-scheduled-experiment-jobs" {
+      keyword id PK
+      boolean enabled
+      long enabledTime
+      long lastUpdateTime
+      keyword timestamp
+      keyword schedule
+    }
+    ".search-relevance-scheduled-experiment-history" {
+      keyword id PK
+      keyword experimentId FK
+      date timestamp
+      keyword status
+      object results
+    }
+
+    ".plugins-search-relevance-experiment" ||--o{ search-relevance-evaluation-result : "has zero to many"
+    ".plugins-search-relevance-experiment" ||--o{ search-relevance-queryset : "has zero to many"
+    ".plugins-search-relevance-experiment" ||--|{ search-relevance-search-config : "has one to many"
+    ".plugins-search-relevance-experiment" ||--o{ search-relevance-judgment : "has zero to many"
+    search-relevance-search-config ||--o{ search-relevance-evaluation-result : "referenced by"
+    ".plugins-search-relevance-experiment" ||--o{ search-relevance-experiment-variant : "hybrid optimizer only"
+    search-relevance-experiment-variant ||--o{ search-relevance-evaluation-result : "referenced by"
+    ".search-relevance-scheduled-experiment-history" ||--o{ search-relevance-evaluation-result : "referenced by"
+    search-relevance-evaluation-result }o--o{ search-relevance-judgment : includes
+    ".plugins-search-relevance-experiment" }o--|| ".search-relevance-scheduled-experiment-jobs" : "schedule opt link"
+    ".plugins-search-relevance-experiment" ||--o{ ".search-relevance-scheduled-experiment-history" : "has histories"
+    
+```
+
+#### UBI Plugin provided Indices
+
+UBI provides two indices that may be used in conjunction with SRW.  There are no direct links.
+
+```mermaid
+erDiagram
+
+    ubi_events {
+      keyword application
+      keyword action_name
+      keyword client_id
+      keyword query_id FK
+      keyword message
+      keyword message_type
+      keyword user_query
+      date timestamp
+      object event_attributes
+    }
+    ubi_queries {
+      keyword query_id PK
+      date timestamp
+      text query
+      keyword query_response_id
+      keyword query_response_hit_ids
+      keyword user_query
+      flat_object query_attributes
+      keyword client_id
+      keyword application
+    }
+    
+    ubi_queries ||--o{ ubi_events : "referenced by"
+    
+```
 
 ## Explanation on Scheduled Experiment Indices
 
