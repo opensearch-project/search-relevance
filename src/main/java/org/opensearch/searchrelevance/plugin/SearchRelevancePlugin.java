@@ -89,7 +89,9 @@ import org.opensearch.searchrelevance.rest.RestPutJudgmentAction;
 import org.opensearch.searchrelevance.rest.RestPutQuerySetAction;
 import org.opensearch.searchrelevance.rest.RestPutSearchConfigurationAction;
 import org.opensearch.searchrelevance.rest.RestSearchJudgmentAction;
+import org.opensearch.searchrelevance.rest.RestSearchExperimentAction;
 import org.opensearch.searchrelevance.rest.RestSearchRelevanceStatsAction;
+import org.opensearch.searchrelevance.rest.RestSearchSearchConfigurationAction;
 import org.opensearch.searchrelevance.scheduler.ScheduledExperimentRunnerManager;
 import org.opensearch.searchrelevance.scheduler.SearchRelevanceJobParameters;
 import org.opensearch.searchrelevance.scheduler.SearchRelevanceJobRunner;
@@ -102,6 +104,8 @@ import org.opensearch.searchrelevance.transport.experiment.GetExperimentAction;
 import org.opensearch.searchrelevance.transport.experiment.GetExperimentTransportAction;
 import org.opensearch.searchrelevance.transport.experiment.PutExperimentAction;
 import org.opensearch.searchrelevance.transport.experiment.PutExperimentTransportAction;
+import org.opensearch.searchrelevance.transport.experiment.SearchExperimentAction;
+import org.opensearch.searchrelevance.transport.experiment.SearchExperimentTransportAction;
 import org.opensearch.searchrelevance.transport.judgment.DeleteJudgmentAction;
 import org.opensearch.searchrelevance.transport.judgment.DeleteJudgmentTransportAction;
 import org.opensearch.searchrelevance.transport.judgment.GetJudgmentAction;
@@ -130,6 +134,8 @@ import org.opensearch.searchrelevance.transport.searchConfiguration.GetSearchCon
 import org.opensearch.searchrelevance.transport.searchConfiguration.GetSearchConfigurationTransportAction;
 import org.opensearch.searchrelevance.transport.searchConfiguration.PutSearchConfigurationAction;
 import org.opensearch.searchrelevance.transport.searchConfiguration.PutSearchConfigurationTransportAction;
+import org.opensearch.searchrelevance.transport.searchConfiguration.SearchSearchConfigurationAction;
+import org.opensearch.searchrelevance.transport.searchConfiguration.SearchSearchConfigurationTransportAction;
 import org.opensearch.searchrelevance.transport.stats.SearchRelevanceStatsAction;
 import org.opensearch.searchrelevance.transport.stats.SearchRelevanceStatsTransportAction;
 import org.opensearch.searchrelevance.utils.ClusterUtil;
@@ -283,9 +289,11 @@ public class SearchRelevancePlugin extends Plugin
             new RestPutSearchConfigurationAction(settingsAccessor),
             new RestDeleteSearchConfigurationAction(settingsAccessor),
             new RestGetSearchConfigurationAction(settingsAccessor),
+            new RestSearchSearchConfigurationAction(settingsAccessor),
             new RestPutExperimentAction(settingsAccessor),
             new RestGetExperimentAction(settingsAccessor),
             new RestDeleteExperimentAction(settingsAccessor),
+            new RestSearchExperimentAction(settingsAccessor),
             new RestSearchRelevanceStatsAction(settingsAccessor, clusterUtil),
             new RestPostScheduledExperimentAction(settingsAccessor, cronUtil),
             new RestDeleteScheduledExperimentAction(settingsAccessor),
@@ -307,9 +315,11 @@ public class SearchRelevancePlugin extends Plugin
             new ActionHandler<>(PutSearchConfigurationAction.INSTANCE, PutSearchConfigurationTransportAction.class),
             new ActionHandler<>(DeleteSearchConfigurationAction.INSTANCE, DeleteSearchConfigurationTransportAction.class),
             new ActionHandler<>(GetSearchConfigurationAction.INSTANCE, GetSearchConfigurationTransportAction.class),
+            new ActionHandler<>(SearchSearchConfigurationAction.INSTANCE, SearchSearchConfigurationTransportAction.class),
             new ActionHandler<>(PutExperimentAction.INSTANCE, PutExperimentTransportAction.class),
             new ActionHandler<>(DeleteExperimentAction.INSTANCE, DeleteExperimentTransportAction.class),
             new ActionHandler<>(GetExperimentAction.INSTANCE, GetExperimentTransportAction.class),
+            new ActionHandler<>(SearchExperimentAction.INSTANCE, SearchExperimentTransportAction.class),
             new ActionHandler<>(SearchRelevanceStatsAction.INSTANCE, SearchRelevanceStatsTransportAction.class),
             new ActionHandler<>(PostScheduledExperimentAction.INSTANCE, PostScheduledExperimentTransportAction.class),
             new ActionHandler<>(DeleteScheduledExperimentAction.INSTANCE, DeleteScheduledExperimentTransportAction.class),
