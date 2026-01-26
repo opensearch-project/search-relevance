@@ -7,6 +7,8 @@
  */
 package org.opensearch.searchrelevance.ubi;
 
+import static org.opensearch.searchrelevance.common.PluginConstants.UBI_QUERIES_INDEX;
+
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -22,10 +24,12 @@ public abstract class QuerySampler {
     private static final Logger LOGGER = LogManager.getLogger(QuerySampler.class);
     private final Client client;
     private final int size;
+    private final String ubiQueriesIndex;
 
-    protected QuerySampler(int size, @NonNull Client client) {
+    protected QuerySampler(int size, @NonNull Client client, String ubiQueriesIndex) {
         this.client = client;
         this.size = size;
+        this.ubiQueriesIndex = ubiQueriesIndex != null ? ubiQueriesIndex : UBI_QUERIES_INDEX;
     }
 
     protected Client getClient() {
@@ -36,13 +40,21 @@ public abstract class QuerySampler {
         return size;
     }
 
+    protected String getUbiQueriesIndex() {
+        return ubiQueriesIndex;
+    }
+
     public abstract CompletableFuture<Map<String, Integer>> sample();
 
-    public static QuerySampler create(String name, int size, Client client) {
+    public static QuerySampler create(String name, int size, Client client, String ubiQueriesIndex) {
         return switch (name) {
-            case ProbabilityProportionalToSizeQuerySampler.NAME -> new ProbabilityProportionalToSizeQuerySampler(size, client);
-            case RandomQuerySampler.NAME -> new RandomQuerySampler(size, client);
-            case TopNQuerySampler.NAME -> new TopNQuerySampler(size, client);
+            case ProbabilityProportionalToSizeQuerySampler.NAME -> new ProbabilityProportionalToSizeQuerySampler(
+                size,
+                client,
+                ubiQueriesIndex
+            );
+            case RandomQuerySampler.NAME -> new RandomQuerySampler(size, client, ubiQueriesIndex);
+            case TopNQuerySampler.NAME -> new TopNQuerySampler(size, client, ubiQueriesIndex);
             default -> throw new SearchRelevanceException("Unknown sampler type: " + name, RestStatus.BAD_REQUEST);
         };
     }

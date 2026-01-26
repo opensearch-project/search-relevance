@@ -24,7 +24,7 @@ import org.opensearch.test.OpenSearchTestCase;
 public class PutJudgmentActionTests extends OpenSearchTestCase {
 
     public void testStreams() throws IOException {
-        PutJudgmentRequest request = new PutUbiJudgmentRequest(JudgmentType.UBI_JUDGMENT, "name", "description", "coec", 20, "", "");
+        PutJudgmentRequest request = new PutUbiJudgmentRequest(JudgmentType.UBI_JUDGMENT, "name", "description", "coec", 20, "", "", null);
         BytesStreamOutput output = new BytesStreamOutput();
         request.writeTo(output);
         StreamInput in = StreamInput.wrap(output.bytes().toBytesRef().bytes);
@@ -38,7 +38,7 @@ public class PutJudgmentActionTests extends OpenSearchTestCase {
     }
 
     public void testRequestValidation() {
-        PutJudgmentRequest request = new PutUbiJudgmentRequest(JudgmentType.UBI_JUDGMENT, "name", "description", "coec", 20, "", "");
+        PutJudgmentRequest request = new PutUbiJudgmentRequest(JudgmentType.UBI_JUDGMENT, "name", "description", "coec", 20, "", "", null);
         assertNull(request.validate());
     }
 
@@ -144,5 +144,44 @@ public class PutJudgmentActionTests extends OpenSearchTestCase {
         assertNull(serialized.getPromptTemplate());
         assertNull(serialized.getLlmJudgmentRatingType());
         assertEquals(false, serialized.isOverwriteCache());
+    }
+
+    public void testUbiJudgmentWithCustomIndexes() throws IOException {
+        PutUbiJudgmentRequest request = new PutUbiJudgmentRequest(
+            JudgmentType.UBI_JUDGMENT,
+            "name",
+            "description",
+            "coec",
+            20,
+            "2024-01-01",
+            "2024-12-31",
+            "custom_events_index"
+        );
+        BytesStreamOutput output = new BytesStreamOutput();
+        request.writeTo(output);
+        StreamInput in = StreamInput.wrap(output.bytes().toBytesRef().bytes);
+        PutUbiJudgmentRequest serialized = new PutUbiJudgmentRequest(in);
+        assertEquals("name", serialized.getName());
+        assertEquals(JudgmentType.UBI_JUDGMENT, serialized.getType());
+        assertEquals("description", serialized.getDescription());
+        assertEquals("coec", serialized.getClickModel());
+        assertEquals(20, serialized.getMaxRank());
+        assertEquals("2024-01-01", serialized.getStartDate());
+        assertEquals("2024-12-31", serialized.getEndDate());
+        assertEquals("custom_events_index", serialized.getUbiEventsIndex());
+    }
+
+    public void testUbiJudgmentDefaultIndexesWhenNull() {
+        PutUbiJudgmentRequest request = new PutUbiJudgmentRequest(
+            JudgmentType.UBI_JUDGMENT,
+            "name",
+            "description",
+            "coec",
+            10,
+            "",
+            "",
+            null
+        );
+        assertEquals("ubi_events", request.getUbiEventsIndex());
     }
 }
