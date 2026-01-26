@@ -29,6 +29,7 @@ import static org.opensearch.searchrelevance.common.PluginConstants.SEARCH_CONFI
 import static org.opensearch.searchrelevance.common.PluginConstants.SIZE;
 import static org.opensearch.searchrelevance.common.PluginConstants.START_DATE;
 import static org.opensearch.searchrelevance.common.PluginConstants.TYPE;
+import static org.opensearch.searchrelevance.common.PluginConstants.UBI_EVENTS_INDEX_PARAM;
 
 import java.io.IOException;
 import java.util.List;
@@ -204,7 +205,9 @@ public class RestPutJudgmentAction extends BaseRestHandler {
                     );
                 }
 
-                createRequest = new PutUbiJudgmentRequest(type, name, description, clickModel, maxRank, startDate, endDate);
+                String ubiEventsIndex = (String) source.get(UBI_EVENTS_INDEX_PARAM);
+
+                createRequest = new PutUbiJudgmentRequest(type, name, description, clickModel, maxRank, startDate, endDate, ubiEventsIndex);
             }
             case IMPORT_JUDGMENT -> {
                 List<Map<String, Object>> judgmentRatings = (List<Map<String, Object>>) source.get(JUDGMENT_RATINGS);

@@ -7,8 +7,6 @@
  */
 package org.opensearch.searchrelevance.ubi;
 
-import static org.opensearch.searchrelevance.common.PluginConstants.UBI_QUERIES_INDEX;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -38,8 +36,8 @@ public class ProbabilityProportionalToSizeQuerySampler extends QuerySampler {
     private static final Logger LOGGER = LogManager.getLogger(ProbabilityProportionalToSizeQuerySampler.class);
     private static final double EPSILON = 0.00001;
 
-    public ProbabilityProportionalToSizeQuerySampler(int size, Client client) {
-        super(size, client);
+    public ProbabilityProportionalToSizeQuerySampler(int size, Client client, String ubiQueriesIndex) {
+        super(size, client, ubiQueriesIndex);
     }
 
     @Override
@@ -53,7 +51,7 @@ public class ProbabilityProportionalToSizeQuerySampler extends QuerySampler {
             public void onResponse(Collection<String> userQueries) {
                 try {
                     if (userQueries.isEmpty()) {
-                        LOGGER.warn("No queries found in {}", UBI_QUERIES_INDEX);
+                        LOGGER.warn("No queries found in {}", getUbiQueriesIndex());
                         future.complete(new HashMap<>());
                         return;
                     }
@@ -67,7 +65,7 @@ public class ProbabilityProportionalToSizeQuerySampler extends QuerySampler {
 
             @Override
             public void onFailure(Exception e) {
-                LOGGER.error("Failed to retrieve queries from {}: {}", UBI_QUERIES_INDEX, e.getMessage());
+                LOGGER.error("Failed to retrieve queries from {}: {}", getUbiQueriesIndex(), e.getMessage());
                 future.complete(new HashMap<>());
             }
         });
@@ -147,7 +145,7 @@ public class ProbabilityProportionalToSizeQuerySampler extends QuerySampler {
         try {
             if (scrollId == null) {
                 // Initial search
-                SearchRequest searchRequest = new SearchRequest(UBI_QUERIES_INDEX).scroll(scroll).source(searchSourceBuilder);
+                SearchRequest searchRequest = new SearchRequest(getUbiQueriesIndex()).scroll(scroll).source(searchSourceBuilder);
 
                 getClient().search(
                     searchRequest,

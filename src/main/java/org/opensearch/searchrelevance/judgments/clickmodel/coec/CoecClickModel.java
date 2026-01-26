@@ -7,18 +7,13 @@
  */
 package org.opensearch.searchrelevance.judgments.clickmodel.coec;
 
-import static org.opensearch.searchrelevance.common.PluginConstants.UBI_EVENTS_INDEX;
-
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -101,7 +96,7 @@ public class CoecClickModel extends ClickModel {
 
         searchSourceBuilder.aggregation(actionAgg);
 
-        SearchRequest searchRequest = new SearchRequest(UBI_EVENTS_INDEX).source(searchSourceBuilder);
+        SearchRequest searchRequest = new SearchRequest(parameters.getUbiEventsIndex()).source(searchSourceBuilder);
 
         client.search(searchRequest, ActionListener.wrap(response -> {
             try {
@@ -191,7 +186,7 @@ public class CoecClickModel extends ClickModel {
                 null
             );
 
-        SearchRequest searchRequest = new SearchRequest(UBI_EVENTS_INDEX).source(searchSourceBuilder).scroll(SCROLL_TIMEOUT);
+        SearchRequest searchRequest = new SearchRequest(parameters.getUbiEventsIndex()).source(searchSourceBuilder).scroll(SCROLL_TIMEOUT);
 
         processClickthroughSearch(searchRequest, queriesToClickthroughRates, listener);
     }
@@ -277,7 +272,7 @@ public class CoecClickModel extends ClickModel {
 
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder().query(queryBuilder).size(SCROLL_SIZE).timeout(SEARCH_TIMEOUT);
 
-        SearchRequest searchRequest = new SearchRequest(UBI_EVENTS_INDEX).source(searchSourceBuilder).scroll(SCROLL_TIMEOUT);
+        SearchRequest searchRequest = new SearchRequest(parameters.getUbiEventsIndex()).source(searchSourceBuilder).scroll(SCROLL_TIMEOUT);
 
         LOGGER.debug("Starting click events scroll search");
         scrollEvents(searchRequest, null, clickCounts, "click", listener);
@@ -294,7 +289,7 @@ public class CoecClickModel extends ClickModel {
 
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder().query(queryBuilder).size(SCROLL_SIZE).timeout(SEARCH_TIMEOUT);
 
-        SearchRequest searchRequest = new SearchRequest(UBI_EVENTS_INDEX).source(searchSourceBuilder).scroll(SCROLL_TIMEOUT);
+        SearchRequest searchRequest = new SearchRequest(parameters.getUbiEventsIndex()).source(searchSourceBuilder).scroll(SCROLL_TIMEOUT);
 
         LOGGER.debug("Starting impression events scroll search");
         scrollEvents(searchRequest, null, impressionCounts, "impression", ActionListener.wrap(impressionCountsResult -> {
@@ -519,151 +514,6 @@ public class CoecClickModel extends ClickModel {
         scrollRankAggregatedData(null, response.getScrollId(), clickCounts, impressionCounts, listener);
     }
 
-    private void scrollClickthroughRates(
-        SearchRequest initialRequest,
-        String scrollId,
-        Map<String, Set<ClickthroughRate>> queriesToClickthroughRates,
-        ActionListener<Map<String, Set<ClickthroughRate>>> listener
-    ) {
-        if (scrollId == null) {
-            client.search(initialRequest, new ActionListener<SearchResponse>() {
-                @Override
-                public void onResponse(SearchResponse response) {
-                    processClickthroughBatch(response, queriesToClickthroughRates, listener);
-                }
-
-                @Override
-                public void onFailure(Exception e) {
-                    LOGGER.error("Initial clickthrough search failed", e);
-                    listener.onFailure(e);
-                }
-            });
-        } else {
-            SearchScrollRequest scrollRequest = new SearchScrollRequest(scrollId).scroll(SCROLL_TIMEOUT);
-
-            client.searchScroll(scrollRequest, new ActionListener<SearchResponse>() {
-                @Override
-                public void onResponse(SearchResponse response) {
-                    processClickthroughBatch(response, queriesToClickthroughRates, listener);
-                }
-
-                @Override
-                public void onFailure(Exception e) {
-                    LOGGER.error("Clickthrough scroll request failed", e);
-                    listener.onFailure(e);
-                }
-            });
-        }
-    }
-
-    private void processClickthroughBatch(
-        SearchResponse response,
-        Map<String, Set<ClickthroughRate>> queriesToClickthroughRates,
-        ActionListener<Map<String, Set<ClickthroughRate>>> listener
-    ) {
-        SearchHit[] hits = response.getHits().getHits();
-        LOGGER.debug("Processing {} hits for clickthrough rates", hits.length);
-
-        if (hits.length == 0) {
-            if (response.getScrollId() != null) {
-                ClearScrollRequest clearScrollRequest = new ClearScrollRequest();
-                clearScrollRequest.addScrollId(response.getScrollId());
-                client.clearScroll(clearScrollRequest, ActionListener.wrap(clearResponse -> {
-                    LOGGER.info("Completed clickthrough rate calculation with {} queries", queriesToClickthroughRates.size());
-                    listener.onResponse(queriesToClickthroughRates);
-                }, e -> {
-                    LOGGER.warn("Failed to clear scroll", e);
-                    listener.onResponse(queriesToClickthroughRates);
-                }));
-            } else {
-                listener.onResponse(queriesToClickthroughRates);
-            }
-            return;
-        }
-
-        AtomicInteger pendingHits = new AtomicInteger(hits.length);
-        AtomicBoolean hasError = new AtomicBoolean(false);
-
-        for (SearchHit hit : hits) {
-            try {
-                UbiEvent ubiEvent = JsonUtils.fromJson(hit.getSourceAsString(), UbiEvent.class);
-                String queryId = ubiEvent.getQueryId();
-
-                getUserQuery(queryId, ActionListener.wrap(userQuery -> {
-                    if (userQuery != null) {
-                        synchronized (queriesToClickthroughRates) {
-                            Set<ClickthroughRate> clickthroughRates = queriesToClickthroughRates.computeIfAbsent(
-                                userQuery,
-                                k -> new HashSet<>()
-                            );
-
-                            ClickthroughRate clickthroughRate = clickthroughRates.stream()
-                                .filter(ctr -> ctr.getObjectId().equals(ubiEvent.getEventAttributes().getObject().getObjectId()))
-                                .findFirst()
-                                .orElseGet(() -> new ClickthroughRate(ubiEvent.getEventAttributes().getObject().getObjectId()));
-
-                            if ("click".equalsIgnoreCase(ubiEvent.getActionName())) {
-                                clickthroughRate.logClick();
-                            } else if ("impression".equalsIgnoreCase(ubiEvent.getActionName())) {
-                                clickthroughRate.logImpression();
-                            }
-
-                            clickthroughRates.add(clickthroughRate);
-                        }
-                    }
-                    checkBatchCompletion(pendingHits, hasError, response.getScrollId(), queriesToClickthroughRates, listener);
-                }, e -> {
-                    LOGGER.warn("Error processing user query for hit: " + hit.getId(), e);
-                    hasError.set(true);
-                    checkBatchCompletion(pendingHits, hasError, response.getScrollId(), queriesToClickthroughRates, listener);
-                }));
-            } catch (Exception e) {
-                LOGGER.warn("Error processing hit: " + hit.getId(), e);
-                hasError.set(true);
-                checkBatchCompletion(pendingHits, hasError, response.getScrollId(), queriesToClickthroughRates, listener);
-            }
-        }
-    }
-
-    private void checkBatchCompletion(
-        AtomicInteger pendingHits,
-        AtomicBoolean hasError,
-        String scrollId,
-        Map<String, Set<ClickthroughRate>> queriesToClickthroughRates,
-        ActionListener<Map<String, Set<ClickthroughRate>>> listener
-    ) {
-        if (pendingHits.decrementAndGet() == 0) {
-            if (hasError.get()) {
-                listener.onFailure(new IllegalStateException("Error processing some hits in batch"));
-            } else {
-                // Continue scrolling
-                scrollClickthroughRates(null, scrollId, queriesToClickthroughRates, listener);
-            }
-        }
-    }
-
-    private void getUserQuery(String queryId, ActionListener<String> listener) {
-        SearchSourceBuilder sourceBuilder = new SearchSourceBuilder().query(QueryBuilders.termQuery("query_id.keyword", queryId))
-            .size(1)
-            // Specify only the fields we need
-            .fetchSource(new String[] { "user_query" }, null);
-
-        SearchRequest searchRequest = new SearchRequest("ubi_queries").source(sourceBuilder);
-
-        client.search(searchRequest, ActionListener.wrap(response -> {
-            if (response.getHits().getHits().length > 0) {
-                SearchHit hit = response.getHits().getHits()[0];
-                Map<String, Object> source = hit.getSourceAsMap();
-                listener.onResponse((String) source.get("user_query"));
-            } else {
-                listener.onResponse(null);
-            }
-        }, e -> {
-            LOGGER.warn("Failed to get user query for queryId: " + queryId, e);
-            listener.onResponse(null);
-        }));
-    }
-
     private void getQueryCount(String userQuery, String objectId, int rank, ActionListener<Long> listener) {
         BoolQueryBuilder queryBuilder = QueryBuilders.boolQuery()
             .must(QueryBuilders.termQuery("action_name", "impression"))
@@ -672,7 +522,7 @@ public class CoecClickModel extends ClickModel {
 
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder().query(queryBuilder).trackTotalHits(true).size(0);
 
-        SearchRequest searchRequest = new SearchRequest(UBI_EVENTS_INDEX).source(searchSourceBuilder);
+        SearchRequest searchRequest = new SearchRequest(parameters.getUbiEventsIndex()).source(searchSourceBuilder);
 
         client.search(
             searchRequest,

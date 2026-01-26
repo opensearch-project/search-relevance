@@ -71,6 +71,9 @@ public class PluginConstants {
     public static final String NAX_RANK = "maxRank";
     public static final String START_DATE = "startDate";
     public static final String END_DATE = "endDate";
+    /* The customized UBI index names */
+    public static final String UBI_QUERIES_INDEX_PARAM = "ubiQueriesIndex";
+    public static final String UBI_EVENTS_INDEX_PARAM = "ubiEventsIndex";
 
     /**
      * Rest Input Field Names

@@ -7,7 +7,6 @@
  */
 package org.opensearch.searchrelevance.ubi;
 
-import static org.opensearch.searchrelevance.common.PluginConstants.UBI_QUERIES_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.USER_QUERY_FIELD;
 
 import java.util.HashMap;
@@ -39,8 +38,8 @@ public class RandomQuerySampler extends QuerySampler {
     private static final Logger LOGGER = LogManager.getLogger(RandomQuerySampler.class);
     private static final int SEARCH_TIMEOUT_SECONDS = 30;
 
-    public RandomQuerySampler(int size, Client client) {
-        super(size, client);
+    public RandomQuerySampler(int size, Client client, String ubiQueriesIndex) {
+        super(size, client, ubiQueriesIndex);
     }
 
     @Override
@@ -91,7 +90,7 @@ public class RandomQuerySampler extends QuerySampler {
             .collapse(new CollapseBuilder(USER_QUERY_FIELD))
             .size(getSize());
 
-        return new SearchRequest(UBI_QUERIES_INDEX).source(searchSourceBuilder);
+        return new SearchRequest(getUbiQueriesIndex()).source(searchSourceBuilder);
     }
 
     private CompletableFuture<Map<String, Integer>> getQuerySet(SearchResponse searchResponse) {
@@ -117,7 +116,7 @@ public class RandomQuerySampler extends QuerySampler {
             .size(0)
             .trackTotalHits(true);
 
-        SearchRequest searchRequest = new SearchRequest(UBI_QUERIES_INDEX).source(searchSourceBuilder);
+        SearchRequest searchRequest = new SearchRequest(getUbiQueriesIndex()).source(searchSourceBuilder);
 
         getClient().search(searchRequest, new ActionListener<SearchResponse>() {
             @Override

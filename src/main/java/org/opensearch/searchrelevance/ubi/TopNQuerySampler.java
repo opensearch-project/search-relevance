@@ -7,7 +7,6 @@
  */
 package org.opensearch.searchrelevance.ubi;
 
-import static org.opensearch.searchrelevance.common.PluginConstants.UBI_QUERIES_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.USER_QUERY_FIELD;
 
 import java.util.HashMap;
@@ -37,8 +36,8 @@ public class TopNQuerySampler extends QuerySampler {
     private static final Logger LOGGER = LogManager.getLogger(TopNQuerySampler.class);
     private static final String AGGREGATION_NAME = "By_User_Query";
 
-    public TopNQuerySampler(int size, Client client) {
-        super(size, client);
+    public TopNQuerySampler(int size, Client client, String ubiQueriesIndex) {
+        super(size, client, ubiQueriesIndex);
     }
 
     @Override
@@ -88,7 +87,7 @@ public class TopNQuerySampler extends QuerySampler {
         // Build search source
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder().query(boolQuery).aggregation(userQueryAggregation).size(0);
         // Build search request
-        return new SearchRequest(UBI_QUERIES_INDEX).source(searchSourceBuilder);
+        return new SearchRequest(getUbiQueriesIndex()).source(searchSourceBuilder);
     }
 
     private Map<String, Integer> processSearchResponse(SearchResponse searchResponse) {

@@ -15,6 +15,7 @@ import static org.opensearch.searchrelevance.common.PluginConstants.NAME;
 import static org.opensearch.searchrelevance.common.PluginConstants.QUERYSETS_URL;
 import static org.opensearch.searchrelevance.common.PluginConstants.QUERY_SET_SIZE;
 import static org.opensearch.searchrelevance.common.PluginConstants.SAMPLING;
+import static org.opensearch.searchrelevance.common.PluginConstants.UBI_QUERIES_INDEX_PARAM;
 
 import java.io.IOException;
 import java.util.List;
@@ -33,7 +34,7 @@ import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.searchrelevance.transport.queryset.PostQuerySetAction;
-import org.opensearch.searchrelevance.transport.queryset.PostQuerySetRequest;
+import org.opensearch.searchrelevance.transport.queryset.PostUbiQuerySetRequest;
 import org.opensearch.searchrelevance.ubi.ProbabilityProportionalToSizeQuerySampler;
 import org.opensearch.searchrelevance.utils.TextValidationUtil;
 import org.opensearch.transport.client.node.NodeClient;
@@ -92,7 +93,9 @@ public class RestCreateQuerySetAction extends BaseRestHandler {
             return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.FORBIDDEN, "Query Set Limit Exceeded."));
         }
 
-        PostQuerySetRequest createRequest = new PostQuerySetRequest(name, description, sampling, querySetSize);
+        String ubiQueriesIndex = (String) source.get(UBI_QUERIES_INDEX_PARAM);
+
+        PostUbiQuerySetRequest createRequest = new PostUbiQuerySetRequest(name, description, sampling, querySetSize, ubiQueriesIndex);
 
         return channel -> client.execute(PostQuerySetAction.INSTANCE, createRequest, new ActionListener<IndexResponse>() {
             @Override

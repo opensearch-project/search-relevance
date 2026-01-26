@@ -62,6 +62,44 @@ public class SearchEvaluationExperimentIT extends BaseExperimentIT {
     }
 
     @SneakyThrows
+    public void testSearchExperiment_whenExperimentExists_thenSuccessful() {
+        // Arrange
+        initializeIndexIfNotExist(INDEX_NAME_ESCI);
+
+        String searchConfigurationId = createSimpleSearchConfiguration(INDEX_NAME_ESCI);
+        String querySetId = createQuerySet();
+        String judgmentId = createJudgment();
+        String experimentId = createSearchEvaluationExperiment(querySetId, searchConfigurationId, judgmentId);
+
+        // Wait for experiment to complete
+        pollExperimentUntilCompleted(experimentId);
+
+        // Act - Search for the experiment using _search endpoint
+        String searchBody = "{" + "\"query\": {" + "\"term\": {" + "\"id\": \"" + experimentId + "\"" + "}" + "}" + "}";
+        Response searchResponse = makeRequest(
+            client(),
+            RestRequest.Method.POST.name(),
+            EXPERIMENTS_URI + "/_search",
+            null,
+            toHttpEntity(searchBody),
+            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
+        );
+
+        // Assert
+        Map<String, Object> searchResultJson = entityAsMap(searchResponse);
+        Map<String, Object> hits = (Map<String, Object>) searchResultJson.get("hits");
+        List<Map<String, Object>> hitList = (List<Map<String, Object>>) hits.get("hits");
+        assertFalse(hitList.isEmpty());
+        Map<String, Object> firstHit = hitList.get(0);
+        assertEquals(experimentId, firstHit.get("_id"));
+        Map<String, Object> firstHitSource = (Map<String, Object>) firstHit.get("_source");
+        assertEquals("POINTWISE_EVALUATION", firstHitSource.get("type"));
+        assertEquals(querySetId, firstHitSource.get("querySetId"));
+
+        deleteIndex(INDEX_NAME_ESCI);
+    }
+
+    @SneakyThrows
     private String createSearchEvaluationExperiment(String querySetId, String searchConfigurationId, String judgmentId) {
         String createExperimentBody = replacePlaceholders(
             Files.readString(Path.of(classLoader.getResource("experiment/CreateExperimentPointwiseEvaluation.json").toURI())),
