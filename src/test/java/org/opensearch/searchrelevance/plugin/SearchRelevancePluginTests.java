@@ -201,7 +201,7 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
     }
 
     public void testTotalRestHandlers() {
-        assertEquals(20, plugin.getRestHandlers(Settings.EMPTY, null, null, null, null, null, null).size());
+        assertEquals(21, plugin.getRestHandlers(Settings.EMPTY, null, null, null, null, null, null).size());
     }
 
     public void testQuerySetTransportIsAdded() {
