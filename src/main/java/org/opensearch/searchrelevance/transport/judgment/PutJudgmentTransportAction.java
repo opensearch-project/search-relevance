@@ -11,7 +11,7 @@ import static org.opensearch.searchrelevance.common.MLConstants.LLM_JUDGMENT_RAT
 import static org.opensearch.searchrelevance.common.MLConstants.OVERWRITE_CACHE;
 import static org.opensearch.searchrelevance.common.MLConstants.PROMPT_TEMPLATE;
 import static org.opensearch.searchrelevance.common.MetricsConstants.MODEL_ID;
-import static org.opensearch.searchrelevance.ubi.UbiValidator.checkUbiIndicesExist;
+import static org.opensearch.searchrelevance.ubi.UbiValidator.checkUbiEventsIndexExists;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -111,15 +111,15 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
                 metadata.put(OVERWRITE_CACHE, llmRequest.isOverwriteCache());
             }
             case UBI_JUDGMENT -> {
-                if (!checkUbiIndicesExist(clusterService)) {
-                    throw new SearchRelevanceException("UBI is not initialized", RestStatus.CONFLICT);
-                }
-                ;
                 PutUbiJudgmentRequest ubiRequest = (PutUbiJudgmentRequest) request;
+                if (!checkUbiEventsIndexExists(clusterService, ubiRequest.getUbiEventsIndex())) {
+                    throw new SearchRelevanceException("UBI events index does not exist", RestStatus.CONFLICT);
+                }
                 metadata.put("clickModel", ubiRequest.getClickModel());
                 metadata.put("maxRank", ubiRequest.getMaxRank());
                 metadata.put("startDate", ubiRequest.getStartDate());
                 metadata.put("endDate", ubiRequest.getEndDate());
+                metadata.put("ubiEventsIndex", ubiRequest.getUbiEventsIndex());
             }
             case IMPORT_JUDGMENT -> {
                 PutImportJudgmentRequest importRequest = (PutImportJudgmentRequest) request;

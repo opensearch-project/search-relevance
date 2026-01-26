@@ -7,6 +7,8 @@
  */
 package org.opensearch.searchrelevance.transport.judgment;
 
+import static org.opensearch.searchrelevance.common.PluginConstants.UBI_EVENTS_INDEX;
+
 import java.io.IOException;
 
 import org.opensearch.core.common.io.stream.StreamInput;
@@ -20,6 +22,7 @@ public class PutUbiJudgmentRequest extends PutJudgmentRequest {
     private int maxRank;
     private String startDate;
     private String endDate;
+    private String ubiEventsIndex;
 
     public PutUbiJudgmentRequest(
         @NonNull JudgmentType type,
@@ -28,13 +31,18 @@ public class PutUbiJudgmentRequest extends PutJudgmentRequest {
         @NonNull String clickModel,
         int maxRank,
         @NonNull String startDate,
-        @NonNull String endDate
+        @NonNull String endDate,
+        String ubiEventsIndex
     ) {
         super(type, name, description);
         this.clickModel = clickModel;
         this.maxRank = maxRank;
         this.startDate = startDate;
         this.endDate = endDate;
+        // Default to standard UBI events index if not specified.
+        // Index existence and required fields (query_id, action_name, event_attributes.object.object_id)
+        // are validated at cluster level in PutJudgmentTransportAction before judgment processing begins.
+        this.ubiEventsIndex = ubiEventsIndex != null ? ubiEventsIndex : UBI_EVENTS_INDEX;
     }
 
     public PutUbiJudgmentRequest(StreamInput in) throws IOException {
@@ -43,6 +51,7 @@ public class PutUbiJudgmentRequest extends PutJudgmentRequest {
         this.maxRank = in.readInt();
         this.startDate = in.readString();
         this.endDate = in.readString();
+        this.ubiEventsIndex = in.readString();
     }
 
     @Override
@@ -52,6 +61,7 @@ public class PutUbiJudgmentRequest extends PutJudgmentRequest {
         out.writeInt(maxRank);
         out.writeString(startDate);
         out.writeString(endDate);
+        out.writeString(ubiEventsIndex);
     }
 
     public String getClickModel() {
@@ -68,5 +78,9 @@ public class PutUbiJudgmentRequest extends PutJudgmentRequest {
 
     public String getEndDate() {
         return endDate;
+    }
+
+    public String getUbiEventsIndex() {
+        return ubiEventsIndex;
     }
 }

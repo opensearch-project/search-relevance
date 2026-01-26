@@ -47,9 +47,15 @@ public class UbiJudgmentsProcessor implements BaseJudgmentsProcessor {
         int maxRank = (int) metadata.get("maxRank");
         String startDate = (String) metadata.get("startDate");
         String endDate = (String) metadata.get("endDate");
+        String ubiEventsIndex = (String) metadata.get("ubiEventsIndex");
 
         if (CoecClickModel.CLICK_MODEL_NAME.equalsIgnoreCase(clickModel)) {
-            final CoecClickModelParameters coecClickModelParameters = new CoecClickModelParameters(maxRank, startDate, endDate);
+            final CoecClickModelParameters coecClickModelParameters = new CoecClickModelParameters(
+                maxRank,
+                startDate,
+                endDate,
+                ubiEventsIndex
+            );
             final CoecClickModel coecClickModel = new CoecClickModel(client, coecClickModelParameters);
 
             // Create StepListener for the click model calculation
