@@ -110,11 +110,18 @@ public class LlmJudgmentBWCIT extends AbstractSearchRelevanceRollingUpgradeTestC
         assertEquals("Judgment name should match", judgmentName, judgment.get("name"));
         assertEquals("Judgment type should be LLM_JUDGMENT", "LLM_JUDGMENT", judgment.get("type"));
 
-        // Validate OLD format: should NOT have new fields like promptTemplate and llmJudgmentRatingType
+        // Validate OLD format fields based on BWC version
+        // promptTemplate was introduced in 3.5.0 (PR #264), so versions before 3.5.0 should NOT have it
         Map<String, Object> metadata = (Map<String, Object>) judgment.get("metadata");
         if (metadata != null) {
-            assertNull("OLD format should not have promptTemplate", metadata.get("promptTemplate"));
-            assertNull("OLD format should not have llmJudgmentRatingType", metadata.get("llmJudgmentRatingType"));
+            String bwcVersion = getBWCVersion();
+            if (bwcVersion != null && (bwcVersion.startsWith("3.3") || bwcVersion.startsWith("3.4"))) {
+                assertNull("OLD format (pre-3.5.0) should not have promptTemplate", metadata.get("promptTemplate"));
+                assertNull("OLD format (pre-3.5.0) should not have llmJudgmentRatingType", metadata.get("llmJudgmentRatingType"));
+            } else {
+                // For 3.5.0+, promptTemplate is supported and a default value is stored
+                assertNotNull("3.5.0+ format should have default promptTemplate", metadata.get("promptTemplate"));
+            }
         }
     }
 
