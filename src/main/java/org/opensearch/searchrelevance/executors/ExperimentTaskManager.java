@@ -149,10 +149,12 @@ public class ExperimentTaskManager {
             return executeVariantAsync(params);
         }, isCancelled, ActionListener.wrap(results -> {
             experimentTaskContexts.remove(experimentId);
-            // If resultFuture hasn't been completed yet (e.g., cancelled before any variants ran),
-            // complete it exceptionally so callers don't wait forever
-            if (!resultFuture.isDone()) {
-                resultFuture.completeExceptionally(new TimeoutException("Experiment cancelled or no variants processed"));
+            // resultFuture is completed by ExperimentTaskContext.finishExperiment() when all
+            // variant DAO callbacks fire completeVariantSuccess/Failure. Don't interfere here
+            // for the normal flow — the async DAO writes may still be in-flight.
+            // Only complete exceptionally if cancelled before any variants were processed.
+            if (isCancelled.get() && !resultFuture.isDone()) {
+                resultFuture.completeExceptionally(new TimeoutException("Experiment cancelled before variants could be processed"));
             }
             log.debug("Batched variant execution complete for experiment {}", experimentId);
         }, e -> {
@@ -175,11 +177,15 @@ public class ExperimentTaskManager {
         CompletableFuture<Void> future = new CompletableFuture<>();
 
         if (params.getTaskContext().getHasFailure().get()) {
+            // Count the skipped variant so ExperimentTaskContext.remainingVariants reaches 0
+            params.getTaskContext().completeVariantFailure();
             future.complete(null);
             return future;
         }
         if (params.getCancellationToken() != null && params.getCancellationToken().isCancelled()) {
             log.info("Cancelled variant task for experiment {}", params.getExperimentId());
+            // Count the skipped variant so ExperimentTaskContext.remainingVariants reaches 0
+            params.getTaskContext().completeVariantFailure();
             TimeoutException exception = new TimeoutException("Timed out at variant task");
             params.getTaskContext().getResultFuture().completeExceptionally(exception);
             future.completeExceptionally(exception);
@@ -215,6 +221,8 @@ public class ExperimentTaskManager {
                     );
                     future.complete(null);
                 } catch (Exception e) {
+                    // Ensure variant is counted even when response processing throws
+                    params.getTaskContext().completeVariantFailure();
                     future.completeExceptionally(e);
                 }
             }
@@ -225,6 +233,8 @@ public class ExperimentTaskManager {
                     handleSearchFailure(e, params.getExperimentVariant(), params.getExperimentId(), evaluationId, params.getTaskContext());
                     future.complete(null);
                 } catch (Exception ex) {
+                    // Ensure variant is counted even when failure handling throws
+                    params.getTaskContext().completeVariantFailure();
                     future.completeExceptionally(ex);
                 }
             }
