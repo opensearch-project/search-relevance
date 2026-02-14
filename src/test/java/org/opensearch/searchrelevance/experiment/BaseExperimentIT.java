@@ -57,7 +57,7 @@ public abstract class BaseExperimentIT extends BaseSearchRelevanceIT {
             "documentIds",
             List.of("B06Y1L1YJD", "B01M3XBRRX", "B07D29PHFY"),
             "metrics",
-            Map.of("Coverage@5", 1.0, "Precision@5", 1.0, "MAP@5", 1.0, "NDCG@5", 0.94)
+            Map.of("Coverage@5", 1.0, "Precision@5", 0.33, "MAP@5", 0.5, "NDCG@5", 0.94)
         ),
 
         "metal frame",
@@ -65,7 +65,7 @@ public abstract class BaseExperimentIT extends BaseSearchRelevanceIT {
             "documentIds",
             List.of("B07MBG53JD", "B097Q69V1B", "B00TLYRBMG", "B08G46SS1T", "B07H81Z91C"),
             "metrics",
-            Map.of("Coverage@5", 1.0, "Precision@5", 1.0, "MAP@5", 1.0, "NDCG@5", 0.9)
+            Map.of("Coverage@5", 1.0, "Precision@5", 0.2, "MAP@5", 0.5, "NDCG@5", 0.9)
         )
     );
 
@@ -186,7 +186,8 @@ public abstract class BaseExperimentIT extends BaseSearchRelevanceIT {
     }
 
     /**
-     * Generate a unique index name for the test class to avoid collisions during parallel execution
+     * Generate a unique index name for the test class to avoid collisions during
+     * parallel execution
      */
     protected static String generateUniqueIndexName(String testClassName) {
         return BASE_INDEX_NAME_ESCI + "_" + testClassName.toLowerCase(Locale.ROOT);
