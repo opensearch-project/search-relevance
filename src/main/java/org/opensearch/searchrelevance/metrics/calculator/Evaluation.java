@@ -16,17 +16,26 @@ public class Evaluation {
     public static final String METRICS_PRECISION_AT = "Precision@";
     public static final String METRICS_MEAN_AVERAGE_PRECISION_AT = "MAP@";
     public static final String METRICS_NORMALIZED_DISCOUNTED_CUMULATIVE_GAIN_AT = "NDCG@";
+    public static final String METRICS_DISCOUNTED_CUMULATIVE_GAIN_AT = "DCG@";
+    public static final String METRICS_RECALL_AT = "Recall@";
+    public static final String METRICS_MEAN_RECIPROCAL_RANK = "MRR";
 
     /**
-     * Precision@K - measures precision at a specific rank k
+     * Precision@K - measures precision at a specific rank k.
+     *
+     * @param docIds         ordered list of document IDs returned by search
+     * @param judgmentScores mapping from doc ID to its judgment rating
+     * @param k              rank cutoff
+     * @param threshold      binary relevance threshold; a doc is relevant when its
+     *                       rating {@code >= threshold} and {@code > 0}
      */
-    public static double calculatePrecisionAtK(List<String> docIds, Map<String, String> judgmentScores, int k) {
+    public static double calculatePrecisionAtK(List<String> docIds, Map<String, String> judgmentScores, int k, double threshold) {
         int relevantCount = 0;
         int count = 0;
 
         for (String docId : docIds) {
             if (count >= k) break;
-            if (judgmentScores.containsKey(docId) && Double.valueOf(judgmentScores.get(docId)) > 0) {
+            if (isRelevant(docId, judgmentScores, threshold)) {
                 relevantCount++;
             }
             count++;
@@ -37,14 +46,18 @@ public class Evaluation {
     }
 
     /**
+     * Count the total number of relevant documents in the judgment set.
      *
-     * @param judgmentRatings the docid->judgment mapping for a query
-     * @return the total number of documents with judgment > 0 in the ratings
+     * @param judgmentRatings the docid-&gt;judgment mapping for a query
+     * @param threshold       binary relevance threshold
+     * @return the number of documents whose judgment {@code >= threshold} and
+     *         {@code > 0}
      */
-    private static int countRelevant(Map<String, String> judgmentRatings) {
+    private static int countRelevant(Map<String, String> judgmentRatings, double threshold) {
         int numRel = 0;
         for (String value : judgmentRatings.values()) {
-            if (Double.valueOf(value) > 0) {
+            double v = Double.parseDouble(value);
+            if (v >= threshold && v > 0) {
                 numRel++;
             }
         }
@@ -52,16 +65,32 @@ public class Evaluation {
     }
 
     /**
-     * Mean Average Precision (MAP)
+     * Determine whether a document is considered relevant given the threshold.
      */
-    public static double calculateMAPAtK(List<String> docIds, Map<String, String> judgmentScores, int k) {
+    private static boolean isRelevant(String docId, Map<String, String> judgmentScores, double threshold) {
+        if (!judgmentScores.containsKey(docId)) {
+            return false;
+        }
+        double score = Double.parseDouble(judgmentScores.get(docId));
+        return score >= threshold && score > 0;
+    }
+
+    /**
+     * Mean Average Precision (MAP).
+     *
+     * @param docIds         ordered list of document IDs returned by search
+     * @param judgmentScores mapping from doc ID to its judgment rating
+     * @param k              rank cutoff
+     * @param threshold      binary relevance threshold
+     */
+    public static double calculateMAPAtK(List<String> docIds, Map<String, String> judgmentScores, int k, double threshold) {
         double sum = 0.0;
         int relevantCount = 0;
-        int numRel = countRelevant(judgmentScores);
+        int numRel = countRelevant(judgmentScores, threshold);
         int size = Math.min(k, docIds.size());
         for (int i = 0; i < size; i++) {
             String docId = docIds.get(i);
-            if (judgmentScores.containsKey(docId) && Double.valueOf(judgmentScores.get(docId)) > 0) {
+            if (isRelevant(docId, judgmentScores, threshold)) {
                 relevantCount++;
                 sum += (double) relevantCount / (i + 1);
             }

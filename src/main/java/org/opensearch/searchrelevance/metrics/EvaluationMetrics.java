@@ -15,6 +15,7 @@ import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.METRI
 import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.calculateMAPAtK;
 import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.calculateNDCGAtK;
 import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.calculatePrecisionAtK;
+import static org.opensearch.searchrelevance.metrics.calculator.JudgmentThresholdCalculator.computeThreshold;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -35,7 +36,13 @@ public class EvaluationMetrics {
     }
 
     /**
-     * calculate evaluation metrics with evaluation calculators.
+     * Calculate evaluation metrics with evaluation calculators.
+     *
+     * <p>
+     * A dynamic binary-relevance threshold is computed from the judgment
+     * distribution
+     * and applied to Precision@K and MAP@K. NDCG uses graded relevance and is not
+     * affected.
      */
     public static List<Map<String, Object>> calculateEvaluationMetrics(List<String> docIds, Map<String, String> judgments, int k) {
         List<Map<String, Object>> metrics = new ArrayList<>();
@@ -47,11 +54,16 @@ public class EvaluationMetrics {
 
         double coverage = totalCount > 0 ? Math.round((double) totalDocsWithScores / totalCount * 100.0) / 100.0 : 0.0;
 
-        // TODO: it's not guarantee that each docId will have its score, especially for UBI data.
-        // Need to define a reliable rate. say, coverage > 80%, then the results become reliable
+        // Compute dynamic threshold: T = max(0.5 * J_max, P90)
+        double threshold = computeThreshold(judgments);
+
+        // TODO: it's not guarantee that each docId will have its score, especially for
+        // UBI data.
+        // Need to define a reliable rate. say, coverage > 80%, then the results become
+        // reliable
         addMetric(metrics, String.format(Locale.ROOT, "Coverage@%d", k), coverage);
-        addMetric(metrics, METRICS_PRECISION_AT + k, calculatePrecisionAtK(docIds, judgments, k));
-        addMetric(metrics, METRICS_MEAN_AVERAGE_PRECISION_AT + k, calculateMAPAtK(docIds, judgments, k));
+        addMetric(metrics, METRICS_PRECISION_AT + k, calculatePrecisionAtK(docIds, judgments, k, threshold));
+        addMetric(metrics, METRICS_MEAN_AVERAGE_PRECISION_AT + k, calculateMAPAtK(docIds, judgments, k, threshold));
         addMetric(metrics, METRICS_NORMALIZED_DISCOUNTED_CUMULATIVE_GAIN_AT + k, calculateNDCGAtK(docIds, judgments, k));
 
         return metrics;
