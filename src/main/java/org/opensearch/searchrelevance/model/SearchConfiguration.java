@@ -76,4 +76,8 @@ public class SearchConfiguration implements ToXContentObject {
         return searchPipeline;
     }
 
+    public String description() {
+        return description;
+    }
+
 }
