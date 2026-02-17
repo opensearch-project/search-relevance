@@ -35,7 +35,8 @@ import com.google.common.collect.ImmutableList;
 import lombok.SneakyThrows;
 
 /**
- * Base class for experiment integration tests containing common logic and setup methods.
+ * Base class for experiment integration tests containing common logic and setup
+ * methods.
  */
 public abstract class BaseExperimentIT extends BaseSearchRelevanceIT {
 
@@ -57,7 +58,7 @@ public abstract class BaseExperimentIT extends BaseSearchRelevanceIT {
             "documentIds",
             List.of("B06Y1L1YJD", "B01M3XBRRX", "B07D29PHFY"),
             "metrics",
-            Map.of("Coverage@5", 1.0, "Precision@5", 0.33, "MAP@5", 0.5, "NDCG@5", 0.94)
+            Map.of("Coverage@5", 1.0, "Precision@5", 0.33, "MAP@5", 0.5, "NDCG@5", 0.94, "Recall@5", 1.0, "MRR", 0.5, "DCG@5", 1.43)
         ),
 
         "metal frame",
@@ -65,7 +66,7 @@ public abstract class BaseExperimentIT extends BaseSearchRelevanceIT {
             "documentIds",
             List.of("B07MBG53JD", "B097Q69V1B", "B00TLYRBMG", "B08G46SS1T", "B07H81Z91C"),
             "metrics",
-            Map.of("Coverage@5", 1.0, "Precision@5", 0.2, "MAP@5", 0.5, "NDCG@5", 0.9)
+            Map.of("Coverage@5", 1.0, "Precision@5", 0.2, "MAP@5", 0.5, "NDCG@5", 0.9, "Recall@5", 1.0, "MRR", 0.5, "DCG@5", 1.68)
         )
     );
 

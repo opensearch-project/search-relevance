@@ -28,8 +28,10 @@ import com.google.common.collect.ImmutableList;
 import lombok.SneakyThrows;
 
 /**
- * Integration tests for search evaluation experiments (POINTWISE_EVALUATION type).
- * This test class verifies the functionality of running pointwise evaluation experiments
+ * Integration tests for search evaluation experiments (POINTWISE_EVALUATION
+ * type).
+ * This test class verifies the functionality of running pointwise evaluation
+ * experiments
  * that evaluate search configurations against query sets and judgments.
  */
 @ThreadLeakScope(ThreadLeakScope.Scope.NONE)
@@ -211,7 +213,7 @@ public class SearchEvaluationExperimentIT extends BaseExperimentIT {
             List<Map> metrics = (List<Map>) evaluationSource.get("metrics");
             assertNotNull("Metrics should exist", metrics);
             assertFalse("Metrics should not be empty", metrics.isEmpty());
-            assertEquals("Should have 4 metrics", 4, metrics.size());
+            assertEquals("Should have 7 metrics", 7, metrics.size());
 
             // Verify we have document IDs
             List<String> documentIds = (List<String>) evaluationSource.get("documentIds");
