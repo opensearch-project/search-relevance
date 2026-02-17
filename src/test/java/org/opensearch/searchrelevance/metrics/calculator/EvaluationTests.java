@@ -194,21 +194,39 @@ public class EvaluationTests extends OpenSearchTestCase {
     // Graded 1-5 scale
     // ----------------------------------------------------------------
 
+    public void testGraded1To5Scale() {
+        // Ratings: 1,2,3,4,5,1,2,3,4,5
+        Map<String, String> graded = new LinkedHashMap<>();
+        List<String> docs = new ArrayList<>();
+        for (int i = 0; i < 10; i++) {
+            String id = "g" + i;
+            docs.add(id);
+            graded.put(id, Integer.toString((i % 5) + 1));
+        }
+        // J_max=5, sorted=[1,1,2,2,3,3,4,4,5,5], P90 index = ceil(0.9*10)-1 = 8 ->
+        // value=5
+        // T = max(2.5, 5) = 5
+        double t = JudgmentThresholdCalculator.computeThreshold(graded);
+        assertEquals(5.0, t, 0.001);
+        // Relevant: g4(5), g9(5) -> 2 out of 10 = 0.2
+        double p = Evaluation.calculatePrecisionAtK(docs, graded, 10, t);
+        assertEquals(0.2, p, 0.001);
+    }
+
     // ----------------------------------------------------------------
     // Recall@K tests with dynamic threshold
     // ----------------------------------------------------------------
 
     public void testCalculateRecallAtK() {
         // With threshold=2: 7 total relevant docs in judgments (d2, d5, d8, d11, d14,
-        // d17,
-        // d20)
+        // d17, d20)
         // Top 20: all 7 are retrieved -> Recall = 7/7 = 1.0
         double recall = Evaluation.calculateRecallAtK(this.results, this.judgments, 20, threshold);
         assertEquals(1.0, recall, 0.001);
 
         // Top 5: d1(1), d2(2), d3(0), d4(1), d5(2)
         // Relevant in top 5: d2, d5 (2 docs)
-        // Recall@5 = 2/7 ≈ 0.29
+        // Recall@5 = 2/7 ~= 0.29
         recall = Evaluation.calculateRecallAtK(this.results, this.judgments, 5, threshold);
         assertEquals(0.29, recall, 0.001);
 
