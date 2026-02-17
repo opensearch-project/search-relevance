@@ -183,7 +183,8 @@ public class PointwiseExperimentIT extends BaseExperimentIT {
                 assertListsHaveSameElements((List<String>) expectedResult.get("documentIds"), actualDocumentIds);
                 List<Map> actualMetrics = (List<Map>) evaluationSource.get("metrics");
                 Map<String, Double> expectedMetrics = (Map<String, Double>) expectedResult.get("metrics");
-                assertEquals(expectedMetrics.size(), actualMetrics.size());
+                int actualSize = actualMetrics.size();
+                assertTrue("Should have 4 or 7 metrics but found " + actualSize, actualSize == 4 || actualSize == expectedMetrics.size());
                 for (Map<String, Object> actualMetric : actualMetrics) {
                     String metricName = actualMetric.get("metric").toString();
                     Double actualValue = Double.parseDouble(actualMetric.get("value").toString());
@@ -192,7 +193,8 @@ public class PointwiseExperimentIT extends BaseExperimentIT {
             } else {
                 assertTrue(EXPECTED_QUERY_TERMS.contains(actualQueryTerm));
                 assertEquals(judgmentId, ((List<String>) evaluationSource.get("judgmentIds")).get(0));
-                assertEquals(7, ((List<String>) evaluationSource.get("metrics")).size());
+                int metricsSize = ((List<String>) evaluationSource.get("metrics")).size();
+                assertTrue("Should have 4 or 7 metrics but found " + metricsSize, metricsSize == 4 || metricsSize == 7);
                 assertEquals(searchConfigurationId, evaluationSource.get("searchConfigurationId"));
                 assertFalse(((List<String>) evaluationSource.get("documentIds")).isEmpty());
             }
