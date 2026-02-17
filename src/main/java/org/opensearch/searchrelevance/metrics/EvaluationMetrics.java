@@ -9,12 +9,18 @@ package org.opensearch.searchrelevance.metrics;
 
 import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_METRIC;
 import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_VALUE;
+import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.METRICS_DISCOUNTED_CUMULATIVE_GAIN_AT;
 import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.METRICS_MEAN_AVERAGE_PRECISION_AT;
+import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.METRICS_MEAN_RECIPROCAL_RANK;
 import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.METRICS_NORMALIZED_DISCOUNTED_CUMULATIVE_GAIN_AT;
 import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.METRICS_PRECISION_AT;
+import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.METRICS_RECALL_AT;
+import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.calculateDCGAtK;
 import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.calculateMAPAtK;
+import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.calculateMRR;
 import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.calculateNDCGAtK;
 import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.calculatePrecisionAtK;
+import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.calculateRecallAtK;
 import static org.opensearch.searchrelevance.metrics.calculator.JudgmentThresholdCalculator.computeThreshold;
 
 import java.util.ArrayList;
@@ -63,7 +69,10 @@ public class EvaluationMetrics {
         // reliable
         addMetric(metrics, String.format(Locale.ROOT, "Coverage@%d", k), coverage);
         addMetric(metrics, METRICS_PRECISION_AT + k, calculatePrecisionAtK(docIds, judgments, k, threshold));
+        addMetric(metrics, METRICS_RECALL_AT + k, calculateRecallAtK(docIds, judgments, k, threshold));
         addMetric(metrics, METRICS_MEAN_AVERAGE_PRECISION_AT + k, calculateMAPAtK(docIds, judgments, k, threshold));
+        addMetric(metrics, METRICS_MEAN_RECIPROCAL_RANK, calculateMRR(docIds, judgments, k, threshold));
+        addMetric(metrics, METRICS_DISCOUNTED_CUMULATIVE_GAIN_AT + k, calculateDCGAtK(docIds, judgments, k));
         addMetric(metrics, METRICS_NORMALIZED_DISCOUNTED_CUMULATIVE_GAIN_AT + k, calculateNDCGAtK(docIds, judgments, k));
 
         return metrics;

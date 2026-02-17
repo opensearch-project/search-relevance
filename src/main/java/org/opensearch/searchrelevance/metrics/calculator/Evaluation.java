@@ -95,8 +95,10 @@ public class Evaluation {
                 sum += (double) relevantCount / (i + 1);
             }
         }
-        // MAP is computed over the full set of relevant documents, not just the ones retrieved.
-        // see https://en.wikipedia.org/wiki/Evaluation_measures_(information_retrieval)#Average_precision
+        // MAP is computed over the full set of relevant documents, not just the ones
+        // retrieved.
+        // see
+        // https://en.wikipedia.org/wiki/Evaluation_measures_(information_retrieval)#Average_precision
         double map = relevantCount > 0 ? sum / numRel : 0.0;
         return Math.round(map * 100.0) / 100.0;
     }
@@ -105,20 +107,74 @@ public class Evaluation {
      * Normalized Discounted Cumulative Gain (NDCG)
      */
     public static double calculateNDCGAtK(List<String> docIds, Map<String, String> judgmentScores, int k) {
-        double dcg = 0.0;
+        double dcg = calculateDCGAtK(docIds, judgmentScores, k);
         double idcg = calculateIDCG(docIds, judgmentScores, k);
+
+        double ndcg = idcg > 0 ? dcg / idcg : 0.0;
+        return Math.round(ndcg * 100.0) / 100.0;
+    }
+
+    /**
+     * Recall@K - measures the proportion of relevant documents retrieved in the top
+     * K.
+     *
+     * @param docIds         ordered list of document IDs returned by search
+     * @param judgmentScores mapping from doc ID to its judgment rating
+     * @param k              rank cutoff
+     * @param threshold      binary relevance threshold
+     */
+    public static double calculateRecallAtK(List<String> docIds, Map<String, String> judgmentScores, int k, double threshold) {
+        int relevantInTopK = 0;
+        int size = Math.min(k, docIds.size());
+
+        for (int i = 0; i < size; i++) {
+            String docId = docIds.get(i);
+            if (isRelevant(docId, judgmentScores, threshold)) {
+                relevantInTopK++;
+            }
+        }
+
+        int totalRelevant = countRelevant(judgmentScores, threshold);
+        double recall = totalRelevant > 0 ? (double) relevantInTopK / totalRelevant : 0.0;
+        return Math.round(recall * 100.0) / 100.0;
+    }
+
+    /**
+     * Mean Reciprocal Rank (MRR) - 1 / Rank of the first relevant document.
+     *
+     * @param docIds         ordered list of document IDs returned by search
+     * @param judgmentScores mapping from doc ID to its judgment rating
+     * @param k              rank cutoff (MRR typically considers the first relevant
+     *                       doc within K)
+     * @param threshold      binary relevance threshold
+     */
+    public static double calculateMRR(List<String> docIds, Map<String, String> judgmentScores, int k, double threshold) {
+        int size = Math.min(k, docIds.size());
+        for (int i = 0; i < size; i++) {
+            String docId = docIds.get(i);
+            if (isRelevant(docId, judgmentScores, threshold)) {
+                // Rank is i + 1 (1-based)
+                return Math.round((1.0 / (i + 1)) * 100.0) / 100.0;
+            }
+        }
+        return 0.0;
+    }
+
+    /**
+     * Discounted Cumulative Gain (DCG@K) - non-normalized version of NDCG.
+     */
+    public static double calculateDCGAtK(List<String> docIds, Map<String, String> judgmentScores, int k) {
+        double dcg = 0.0;
         int size = Math.min(k, docIds.size());
 
         for (int i = 0; i < size; i++) {
             String docId = docIds.get(i);
             if (judgmentScores.containsKey(docId)) {
-                double relevance = Double.valueOf(judgmentScores.get(docId));
+                double relevance = Double.parseDouble(judgmentScores.get(docId));
                 dcg += (Math.pow(2, relevance) - 1) / (Math.log(i + 2) / Math.log(2));
             }
         }
-
-        double ndcg = idcg > 0 ? dcg / idcg : 0.0;
-        return Math.round(ndcg * 100.0) / 100.0;
+        return Math.round(dcg * 100.0) / 100.0;
     }
 
     private static double calculateIDCG(List<String> docIds, Map<String, String> judgmentScores, int k) {
@@ -130,8 +186,11 @@ public class Evaluation {
         }
 
         Collections.sort(relevanceScores, Collections.reverseOrder());
-        // we truncate the list to k if the list is larger than k. Otherwise we keep the full list
-        relevanceScores = relevanceScores.subList(0, Math.min(relevanceScores.size(), k));
+        // we truncate the list to k if the list is larger than k. Otherwise we keep the
+        // full list
+        if (relevanceScores.size() > k) {
+            relevanceScores = relevanceScores.subList(0, k);
+        }
         double idcg = 0.0;
 
         for (int i = 0; i < relevanceScores.size(); i++) {
