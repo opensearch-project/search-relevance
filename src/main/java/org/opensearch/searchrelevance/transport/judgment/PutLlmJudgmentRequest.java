@@ -10,6 +10,7 @@ package org.opensearch.searchrelevance.transport.judgment;
 import java.io.IOException;
 import java.util.List;
 
+import org.opensearch.Version;
 import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.core.common.io.stream.StreamOutput;
 import org.opensearch.searchrelevance.model.JudgmentType;
@@ -106,7 +107,11 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         this.promptTemplate = in.readOptionalString();
         this.llmJudgmentRatingType = in.readOptionalWriteable(LLMJudgmentRatingType::readFromStream);
         this.overwriteCache = Boolean.TRUE.equals(in.readOptionalBoolean());
-        this.expandCoverage = Boolean.TRUE.equals(in.readOptionalBoolean());
+        if (in.getVersion().onOrAfter(Version.V_3_6_0)) {
+            this.expandCoverage = Boolean.TRUE.equals(in.readOptionalBoolean());
+        } else {
+            this.expandCoverage = false;
+        }
     }
 
     @Override
@@ -122,7 +127,9 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         out.writeOptionalString(promptTemplate);
         out.writeOptionalWriteable(llmJudgmentRatingType);
         out.writeOptionalBoolean(overwriteCache);
-        out.writeOptionalBoolean(expandCoverage);
+        if (out.getVersion().onOrAfter(Version.V_3_6_0)) {
+            out.writeOptionalBoolean(expandCoverage);
+        }
     }
 
     public String getModelId() {
