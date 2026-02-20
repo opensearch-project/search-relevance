@@ -10,6 +10,7 @@ package org.opensearch.searchrelevance.plugin;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_CACHE_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_JOBS_INDEX;
+import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_JUDGMENT_CACHE_TTL;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_ENABLED;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_MINIMUM_INTERVAL;
@@ -222,6 +223,7 @@ public class SearchRelevancePlugin extends Plugin
         );
         this.metricsHelper = new MetricsHelper(clusterService, client, judgmentDao, evaluationResultDao, experimentVariantDao);
         this.settingsAccessor = new SearchRelevanceSettingsAccessor(clusterService, environment.settings());
+        this.judgmentCacheDao.setSettingsAccessor(this.settingsAccessor);
         this.clusterUtil = new ClusterUtil(clusterService);
         this.cronUtil = new CronUtil(settingsAccessor);
         this.infoStatsManager = new InfoStatsManager(settingsAccessor);
@@ -405,7 +407,8 @@ public class SearchRelevancePlugin extends Plugin
             SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT,
             SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_ENABLED,
             SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_TIMEOUT,
-            SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_MINIMUM_INTERVAL
+            SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_MINIMUM_INTERVAL,
+            SEARCH_RELEVANCE_JUDGMENT_CACHE_TTL
         );
     }
 

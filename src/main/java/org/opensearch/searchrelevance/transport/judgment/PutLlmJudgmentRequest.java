@@ -57,6 +57,13 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
      */
     private boolean overwriteCache;
 
+    /**
+     * Flag to enable expanded document coverage for hybrid search optimization.
+     * When true, pools documents from 3 hybrid weight configurations [0.0, 0.5, 1.0]
+     * instead of executing a single search. Requires a hybrid search configuration.
+     */
+    private boolean expandCoverage;
+
     public PutLlmJudgmentRequest(
         @NonNull JudgmentType type,
         @NonNull String name,
@@ -70,7 +77,8 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         boolean ignoreFailure,
         String promptTemplate,
         LLMJudgmentRatingType llmJudgmentRatingType,
-        boolean overwriteCache
+        boolean overwriteCache,
+        boolean expandCoverage
     ) {
         super(type, name, description);
         this.modelId = modelId;
@@ -83,6 +91,7 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         this.promptTemplate = promptTemplate;
         this.llmJudgmentRatingType = llmJudgmentRatingType;
         this.overwriteCache = overwriteCache;
+        this.expandCoverage = expandCoverage;
     }
 
     public PutLlmJudgmentRequest(StreamInput in) throws IOException {
@@ -97,6 +106,7 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         this.promptTemplate = in.readOptionalString();
         this.llmJudgmentRatingType = in.readOptionalWriteable(LLMJudgmentRatingType::readFromStream);
         this.overwriteCache = Boolean.TRUE.equals(in.readOptionalBoolean());
+        this.expandCoverage = Boolean.TRUE.equals(in.readOptionalBoolean());
     }
 
     @Override
@@ -112,6 +122,7 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         out.writeOptionalString(promptTemplate);
         out.writeOptionalWriteable(llmJudgmentRatingType);
         out.writeOptionalBoolean(overwriteCache);
+        out.writeOptionalBoolean(expandCoverage);
     }
 
     public String getModelId() {
@@ -152,6 +163,10 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
 
     public boolean isOverwriteCache() {
         return overwriteCache;
+    }
+
+    public boolean isExpandCoverage() {
+        return expandCoverage;
     }
 
 }

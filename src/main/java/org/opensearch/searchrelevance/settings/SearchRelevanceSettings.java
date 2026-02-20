@@ -85,6 +85,19 @@ public class SearchRelevanceSettings {
      * times the jobs are run will be greater than or equal to the minimum
      * interval defined here.
      */
+    /**
+     * Judgment cache TTL. When set to a positive value, cache entries older than this TTL
+     * are deleted lazily at the start of each judgment generation.
+     * Default: -1 (disabled — infinite retention, no data deletion).
+     */
+    public static final Setting<TimeValue> SEARCH_RELEVANCE_JUDGMENT_CACHE_TTL = Setting.timeSetting(
+        "plugins.search_relevance.judgment_cache.ttl",
+        TimeValue.MINUS_ONE,
+        TimeValue.MINUS_ONE,
+        Setting.Property.NodeScope,
+        Setting.Property.Dynamic
+    );
+
     public static final Setting<TimeValue> SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_MINIMUM_INTERVAL = Setting.positiveTimeSetting(
         "plugins.search_relevance.scheduled_experiments_minimum_interval",
         TimeValue.timeValueSeconds(1),

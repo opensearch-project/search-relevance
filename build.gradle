@@ -217,6 +217,9 @@ dependencies {
     api "org.opensearch:opensearch:${opensearch_version}"
     api group: 'org.opensearch', name:'opensearch-ml-client', version: "${opensearch_build}"
     compileOnly "org.opensearch:opensearch-job-scheduler-spi:${opensearch_build}"
+    compileOnly("org.opensearch:opensearch-neural-search:${opensearch_build}") {
+        transitive = false
+    }
     implementation group: 'com.google.guava', name: 'guava', version:'33.4.8-jre'
     compileOnly group: 'org.apache.commons', name: 'commons-lang3', version: '3.20.0'
     implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.20.0'

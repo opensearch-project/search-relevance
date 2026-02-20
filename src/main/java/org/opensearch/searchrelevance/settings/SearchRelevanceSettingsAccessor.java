@@ -29,6 +29,8 @@ public class SearchRelevanceSettingsAccessor {
     private volatile boolean isScheduledExperimentsEnabled;
     @Getter
     private volatile TimeValue scheduledExperimentsTimeout;
+
+    private volatile TimeValue judgmentCacheTtl;
     @Getter
     private volatile TimeValue scheduledExperimentsMinimumInterval;
 
@@ -45,6 +47,7 @@ public class SearchRelevanceSettingsAccessor {
         isScheduledExperimentsEnabled = SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_ENABLED.get(settings);
         scheduledExperimentsTimeout = SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_TIMEOUT.get(settings);
         scheduledExperimentsMinimumInterval = SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_MINIMUM_INTERVAL.get(settings);
+        judgmentCacheTtl = SearchRelevanceSettings.SEARCH_RELEVANCE_JUDGMENT_CACHE_TTL.get(settings);
         registerSettingsCallbacks(clusterService);
     }
 
@@ -80,5 +83,14 @@ public class SearchRelevanceSettingsAccessor {
             .addSettingsUpdateConsumer(SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_MINIMUM_INTERVAL, value -> {
                 scheduledExperimentsMinimumInterval = value;
             });
+
+        clusterService.getClusterSettings()
+            .addSettingsUpdateConsumer(SearchRelevanceSettings.SEARCH_RELEVANCE_JUDGMENT_CACHE_TTL, value -> {
+                judgmentCacheTtl = value;
+            });
+    }
+
+    public TimeValue getJudgmentCacheTtl() {
+        return judgmentCacheTtl;
     }
 }
