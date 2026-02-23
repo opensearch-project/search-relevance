@@ -1,0 +1,12 @@
+{
+  "name": "LLM Judgment Expand Coverage",
+  "type": "LLM_JUDGMENT",
+  "querySetId": "{{querySetId}}",
+  "searchConfigurationList": ["{{searchConfigId}}"],
+  "modelId": "test_model_id",
+  "size": 5,
+  "tokenLimit": 4000,
+  "contextFields": ["name", "description"],
+  "ignoreFailure": false,
+  "expandCoverage": true
+}

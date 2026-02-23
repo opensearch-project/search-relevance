@@ -11,6 +11,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_CACHE_INDEX;
+import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_JUDGMENT_CACHE_TTL;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_ENABLED;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_MINIMUM_INTERVAL;
@@ -149,7 +150,8 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
                         SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT,
                         SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_ENABLED,
                         SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_TIMEOUT,
-                        SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_MINIMUM_INTERVAL
+                        SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_MINIMUM_INTERVAL,
+                        SEARCH_RELEVANCE_JUDGMENT_CACHE_TTL
                     )
                 )
             )
@@ -229,7 +231,7 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
 
     public void testGetSettings() {
         List<Setting<?>> settings = plugin.getSettings();
-        assertEquals(6, settings.size());
+        assertEquals(7, settings.size());
 
         Setting<?> setting0 = settings.get(0);
         assertEquals("plugins.search_relevance.workbench_enabled", setting0.getKey());
@@ -254,5 +256,43 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
         Setting<?> setting5 = settings.get(5);
         assertEquals("plugins.search_relevance.scheduled_experiments_minimum_interval", setting5.getKey());
         assertEquals(TimeValue.timeValueSeconds(1), setting5.get(Settings.EMPTY));
+
+        Setting<?> setting6 = settings.get(6);
+        assertEquals("plugins.search_relevance.judgment_cache.ttl", setting6.getKey());
+        assertEquals(TimeValue.MINUS_ONE, setting6.get(Settings.EMPTY));
+    }
+
+    public void testJudgmentCacheTtlSetting_DefaultIsDisabled() {
+        TimeValue value = SEARCH_RELEVANCE_JUDGMENT_CACHE_TTL.get(Settings.EMPTY);
+        assertEquals(TimeValue.MINUS_ONE, value);
+        assertTrue("Default TTL should be negative (disabled)", value.millis() < 0);
+    }
+
+    public void testJudgmentCacheTtlSetting_AcceptsValidValues() {
+        Settings s90d = Settings.builder().put("plugins.search_relevance.judgment_cache.ttl", "90d").build();
+        assertEquals(TimeValue.timeValueDays(90), SEARCH_RELEVANCE_JUDGMENT_CACHE_TTL.get(s90d));
+
+        Settings s30d = Settings.builder().put("plugins.search_relevance.judgment_cache.ttl", "30d").build();
+        assertEquals(TimeValue.timeValueDays(30), SEARCH_RELEVANCE_JUDGMENT_CACHE_TTL.get(s30d));
+
+        Settings s24h = Settings.builder().put("plugins.search_relevance.judgment_cache.ttl", "24h").build();
+        assertEquals(TimeValue.timeValueHours(24), SEARCH_RELEVANCE_JUDGMENT_CACHE_TTL.get(s24h));
+
+        Settings sDisabled = Settings.builder().put("plugins.search_relevance.judgment_cache.ttl", "-1").build();
+        assertEquals(TimeValue.MINUS_ONE, SEARCH_RELEVANCE_JUDGMENT_CACHE_TTL.get(sDisabled));
+    }
+
+    public void testJudgmentCacheTtlSetting_RejectsInvalidFormat() {
+        assertThrows(IllegalArgumentException.class, () -> {
+            Settings s = Settings.builder().put("plugins.search_relevance.judgment_cache.ttl", "abc").build();
+            SEARCH_RELEVANCE_JUDGMENT_CACHE_TTL.get(s);
+        });
+    }
+
+    public void testJudgmentCacheTtlSetting_RejectsMaliciousInput() {
+        assertThrows(IllegalArgumentException.class, () -> {
+            Settings s = Settings.builder().put("plugins.search_relevance.judgment_cache.ttl", "123-dsf443f-df%@#@34").build();
+            SEARCH_RELEVANCE_JUDGMENT_CACHE_TTL.get(s);
+        });
     }
 }

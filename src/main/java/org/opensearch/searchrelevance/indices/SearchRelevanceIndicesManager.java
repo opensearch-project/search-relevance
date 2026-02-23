@@ -574,6 +574,25 @@ public class SearchRelevanceIndicesManager {
     }
 
     /**
+     * Delete by query using a custom query builder
+     * @param query - query builder for matching documents to delete
+     * @param index - index on which delete operation has to be performed
+     * @param listener - action listener for async action
+     */
+    public void deleteByQuery(
+        final org.opensearch.index.query.QueryBuilder query,
+        final SearchRelevanceIndices index,
+        final ActionListener<BulkByScrollResponse> listener
+    ) {
+        DeleteByQueryRequest deleteByQueryRequest = new DeleteByQueryRequest(index.getIndexName());
+        deleteByQueryRequest.setConflicts(PROCEED);
+        deleteByQueryRequest.setBatchSize(BATCH_SIZE_FOR_DELETE_BY_QUERY);
+        deleteByQueryRequest.setQuery(query);
+
+        client.execute(DeleteByQueryAction.INSTANCE, deleteByQueryRequest, listener);
+    }
+
+    /**
      * Gets index mapping JSON content from the classpath
      *
      * @param mapping type of the index to fetch the specific mapping file

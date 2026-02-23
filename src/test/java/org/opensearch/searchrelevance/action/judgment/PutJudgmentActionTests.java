@@ -93,7 +93,8 @@ public class PutJudgmentActionTests extends OpenSearchTestCase {
             false,
             "test_prompt_template",
             LLMJudgmentRatingType.SCORE0_1,
-            true
+            true,
+            false  // expandCoverage
         );
 
         BytesStreamOutput output = new BytesStreamOutput();
@@ -114,6 +115,36 @@ public class PutJudgmentActionTests extends OpenSearchTestCase {
         assertEquals("test_prompt_template", serialized.getPromptTemplate());
         assertEquals(LLMJudgmentRatingType.SCORE0_1, serialized.getLlmJudgmentRatingType());
         assertEquals(true, serialized.isOverwriteCache());
+        assertEquals(false, serialized.isExpandCoverage());
+    }
+
+    public void testLlmJudgmentRequestStreamsWithExpandCoverageTrue() throws IOException {
+        PutLlmJudgmentRequest request = new PutLlmJudgmentRequest(
+            JudgmentType.LLM_JUDGMENT,
+            "test_name",
+            "test_description",
+            "test_model_id",
+            "test_query_set_id",
+            List.of("config1"),
+            10,
+            1000,
+            List.of("field1"),
+            false,
+            null,
+            null,
+            false,
+            true  // expandCoverage = true
+        );
+
+        BytesStreamOutput output = new BytesStreamOutput();
+        request.writeTo(output);
+        StreamInput in = StreamInput.wrap(output.bytes().toBytesRef().bytes);
+        PutLlmJudgmentRequest serialized = new PutLlmJudgmentRequest(in);
+
+        assertEquals("test_name", serialized.getName());
+        assertEquals(JudgmentType.LLM_JUDGMENT, serialized.getType());
+        assertEquals(true, serialized.isExpandCoverage());
+        assertEquals(false, serialized.isOverwriteCache());
     }
 
     public void testLlmJudgmentRequestStreamsWithNullOptionalFields() throws IOException {
@@ -130,7 +161,8 @@ public class PutJudgmentActionTests extends OpenSearchTestCase {
             true,
             null,
             null,
-            false
+            false,
+            false  // expandCoverage
         );
 
         BytesStreamOutput output = new BytesStreamOutput();
@@ -144,6 +176,7 @@ public class PutJudgmentActionTests extends OpenSearchTestCase {
         assertNull(serialized.getPromptTemplate());
         assertNull(serialized.getLlmJudgmentRatingType());
         assertEquals(false, serialized.isOverwriteCache());
+        assertEquals(false, serialized.isExpandCoverage());
     }
 
     public void testUbiJudgmentWithCustomIndexes() throws IOException {

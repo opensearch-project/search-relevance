@@ -1,0 +1,6 @@
+{
+  "name": "Hybrid Search Configuration",
+  "description": "Hybrid search with BM25 and neural sub-queries",
+  "index": "{{index}}",
+  "query": "{\"query\": {\"hybrid\": {\"queries\": [{\"match\": {\"name\": {\"query\": \"%SearchText%\"}}}, {\"match\": {\"description\": {\"query\": \"%SearchText%\"}}}]}}}"
+}

@@ -37,8 +37,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.opensearch.ExceptionsHelper;
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.core.action.ActionListener;
@@ -64,13 +62,14 @@ import org.opensearch.searchrelevance.utils.TextValidationUtil;
 import org.opensearch.transport.client.node.NodeClient;
 
 import lombok.AllArgsConstructor;
+import lombok.extern.log4j.Log4j2;
 
 /**
  * Rest Action to facilitate requests to create a judgment.
  */
 @AllArgsConstructor
+@Log4j2
 public class RestPutJudgmentAction extends BaseRestHandler {
-    private static final Logger LOGGER = LogManager.getLogger(RestPutJudgmentAction.class);
     private static final String PUT_JUDGMENT_ACTION = "put_judgment_action";
     private SearchRelevanceSettingsAccessor settingsAccessor;
 
@@ -166,6 +165,7 @@ public class RestPutJudgmentAction extends BaseRestHandler {
                     }
                 }
                 boolean overwriteCache = Optional.ofNullable((Boolean) source.get(OVERWRITE_CACHE)).orElse(Boolean.FALSE);
+                boolean expandCoverage = Optional.ofNullable((Boolean) source.get("expandCoverage")).orElse(Boolean.FALSE);
 
                 createRequest = new PutLlmJudgmentRequest(
                     type,
@@ -180,7 +180,8 @@ public class RestPutJudgmentAction extends BaseRestHandler {
                     ignoreFailure,
                     promptTemplate,
                     llmJudgmentRatingType,
-                    overwriteCache
+                    overwriteCache,
+                    expandCoverage
                 );
             }
             case UBI_JUDGMENT -> {
@@ -237,7 +238,7 @@ public class RestPutJudgmentAction extends BaseRestHandler {
                 try {
                     channel.sendResponse(new BytesRestResponse(channel, ExceptionsHelper.status(e), e));
                 } catch (IOException ex) {
-                    LOGGER.error("Failed to send error response", ex);
+                    log.error("Failed to send error response", ex);
                 }
             }
         });

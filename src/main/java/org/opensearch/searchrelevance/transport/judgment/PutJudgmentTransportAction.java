@@ -19,8 +19,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.HandledTransportAction;
@@ -38,12 +36,13 @@ import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
 
+import lombok.extern.log4j.Log4j2;
+
+@Log4j2
 public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgmentRequest, IndexResponse> {
     private final ClusterService clusterService;
     private final JudgmentDao judgmentDao;
     private final JudgmentsProcessorFactory judgmentsProcessorFactory;
-
-    private static final Logger LOGGER = LogManager.getLogger(PutJudgmentTransportAction.class);
 
     @Inject
     public PutJudgmentTransportAction(
@@ -84,12 +83,12 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
                 // Trigger async processing in the background
                 triggerAsyncProcessing(id, request, initialJudgment.getMetadata());
             }, e -> {
-                LOGGER.error("Failed to create initial judgment", e);
+                log.error("Failed to create initial judgment", e);
                 listener.onFailure(new SearchRelevanceException("Failed to create initial judgment", e, RestStatus.INTERNAL_SERVER_ERROR));
             }));
 
         } catch (Exception e) {
-            LOGGER.error("Failed to process judgment request", e);
+            log.error("Failed to process judgment request", e);
             listener.onFailure(new SearchRelevanceException("Failed to process judgment request", e, RestStatus.INTERNAL_SERVER_ERROR));
         }
     }
@@ -109,6 +108,7 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
                 metadata.put(PROMPT_TEMPLATE, llmRequest.getPromptTemplate());
                 metadata.put(LLM_JUDGMENT_RATING_TYPE, llmRequest.getLlmJudgmentRatingType());
                 metadata.put(OVERWRITE_CACHE, llmRequest.isOverwriteCache());
+                metadata.put("expandCoverage", llmRequest.isExpandCoverage());
             }
             case UBI_JUDGMENT -> {
                 PutUbiJudgmentRequest ubiRequest = (PutUbiJudgmentRequest) request;
@@ -130,11 +130,11 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
     }
 
     private void triggerAsyncProcessing(String judgmentId, PutJudgmentRequest request, Map<String, Object> metadata) {
-        LOGGER.info("Starting async processing for judgment: {}, type: {}, metadata: {}", judgmentId, request.getType(), metadata);
+        log.info("Starting async processing for judgment: {}, type: {}, metadata: {}", judgmentId, request.getType(), metadata);
         BaseJudgmentsProcessor processor = judgmentsProcessorFactory.getProcessor(request.getType());
 
         processor.generateJudgmentRating(metadata, ActionListener.wrap(judgmentRatings -> {
-            LOGGER.info(
+            log.info(
                 "Generated judgment ratings for {}, ratings size: {}",
                 judgmentId,
                 judgmentRatings != null ? judgmentRatings.size() : 0
@@ -162,14 +162,14 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
         judgmentDao.updateJudgment(
             finalJudgment,
             ActionListener.wrap(
-                response -> LOGGER.debug("Updated final judgment: {}", judgmentId),
+                response -> log.debug("Updated final judgment: {}", judgmentId),
                 error -> handleAsyncFailure(judgmentId, request, "Failed to update final judgment", error)
             )
         );
     }
 
     private void handleAsyncFailure(String judgmentId, PutJudgmentRequest request, String message, Exception error) {
-        LOGGER.error(message + " for judgment: " + judgmentId, error);
+        log.error(message + " for judgment: " + judgmentId, error);
 
         Judgment errorJudgment = new Judgment(
             judgmentId,
@@ -184,8 +184,8 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
         judgmentDao.updateJudgment(
             errorJudgment,
             ActionListener.wrap(
-                response -> LOGGER.info("Updated judgment {} status to ERROR", judgmentId),
-                e -> LOGGER.error("Failed to update error status for judgment: " + judgmentId, e)
+                response -> log.info("Updated judgment {} status to ERROR", judgmentId),
+                e -> log.error("Failed to update error status for judgment: " + judgmentId, e)
             )
         );
     }

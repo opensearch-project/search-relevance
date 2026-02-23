@@ -10,6 +10,7 @@ package org.opensearch.searchrelevance.judgments;
 import static org.opensearch.searchrelevance.common.MLConstants.LLM_JUDGMENT_RATING_TYPE;
 import static org.opensearch.searchrelevance.common.MLConstants.OVERWRITE_CACHE;
 import static org.opensearch.searchrelevance.common.MLConstants.PROMPT_TEMPLATE;
+import static org.opensearch.searchrelevance.model.builder.SearchRequestBuilder.buildRequestForHybridSearch;
 import static org.opensearch.searchrelevance.model.builder.SearchRequestBuilder.buildSearchRequest;
 import static org.opensearch.searchrelevance.utils.ParserUtils.combinedIndexAndDocId;
 import static org.opensearch.searchrelevance.utils.ParserUtils.generatePromptTemplateCode;
@@ -42,6 +43,7 @@ import org.opensearch.searchrelevance.dao.QuerySetDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.executors.LlmJudgmentTaskManager;
+import org.opensearch.searchrelevance.experiment.QuerySourceUtil;
 import org.opensearch.searchrelevance.ml.ChunkResult;
 import org.opensearch.searchrelevance.ml.MLAccessor;
 import org.opensearch.searchrelevance.model.JudgmentCache;
@@ -121,6 +123,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                 log.debug("No ratingType provided, defaulting to SCORE0_1");
             }
             boolean overwriteCache = (boolean) metadata.get(OVERWRITE_CACHE);
+            boolean expandCoverage = Boolean.TRUE.equals(metadata.get("expandCoverage"));
 
             QuerySet querySet = querySetDao.getQuerySetSync(querySetId);
             List<SearchConfiguration> searchConfigurations = searchConfigurationList.stream()
@@ -138,6 +141,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                 promptTemplate,
                 ratingType,
                 overwriteCache,
+                expandCoverage,
                 listener
             );
         } catch (Exception e) {
@@ -157,12 +161,20 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         String promptTemplate,
         LLMJudgmentRatingType ratingType,
         boolean overwriteCache,
+        boolean expandCoverage,
         ActionListener<List<Map<String, Object>>> listener
     ) {
         List<String> queryTextsWithCustomInput = querySet.querySetQueries().stream().map(e -> e.queryText()).collect(Collectors.toList());
         int totalQueries = queryTextsWithCustomInput.size();
 
         log.info("Starting LLM judgment generation for {} total queries", totalQueries);
+
+        // Fire-and-forget cleanup of stale cache entries (older than 90 days)
+        try {
+            judgmentCacheDao.cleanupStaleEntries();
+        } catch (Exception e) {
+            log.warn("Failed to trigger judgment cache cleanup - continuing without cleanup", e);
+        }
 
         // Create judgment cache index upfront to prevent concurrent creation attempts
         StepListener<Void> cacheIndexListener = new StepListener<>();
@@ -182,7 +194,8 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                         ignoreFailure,
                         promptTemplate,
                         ratingType,
-                        overwriteCache
+                        overwriteCache,
+                        expandCoverage
                     );
                 } catch (Exception e) {
                     if (ignoreFailure) {
@@ -229,7 +242,8 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                         ignoreFailure,
                         promptTemplate,
                         ratingType,
-                        overwriteCache
+                        overwriteCache,
+                        expandCoverage
                     );
                 } catch (Exception e) {
                     if (ignoreFailure) {
@@ -274,7 +288,8 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         boolean ignoreFailure,
         String promptTemplate,
         LLMJudgmentRatingType ratingType,
-        boolean overwriteCache
+        boolean overwriteCache,
+        boolean expandCoverage
     ) {
         log.info("Processing query text judgment: {}", queryTextWithCustomInput);
 
@@ -284,7 +299,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
 
         try {
             // Step 1: Execute searches concurrently within this query text task
-            processSearchConfigurationsAsync(searchConfigurations, queryText, size, allHits, ignoreFailure);
+            processSearchConfigurationsAsync(searchConfigurations, queryText, size, allHits, ignoreFailure, expandCoverage);
 
             // Step 2: Deduplicate from cache (skip if overwriteCache is true)
             List<String> docIds = new ArrayList<>(allHits.keySet());
@@ -333,33 +348,75 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         }
     }
 
-    private void processSearchConfigurationsAsync(
+    // Package-private for unit testing (expandCoverage pooling verification)
+    void processSearchConfigurationsAsync(
         List<SearchConfiguration> searchConfigurations,
         String queryText,
         int size,
         ConcurrentMap<String, SearchHit> allHits,
-        boolean ignoreFailure
+        boolean ignoreFailure,
+        boolean expandCoverage
     ) throws Exception {
-        List<CompletableFuture<Void>> searchFutures = searchConfigurations.stream().map(config -> {
-            CompletableFuture<SearchResponse> future = new CompletableFuture<>();
-            SearchRequest searchRequest = buildSearchRequest(config.index(), config.query(), queryText, config.searchPipeline(), size);
-            client.search(searchRequest, ActionListener.wrap(future::complete, future::completeExceptionally));
+        List<CompletableFuture<Void>> searchFutures = new ArrayList<>();
 
-            return future.thenAccept(response -> {
-                if (response.getHits().getTotalHits().value() > 0) {
-                    for (SearchHit hit : response.getHits().getHits()) {
-                        allHits.put(hit.getId(), hit);
-                    }
-                    log.debug("Collected {} hits from index: {}", response.getHits().getHits().length, config.index());
+        for (SearchConfiguration config : searchConfigurations) {
+            if (expandCoverage) {
+                // Validate hybrid query and dynamically generate pooling weight configurations
+                Map<String, Object> queryMap = OBJECT_MAPPER.readValue(config.query(), new TypeReference<Map<String, Object>>() {
+                });
+                if (!QuerySourceUtil.isHybridQueryAnySize(queryMap)) {
+                    throw new IllegalArgumentException("expandCoverage requires a hybrid search query with at least 1 sub-query.");
                 }
-            }).exceptionally(e -> {
-                log.warn("Search failed for index: {}, continuing with other searches", config.index(), e);
-                return null; // Continue processing other searches
-            });
-        }).toList();
+                int numSubQueries = QuerySourceUtil.getSubQueryCount(queryMap);
+                List<List<Float>> poolWeights = QuerySourceUtil.generatePoolingWeights(numSubQueries);
+                log.info(
+                    "expandCoverage enabled: executing {} pooling searches for query: {} ({} sub-queries)",
+                    poolWeights.size(),
+                    queryText,
+                    numSubQueries
+                );
+                for (List<Float> weights : poolWeights) {
+                    Map<String, Object> pipeline = QuerySourceUtil.createPoolingSearchPipeline(
+                        weights,
+                        QuerySourceUtil.POOL_NORMALIZATION,
+                        QuerySourceUtil.POOL_COMBINATION
+                    );
+                    SearchRequest searchRequest = buildRequestForHybridSearch(config.index(), config.query(), pipeline, queryText, size);
+                    CompletableFuture<SearchResponse> future = new CompletableFuture<>();
+                    client.search(searchRequest, ActionListener.wrap(future::complete, future::completeExceptionally));
+                    searchFutures.add(future.thenAccept(response -> {
+                        if (response.getHits().getTotalHits().value() > 0) {
+                            for (SearchHit hit : response.getHits().getHits()) {
+                                allHits.putIfAbsent(hit.getId(), hit);
+                            }
+                            log.debug("Pooling: collected {} hits with weights {}", response.getHits().getHits().length, weights);
+                        }
+                    }).exceptionally(e -> {
+                        log.warn("Pooling search failed for weights {}, continuing", weights, e);
+                        return null;
+                    }));
+                }
+            } else {
+                // Existing behavior: single search with config's pipeline
+                CompletableFuture<SearchResponse> future = new CompletableFuture<>();
+                SearchRequest searchRequest = buildSearchRequest(config.index(), config.query(), queryText, config.searchPipeline(), size);
+                client.search(searchRequest, ActionListener.wrap(future::complete, future::completeExceptionally));
+                searchFutures.add(future.thenAccept(response -> {
+                    if (response.getHits().getTotalHits().value() > 0) {
+                        for (SearchHit hit : response.getHits().getHits()) {
+                            allHits.put(hit.getId(), hit);
+                        }
+                        log.debug("Collected {} hits from index: {}", response.getHits().getHits().length, config.index());
+                    }
+                }).exceptionally(e -> {
+                    log.warn("Search failed for index: {}, continuing with other searches", config.index(), e);
+                    return null;
+                }));
+            }
+        }
 
         CompletableFuture.allOf(searchFutures.toArray(new CompletableFuture[0])).join();
-        log.info("Search phase completed. Total hits collected: {}", allHits.size());
+        log.info("Search phase completed. Total hits collected: {} (expandCoverage={})", allHits.size(), expandCoverage);
     }
 
     private List<String> deduplicateFromCache(

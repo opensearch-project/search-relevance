@@ -48,6 +48,14 @@ public class SearchRequestBuilder {
         log.debug("SearchRequestBuilder initialized with NamedXContentRegistry");
     }
 
+    /**
+     * Returns the NamedXContentRegistry used for parsing query types.
+     * @return the initialized registry, or null if not yet initialized
+     */
+    public static NamedXContentRegistry getNamedXContentRegistry() {
+        return NAMED_XCONTENT_REGISTRY;
+    }
+
     private static XContentParser newParserWithRegistry(String json) throws IOException {
         if (NAMED_XCONTENT_REGISTRY == null) {
             throw new IllegalStateException(
