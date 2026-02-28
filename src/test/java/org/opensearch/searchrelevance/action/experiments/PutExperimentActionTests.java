@@ -22,6 +22,8 @@ public class PutExperimentActionTests extends OpenSearchTestCase {
         PutExperimentRequest request = new PutExperimentRequest(
             ExperimentType.PAIRWISE_COMPARISON,
             null,
+            "Test Experiment",
+            "Test Description",
             "1234",
             List.of("5678", "0000"),
             List.of("5678", "0000"),
@@ -40,6 +42,8 @@ public class PutExperimentActionTests extends OpenSearchTestCase {
         PutExperimentRequest request = new PutExperimentRequest(
             ExperimentType.PAIRWISE_COMPARISON,
             null,
+            "Test Experiment",
+            "Test Description",
             "1234",
             List.of("5678", "0000"),
             List.of("5678", "0000"),

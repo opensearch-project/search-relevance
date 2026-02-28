@@ -58,14 +58,22 @@ public class ScheduledExperimentRunnerManager {
     }
 
     /**
-     * Manager for fetching the experiment that is scheduled then running the experiment.
-     * Additionally, this class puts the incomplete {@link ScheduledExperimentResult}
+     * Manager for fetching the experiment that is scheduled then running the
+     * experiment.
+     * Additionally, this class puts the incomplete
+     * {@link ScheduledExperimentResult}
      * into its index.
      *
-     * @param parameter Parameters for running the scheduled job
-     * @param scheduledExperimentResultId The id in the {@link ScheduledExperimentResult} index for this experiment
-     * @param cancellationToken The token to indicate whether this scheduled experiment run has been cancelled
-     * @param actuallyFinished A countdown latch to indicate whether all asynchronous operations for a scheduled experiment run is complete
+     * @param parameter                   Parameters for running the scheduled job
+     * @param scheduledExperimentResultId The id in the
+     *                                    {@link ScheduledExperimentResult} index
+     *                                    for this experiment
+     * @param cancellationToken           The token to indicate whether this
+     *                                    scheduled experiment run has been
+     *                                    cancelled
+     * @param actuallyFinished            A countdown latch to indicate whether all
+     *                                    asynchronous operations for a scheduled
+     *                                    experiment run is complete
      */
     public void runScheduledExperiment(
         SearchRelevanceJobParameters parameter,
@@ -84,7 +92,8 @@ public class ScheduledExperimentRunnerManager {
                     }
                     Experiment experiment = convertToExperiment(experimentResponse);
                     String timestamp = TimeUtils.getTimestamp();
-                    // What I will do here is add a new request parameter to replace the Experiment object so I can store the id
+                    // What I will do here is add a new request parameter to replace the Experiment
+                    // object so I can store the id
                     // of the running experiment to record the end time when finished.
                     ScheduledExperimentResult scheduledExperimentResult = new ScheduledExperimentResult(
                         scheduledExperimentResultId,
@@ -96,6 +105,8 @@ public class ScheduledExperimentRunnerManager {
                     PutExperimentRequest request = new PutExperimentRequest(
                         experiment.type(),
                         scheduledExperimentResultId,
+                        experiment.name(),
+                        experiment.description(),
                         experiment.querySetId(),
                         experiment.searchConfigurationList(),
                         experiment.judgmentList(),
@@ -112,7 +123,14 @@ public class ScheduledExperimentRunnerManager {
 
                             ScheduledJob scheduledJob = convertToScheduledJob(jobResponse);
                             scheduledJobsDao.updateScheduledJob(scheduledJob, ActionListener.wrap(updatedJobResponse -> {
-                                experimentRunningManager.startExperimentRun(experimentId, request, cancellationToken, actuallyFinished);
+                                experimentRunningManager.startExperimentRun(
+                                    experimentId,
+                                    request,
+                                    experiment.name(),
+                                    experiment.description(),
+                                    cancellationToken,
+                                    actuallyFinished
+                                );
                             }, e -> {
                                 log.error("Somehow for experiment {}, we cannot update the experiment run job", experimentId);
                                 handleAsyncFailure(experimentId, request, timestamp, e);
@@ -174,6 +192,8 @@ public class ScheduledExperimentRunnerManager {
         return new Experiment(
             "",
             "",
+            (String) sourceMap.get(Experiment.NAME),
+            (String) sourceMap.get(Experiment.DESCRIPTION),
             ExperimentType.valueOf((String) sourceMap.get("type")),
             AsyncStatus.valueOf((String) sourceMap.get("status")),
             (String) sourceMap.get("querySetId"),
@@ -227,9 +247,11 @@ public class ScheduledExperimentRunnerManager {
 
     /**
      *
-     * @param experimentId Id of experiment that is scheduled to run
+     * @param experimentId                Id of experiment that is scheduled to run
      * @param scheduledExperimentResultId Id of scheduled experiment result
-     * @param cancellationToken The token to indicate whether this scheduled experiment run has been cancelled
+     * @param cancellationToken           The token to indicate whether this
+     *                                    scheduled experiment run has been
+     *                                    cancelled
      */
     public void cleanupResources(String experimentId, String scheduledExperimentResultId, ExperimentCancellationToken cancellationToken) {
         log.info("Cleaning up all resources for {}", experimentId);

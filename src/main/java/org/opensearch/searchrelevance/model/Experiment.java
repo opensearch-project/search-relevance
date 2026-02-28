@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 import org.opensearch.core.xcontent.ToXContentObject;
@@ -22,6 +23,8 @@ import org.opensearch.core.xcontent.XContentBuilder;
 public class Experiment implements ToXContentObject {
     public static final String ID = "id";
     public static final String TIME_STAMP = "timestamp";
+    public static final String NAME = "name";
+    public static final String DESCRIPTION = "description";
     public static final String TYPE = "type";
     public static final String STATUS = "status";
     public static final String QUERY_SET_ID = "querySetId";
@@ -38,6 +41,8 @@ public class Experiment implements ToXContentObject {
      */
     private final String id;
     private final String timestamp;
+    private final String name;
+    private final String description;
     private final ExperimentType type;
     private final AsyncStatus status;
     private final String querySetId;
@@ -51,6 +56,8 @@ public class Experiment implements ToXContentObject {
     public Experiment(
         String id,
         String timestamp,
+        String name,
+        String description,
         ExperimentType type,
         AsyncStatus status,
         String querySetId,
@@ -59,11 +66,13 @@ public class Experiment implements ToXContentObject {
         int size,
         List<Map<String, Object>> results
     ) {
-        this.id = id;
-        this.timestamp = timestamp;
-        this.type = type;
-        this.status = status;
-        this.querySetId = querySetId;
+        this.id = Objects.requireNonNull(id, "Experiment ID cannot be null");
+        this.timestamp = Objects.requireNonNull(timestamp, "Timestamp cannot be null");
+        this.name = name;  // Optional field, can be null
+        this.description = description;  // Optional field, can be null
+        this.type = Objects.requireNonNull(type, "Experiment type cannot be null");
+        this.status = Objects.requireNonNull(status, "Status cannot be null");
+        this.querySetId = Objects.requireNonNull(querySetId, "QuerySet ID cannot be null");
         this.searchConfigurationList = searchConfigurationList;
         this.judgmentList = judgmentList;
         this.size = size;
@@ -73,8 +82,11 @@ public class Experiment implements ToXContentObject {
     }
 
     public Experiment(Experiment previousExperiment, boolean isScheduled, String scheduledExperimentJobId) {
+        Objects.requireNonNull(previousExperiment, "Previous experiment cannot be null");
         this.id = previousExperiment.id();
         this.timestamp = previousExperiment.timestamp();
+        this.name = previousExperiment.name();
+        this.description = previousExperiment.description();
         this.type = previousExperiment.type();
         this.status = previousExperiment.status();
         this.querySetId = previousExperiment.querySetId();
@@ -91,6 +103,12 @@ public class Experiment implements ToXContentObject {
         XContentBuilder xContentBuilder = builder.startObject();
         xContentBuilder.field(ID, this.id.trim());
         xContentBuilder.field(TIME_STAMP, this.timestamp.trim());
+        if (this.name != null) {
+            xContentBuilder.field(NAME, this.name.trim());
+        }
+        if (this.description != null) {
+            xContentBuilder.field(DESCRIPTION, this.description.trim());
+        }
         xContentBuilder.field(TYPE, this.type.name().trim());
         xContentBuilder.field(STATUS, this.status.name().trim());
         xContentBuilder.field(QUERY_SET_ID, this.querySetId.trim());
@@ -112,6 +130,14 @@ public class Experiment implements ToXContentObject {
 
     public String timestamp() {
         return timestamp;
+    }
+
+    public String name() {
+        return name;
+    }
+
+    public String description() {
+        return description;
     }
 
     public ExperimentType type() {

@@ -9,8 +9,10 @@ package org.opensearch.searchrelevance.rest;
 
 import static java.util.Collections.singletonList;
 import static org.opensearch.rest.RestRequest.Method.PUT;
+import static org.opensearch.searchrelevance.common.PluginConstants.DESCRIPTION;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENTS_URI;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_LIST;
+import static org.opensearch.searchrelevance.common.PluginConstants.NAME;
 import static org.opensearch.searchrelevance.common.PluginConstants.QUERYSET_ID;
 import static org.opensearch.searchrelevance.common.PluginConstants.SEARCH_CONFIGURATION_LIST;
 import static org.opensearch.searchrelevance.common.PluginConstants.SIZE;
@@ -35,6 +37,7 @@ import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.searchrelevance.transport.experiment.PutExperimentAction;
 import org.opensearch.searchrelevance.transport.experiment.PutExperimentRequest;
 import org.opensearch.searchrelevance.utils.ParserUtils;
+import org.opensearch.searchrelevance.utils.TextValidationUtil;
 import org.opensearch.transport.client.node.NodeClient;
 
 import lombok.AllArgsConstructor;
@@ -66,6 +69,24 @@ public class RestPutExperimentAction extends BaseRestHandler {
         }
         XContentParser parser = request.contentParser();
         Map<String, Object> source = parser.map();
+
+        // Parse and validate optional name field
+        TextValidationUtil.ParsedField parsedName = TextValidationUtil.parseOptionalExperimentName(source, NAME);
+        if (parsedName.hasError()) {
+            return channel -> channel.sendResponse(
+                new BytesRestResponse(RestStatus.BAD_REQUEST, "Invalid name: " + parsedName.getErrorMessage())
+            );
+        }
+        String name = parsedName.getValue();
+
+        // Parse and validate optional description field
+        TextValidationUtil.ParsedField parsedDescription = TextValidationUtil.parseOptionalDescription(source, DESCRIPTION);
+        if (parsedDescription.hasError()) {
+            return channel -> channel.sendResponse(
+                new BytesRestResponse(RestStatus.BAD_REQUEST, "Invalid description: " + parsedDescription.getErrorMessage())
+            );
+        }
+        String description = parsedDescription.getValue();
 
         String querySetId = (String) source.get(QUERYSET_ID);
         List<String> searchConfigurationList = ParserUtils.convertObjToList(source, SEARCH_CONFIGURATION_LIST);
@@ -123,6 +144,8 @@ public class RestPutExperimentAction extends BaseRestHandler {
         PutExperimentRequest createRequest = new PutExperimentRequest(
             experimentType,
             null,
+            name,
+            description,
             querySetId,
             searchConfigurationList,
             judgmentList,

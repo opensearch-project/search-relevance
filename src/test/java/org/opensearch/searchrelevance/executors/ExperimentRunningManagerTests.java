@@ -108,13 +108,13 @@ public class ExperimentRunningManagerTests extends OpenSearchTestCase {
 
         ExperimentCancellationToken cancellationToken = new ExperimentCancellationToken("scheduled-experiment-result-id");
         cancellationToken.cancel();
-        experimentRunningManager.fetchSearchConfigurationsAsync(
+        ExperimentRunningManager.ExperimentContext context = new ExperimentRunningManager.ExperimentContext(
             "experimentId",
             request,
-            List.of("querySetReference"),
-            cancellationToken,
-            actuallyFinished
+            request.getName(),
+            request.getDescription()
         );
+        experimentRunningManager.fetchSearchConfigurationsAsync(context, List.of("querySetReference"), cancellationToken, actuallyFinished);
 
         assertEquals(0, actuallyFinished.getCount());
     }
@@ -131,13 +131,13 @@ public class ExperimentRunningManagerTests extends OpenSearchTestCase {
             listener.onResponse(searchConfigResponse);
             return null;
         }).when(searchConfigurationDao).getSearchConfiguration(any(String.class), any(ActionListener.class));
-        experimentRunningManager.fetchSearchConfigurationsAsync(
+        ExperimentRunningManager.ExperimentContext context = new ExperimentRunningManager.ExperimentContext(
             "experimentId",
             request,
-            List.of("querySetReference"),
-            cancellationToken,
-            actuallyFinished
+            request.getName(),
+            request.getDescription()
         );
+        experimentRunningManager.fetchSearchConfigurationsAsync(context, List.of("querySetReference"), cancellationToken, actuallyFinished);
 
         assertEquals(0, actuallyFinished.getCount());
 
@@ -149,9 +149,14 @@ public class ExperimentRunningManagerTests extends OpenSearchTestCase {
 
         ExperimentCancellationToken cancellationToken = new ExperimentCancellationToken("scheduled-experiment-result-id");
         cancellationToken.cancel();
-        experimentRunningManager.executeExperimentEvaluation(
+        ExperimentRunningManager.ExperimentContext context = new ExperimentRunningManager.ExperimentContext(
             "experimentId",
             request,
+            request.getName(),
+            request.getDescription()
+        );
+        experimentRunningManager.executeExperimentEvaluation(
+            context,
             null,
             List.of("queryText"),
             null,
@@ -187,26 +192,43 @@ public class ExperimentRunningManagerTests extends OpenSearchTestCase {
     }
 
     public void testStartExperimentRunReject() {
-        // Make sure that only at most one experiment run for a given scheduled experiment run id
+        // Make sure that only at most one experiment run for a given scheduled
+        // experiment run id
         // can be scheduled at a given time
-        // Also makes sure the entry in the mapping futures is removed when the cancellation token is cancelled.
+        // Also makes sure the entry in the mapping futures is removed when the
+        // cancellation token is cancelled.
         PutExperimentRequest request = createExperimentRequest();
         CountDownLatch actuallyFinished1 = new CountDownLatch(1);
 
         doAnswer(invocation -> { return null; }).when(querySetDao).getQuerySet(any(String.class), any(ActionListener.class));
 
         ExperimentCancellationToken cancellationToken1 = new ExperimentCancellationToken("scheduled-experiment-result-id");
-        experimentRunningManager.startExperimentRun("experimentId", request, cancellationToken1, actuallyFinished1);
+        experimentRunningManager.startExperimentRun(
+            "experimentId",
+            request,
+            request.getName(),
+            request.getDescription(),
+            cancellationToken1,
+            actuallyFinished1
+        );
 
         assertEquals(1, actuallyFinished1.getCount());
 
         verifyNoInteractions(scheduledExperimentHistoryDao);
 
-        // Try running a second experiment and make sure that it does not run successfully
+        // Try running a second experiment and make sure that it does not run
+        // successfully
         CountDownLatch actuallyFinished2 = new CountDownLatch(1);
         ExperimentCancellationToken cancellationToken2 = new ExperimentCancellationToken("scheduled-experiment-result-id");
 
-        experimentRunningManager.startExperimentRun("experimentId", request, cancellationToken2, actuallyFinished2);
+        experimentRunningManager.startExperimentRun(
+            "experimentId",
+            request,
+            request.getName(),
+            request.getDescription(),
+            cancellationToken2,
+            actuallyFinished2
+        );
 
         // This indicates that the async failure method was hit
         verify(scheduledExperimentHistoryDao, times(1)).updateScheduledExperimentResult(
@@ -218,7 +240,14 @@ public class ExperimentRunningManagerTests extends OpenSearchTestCase {
         cancellationToken1.cancel();
 
         // After the first run finishes, we can start a new experiment
-        experimentRunningManager.startExperimentRun("experimentId", request, cancellationToken2, actuallyFinished2);
+        experimentRunningManager.startExperimentRun(
+            "experimentId",
+            request,
+            request.getName(),
+            request.getDescription(),
+            cancellationToken2,
+            actuallyFinished2
+        );
         verify(scheduledExperimentHistoryDao, times(1)).updateScheduledExperimentResult(
             any(ScheduledExperimentResult.class),
             any(ActionListener.class)
@@ -230,6 +259,8 @@ public class ExperimentRunningManagerTests extends OpenSearchTestCase {
         PutExperimentRequest request = new PutExperimentRequest(
             ExperimentType.POINTWISE_EVALUATION,
             "scheduled-experiment-result-id",
+            "Test Experiment",
+            "Test Description",
             "test-queryset-id",
             List.of("config1"),
             List.of("judgment1"),

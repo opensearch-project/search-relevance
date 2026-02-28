@@ -15,6 +15,7 @@ import static org.opensearch.searchrelevance.common.MLConstants.PLACEHOLDER_SEAR
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 
 import org.opensearch.searchrelevance.model.QueryWithReference;
 
@@ -24,10 +25,12 @@ public class TextValidationUtil {
     private static final int MAX_DESCRIPTION_LENGTH = 250;
     private static final int MAX_PROMPT_TEMPLATE_LENGTH = 10000;
     // Characters that could break JSON or cause security issues
-    private static final String DANGEROUS_CHARS_PATTERN = "[\"\\\\<>]+";  // Excludes quotes, backslashes, and HTML tags
+    private static final String DANGEROUS_CHARS_PATTERN = "[\"\\\\<>]+"; // Excludes quotes, backslashes, and HTML tags
     // Characters that could break QuerySet parsing logic
-    // Newline (\n), delimiter (#), and colon (:) are reserved for the format: "queryText#\nkey: value"
-    private static final String QUERYSET_RESERVED_CHARS_PATTERN = "[\\r\\n#:]+";  // Excludes newline, carriage return, #, and colon
+    // Newline (\n), delimiter (#), and colon (:) are reserved for the format:
+    // "queryText#\nkey: value"
+    private static final String QUERYSET_RESERVED_CHARS_PATTERN = "[\\r\\n#:]+"; // Excludes newline, carriage return,
+                                                                                 // #, and colon
 
     public static class ValidationResult {
         private final boolean valid;
@@ -60,7 +63,7 @@ public class TextValidationUtil {
     /**
      * Validates text with a specified maximum length
      *
-     * @param text The text to validate
+     * @param text      The text to validate
      * @param maxLength The maximum allowed length
      * @return ValidationResult indicating if the text is valid
      */
@@ -95,6 +98,142 @@ public class TextValidationUtil {
     }
 
     /**
+     * Result class for parsed optional string fields.
+     * Contains either a valid parsed value, a validation error, or indicates the
+     * field was absent.
+     */
+    public static class ParsedField {
+        private final String value;
+        private final String errorMessage;
+        private final boolean present;
+
+        private ParsedField(String value, String errorMessage, boolean present) {
+            this.value = value;
+            this.errorMessage = errorMessage;
+            this.present = present;
+        }
+
+        /**
+         * Creates a result for a successfully parsed and validated field.
+         */
+        public static ParsedField valid(String value) {
+            return new ParsedField(value, null, true);
+        }
+
+        /**
+         * Creates a result for a field that failed validation.
+         */
+        public static ParsedField invalid(String errorMessage) {
+            return new ParsedField(null, errorMessage, true);
+        }
+
+        /**
+         * Creates a result for a field that was not present or was blank.
+         */
+        public static ParsedField absent() {
+            return new ParsedField(null, null, false);
+        }
+
+        public String getValue() {
+            return value;
+        }
+
+        public String getErrorMessage() {
+            return errorMessage;
+        }
+
+        public boolean isPresent() {
+            return present;
+        }
+
+        public boolean isValid() {
+            return errorMessage == null;
+        }
+
+        public boolean hasError() {
+            return errorMessage != null;
+        }
+
+        /**
+         * Returns the value as an Optional, empty if absent or invalid.
+         */
+        public Optional<String> asOptional() {
+            return Optional.ofNullable(value);
+        }
+    }
+
+    /**
+     * Parses and validates an optional experiment name field from a request source
+     * map.
+     * Handles trimming, blank-to-null conversion, and validation.
+     *
+     * @param source    The source map from the request
+     * @param fieldName The name of the field to extract (e.g., "name")
+     * @return ParsedField containing the result
+     */
+    public static ParsedField parseOptionalExperimentName(Map<String, Object> source, String fieldName) {
+        if (source == null || fieldName == null) {
+            return ParsedField.absent();
+        }
+
+        Object rawValue = source.get(fieldName);
+        if (rawValue == null) {
+            return ParsedField.absent();
+        }
+
+        if (!(rawValue instanceof String)) {
+            return ParsedField.invalid("Field '" + fieldName + "' must be a string");
+        }
+
+        String value = ((String) rawValue).trim();
+        if (value.isEmpty()) {
+            return ParsedField.absent();
+        }
+
+        ValidationResult validation = validateName(value);
+        if (!validation.isValid()) {
+            return ParsedField.invalid(validation.getErrorMessage());
+        }
+
+        return ParsedField.valid(value);
+    }
+
+    /**
+     * Parses and validates an optional description field from a request source map.
+     * Handles trimming, blank-to-null conversion, and validation.
+     *
+     * @param source    The source map from the request
+     * @param fieldName The name of the field to extract (e.g., "description")
+     * @return ParsedField containing the result
+     */
+    public static ParsedField parseOptionalDescription(Map<String, Object> source, String fieldName) {
+        if (source == null || fieldName == null) {
+            return ParsedField.absent();
+        }
+
+        Object rawValue = source.get(fieldName);
+        if (rawValue == null) {
+            return ParsedField.absent();
+        }
+
+        if (!(rawValue instanceof String)) {
+            return ParsedField.invalid("Field '" + fieldName + "' must be a string");
+        }
+
+        String value = ((String) rawValue).trim();
+        if (value.isEmpty()) {
+            return ParsedField.absent();
+        }
+
+        ValidationResult validation = validateDescription(value);
+        if (!validation.isValid()) {
+            return ParsedField.invalid(validation.getErrorMessage());
+        }
+
+        return ParsedField.valid(value);
+    }
+
+    /**
      * Validates description field with maximum length of 250 characters
      *
      * @param description The description to validate
@@ -125,7 +264,7 @@ public class TextValidationUtil {
      * - Hash (#) - used as delimiter between queryText and custom fields
      * - Colon (:) - used to separate keys from values in the new format
      *
-     * @param text The text to validate
+     * @param text      The text to validate
      * @param maxLength The maximum allowed length
      * @return ValidationResult indicating if the text is valid for QuerySet
      */
@@ -146,7 +285,8 @@ public class TextValidationUtil {
             return new ValidationResult(false, "Text contains invalid characters (quotes, backslashes, or HTML tags are not allowed)");
         }
 
-        // Check for reserved characters - use contains() for better detection including newlines
+        // Check for reserved characters - use contains() for better detection including
+        // newlines
         if (text.contains("\n") || text.contains("\r") || text.contains("#") || text.contains(":")) {
             return new ValidationResult(false, "Text contains reserved characters (newline, #, or : are not allowed in QuerySet values)");
         }
@@ -174,12 +314,14 @@ public class TextValidationUtil {
             return new ValidationResult(false, "Key exceeds maximum length of " + MAX_NAME_LENGTH + " characters");
         }
 
-        // Keys should not contain reserved characters - use contains() for better detection including newlines
+        // Keys should not contain reserved characters - use contains() for better
+        // detection including newlines
         if (key.contains("\n") || key.contains("\r") || key.contains("#") || key.contains(":")) {
             return new ValidationResult(false, "Key contains reserved characters (newline, #, or : are not allowed in QuerySet keys)");
         }
 
-        // Keys should not contain whitespace (except single spaces within the key, not at start/end)
+        // Keys should not contain whitespace (except single spaces within the key, not
+        // at start/end)
         if (key.trim().length() != key.length()) {
             return new ValidationResult(false, "Key cannot have leading or trailing whitespace");
         }
@@ -228,8 +370,10 @@ public class TextValidationUtil {
     }
 
     /**
-     * Validates that a prompt template contains the required placeholders and meets formatting requirements.
-     * - Must contain {{hits}} or {{results}} to provide documents to the LLM for rating
+     * Validates that a prompt template contains the required placeholders and meets
+     * formatting requirements.
+     * - Must contain {{hits}} or {{results}} to provide documents to the LLM for
+     * rating
      * - Must contain {{queryText}} or {{searchText}} to provide the search query
      * - Must not contain the reserved delimiter character (#)
      * - Must not exceed maximum length
@@ -302,7 +446,8 @@ public class TextValidationUtil {
      * Extracts queryText and validates all fields including custom key-value pairs.
      *
      * @param queryMap The raw query map from the request
-     * @return QueryValidationResult containing either the validated QueryWithReference or an error message
+     * @return QueryValidationResult containing either the validated
+     *         QueryWithReference or an error message
      */
     public static QueryValidationResult validateAndParseQuery(Map<String, Object> queryMap) {
         if (queryMap == null) {
@@ -322,7 +467,8 @@ public class TextValidationUtil {
             return QueryValidationResult.failure("Invalid queryText: " + queryTextValidation.getErrorMessage());
         }
 
-        // Create customizedKeyValueMap with all entries except queryText, converting values to strings
+        // Create customizedKeyValueMap with all entries except queryText, converting
+        // values to strings
         Map<String, String> customizedKeyValueMap = new HashMap<>();
         for (Map.Entry<String, Object> entry : queryMap.entrySet()) {
             if (!"queryText".equals(entry.getKey()) && entry.getValue() != null) {

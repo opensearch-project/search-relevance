@@ -108,6 +108,8 @@ public class DeleteScheduledExperimentTransportAction extends HandledTransportAc
         return new Experiment(
             (String) sourceMap.get("id"),
             TimeUtils.getTimestamp(),
+            (String) sourceMap.get(Experiment.NAME),
+            (String) sourceMap.get(Experiment.DESCRIPTION),
             ExperimentType.valueOf((String) sourceMap.get("type")),
             AsyncStatus.valueOf((String) sourceMap.get("status")),
             (String) sourceMap.get("querySetId"),

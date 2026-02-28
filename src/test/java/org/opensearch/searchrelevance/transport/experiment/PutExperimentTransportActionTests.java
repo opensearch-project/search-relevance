@@ -104,6 +104,8 @@ public class PutExperimentTransportActionTests extends OpenSearchTestCase {
         PutExperimentRequest request = new PutExperimentRequest(
             ExperimentType.PAIRWISE_COMPARISON,
             null,
+            "Test Experiment",
+            "Test Description",
             "test-queryset-id",
             List.of("config1"),
             List.of("judgment1"),
@@ -162,6 +164,8 @@ public class PutExperimentTransportActionTests extends OpenSearchTestCase {
         PutExperimentRequest request = new PutExperimentRequest(
             ExperimentType.PAIRWISE_COMPARISON,
             null,
+            "Test Experiment",
+            "Test Description",
             "nonexistent-queryset",
             List.of("config1"),
             List.of("judgment1"),
@@ -197,6 +201,8 @@ public class PutExperimentTransportActionTests extends OpenSearchTestCase {
         PutExperimentRequest request = new PutExperimentRequest(
             ExperimentType.PAIRWISE_COMPARISON,
             null,
+            "Test Experiment",
+            "Test Description",
             "test-queryset-id",
             List.of("config1"),
             List.of("judgment1"),
@@ -217,5 +223,62 @@ public class PutExperimentTransportActionTests extends OpenSearchTestCase {
 
         Exception exception = exceptionCaptor.getValue();
         assertTrue(exception.getMessage().contains("Failed to create initial experiment"));
+    }
+
+    // ============================================
+    // generateDefaultExperimentName Tests
+    // ============================================
+
+    public void testGenerateDefaultExperimentName_ValidInputs() {
+        String id = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
+        String result = PutExperimentTransportAction.generateDefaultExperimentName(ExperimentType.PAIRWISE_COMPARISON, id);
+        assertEquals("PAIRWISE_COMPARISON-a1b2c3d4", result);
+    }
+
+    public void testGenerateDefaultExperimentName_ShortId() {
+        String shortId = "abc";
+        String result = PutExperimentTransportAction.generateDefaultExperimentName(ExperimentType.POINTWISE_EVALUATION, shortId);
+        assertEquals("POINTWISE_EVALUATION-abc", result);
+    }
+
+    public void testGenerateDefaultExperimentName_ExactlyEightChars() {
+        String exactId = "12345678";
+        String result = PutExperimentTransportAction.generateDefaultExperimentName(ExperimentType.HYBRID_OPTIMIZER, exactId);
+        assertEquals("HYBRID_OPTIMIZER-12345678", result);
+    }
+
+    public void testGenerateDefaultExperimentName_NullType() {
+        try {
+            PutExperimentTransportAction.generateDefaultExperimentName(null, "test-id");
+            fail("Expected NullPointerException");
+        } catch (NullPointerException e) {
+            assertTrue(e.getMessage().contains("Experiment type must not be null"));
+        }
+    }
+
+    public void testGenerateDefaultExperimentName_NullId() {
+        try {
+            PutExperimentTransportAction.generateDefaultExperimentName(ExperimentType.PAIRWISE_COMPARISON, null);
+            fail("Expected NullPointerException");
+        } catch (NullPointerException e) {
+            assertTrue(e.getMessage().contains("Experiment ID must not be null"));
+        }
+    }
+
+    public void testGenerateDefaultExperimentName_AllTypes() {
+        String id = "test-uuid-1234";
+
+        assertEquals(
+            "PAIRWISE_COMPARISON-test-uui",
+            PutExperimentTransportAction.generateDefaultExperimentName(ExperimentType.PAIRWISE_COMPARISON, id)
+        );
+        assertEquals(
+            "POINTWISE_EVALUATION-test-uui",
+            PutExperimentTransportAction.generateDefaultExperimentName(ExperimentType.POINTWISE_EVALUATION, id)
+        );
+        assertEquals(
+            "HYBRID_OPTIMIZER-test-uui",
+            PutExperimentTransportAction.generateDefaultExperimentName(ExperimentType.HYBRID_OPTIMIZER, id)
+        );
     }
 }

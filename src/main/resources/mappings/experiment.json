@@ -1,10 +1,12 @@
 {
   "_meta": {
-    "schema_version": 0
+    "schema_version": 1
   },
   "properties": {
     "id": { "type": "keyword" },
     "timestamp": { "type": "date", "format": "strict_date_time" },
+    "name": { "type": "text", "fields": { "keyword": { "type": "keyword" } } },
+    "description": { "type": "text" },
     "type": { "type": "keyword" },
     "status": { "type": "keyword" },
     "querySetId": { "type": "keyword" },

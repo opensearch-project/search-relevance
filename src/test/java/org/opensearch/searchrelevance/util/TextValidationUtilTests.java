@@ -7,7 +7,9 @@
  */
 package org.opensearch.searchrelevance.util;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.opensearch.searchrelevance.plugin.SearchRelevanceRestTestCase;
 import org.opensearch.searchrelevance.utils.TextValidationUtil;
@@ -531,5 +533,244 @@ public class TextValidationUtilTests extends SearchRelevanceRestTestCase {
         TextValidationUtil.ValidationResult result = TextValidationUtil.validatePromptTemplate(longTemplate.toString());
         assertTrue("Valid long template should be accepted", result.isValid());
         assertNull(result.getErrorMessage());
+    }
+
+    // ============================================
+    // Experiment Name Validation Tests
+    // ============================================
+
+    public void testValidateExperimentName_ValidNames() {
+        // Test valid experiment names within 50 character limit (same as other
+        // entities)
+        List<String> validNames = List.of("My Experiment", "PAIRWISE_COMPARISON-a1b2c3d4", "Test Experiment 123", "a".repeat(50));
+
+        for (String name : validNames) {
+            TextValidationUtil.ValidationResult result = TextValidationUtil.validateName(name);
+            assertTrue("Name should be valid: " + name, result.isValid());
+            assertNull(result.getErrorMessage());
+        }
+    }
+
+    public void testValidateExperimentName_TooLong() {
+        // Test that experiment names over 50 characters are rejected (same limit as
+        // other entities)
+        String longName = "a".repeat(51);
+        TextValidationUtil.ValidationResult result = TextValidationUtil.validateName(longName);
+        assertFalse("Name over 50 chars should be invalid", result.isValid());
+        assertEquals("Text exceeds maximum length of 50 characters", result.getErrorMessage());
+    }
+
+    public void testValidateExperimentName_InvalidCharacters() {
+        // Test that dangerous characters are rejected
+        List<String> invalidNames = List.of("Name with \"quotes\"", "Name with <html>", "Name with \\backslash");
+
+        for (String name : invalidNames) {
+            TextValidationUtil.ValidationResult result = TextValidationUtil.validateName(name);
+            assertFalse("Name with invalid chars should be invalid: " + name, result.isValid());
+        }
+    }
+
+    // ============================================
+    // ParsedField Tests
+    // ============================================
+
+    public void testParsedField_Valid() {
+        TextValidationUtil.ParsedField field = TextValidationUtil.ParsedField.valid("test value");
+        assertTrue(field.isValid());
+        assertTrue(field.isPresent());
+        assertFalse(field.hasError());
+        assertEquals("test value", field.getValue());
+        assertNull(field.getErrorMessage());
+        assertTrue(field.asOptional().isPresent());
+        assertEquals("test value", field.asOptional().get());
+    }
+
+    public void testParsedField_Invalid() {
+        TextValidationUtil.ParsedField field = TextValidationUtil.ParsedField.invalid("error message");
+        assertFalse(field.isValid());
+        assertTrue(field.isPresent());
+        assertTrue(field.hasError());
+        assertNull(field.getValue());
+        assertEquals("error message", field.getErrorMessage());
+        assertFalse(field.asOptional().isPresent());
+    }
+
+    public void testParsedField_Absent() {
+        TextValidationUtil.ParsedField field = TextValidationUtil.ParsedField.absent();
+        assertTrue(field.isValid());
+        assertFalse(field.isPresent());
+        assertFalse(field.hasError());
+        assertNull(field.getValue());
+        assertNull(field.getErrorMessage());
+        assertFalse(field.asOptional().isPresent());
+    }
+
+    // ============================================
+    // parseOptionalExperimentName Tests
+    // ============================================
+
+    public void testParseOptionalExperimentName_ValidName() {
+        Map<String, Object> source = new HashMap<>();
+        source.put("name", "My Experiment");
+
+        TextValidationUtil.ParsedField result = TextValidationUtil.parseOptionalExperimentName(source, "name");
+        assertTrue(result.isValid());
+        assertTrue(result.isPresent());
+        assertEquals("My Experiment", result.getValue());
+    }
+
+    public void testParseOptionalExperimentName_TrimsWhitespace() {
+        Map<String, Object> source = new HashMap<>();
+        source.put("name", "  My Experiment  ");
+
+        TextValidationUtil.ParsedField result = TextValidationUtil.parseOptionalExperimentName(source, "name");
+        assertTrue(result.isValid());
+        assertTrue(result.isPresent());
+        assertEquals("My Experiment", result.getValue());
+    }
+
+    public void testParseOptionalExperimentName_NullSource() {
+        TextValidationUtil.ParsedField result = TextValidationUtil.parseOptionalExperimentName(null, "name");
+        assertTrue(result.isValid());
+        assertFalse(result.isPresent());
+        assertNull(result.getValue());
+    }
+
+    public void testParseOptionalExperimentName_NullFieldName() {
+        Map<String, Object> source = new HashMap<>();
+        source.put("name", "My Experiment");
+
+        TextValidationUtil.ParsedField result = TextValidationUtil.parseOptionalExperimentName(source, null);
+        assertTrue(result.isValid());
+        assertFalse(result.isPresent());
+    }
+
+    public void testParseOptionalExperimentName_MissingField() {
+        Map<String, Object> source = new HashMap<>();
+        source.put("other", "value");
+
+        TextValidationUtil.ParsedField result = TextValidationUtil.parseOptionalExperimentName(source, "name");
+        assertTrue(result.isValid());
+        assertFalse(result.isPresent());
+        assertNull(result.getValue());
+    }
+
+    public void testParseOptionalExperimentName_NullValue() {
+        Map<String, Object> source = new HashMap<>();
+        source.put("name", null);
+
+        TextValidationUtil.ParsedField result = TextValidationUtil.parseOptionalExperimentName(source, "name");
+        assertTrue(result.isValid());
+        assertFalse(result.isPresent());
+    }
+
+    public void testParseOptionalExperimentName_EmptyValue() {
+        Map<String, Object> source = new HashMap<>();
+        source.put("name", "");
+
+        TextValidationUtil.ParsedField result = TextValidationUtil.parseOptionalExperimentName(source, "name");
+        assertTrue(result.isValid());
+        assertFalse(result.isPresent());
+    }
+
+    public void testParseOptionalExperimentName_BlankValue() {
+        Map<String, Object> source = new HashMap<>();
+        source.put("name", "   ");
+
+        TextValidationUtil.ParsedField result = TextValidationUtil.parseOptionalExperimentName(source, "name");
+        assertTrue(result.isValid());
+        assertFalse(result.isPresent());
+    }
+
+    public void testParseOptionalExperimentName_NonStringValue() {
+        Map<String, Object> source = new HashMap<>();
+        source.put("name", 12345);
+
+        TextValidationUtil.ParsedField result = TextValidationUtil.parseOptionalExperimentName(source, "name");
+        assertFalse(result.isValid());
+        assertTrue(result.hasError());
+        assertTrue(result.getErrorMessage().contains("must be a string"));
+    }
+
+    public void testParseOptionalDescription_NonStringValue() {
+        Map<String, Object> source = new HashMap<>();
+        source.put("description", 12345);
+
+        TextValidationUtil.ParsedField result = TextValidationUtil.parseOptionalDescription(source, "description");
+        assertFalse(result.isValid());
+        assertTrue(result.hasError());
+        assertTrue(result.getErrorMessage().contains("must be a string"));
+    }
+
+    public void testParseOptionalExperimentName_TooLong() {
+        Map<String, Object> source = new HashMap<>();
+        source.put("name", "a".repeat(51));
+
+        TextValidationUtil.ParsedField result = TextValidationUtil.parseOptionalExperimentName(source, "name");
+        assertFalse(result.isValid());
+        assertTrue(result.hasError());
+        assertTrue(result.getErrorMessage().contains("exceeds maximum length"));
+    }
+
+    public void testParseOptionalExperimentName_InvalidCharacters() {
+        Map<String, Object> source = new HashMap<>();
+        source.put("name", "Name with \"quotes\"");
+
+        TextValidationUtil.ParsedField result = TextValidationUtil.parseOptionalExperimentName(source, "name");
+        assertFalse(result.isValid());
+        assertTrue(result.hasError());
+        assertTrue(result.getErrorMessage().contains("invalid characters"));
+    }
+
+    // ============================================
+    // parseOptionalDescription Tests
+    // ============================================
+
+    public void testParseOptionalDescription_ValidDescription() {
+        Map<String, Object> source = new HashMap<>();
+        source.put("description", "This is a valid description");
+
+        TextValidationUtil.ParsedField result = TextValidationUtil.parseOptionalDescription(source, "description");
+        assertTrue(result.isValid());
+        assertTrue(result.isPresent());
+        assertEquals("This is a valid description", result.getValue());
+    }
+
+    public void testParseOptionalDescription_TrimsWhitespace() {
+        Map<String, Object> source = new HashMap<>();
+        source.put("description", "  Description with spaces  ");
+
+        TextValidationUtil.ParsedField result = TextValidationUtil.parseOptionalDescription(source, "description");
+        assertTrue(result.isValid());
+        assertTrue(result.isPresent());
+        assertEquals("Description with spaces", result.getValue());
+    }
+
+    public void testParseOptionalDescription_MissingField() {
+        Map<String, Object> source = new HashMap<>();
+
+        TextValidationUtil.ParsedField result = TextValidationUtil.parseOptionalDescription(source, "description");
+        assertTrue(result.isValid());
+        assertFalse(result.isPresent());
+    }
+
+    public void testParseOptionalDescription_TooLong() {
+        Map<String, Object> source = new HashMap<>();
+        source.put("description", "a".repeat(251));
+
+        TextValidationUtil.ParsedField result = TextValidationUtil.parseOptionalDescription(source, "description");
+        assertFalse(result.isValid());
+        assertTrue(result.hasError());
+        assertTrue(result.getErrorMessage().contains("exceeds maximum length"));
+    }
+
+    public void testParseOptionalDescription_InvalidCharacters() {
+        Map<String, Object> source = new HashMap<>();
+        source.put("description", "Description with <html>");
+
+        TextValidationUtil.ParsedField result = TextValidationUtil.parseOptionalDescription(source, "description");
+        assertFalse(result.isValid());
+        assertTrue(result.hasError());
+        assertTrue(result.getErrorMessage().contains("invalid characters"));
     }
 }

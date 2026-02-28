@@ -8,6 +8,7 @@
 package org.opensearch.searchrelevance.transport.experiment;
 
 import java.util.ArrayList;
+import java.util.Objects;
 import java.util.UUID;
 
 import org.opensearch.action.index.IndexResponse;
@@ -28,6 +29,7 @@ import org.opensearch.searchrelevance.experiment.PointwiseExperimentProcessor;
 import org.opensearch.searchrelevance.metrics.MetricsHelper;
 import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.Experiment;
+import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.tasks.Task;
@@ -41,6 +43,9 @@ import lombok.extern.log4j.Log4j2;
  */
 @Log4j2
 public class PutExperimentTransportAction extends HandledTransportAction<PutExperimentRequest, IndexResponse> {
+
+    /** Length of the short ID used in default experiment names */
+    private static final int SHORT_ID_LENGTH = 8;
 
     private final ExperimentDao experimentDao;
     private final QuerySetDao querySetDao;
@@ -83,9 +88,15 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
 
         try {
             String id = UUID.randomUUID().toString();
+            final String experimentName = (request.getName() != null && !request.getName().trim().isEmpty())
+                ? request.getName()
+                : generateDefaultExperimentName(request.getType(), id);
+
             Experiment initialExperiment = new Experiment(
                 id,
                 TimeUtils.getTimestamp(),
+                experimentName,
+                request.getDescription(),
                 request.getType(),
                 AsyncStatus.PROCESSING,
                 request.getQuerySetId(),
@@ -101,7 +112,7 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
                 listener.onResponse((IndexResponse) response);
 
                 // Start experiment with async processing
-                experimentRunningManager.startExperimentRun(id, request, null, null);
+                experimentRunningManager.startExperimentRun(id, request, experimentName, request.getDescription(), null, null);
             }, e -> {
                 log.error("Failed to create initial experiment", e);
                 listener.onFailure(
@@ -113,5 +124,22 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
             log.error("Failed to process experiment request", e);
             listener.onFailure(new SearchRelevanceException("Failed to process experiment request", e, RestStatus.INTERNAL_SERVER_ERROR));
         }
+    }
+
+    /**
+     * Generates a default experiment name based on the experiment type and a short
+     * ID.
+     * Format: "{ExperimentType}-{shortId}" e.g., "PAIRWISE_COMPARISON-a1b2c3d4"
+     *
+     * @param type the experiment type (must not be null)
+     * @param id   the full experiment ID (must not be null)
+     * @return a default name for the experiment
+     * @throws NullPointerException if type or id is null
+     */
+    public static String generateDefaultExperimentName(ExperimentType type, String id) {
+        Objects.requireNonNull(type, "Experiment type must not be null");
+        Objects.requireNonNull(id, "Experiment ID must not be null");
+        String shortId = id.length() > SHORT_ID_LENGTH ? id.substring(0, SHORT_ID_LENGTH) : id;
+        return type.name() + "-" + shortId;
     }
 }

@@ -31,6 +31,8 @@ import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.search.ShardSearchFailure;
 import org.opensearch.action.support.WriteRequest;
+import org.opensearch.action.update.UpdateRequest;
+import org.opensearch.action.update.UpdateResponse;
 import org.opensearch.cluster.metadata.MappingMetadata;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.io.Streams;
@@ -550,6 +552,63 @@ public class SearchRelevanceIndicesManager {
         };
         executeAction(listener, searchOperationContext, action);
         return null;
+    }
+
+    /**
+     * Patch (partially update) a document in the system index.
+     * Only updates the specified fields, leaving other fields unchanged.
+     *
+     * @param docId - document id to be updated
+     * @param updates - map of field names to new values
+     * @param index - system index
+     * @param listener - action listener for async action
+     */
+    public void patchDoc(
+        final String docId,
+        final Map<String, Object> updates,
+        final SearchRelevanceIndices index,
+        final ActionListener<UpdateResponse> listener
+    ) {
+        if (docId == null || docId.isEmpty()) {
+            listener.onFailure(new SearchRelevanceException("Document ID cannot be null or empty", RestStatus.BAD_REQUEST));
+            return;
+        }
+        if (updates == null || updates.isEmpty()) {
+            listener.onFailure(new SearchRelevanceException("Updates map cannot be null or empty", RestStatus.BAD_REQUEST));
+            return;
+        }
+        if (index == null) {
+            listener.onFailure(new SearchRelevanceException("Index cannot be null", RestStatus.BAD_REQUEST));
+            return;
+        }
+
+        SearchOperationContext searchOperationContext = SearchOperationContext.builder().index(index).documentId(docId).build();
+        BiConsumer<SearchOperationContext, ActionListener<?>> action = (context, actionListener) -> StashedThreadContext.run(client, () -> {
+            try {
+                @SuppressWarnings("unchecked")
+                ActionListener<UpdateResponse> typedListener = (ActionListener<UpdateResponse>) actionListener;
+                UpdateRequest updateRequest = new UpdateRequest(context.getIndex().getIndexName(), context.getDocumentId()).doc(updates)
+                    .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
+
+                client.update(updateRequest, new ActionListener<>() {
+                    @Override
+                    public void onResponse(UpdateResponse updateResponse) {
+                        log.info("Successfully patched doc id [{}]", context.getDocumentId());
+                        typedListener.onResponse(updateResponse);
+                    }
+
+                    @Override
+                    public void onFailure(Exception e) {
+                        typedListener.onFailure(
+                            new SearchRelevanceException("Failed to patch document", e, RestStatus.INTERNAL_SERVER_ERROR)
+                        );
+                    }
+                });
+            } catch (Exception e) {
+                actionListener.onFailure(new SearchRelevanceException("Failed to patch doc", e, RestStatus.INTERNAL_SERVER_ERROR));
+            }
+        });
+        executeAction(listener, searchOperationContext, action);
     }
 
     /**
