@@ -17,10 +17,10 @@ import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.METRI
 import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.METRICS_RECALL_AT;
 import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.calculateDCGAtK;
 import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.calculateMAPAtK;
-import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.calculateMRR;
 import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.calculateNDCGAtK;
 import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.calculatePrecisionAtK;
 import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.calculateRecallAtK;
+import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.calculateReciprocalRank;
 import static org.opensearch.searchrelevance.metrics.calculator.JudgmentThresholdCalculator.computeThreshold;
 
 import java.util.ArrayList;
@@ -71,7 +71,7 @@ public class EvaluationMetrics {
         addMetric(metrics, METRICS_PRECISION_AT + k, calculatePrecisionAtK(docIds, judgments, k, threshold));
         addMetric(metrics, METRICS_RECALL_AT + k, calculateRecallAtK(docIds, judgments, k, threshold));
         addMetric(metrics, METRICS_MEAN_AVERAGE_PRECISION_AT + k, calculateMAPAtK(docIds, judgments, k, threshold));
-        addMetric(metrics, METRICS_MEAN_RECIPROCAL_RANK, calculateMRR(docIds, judgments, k, threshold));
+        addMetric(metrics, METRICS_MEAN_RECIPROCAL_RANK, calculateReciprocalRank(docIds, judgments, k, threshold));
         addMetric(metrics, METRICS_DISCOUNTED_CUMULATIVE_GAIN_AT + k, calculateDCGAtK(docIds, judgments, k));
         addMetric(metrics, METRICS_NORMALIZED_DISCOUNTED_CUMULATIVE_GAIN_AT + k, calculateNDCGAtK(docIds, judgments, k));
 

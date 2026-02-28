@@ -240,24 +240,24 @@ public class EvaluationTests extends OpenSearchTestCase {
     }
 
     // ----------------------------------------------------------------
-    // MRR tests with dynamic threshold
+    // Reciprocal Rank (RR) tests with dynamic threshold
     // ----------------------------------------------------------------
 
-    public void testCalculateMRR() {
+    public void testCalculateReciprocalRank() {
         // With threshold=2, first relevant doc is d2 (index 1, rank 2)
-        // MRR = 1/2 = 0.5
-        double mrr = Evaluation.calculateMRR(this.results, this.judgments, 20, threshold);
-        assertEquals(0.5, mrr, 0.001);
+        // RR = 1/2 = 0.5
+        double rr = Evaluation.calculateReciprocalRank(this.results, this.judgments, 20, threshold);
+        assertEquals(0.5, rr, 0.001);
 
-        // If top 1 doc (d1, rating 1) is checked: not relevant -> MRR = 0.0
-        mrr = Evaluation.calculateMRR(this.results, this.judgments, 1, threshold);
-        assertEquals(0.0, mrr, 0.001);
+        // If top 1 doc (d1, rating 1) is checked: not relevant -> RR = 0.0
+        rr = Evaluation.calculateReciprocalRank(this.results, this.judgments, 1, threshold);
+        assertEquals(0.0, rr, 0.001);
 
         // Case where no relevant docs exist at all
         // Create disjoint judgments/results
         List<String> badResults = List.of("bad1", "bad2");
-        mrr = Evaluation.calculateMRR(badResults, this.judgments, 5, threshold);
-        assertEquals(0.0, mrr, 0.001);
+        rr = Evaluation.calculateReciprocalRank(badResults, this.judgments, 5, threshold);
+        assertEquals(0.0, rr, 0.001);
     }
 
     // ----------------------------------------------------------------

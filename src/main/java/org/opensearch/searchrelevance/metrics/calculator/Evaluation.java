@@ -104,10 +104,18 @@ public class Evaluation {
     }
 
     /**
-     * Normalized Discounted Cumulative Gain (NDCG)
+     * Normalized Discounted Cumulative Gain (NDCG@K).
+     * <p>
+     * Uses unrounded DCG internally to avoid compounding rounding errors
+     * when computing the ratio DCG/IDCG.
+     *
+     * @param docIds         ordered list of document IDs returned by search
+     * @param judgmentScores mapping from doc ID to its judgment rating
+     * @param k              rank cutoff
+     * @return NDCG value rounded to 2 decimal places
      */
     public static double calculateNDCGAtK(List<String> docIds, Map<String, String> judgmentScores, int k) {
-        double dcg = calculateDCGAtK(docIds, judgmentScores, k);
+        double dcg = rawDCGAtK(docIds, judgmentScores, k);
         double idcg = calculateIDCG(docIds, judgmentScores, k);
 
         double ndcg = idcg > 0 ? dcg / idcg : 0.0;
@@ -115,13 +123,18 @@ public class Evaluation {
     }
 
     /**
-     * Recall@K - measures the proportion of relevant documents retrieved in the top
-     * K.
+     * Recall@K - measures the proportion of relevant documents retrieved in the top K.
+     * <p>
+     * Note: The total number of relevant documents is computed from the entire judgment set.
+     * If the judgment set contains documents that are not present in the search index
+     * (e.g., from UBI data or external sources), recall will be computed against all
+     * judged relevant documents, potentially resulting in lower recall values.
      *
      * @param docIds         ordered list of document IDs returned by search
      * @param judgmentScores mapping from doc ID to its judgment rating
      * @param k              rank cutoff
      * @param threshold      binary relevance threshold
+     * @return Recall value rounded to 2 decimal places
      */
     public static double calculateRecallAtK(List<String> docIds, Map<String, String> judgmentScores, int k, double threshold) {
         int relevantInTopK = 0;
@@ -140,15 +153,19 @@ public class Evaluation {
     }
 
     /**
-     * Mean Reciprocal Rank (MRR) - 1 / Rank of the first relevant document.
+     * Reciprocal Rank (RR) - computes 1 / rank of the first relevant document for a single query.
+     * <p>
+     * This method computes RR for an individual query. To obtain Mean Reciprocal Rank (MRR),
+     * average the RR values across multiple queries at the experiment aggregation level.
+     * See: <a href="https://en.wikipedia.org/wiki/Mean_reciprocal_rank">Mean Reciprocal Rank</a>
      *
      * @param docIds         ordered list of document IDs returned by search
      * @param judgmentScores mapping from doc ID to its judgment rating
-     * @param k              rank cutoff (MRR typically considers the first relevant
-     *                       doc within K)
+     * @param k              rank cutoff (considers only documents within top K)
      * @param threshold      binary relevance threshold
+     * @return Reciprocal rank value (1/rank) rounded to 2 decimal places, or 0.0 if no relevant document found in top K
      */
-    public static double calculateMRR(List<String> docIds, Map<String, String> judgmentScores, int k, double threshold) {
+    public static double calculateReciprocalRank(List<String> docIds, Map<String, String> judgmentScores, int k, double threshold) {
         int size = Math.min(k, docIds.size());
         for (int i = 0; i < size; i++) {
             String docId = docIds.get(i);
@@ -162,8 +179,31 @@ public class Evaluation {
 
     /**
      * Discounted Cumulative Gain (DCG@K) - non-normalized version of NDCG.
+     * <p>
+     * Note: Documents without a judgment in judgmentScores are treated as having
+     * relevance = 0 (i.e., they contribute nothing to the DCG score).
+     *
+     * @param docIds         ordered list of document IDs returned by search
+     * @param judgmentScores mapping from doc ID to its judgment rating
+     * @param k              rank cutoff
+     * @return DCG value rounded to 2 decimal places
      */
     public static double calculateDCGAtK(List<String> docIds, Map<String, String> judgmentScores, int k) {
+        return Math.round(rawDCGAtK(docIds, judgmentScores, k) * 100.0) / 100.0;
+    }
+
+    /**
+     * Computes raw (unrounded) DCG@K for internal use.
+     * <p>
+     * This method is used internally by both {@link #calculateDCGAtK} (which rounds for display)
+     * and {@link #calculateNDCGAtK} (which needs unrounded values for accurate ratio computation).
+     *
+     * @param docIds         ordered list of document IDs returned by search
+     * @param judgmentScores mapping from doc ID to its judgment rating
+     * @param k              rank cutoff
+     * @return raw DCG value (not rounded)
+     */
+    private static double rawDCGAtK(List<String> docIds, Map<String, String> judgmentScores, int k) {
         double dcg = 0.0;
         int size = Math.min(k, docIds.size());
 
@@ -174,7 +214,7 @@ public class Evaluation {
                 dcg += (Math.pow(2, relevance) - 1) / (Math.log(i + 2) / Math.log(2));
             }
         }
-        return Math.round(dcg * 100.0) / 100.0;
+        return dcg;
     }
 
     private static double calculateIDCG(List<String> docIds, Map<String, String> judgmentScores, int k) {
