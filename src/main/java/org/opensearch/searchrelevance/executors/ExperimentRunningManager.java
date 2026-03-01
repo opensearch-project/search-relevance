@@ -65,7 +65,7 @@ import lombok.extern.log4j.Log4j2;
  * 2 paths where the code will use {@link ExperimentRunningManager}: The
  * experiment
  * was scheduled to run, or the user manually triggered through
- * {@link PutExperimentTransportAction}.
+ * {@link org.opensearch.searchrelevance.transport.experiment.PutExperimentTransportAction}.
  *
  * <p>
  * When running an experiment, we need a {@link QuerySet} and a
