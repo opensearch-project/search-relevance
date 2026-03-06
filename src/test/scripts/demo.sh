@@ -14,6 +14,10 @@
 #   --skip-ecommerce          Skip deleting and re-loading the ecommerce index
 #   --opensearch_url <url>    OpenSearch base URL (default: http://localhost:9200)
 
+# Resolve the directory this script lives in so data paths work from any working directory
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+DATA_DIR="$SCRIPT_DIR/../data-esci"
+
 # Helper script
 exe() { (set -x ; "$@") | jq | tee RES; echo; }
 
@@ -44,12 +48,12 @@ if [ "$SKIP_ECOMMERCE" = false ]; then
   echo "Deleting ecommerce sample data"
   (curl -s -X DELETE "$OPENSEARCH_URL/ecommerce" > /dev/null) || true
 
-  ECOMMERCE_ZIP_FILE="../data-esci/esci_us_ecommerce_shrunk.ndjson.zip"
+  ECOMMERCE_ZIP_FILE="$DATA_DIR/esci_us_ecommerce_shrunk.ndjson.zip"
 
   echo "Creating ecommerce index using schema.json"
   curl -s -X PUT "$OPENSEARCH_URL/ecommerce" \
     -H 'Content-Type: application/json' \
-    --data-binary @../data-esci/schema.json
+    --data-binary @"$DATA_DIR/schema.json"
 
   echo ""
   echo "Populating ecommerce index"
@@ -69,7 +73,7 @@ echo "Creating UBI indexes using mappings"
 curl -s -X POST "$OPENSEARCH_URL/_plugins/ubi/initialize"
 
 echo "Loading sample UBI data"
-curl -o /dev/null -X POST "$OPENSEARCH_URL/index-name/_bulk?pretty" --data-binary @../data-esci/ubi_queries_events.ndjson -H "Content-Type: application/x-ndjson"
+curl -o /dev/null -X POST "$OPENSEARCH_URL/index-name/_bulk?pretty" --data-binary @"$DATA_DIR/ubi_queries_events.ndjson" -H "Content-Type: application/x-ndjson"
 
 echo "Refreshing UBI indexes to make indexed data available for query sampling"
 curl -XPOST "$OPENSEARCH_URL/ubi_queries/_refresh"
@@ -193,7 +197,7 @@ echo "Upload ESCI Query Set"
 
 exe curl -s -X PUT "$OPENSEARCH_URL/_plugins/_search_relevance/query_sets" \
 -H "Content-type: application/json" \
---data-binary @../data-esci/esci_us_queryset.json
+--data-binary @"$DATA_DIR/esci_us_queryset.json"
 
 
 
@@ -298,7 +302,7 @@ echo "Upload ESCI Judgments"
 
 exe curl -s -X PUT "$OPENSEARCH_URL/_plugins/_search_relevance/judgments" \
 -H "Content-type: application/json" \
---data-binary @../data-esci/esci_us_judgments.json
+--data-binary @"$DATA_DIR/esci_us_judgments.json"
 
 
 
