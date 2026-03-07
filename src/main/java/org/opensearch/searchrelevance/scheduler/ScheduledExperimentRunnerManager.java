@@ -7,6 +7,9 @@
  */
 package org.opensearch.searchrelevance.scheduler;
 
+import static org.opensearch.searchrelevance.common.PluginConstants.DESCRIPTION;
+import static org.opensearch.searchrelevance.common.PluginConstants.NAME;
+
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
@@ -192,8 +195,8 @@ public class ScheduledExperimentRunnerManager {
         return new Experiment(
             "",
             "",
-            (String) sourceMap.get(Experiment.NAME),
-            (String) sourceMap.get(Experiment.DESCRIPTION),
+            (String) sourceMap.get(NAME),
+            (String) sourceMap.get(DESCRIPTION),
             ExperimentType.valueOf((String) sourceMap.get("type")),
             AsyncStatus.valueOf((String) sourceMap.get("status")),
             (String) sourceMap.get("querySetId"),

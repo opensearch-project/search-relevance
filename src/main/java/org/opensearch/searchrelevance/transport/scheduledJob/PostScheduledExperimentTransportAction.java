@@ -7,6 +7,9 @@
  */
 package org.opensearch.searchrelevance.transport.scheduledJob;
 
+import static org.opensearch.searchrelevance.common.PluginConstants.DESCRIPTION;
+import static org.opensearch.searchrelevance.common.PluginConstants.NAME;
+
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
@@ -68,7 +71,8 @@ public class PostScheduledExperimentTransportAction extends HandledTransportActi
             String experimentId = request.getExperimentId();
             String cronExpression = request.getCronExpression();
             Schedule schedule = new CronSchedule(cronExpression, ZoneId.systemDefault());
-            String id = experimentId; // Since there is at most 1 scheduled job per experiment, the ids could be the same.
+            String id = experimentId; // Since there is at most 1 scheduled job per experiment, the ids could be the
+                                      // same.
 
             Instant now = Instant.now();
 
@@ -112,8 +116,8 @@ public class PostScheduledExperimentTransportAction extends HandledTransportActi
         return new Experiment(
             (String) sourceMap.get("id"),
             TimeUtils.getTimestamp(),
-            (String) sourceMap.get(Experiment.NAME),
-            (String) sourceMap.get(Experiment.DESCRIPTION),
+            (String) sourceMap.get(NAME),
+            (String) sourceMap.get(DESCRIPTION),
             ExperimentType.valueOf((String) sourceMap.get("type")),
             AsyncStatus.valueOf((String) sourceMap.get("status")),
             (String) sourceMap.get("querySetId"),

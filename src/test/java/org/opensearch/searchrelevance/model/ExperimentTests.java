@@ -14,6 +14,7 @@ import java.util.List;
 import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.core.xcontent.ToXContent;
 import org.opensearch.core.xcontent.XContentBuilder;
+import org.opensearch.searchrelevance.common.PluginConstants;
 import org.opensearch.test.OpenSearchTestCase;
 
 public class ExperimentTests extends OpenSearchTestCase {
@@ -133,8 +134,8 @@ public class ExperimentTests extends OpenSearchTestCase {
     public void testExperimentFieldConstants() {
         assertEquals("id", Experiment.ID);
         assertEquals("timestamp", Experiment.TIME_STAMP);
-        assertEquals("name", Experiment.NAME);
-        assertEquals("description", Experiment.DESCRIPTION);
+        assertEquals("name", PluginConstants.NAME);
+        assertEquals("description", PluginConstants.DESCRIPTION);
         assertEquals("type", Experiment.TYPE);
         assertEquals("status", Experiment.STATUS);
         assertEquals("querySetId", Experiment.QUERY_SET_ID);

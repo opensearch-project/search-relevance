@@ -335,6 +335,8 @@ erDiagram
     ".plugins-search-relevance-experiment" {
         keyword id PK
         date timestamp
+        text name
+        text description
         keyword type
         keyword status
         keyword querySetId FK

@@ -7,6 +7,8 @@
  */
 package org.opensearch.searchrelevance.transport.experiment;
 
+import java.util.Map;
+
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.HandledTransportAction;
 import org.opensearch.action.update.UpdateResponse;
@@ -15,6 +17,7 @@ import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.searchrelevance.dao.ExperimentDao;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
+import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
 
@@ -39,23 +42,49 @@ public class PatchExperimentTransportAction extends HandledTransportAction<Patch
 
     @Override
     protected void doExecute(Task task, PatchExperimentRequest request, ActionListener<UpdateResponse> listener) {
-        if (listener == null) {
-            throw new IllegalArgumentException("Listener cannot be null");
-        }
-        if (request == null) {
-            listener.onFailure(new SearchRelevanceException("Request cannot be null", RestStatus.BAD_REQUEST));
-            return;
-        }
-
         String experimentId = request.getExperimentId();
         log.debug("Patching experiment [{}] with name: [{}], description: [{}]", experimentId, request.getName(), request.getDescription());
 
-        experimentDao.patchExperiment(experimentId, request.getName(), request.getDescription(), ActionListener.wrap(updateResponse -> {
-            log.debug("Successfully patched experiment: {}", experimentId);
-            listener.onResponse(updateResponse);
+        // First check experiment status to prevent patching while PROCESSING
+        experimentDao.getExperiment(experimentId, ActionListener.wrap(searchResponse -> {
+            try {
+                if (searchResponse.getHits().getTotalHits().value() == 0) {
+                    listener.onFailure(new SearchRelevanceException("Experiment not found: " + experimentId, RestStatus.NOT_FOUND));
+                    return;
+                }
+                Map<String, Object> sourceMap = searchResponse.getHits().getHits()[0].getSourceAsMap();
+                String statusStr = (String) sourceMap.get("status");
+                if (AsyncStatus.PROCESSING.name().equals(statusStr)) {
+                    listener.onFailure(
+                        new SearchRelevanceException(
+                            "Cannot patch experiment while it is in PROCESSING status. Please wait for it to complete.",
+                            RestStatus.CONFLICT
+                        )
+                    );
+                    return;
+                }
+
+                experimentDao.patchExperiment(
+                    experimentId,
+                    request.getName(),
+                    request.getDescription(),
+                    ActionListener.wrap(updateResponse -> {
+                        log.debug("Successfully patched experiment: {}", experimentId);
+                        listener.onResponse(updateResponse);
+                    }, e -> {
+                        log.error("Failed to patch experiment [{}]: {}", experimentId, e.getMessage());
+                        listener.onFailure(e);
+                    })
+                );
+            } catch (Exception e) {
+                log.error("Failed to process experiment status check for [{}]", experimentId, e);
+                listener.onFailure(new SearchRelevanceException("Failed to check experiment status", e, RestStatus.INTERNAL_SERVER_ERROR));
+            }
         }, e -> {
-            log.error("Failed to patch experiment [{}]: {}", experimentId, e.getMessage());
-            listener.onFailure(e);
+            log.error("Failed to fetch experiment [{}] for status check: {}", experimentId, e.getMessage());
+            listener.onFailure(
+                new SearchRelevanceException("Failed to fetch experiment for status check", e, RestStatus.INTERNAL_SERVER_ERROR)
+            );
         }));
     }
 }

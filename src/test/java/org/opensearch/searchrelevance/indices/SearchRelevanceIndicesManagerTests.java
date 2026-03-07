@@ -417,7 +417,8 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         assertEquals(RestStatus.INTERNAL_SERVER_ERROR, ((SearchRelevanceException) capturedException).status());
     }
 
-    // ==================== Schema Version-Based Mapping Update Tests ====================
+    // ==================== Schema Version-Based Mapping Update Tests
+    // ====================
 
     /**
      * Test that when index does not exist, it is created (no mapping update)
@@ -426,13 +427,15 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         // Setup: index does not exist
         when(metadata.hasIndex(QUERY_SET.getIndexName())).thenReturn(false);
 
-        // Mock the sync create index call (createIndexIfAbsentSync uses sync version without listener)
+        // Mock the sync create index call (createIndexIfAbsentSync uses sync version
+        // without listener)
         org.opensearch.action.support.PlainActionFuture<CreateIndexResponse> createFuture =
             new org.opensearch.action.support.PlainActionFuture<>();
         createFuture.onResponse(new CreateIndexResponse(true, true, QUERY_SET.getIndexName()));
         when(indicesAdminClient.create(any(CreateIndexRequest.class))).thenReturn(createFuture);
 
-        // Execute via putDoc (which calls executeWithIndexCreationSynchronizedMode -> createIndexIfAbsentSync)
+        // Execute via putDoc (which calls executeWithIndexCreationSynchronizedMode ->
+        // createIndexIfAbsentSync)
         QuerySet querySet = new QuerySet("test_id", "test_name", "test_description", "test_timestamp", "test_sampling", List.of());
         XContentBuilder xContentBuilder = querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
 
@@ -453,7 +456,8 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
     }
 
     /**
-     * Test that when index exists with same schema version, no mapping update occurs
+     * Test that when index exists with same schema version, no mapping update
+     * occurs
      */
     public void testCreateIndexIfAbsentSync_IndexExistsWithSameVersion_NoUpdate() throws IOException {
         // Setup: index exists with same schema version as current
@@ -493,7 +497,8 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
     }
 
     /**
-     * Test that when index exists without _meta.schema_version (legacy index, version 0),
+     * Test that when index exists without _meta.schema_version (legacy index,
+     * version 0),
      * NO mapping update occurs when current version is also 0.
      */
     public void testCreateIndexIfAbsentSync_LegacyIndexWithoutSchemaVersion_NoUpdate() throws IOException {
@@ -537,7 +542,8 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
      * an exception is thrown.
      */
     public void testCreateIndexIfAbsentSync_IndexExistsWithNullMapping_ThrowsException() throws IOException {
-        // Setup: index exists but has no mapping - unexpected state, should throw exception
+        // Setup: index exists but has no mapping - unexpected state, should throw
+        // exception
         when(metadata.hasIndex(QUERY_SET.getIndexName())).thenReturn(true);
 
         IndexMetadata indexMetadata = mock(IndexMetadata.class);
@@ -567,7 +573,8 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
     }
 
     /**
-     * Test that when index exists with explicit schema_version matching current version,
+     * Test that when index exists with explicit schema_version matching current
+     * version,
      * NO mapping update occurs.
      */
     public void testCreateIndexIfAbsentSync_IndexExistsWithSameExplicitVersion_NoUpdate() throws IOException {
@@ -651,12 +658,15 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
     /**
      * Test that when index exists with older schema_version than current,
      * mapping update IS triggered.
-     * Note: This test simulates the scenario by setting index version to -2 (older than any valid version).
-     * In real usage, this would happen when JSON schema_version is bumped (e.g., 0 -> 1).
+     * Note: This test simulates the scenario by setting index version to -2 (older
+     * than any valid version).
+     * In real usage, this would happen when JSON schema_version is bumped (e.g., 0
+     * -> 1).
      */
     public void testCreateIndexIfAbsentSync_IndexExistsWithOlderVersion_UpdatesMapping() throws IOException {
         // Setup: index exists with schema version -2 (older than current 0)
-        // This simulates what happens when we bump JSON version from 0 to 1 and index still has 0
+        // This simulates what happens when we bump JSON version from 0 to 1 and index
+        // still has 0
         when(metadata.hasIndex(QUERY_SET.getIndexName())).thenReturn(true);
 
         IndexMetadata indexMetadata = mock(IndexMetadata.class);
@@ -692,10 +702,12 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         verify(indicesAdminClient).putMapping(any(PutMappingRequest.class));
     }
 
-    // ==================== Async createIndexIfAbsent with Retry Tests ====================
+    // ==================== Async createIndexIfAbsent with Retry Tests
+    // ====================
 
     /**
-     * Test that when index exists with older version, mapping update succeeds on first attempt.
+     * Test that when index exists with older version, mapping update succeeds on
+     * first attempt.
      */
     public void testCreateIndexIfAbsent_MappingUpdateSucceedsOnFirstAttempt() {
         // Setup: index exists with older schema version
@@ -731,7 +743,8 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
     }
 
     /**
-     * Test that when mapping update fails all 3 retries, stepListener.onFailure is called.
+     * Test that when mapping update fails all 3 retries, stepListener.onFailure is
+     * called.
      */
     public void testCreateIndexIfAbsent_MappingUpdateFailsAfterRetries_ServiceFails() {
         // Setup: index exists with older schema version
@@ -797,7 +810,8 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
     }
 
     /**
-     * Test that when index exists with same version, no mapping update and stepListener succeeds.
+     * Test that when index exists with same version, no mapping update and
+     * stepListener succeeds.
      */
     public void testCreateIndexIfAbsent_SameVersion_NoUpdateAndSucceeds() {
         // Setup: index exists with same schema version as current
@@ -823,6 +837,64 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
 
         // Verify: stepListener was called with success
         assertNull(stepListener.result());
+    }
+
+    // ==================== patchDoc Tests ====================
+
+    public void testPatchDocWhenSucceeded() {
+        String docId = "test_id";
+        Map<String, Object> updates = Map.of("name", "New Name", "description", "New Description");
+
+        doAnswer(invocation -> {
+            ActionListener<org.opensearch.action.update.UpdateResponse> listener = invocation.getArgument(1);
+            org.opensearch.action.update.UpdateResponse updateResponse = mock(org.opensearch.action.update.UpdateResponse.class);
+            when(updateResponse.getId()).thenReturn(docId);
+            listener.onResponse(updateResponse);
+            return null;
+        }).when(client).update(any(org.opensearch.action.update.UpdateRequest.class), any(ActionListener.class));
+
+        @SuppressWarnings("unchecked")
+        ActionListener<org.opensearch.action.update.UpdateResponse> listener = mock(ActionListener.class);
+        indicesManager.patchDoc(docId, updates, QUERY_SET, listener);
+
+        verify(client).update(any(org.opensearch.action.update.UpdateRequest.class), any(ActionListener.class));
+    }
+
+    public void testPatchDocWithNullDocId() {
+        Map<String, Object> updates = Map.of("name", "New Name");
+
+        @SuppressWarnings("unchecked")
+        ActionListener<org.opensearch.action.update.UpdateResponse> listener = mock(ActionListener.class);
+        indicesManager.patchDoc(null, updates, QUERY_SET, listener);
+
+        ArgumentCaptor<Exception> exceptionCaptor = ArgumentCaptor.forClass(Exception.class);
+        verify(listener).onFailure(exceptionCaptor.capture());
+        assertTrue(exceptionCaptor.getValue() instanceof SearchRelevanceException);
+        assertTrue(exceptionCaptor.getValue().getMessage().contains("Document ID cannot be null"));
+    }
+
+    public void testPatchDocWithEmptyUpdates() {
+        @SuppressWarnings("unchecked")
+        ActionListener<org.opensearch.action.update.UpdateResponse> listener = mock(ActionListener.class);
+        indicesManager.patchDoc("test_id", Map.of(), QUERY_SET, listener);
+
+        ArgumentCaptor<Exception> exceptionCaptor = ArgumentCaptor.forClass(Exception.class);
+        verify(listener).onFailure(exceptionCaptor.capture());
+        assertTrue(exceptionCaptor.getValue() instanceof SearchRelevanceException);
+        assertTrue(exceptionCaptor.getValue().getMessage().contains("Updates map cannot be null"));
+    }
+
+    public void testPatchDocWithNullIndex() {
+        Map<String, Object> updates = Map.of("name", "New Name");
+
+        @SuppressWarnings("unchecked")
+        ActionListener<org.opensearch.action.update.UpdateResponse> listener = mock(ActionListener.class);
+        indicesManager.patchDoc("test_id", updates, null, listener);
+
+        ArgumentCaptor<Exception> exceptionCaptor = ArgumentCaptor.forClass(Exception.class);
+        verify(listener).onFailure(exceptionCaptor.capture());
+        assertTrue(exceptionCaptor.getValue() instanceof SearchRelevanceException);
+        assertTrue(exceptionCaptor.getValue().getMessage().contains("Index cannot be null"));
     }
 
 }
