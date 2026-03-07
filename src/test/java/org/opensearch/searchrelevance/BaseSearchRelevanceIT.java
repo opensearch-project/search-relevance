@@ -263,8 +263,7 @@ public class BaseSearchRelevanceIT extends OpenSearchRestTestCase {
     }
 
     /**
-     * wipeAllIndices won't work since it cannot delete security index. Use
-     * deleteExternalIndices instead.
+     * wipeAllIndices won't work since it cannot delete security index. Use deleteExternalIndices instead.
      */
     @Override
     protected boolean preserveIndicesUponCompletion() {
