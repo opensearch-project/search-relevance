@@ -95,10 +95,8 @@ public class Evaluation {
                 sum += (double) relevantCount / (i + 1);
             }
         }
-        // MAP is computed over the full set of relevant documents, not just the ones
-        // retrieved.
-        // see
-        // https://en.wikipedia.org/wiki/Evaluation_measures_(information_retrieval)#Average_precision
+        // MAP is computed over the full set of relevant documents, not just the ones retrieved.
+        // see https://en.wikipedia.org/wiki/Evaluation_measures_(information_retrieval)#Average_precision
         double map = relevantCount > 0 ? sum / numRel : 0.0;
         return Math.round(map * 100.0) / 100.0;
     }
@@ -226,8 +224,7 @@ public class Evaluation {
         }
 
         Collections.sort(relevanceScores, Collections.reverseOrder());
-        // we truncate the list to k if the list is larger than k. Otherwise we keep the
-        // full list
+        // we truncate the list to k if the list is larger than k. Otherwise we keep the full list
         if (relevanceScores.size() > k) {
             relevanceScores = relevanceScores.subList(0, k);
         }

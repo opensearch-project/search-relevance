@@ -35,8 +35,7 @@ import com.google.common.collect.ImmutableList;
 import lombok.SneakyThrows;
 
 /**
- * Base class for experiment integration tests containing common logic and setup
- * methods.
+ * Base class for experiment integration tests containing common logic and setup methods.
  */
 public abstract class BaseExperimentIT extends BaseSearchRelevanceIT {
 

@@ -53,8 +53,7 @@ public class PointwiseExperimentIT extends BaseExperimentIT {
         Thread.sleep(DEFAULT_INTERVAL_MS);
         Map<String, Object> experimentSource = pollExperimentUntilCompleted(experimentId);
         // Assert experiment exists with correct type
-        // We don't wait for completion since it may time out in constrained
-        // environments
+        // We don't wait for completion since it may time out in constrained environments
         assertNotNull("Experiment should exist", experimentSource);
         assertEquals("POINTWISE_EVALUATION", experimentSource.get("type"));
         assertEquals(querySetId, experimentSource.get("querySetId"));
@@ -165,8 +164,7 @@ public class PointwiseExperimentIT extends BaseExperimentIT {
             assertNotNull(getEvaluationResultJson);
 
             Map<String, Object> evaluationSource = (Map<String, Object>) getEvaluationResultJson.get("_source");
-            // randomly pick 2 items and check them field by field, do sanity check for
-            // others
+            // randomly pick 2 items and check them field by field, do sanity check for otherss
             String actualQueryTerm = evaluationSource.get("searchText").toString();
 
             // Verify experiment fields are present for pointwise evaluation experiments

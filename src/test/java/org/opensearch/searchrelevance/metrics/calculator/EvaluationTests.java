@@ -203,12 +203,12 @@ public class EvaluationTests extends OpenSearchTestCase {
             docs.add(id);
             graded.put(id, Integer.toString((i % 5) + 1));
         }
-        // J_max=5, sorted=[1,1,2,2,3,3,4,4,5,5], P90 index = ceil(0.9*10)-1 = 8 ->
+        // J_max=5, sorted=[1,1,2,2,3,3,4,4,5,5], P90 index = ceil(0.9*10)-1 = 8 →
         // value=5
         // T = max(2.5, 5) = 5
         double t = JudgmentThresholdCalculator.computeThreshold(graded);
         assertEquals(5.0, t, 0.001);
-        // Relevant: g4(5), g9(5) -> 2 out of 10 = 0.2
+        // Relevant: g4(5), g9(5) → 2 out of 10 = 0.2
         double p = Evaluation.calculatePrecisionAtK(docs, graded, 10, t);
         assertEquals(0.2, p, 0.001);
     }

@@ -28,11 +28,8 @@ import com.google.common.collect.ImmutableList;
 import lombok.SneakyThrows;
 
 /**
- * Integration tests for search evaluation experiments (POINTWISE_EVALUATION
- * type).
- * This test class verifies the functionality of running pointwise evaluation
- * experiments
- * that evaluate search configurations against query sets and judgments.
+ * Integration tests for search evaluation experiments (POINTWISE_EVALUATION type).
+ * This test class verifies the functionality of running pointwise evaluation experiments
  */
 @ThreadLeakScope(ThreadLeakScope.Scope.NONE)
 @OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.SUITE)
