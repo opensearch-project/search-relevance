@@ -100,7 +100,6 @@ public class ExperimentRunningManager {
      *
      * One thing to be careful about is that only at most scheduled run for a given scheduled experiment run id
      * should be in the system at all times.
-     *
      * @param experimentId - the id of the experiment to be run
      * @param request - required parameters for placing a request to start an experiment
      * @param cancellationToken - reference to cancellation state of scheduled experiment and cancels all futures tied to it
@@ -509,7 +508,12 @@ public class ExperimentRunningManager {
         }
     }
 
-    private void handleFailure(Exception error, AtomicBoolean hasFailure, ExperimentContext context, CountDownLatch actuallyFinished) {
+    private void handleFailure(
+            Exception error,
+            AtomicBoolean hasFailure,
+            ExperimentContext context,
+            CountDownLatch actuallyFinished
+    ) {
         if (hasFailure.compareAndSet(false, true)) {
             handleAsyncFailure(context, "Failed to process metrics", error, actuallyFinished);
         }
@@ -566,7 +570,12 @@ public class ExperimentRunningManager {
         );
     }
 
-    private void handleAsyncFailure(ExperimentContext context, String message, Exception error, CountDownLatch actuallyFinished) {
+    private void handleAsyncFailure(
+            ExperimentContext context,
+            String message,
+            Exception error,
+            CountDownLatch actuallyFinished
+    ) {
         String experimentId = context.getExperimentId();
         PutExperimentRequest request = context.getRequest();
 

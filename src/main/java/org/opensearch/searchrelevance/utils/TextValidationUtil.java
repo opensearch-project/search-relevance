@@ -25,7 +25,7 @@ public class TextValidationUtil {
     private static final int MAX_DESCRIPTION_LENGTH = 250;
     private static final int MAX_PROMPT_TEMPLATE_LENGTH = 10000;
     // Characters that could break JSON or cause security issues
-    private static final String DANGEROUS_CHARS_PATTERN = "[\"\\\\<>]+"; // Excludes quotes, backslashes, and HTML tags
+    private static final String DANGEROUS_CHARS_PATTERN = "[\"\\\\<>]+";  // Excludes quotes, backslashes, and HTML tags
     // Characters that could break QuerySet parsing logic
     // Newline (\n), delimiter (#), and colon (:) are reserved for the format: "queryText#\nkey: value"
     private static final String QUERYSET_RESERVED_CHARS_PATTERN = "[\\r\\n#:]+";  // Excludes newline, carriage return, #, and colon
