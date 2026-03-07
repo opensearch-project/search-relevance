@@ -27,10 +27,8 @@ public class TextValidationUtil {
     // Characters that could break JSON or cause security issues
     private static final String DANGEROUS_CHARS_PATTERN = "[\"\\\\<>]+"; // Excludes quotes, backslashes, and HTML tags
     // Characters that could break QuerySet parsing logic
-    // Newline (\n), delimiter (#), and colon (:) are reserved for the format:
-    // "queryText#\nkey: value"
-    private static final String QUERYSET_RESERVED_CHARS_PATTERN = "[\\r\\n#:]+"; // Excludes newline, carriage return,
-                                                                                 // #, and colon
+    // Newline (\n), delimiter (#), and colon (:) are reserved for the format: "queryText#\nkey: value"
+    private static final String QUERYSET_RESERVED_CHARS_PATTERN = "[\\r\\n#:]+";  // Excludes newline, carriage return, #, and colon
 
     public static class ValidationResult {
         private final boolean valid;
@@ -63,7 +61,7 @@ public class TextValidationUtil {
     /**
      * Validates text with a specified maximum length
      *
-     * @param text      The text to validate
+     * @param text The text to validate
      * @param maxLength The maximum allowed length
      * @return ValidationResult indicating if the text is valid
      */
@@ -264,7 +262,7 @@ public class TextValidationUtil {
      * - Hash (#) - used as delimiter between queryText and custom fields
      * - Colon (:) - used to separate keys from values in the new format
      *
-     * @param text      The text to validate
+     * @param text The text to validate
      * @param maxLength The maximum allowed length
      * @return ValidationResult indicating if the text is valid for QuerySet
      */
@@ -285,8 +283,7 @@ public class TextValidationUtil {
             return new ValidationResult(false, "Text contains invalid characters (quotes, backslashes, or HTML tags are not allowed)");
         }
 
-        // Check for reserved characters - use contains() for better detection including
-        // newlines
+        // Check for reserved characters - use contains() for better detection including newlines
         if (text.contains("\n") || text.contains("\r") || text.contains("#") || text.contains(":")) {
             return new ValidationResult(false, "Text contains reserved characters (newline, #, or : are not allowed in QuerySet values)");
         }
@@ -314,14 +311,12 @@ public class TextValidationUtil {
             return new ValidationResult(false, "Key exceeds maximum length of " + MAX_NAME_LENGTH + " characters");
         }
 
-        // Keys should not contain reserved characters - use contains() for better
-        // detection including newlines
+        // Keys should not contain reserved characters - use contains() for better detection including newlines
         if (key.contains("\n") || key.contains("\r") || key.contains("#") || key.contains(":")) {
             return new ValidationResult(false, "Key contains reserved characters (newline, #, or : are not allowed in QuerySet keys)");
         }
 
-        // Keys should not contain whitespace (except single spaces within the key, not
-        // at start/end)
+        // Keys should not contain whitespace (except single spaces within the key, not at start/end)
         if (key.trim().length() != key.length()) {
             return new ValidationResult(false, "Key cannot have leading or trailing whitespace");
         }
@@ -370,10 +365,8 @@ public class TextValidationUtil {
     }
 
     /**
-     * Validates that a prompt template contains the required placeholders and meets
-     * formatting requirements.
-     * - Must contain {{hits}} or {{results}} to provide documents to the LLM for
-     * rating
+     * Validates that a prompt template contains the required placeholders and meets formatting requirements.
+     * - Must contain {{hits}} or {{results}} to provide documents to the LLM for rating
      * - Must contain {{queryText}} or {{searchText}} to provide the search query
      * - Must not contain the reserved delimiter character (#)
      * - Must not exceed maximum length
@@ -446,8 +439,7 @@ public class TextValidationUtil {
      * Extracts queryText and validates all fields including custom key-value pairs.
      *
      * @param queryMap The raw query map from the request
-     * @return QueryValidationResult containing either the validated
-     *         QueryWithReference or an error message
+     * @return QueryValidationResult containing either the validated QueryWithReference or an error message
      */
     public static QueryValidationResult validateAndParseQuery(Map<String, Object> queryMap) {
         if (queryMap == null) {
@@ -467,8 +459,7 @@ public class TextValidationUtil {
             return QueryValidationResult.failure("Invalid queryText: " + queryTextValidation.getErrorMessage());
         }
 
-        // Create customizedKeyValueMap with all entries except queryText, converting
-        // values to strings
+        // Create customizedKeyValueMap with all entries except queryText, converting values to strings
         Map<String, String> customizedKeyValueMap = new HashMap<>();
         for (Map.Entry<String, Object> entry : queryMap.entrySet()) {
             if (!"queryText".equals(entry.getKey()) && entry.getValue() != null) {

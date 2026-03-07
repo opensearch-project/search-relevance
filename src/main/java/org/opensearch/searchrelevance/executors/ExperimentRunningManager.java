@@ -58,12 +58,9 @@ import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
 
 /**
- * ExperimentRunningManager helps isolate the logic for running the steps that
- * was
- * in PutExperimentTransportAction and ScheduledExperimentRunnerManager. There
- * are
- * 2 paths where the code will use {@link ExperimentRunningManager}: The
- * experiment
+ * ExperimentRunningManager helps isolate the logic for running the steps that was
+ * in PutExperimentTransportAction and ScheduledExperimentRunnerManager. There are
+ * 2 paths where the code will use {@link ExperimentRunningManager}: The experiment
  * was scheduled to run, or the user manually triggered through
  * {@link org.opensearch.searchrelevance.transport.experiment.PutExperimentTransportAction}.
  *
@@ -99,23 +96,15 @@ public class ExperimentRunningManager {
     private final Map<String, List<Future<?>>> runningFutures = new ConcurrentHashMap<>();
 
     /**
-     * Starts the experiment by setting up cancellation callback for the
-     * cancellation token and also retrieves the queryset.
+     * Starts the experiment by setting up cancellation callback for the cancellation token and also retrieves the queryset.
      *
-     * One thing to be careful about is that only at most scheduled run for a given
-     * scheduled experiment run id
+     * One thing to be careful about is that only at most scheduled run for a given scheduled experiment run id
      * should be in the system at all times.
      *
-     * @param experimentId          - the id of the experiment to be run
-     * @param request               - required parameters for placing a request to
-     *                              start an experiment
-     * @param experimentName        - the name of the experiment (already resolved,
-     *                              may be auto-generated)
-     * @param experimentDescription - the description of the experiment
-     * @param cancellationToken     - reference to cancellation state of scheduled
-     *                              experiment and cancels all futures tied to it
-     * @param actuallyFinished      - tracks when the task and all asynchronous
-     *                              processes are completed
+     * @param experimentId - the id of the experiment to be run
+     * @param request - required parameters for placing a request to start an experiment
+     * @param cancellationToken - reference to cancellation state of scheduled experiment and cancels all futures tied to it
+     * @param actuallyFinished - tracks when the task and all asynchronous processes are completed
      */
     public void startExperimentRun(
         String experimentId,
@@ -168,8 +157,7 @@ public class ExperimentRunningManager {
                     return;
                 }
 
-                // Then get SearchConfigurations asynchronously (this will also start the
-                // experiment)
+                // Then get SearchConfigurations asynchronously (this will also start the experiment)
                 fetchSearchConfigurationsAsync(context, queryTextWithReferences, cancellationToken, actuallyFinished);
             } catch (Exception e) {
                 handleAsyncFailure(context, "Failed to process QuerySet", e, actuallyFinished);
@@ -219,8 +207,7 @@ public class ExperimentRunningManager {
         for (CompletableFuture<Entry<String, Object>> configFuture : configFutures) {
             Entry<String, Object> configEntry;
             try {
-                // The config future will be waited on, but there is a chance the future might
-                // be null.
+                // The config future will be waited on, but there is a chance the future might be null.
                 configEntry = configFuture.get();
             } catch (InterruptedException e) {
                 handleFailure(e, hasFailure, context, actuallyFinished);
@@ -370,8 +357,7 @@ public class ExperimentRunningManager {
         int completedQueries = 0;
         int totalQueries = queryTexts.size();
         for (String queryText : queryTexts) {
-            // We need to process metrics for every query text, therefore, we have to keep
-            // track of
+            // We need to process metrics for every query text, therefore, we have to keep track of
             // Any previous failures or tiimeout cancellations.
             if (hasFailure.get() || checkIfCancelled(cancellationToken)) {
                 log.info(
@@ -505,8 +491,7 @@ public class ExperimentRunningManager {
                     // For POINTWISE_EVALUATION, the response contains results array
                     List<Map<String, Object>> pointwiseResults = (List<Map<String, Object>>) queryResults.get("results");
                     if (pointwiseResults != null) {
-                        // Results already contain the proper format with evaluationId,
-                        // searchConfigurationId, queryText
+                        // Results already contain the proper format with evaluationId, searchConfigurationId, queryText
                         finalResults.addAll(pointwiseResults);
                     }
                 } else {

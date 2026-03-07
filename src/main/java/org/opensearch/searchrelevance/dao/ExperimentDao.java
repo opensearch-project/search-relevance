@@ -53,7 +53,6 @@ public class ExperimentDao {
 
     /**
      * Create experiment index if not exists
-     *
      * @param stepListener - step listener for async operation
      */
     public void createIndexIfAbsent(final StepListener<Void> stepListener) {
@@ -62,9 +61,8 @@ public class ExperimentDao {
 
     /**
      * Stores experiment to in the system index
-     *
      * @param experiment - Experiment content to be stored
-     * @param listener   - action listener for async operation
+     * @param listener - action listener for async operation
      */
     public void putExperiment(final Experiment experiment, final ActionListener listener) {
         if (experiment == null) {
@@ -104,9 +102,8 @@ public class ExperimentDao {
 
     /**
      * Delete experiment by experimentId
-     *
      * @param experimentId - id to be deleted
-     * @param listener     - action listener for async operation
+     * @param listener - action listener for async operation
      */
     public void deleteExperiment(final String experimentId, final ActionListener<DeleteResponse> listener) {
         searchRelevanceIndicesManager.deleteDocByDocId(experimentId, EXPERIMENT, listener);
@@ -114,9 +111,8 @@ public class ExperimentDao {
 
     /**
      * Get experiment by experimentId
-     *
      * @param experimentId - id to be deleted
-     * @param listener     - action listener for async operation
+     * @param listener - action listener for async operation
      */
     public SearchResponse getExperiment(String experimentId, ActionListener<SearchResponse> listener) {
         if (experimentId == null || experimentId.isEmpty()) {
@@ -128,10 +124,9 @@ public class ExperimentDao {
 
     /**
      * Get experiment by fieldId (async version)
-     *
-     * @param fieldId   - id on which experiment is to be retrieved
+     * @param fieldId - id on which experiment is to be retrieved
      * @param fieldName - field on which experiment is to be retrieved
-     * @param listener  - action listener for async operation
+     * @param listener - action listener for async operation
      */
     public void getExperimentByFieldId(String fieldId, String fieldName, int size, ActionListener<SearchResponse> listener) {
         if (fieldId == null || fieldId.isEmpty()) {
@@ -180,9 +175,8 @@ public class ExperimentDao {
 
     /**
      * List experiment by source builder
-     *
      * @param sourceBuilder - source builder to be searched
-     * @param listener      - action listener for async operation
+     * @param listener - action listener for async operation
      */
     public SearchResponse listExperiment(SearchSourceBuilder sourceBuilder, ActionListener<SearchResponse> listener) {
         // Apply default values if not set
