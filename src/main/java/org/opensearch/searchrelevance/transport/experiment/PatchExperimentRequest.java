@@ -9,6 +9,7 @@ package org.opensearch.searchrelevance.transport.experiment;
 
 import java.io.IOException;
 
+import org.opensearch.Version;
 import org.opensearch.action.ActionRequest;
 import org.opensearch.action.ActionRequestValidationException;
 import org.opensearch.core.common.io.stream.StreamInput;
@@ -42,16 +43,23 @@ public class PatchExperimentRequest extends ActionRequest {
     public PatchExperimentRequest(StreamInput in) throws IOException {
         super(in);
         this.experimentId = in.readString();
-        this.name = in.readOptionalString();
-        this.description = in.readOptionalString();
+        if (in.getVersion().onOrAfter(Version.V_3_6_0)) {
+            this.name = in.readOptionalString();
+            this.description = in.readOptionalString();
+        } else {
+            this.name = null;
+            this.description = null;
+        }
     }
 
     @Override
     public void writeTo(StreamOutput out) throws IOException {
         super.writeTo(out);
         out.writeString(experimentId);
-        out.writeOptionalString(name);
-        out.writeOptionalString(description);
+        if (out.getVersion().onOrAfter(Version.V_3_6_0)) {
+            out.writeOptionalString(name);
+            out.writeOptionalString(description);
+        }
     }
 
     @Override

@@ -10,6 +10,7 @@ package org.opensearch.searchrelevance.transport.experiment;
 import java.io.IOException;
 import java.util.List;
 
+import org.opensearch.Version;
 import org.opensearch.action.ActionRequest;
 import org.opensearch.action.ActionRequestValidationException;
 import org.opensearch.core.common.io.stream.StreamInput;
@@ -54,8 +55,13 @@ public class PutExperimentRequest extends ActionRequest {
         super(in);
         this.type = in.readEnum(ExperimentType.class);
         this.scheduledExperimentResultId = in.readOptionalString();
-        this.name = in.readOptionalString();
-        this.description = in.readOptionalString();
+        if (in.getVersion().onOrAfter(Version.V_3_6_0)) {
+            this.name = in.readOptionalString();
+            this.description = in.readOptionalString();
+        } else {
+            this.name = null;
+            this.description = null;
+        }
         this.querySetId = in.readString();
         this.searchConfigurationList = in.readStringList();
         this.judgmentList = in.readStringList();
@@ -67,8 +73,10 @@ public class PutExperimentRequest extends ActionRequest {
         super.writeTo(out);
         out.writeEnum(type);
         out.writeOptionalString(scheduledExperimentResultId);
-        out.writeOptionalString(name);
-        out.writeOptionalString(description);
+        if (out.getVersion().onOrAfter(Version.V_3_6_0)) {
+            out.writeOptionalString(name);
+            out.writeOptionalString(description);
+        }
         out.writeString(querySetId);
         out.writeStringArray(searchConfigurationList.toArray(new String[0]));
         out.writeStringArray(judgmentList.toArray(new String[0]));
