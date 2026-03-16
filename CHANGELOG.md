@@ -14,6 +14,7 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ### Bug Fixes
 * Fixed thread pool starvation in LLM judgment processing ([#387](https://github.com/opensearch-project/search-relevance/pull/387))
+* Ensure evaluation results are stored for zero-search-result (ZSR) queries by writing zero-valued metrics instead of skipping the record, preventing empty experiments ([#398](https://github.com/opensearch-project/search-relevance/pull/398))
 
 ### Infrastructure
 

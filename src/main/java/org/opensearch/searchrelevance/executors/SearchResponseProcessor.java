@@ -56,10 +56,6 @@ public class SearchResponseProcessor {
         if (taskContext.getHasFailure().get()) return;
 
         try {
-            if (response.getHits().getTotalHits().value() == 0) {
-                handleNoHits(experimentVariant, experimentId, searchConfigId, evaluationId, taskContext);
-                return;
-            }
 
             SearchHit[] hits = response.getHits().getHits();
             List<String> docIds = Arrays.stream(hits).map(SearchHit::getId).collect(Collectors.toList());
@@ -95,31 +91,6 @@ public class SearchResponseProcessor {
         } catch (Exception e) {
             handleTaskFailure(experimentVariant, e, taskContext);
         }
-    }
-
-    private void handleNoHits(
-        ExperimentVariant experimentVariant,
-        String experimentId,
-        String searchConfigId,
-        String evaluationId,
-        ExperimentTaskContext taskContext
-    ) {
-        log.warn("No hits found for search config: {} and variant: {}", searchConfigId, experimentVariant.getId());
-
-        ExperimentVariant noHitsVariant = new ExperimentVariant(
-            experimentVariant.getId(),
-            TimeUtils.getTimestamp(),
-            experimentVariant.getType(),
-            AsyncStatus.COMPLETED,
-            experimentId,
-            experimentVariant.getParameters(),
-            Map.of("evaluationResultId", evaluationId, "details", "no search hits found")
-        );
-
-        experimentVariantDao.putExperimentVariantEfficient(noHitsVariant, ActionListener.wrap(success -> {
-            log.debug("Persisted no-hits variant: {}", experimentVariant.getId());
-            taskContext.completeVariantFailure();
-        }, error -> handleTaskFailure(experimentVariant, error, taskContext)));
     }
 
     private void updateExperimentVariant(

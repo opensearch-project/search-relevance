@@ -294,6 +294,7 @@ public class BaseSearchRelevanceIT extends OpenSearchRestTestCase {
                 .map(index -> (String) index.get("index"))
                 .filter(indexName -> indexName != null)
                 .filter(indexName -> !indexName.startsWith(INTERNAL_INDICES_PREFIX))
+                .filter(indexName -> !indexName.startsWith("security-auditlog"))
                 .collect(Collectors.toList());
 
             for (final String indexName : externalIndices) {

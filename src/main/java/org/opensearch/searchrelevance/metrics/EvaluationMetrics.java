@@ -27,6 +27,7 @@ import java.util.Map;
  * Evaluation Metrics.
  */
 public class EvaluationMetrics {
+    public static final int TOTAL_METRIC_COUNT = 4;
 
     private static void addMetric(List<Map<String, Object>> metrics, String metricName, double value) {
         Map<String, Object> metric = new HashMap<>();

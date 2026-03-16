@@ -21,6 +21,7 @@ import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.hc.core5.http.message.BasicHeader;
 import org.opensearch.client.Response;
 import org.opensearch.rest.RestRequest;
+import org.opensearch.searchrelevance.metrics.EvaluationMetrics;
 import org.opensearch.test.OpenSearchIntegTestCase;
 
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakScope;
@@ -190,7 +191,7 @@ public class PointwiseExperimentIT extends BaseExperimentIT {
             } else {
                 assertTrue(EXPECTED_QUERY_TERMS.contains(actualQueryTerm));
                 assertEquals(judgmentId, ((List<String>) evaluationSource.get("judgmentIds")).get(0));
-                assertEquals(4, ((List<String>) evaluationSource.get("metrics")).size());
+                assertEquals(EvaluationMetrics.TOTAL_METRIC_COUNT, ((List<String>) evaluationSource.get("metrics")).size());
                 assertEquals(searchConfigurationId, evaluationSource.get("searchConfigurationId"));
                 assertFalse(((List<String>) evaluationSource.get("documentIds")).isEmpty());
             }
