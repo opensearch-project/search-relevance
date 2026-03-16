@@ -26,6 +26,7 @@ import org.opensearch.search.SearchHit;
 import org.opensearch.search.SearchHits;
 import org.opensearch.searchrelevance.dao.EvaluationResultDao;
 import org.opensearch.searchrelevance.dao.ExperimentVariantDao;
+import org.opensearch.searchrelevance.metrics.EvaluationMetrics;
 import org.opensearch.searchrelevance.model.EvaluationResult;
 import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.model.ExperimentVariant;
@@ -84,7 +85,7 @@ public class SearchResponseProcessorTests extends OpenSearchTestCase {
         verify(evaluationResultDao).putEvaluationResultEfficient(captor.capture(), any(ActionListener.class));
 
         EvaluationResult result = captor.getValue();
-        assertEquals(4, result.metrics().size());
+        assertEquals(EvaluationMetrics.TOTAL_METRIC_COUNT, result.metrics().size());
         for (Map<String, Object> metric : result.metrics()) {
             assertEquals(0.0, ((Number) metric.get("value")).doubleValue(), 0.001);
         }
