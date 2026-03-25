@@ -404,8 +404,7 @@ public class TextValidationUtil {
                 String.format(
                     Locale.ROOT,
                     "Prompt template must include either {{%s}} or {{%s}} placeholder to provide documents for rating. "
-                        + "defaulted prompt template example: SearchText - {{%s}}; Hits - {{%s}}, "
-                        + "Additionally, any custom field from your query_set can be used as {{fieldName}} ",
+                        + "example: SearchText - {{%s}}; Hits - {{%s}}",
                     PLACEHOLDER_HITS,
                     PLACEHOLDER_RESULTS,
                     PLACEHOLDER_SEARCH_TEXT,
@@ -423,8 +422,7 @@ public class TextValidationUtil {
                 String.format(
                     Locale.ROOT,
                     "Prompt template must include either {{%s}} or {{%s}} placeholder to provide the search query. "
-                        + "defaulted prompt template example: SearchText - {{%s}}; Hits - {{%s}}, "
-                        + "Additionally, any custom field from your query_set can be used as {{fieldName}} ",
+                        + "example: SearchText - {{%s}}; Hits - {{%s}}",
                     PLACEHOLDER_QUERY_TEXT,
                     PLACEHOLDER_SEARCH_TEXT,
                     PLACEHOLDER_SEARCH_TEXT,
