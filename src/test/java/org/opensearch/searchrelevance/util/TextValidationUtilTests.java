@@ -442,7 +442,7 @@ public class TextValidationUtilTests extends SearchRelevanceRestTestCase {
                 "Error should mention missing hits placeholder",
                 result.getErrorMessage().contains("must include either {{hits}} or {{results}} placeholder")
             );
-            assertTrue("Error should provide example", result.getErrorMessage().contains("Example:"));
+            assertTrue("Error should provide example", result.getErrorMessage().contains("example:"));
         }
     }
 
@@ -462,7 +462,7 @@ public class TextValidationUtilTests extends SearchRelevanceRestTestCase {
                 "Error should mention missing query placeholder",
                 result.getErrorMessage().contains("must include either {{queryText}} or {{searchText}} placeholder")
             );
-            assertTrue("Error should provide example", result.getErrorMessage().contains("Example:"));
+            assertTrue("Error should provide example", result.getErrorMessage().contains("example:"));
         }
     }
 

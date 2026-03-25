@@ -341,7 +341,7 @@ public class RestPutJudgmentActionTests extends SearchRelevanceRestTestCase {
             () -> restPutJudgmentAction.handleRequest(request, channel, client)
         );
         assertTrue(exception.getMessage().contains("must include either {{hits}} or {{results}} placeholder"));
-        assertTrue(exception.getMessage().contains("Example:"));
+        assertTrue(exception.getMessage().contains("example:"));
         assertEquals(RestStatus.BAD_REQUEST, exception.status());
     }
 }
