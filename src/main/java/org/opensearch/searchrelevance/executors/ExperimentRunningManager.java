@@ -508,12 +508,7 @@ public class ExperimentRunningManager {
         }
     }
 
-    private void handleFailure(
-            Exception error,
-            AtomicBoolean hasFailure,
-            ExperimentContext context,
-            CountDownLatch actuallyFinished
-    ) {
+    private void handleFailure(Exception error, AtomicBoolean hasFailure, ExperimentContext context, CountDownLatch actuallyFinished) {
         if (hasFailure.compareAndSet(false, true)) {
             handleAsyncFailure(context, "Failed to process metrics", error, actuallyFinished);
         }
@@ -570,12 +565,7 @@ public class ExperimentRunningManager {
         );
     }
 
-    private void handleAsyncFailure(
-            ExperimentContext context,
-            String message,
-            Exception error,
-            CountDownLatch actuallyFinished
-    ) {
+    private void handleAsyncFailure(ExperimentContext context, String message, Exception error, CountDownLatch actuallyFinished) {
         String experimentId = context.getExperimentId();
         PutExperimentRequest request = context.getRequest();
 

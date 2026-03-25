@@ -54,7 +54,8 @@ public class PatchExperimentTransportAction extends HandledTransportAction<Patch
                 }
                 Map<String, Object> sourceMap = searchResponse.getHits().getHits()[0].getSourceAsMap();
                 String statusStr = (String) sourceMap.get("status");
-                // Note: This is a TOCTOU (Time-Of-Check to Time-Of-Use) race condition as the status check happens before the partial update.
+                // Note: This is a TOCTOU (Time-Of-Check to Time-Of-Use) race condition as the status check happens before the partial
+                // update.
                 if (AsyncStatus.PROCESSING.name().equals(statusStr)) {
                     listener.onFailure(
                         new SearchRelevanceException(
