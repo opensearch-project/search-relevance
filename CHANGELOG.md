@@ -16,6 +16,7 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ### Bug Fixes
 * Fixed thread pool starvation in LLM judgment processing ([#387](https://github.com/opensearch-project/search-relevance/pull/387))
+* Improve error message for customized LLM prompt template validation ([#424](https://github.com/opensearch-project/search-relevance/pull/424))
 
 ### Infrastructure
 
