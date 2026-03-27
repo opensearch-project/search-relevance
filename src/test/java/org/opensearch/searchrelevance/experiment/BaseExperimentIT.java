@@ -11,6 +11,8 @@ import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_I
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENTS_URL;
 import static org.opensearch.searchrelevance.common.PluginConstants.QUERYSETS_URL;
 import static org.opensearch.searchrelevance.common.PluginConstants.SEARCH_CONFIGURATIONS_URL;
+import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.METRICS_DISCOUNTED_CUMULATIVE_GAIN_AT;
+import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.METRICS_MEAN_RECIPROCAL_RANK;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -288,5 +290,17 @@ public abstract class BaseExperimentIT extends BaseSearchRelevanceIT {
 
         assertEquals(expectedType, source.get("type"));
         assertEquals(querySetId, source.get("querySetId"));
+    }
+
+    /**
+     * Returns the assertion tolerance for a given metric. Position-sensitive metrics
+     * (DCG, MRR) use a wider tolerance because BM25 per-shard IDF variation in
+     * multi-node clusters can change document ranking order between runs.
+     */
+    protected double getMetricTolerance(String metricName) {
+        if (metricName.startsWith(METRICS_DISCOUNTED_CUMULATIVE_GAIN_AT) || metricName.equals(METRICS_MEAN_RECIPROCAL_RANK)) {
+            return 0.2;
+        }
+        return 0.02;
     }
 }

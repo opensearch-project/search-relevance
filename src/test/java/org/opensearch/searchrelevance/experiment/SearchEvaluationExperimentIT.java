@@ -232,7 +232,7 @@ public class SearchEvaluationExperimentIT extends BaseExperimentIT {
                             "Metric " + metricName + " should match expected value",
                             expectedMetrics.get(metricName),
                             actualValue,
-                            0.02
+                            getMetricTolerance(metricName)
                         );
                     }
                 }

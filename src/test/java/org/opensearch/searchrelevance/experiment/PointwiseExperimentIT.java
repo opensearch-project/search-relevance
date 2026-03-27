@@ -185,7 +185,7 @@ public class PointwiseExperimentIT extends BaseExperimentIT {
                 for (Map<String, Object> actualMetric : actualMetrics) {
                     String metricName = actualMetric.get("metric").toString();
                     Double actualValue = Double.parseDouble(actualMetric.get("value").toString());
-                    assertEquals(expectedMetrics.get(metricName), actualValue, 0.02);
+                    assertEquals(expectedMetrics.get(metricName), actualValue, getMetricTolerance(metricName));
                 }
             } else {
                 assertTrue(EXPECTED_QUERY_TERMS.contains(actualQueryTerm));
