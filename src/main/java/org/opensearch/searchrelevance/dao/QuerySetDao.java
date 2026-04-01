@@ -185,4 +185,18 @@ public class QuerySetDao {
             .querySetQueries(querySetEntries)
             .build();
     }
+
+    /**
+     * Check if a query set exists by querySetId
+     * @param querySetId - id to check
+     * @param listener - action listener for async operation
+     */
+    public void checkQuerySetExists(String querySetId, ActionListener<SearchResponse> listener) {
+        if (querySetId == null || querySetId.isEmpty()) {
+            listener.onFailure(new SearchRelevanceException("querySetId must not be null or empty", RestStatus.BAD_REQUEST));
+            return;
+        }
+        SearchSourceBuilder sourceBuilder = new SearchSourceBuilder().query(QueryBuilders.termQuery("_id", querySetId)).size(1);
+        searchRelevanceIndicesManager.listDocsBySearchRequest(sourceBuilder, QUERY_SET, listener);
+    }
 }

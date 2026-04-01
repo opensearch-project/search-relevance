@@ -130,4 +130,18 @@ public class JudgmentDao {
 
         return searchRelevanceIndicesManager.listDocsBySearchRequest(sourceBuilder, JUDGMENT, listener);
     }
+
+    /**
+     * Check if a judgment exists by judgmentId
+     * @param judgmentId - id to check
+     * @param listener - action listener for async operation
+     */
+    public void checkJudgmentExists(String judgmentId, ActionListener<SearchResponse> listener) {
+        if (judgmentId == null || judgmentId.isEmpty()) {
+            listener.onFailure(new SearchRelevanceException("judgmentId must not be null or empty", RestStatus.BAD_REQUEST));
+            return;
+        }
+        SearchSourceBuilder sourceBuilder = new SearchSourceBuilder().query(QueryBuilders.termQuery("_id", judgmentId)).size(1);
+        searchRelevanceIndicesManager.listDocsBySearchRequest(sourceBuilder, JUDGMENT, listener);
+    }
 }

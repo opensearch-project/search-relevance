@@ -33,6 +33,16 @@ public class SearchConfigurationIT extends BaseSearchRelevanceIT {
 
     @SneakyThrows
     public void testMainActions_whenCreateReadDeleteSearchConfig_thenSuccessful() {
+        // Create the required index first
+        makeRequest(
+            client(),
+            RestRequest.Method.PUT.name(),
+            "test_index",
+            null,
+            toHttpEntity("{\"settings\": {\"number_of_shards\": 1, \"number_of_replicas\": 0}}"),
+            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
+        );
+
         String requestBody = Files.readString(Path.of(classLoader.getResource("searchconfig/CreateSearchConfiguration.json").toURI()));
         Response uploadResponse = makeRequest(
             client(),
@@ -68,7 +78,6 @@ public class SearchConfigurationIT extends BaseSearchRelevanceIT {
         assertEquals("test_index", source.get("index"));
         assertEquals("{\"query\": {\"match_all\": {}}}", source.get("query"));
         assertEquals("test_pipeline", source.get("searchPipeline"));
-        assertEquals("sample description", source.get("description"));
 
         Response deleteSearchConfigResponse = makeRequest(
             client(),

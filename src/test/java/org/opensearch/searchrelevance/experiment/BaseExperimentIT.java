@@ -111,6 +111,9 @@ public abstract class BaseExperimentIT extends BaseSearchRelevanceIT {
 
     @SneakyThrows
     protected String createSearchConfiguration(String indexName) {
+        // Ensure index exists before creating SearchConfiguration
+        initializeIndexIfNotExist(indexName);
+
         String createSearchConfigurationRequestBody = Files.readString(
             Path.of(classLoader.getResource("searchconfig/CreateSearchConfigurationQueryWithPlaceholder.json").toURI())
         );
@@ -133,6 +136,9 @@ public abstract class BaseExperimentIT extends BaseSearchRelevanceIT {
 
     @SneakyThrows
     protected String createHybridSearchConfiguration(String indexName) {
+        // Ensure index exists before creating SearchConfiguration
+        initializeIndexIfNotExist(indexName);
+
         String createSearchConfigurationRequestBody = Files.readString(
             Path.of(classLoader.getResource("searchconfig/CreateSearchConfigurationHybridQuery.json").toURI())
         );
@@ -155,6 +161,9 @@ public abstract class BaseExperimentIT extends BaseSearchRelevanceIT {
 
     @SneakyThrows
     protected String createSimpleSearchConfiguration(String indexName) {
+        // Ensure index exists before creating SearchConfiguration
+        initializeIndexIfNotExist(indexName);
+
         String createSearchConfigurationRequestBody = Files.readString(
             Path.of(classLoader.getResource("searchconfig/CreateSearchConfigurationSimpleMatch.json").toURI())
         );

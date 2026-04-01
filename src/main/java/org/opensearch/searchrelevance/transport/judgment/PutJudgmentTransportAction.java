@@ -23,17 +23,22 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.support.ActionFilters;
+import org.opensearch.action.support.GroupedActionListener;
 import org.opensearch.action.support.HandledTransportAction;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.searchrelevance.dao.JudgmentDao;
+import org.opensearch.searchrelevance.dao.QuerySetDao;
+import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.judgments.BaseJudgmentsProcessor;
 import org.opensearch.searchrelevance.judgments.JudgmentsProcessorFactory;
 import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.Judgment;
+import org.opensearch.searchrelevance.model.JudgmentType;
+import org.opensearch.searchrelevance.utils.ReferenceValidationUtil;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
@@ -41,6 +46,8 @@ import org.opensearch.transport.TransportService;
 public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgmentRequest, IndexResponse> {
     private final ClusterService clusterService;
     private final JudgmentDao judgmentDao;
+    private final QuerySetDao querySetDao;
+    private final SearchConfigurationDao searchConfigurationDao;
     private final JudgmentsProcessorFactory judgmentsProcessorFactory;
 
     private static final Logger LOGGER = LogManager.getLogger(PutJudgmentTransportAction.class);
@@ -51,11 +58,15 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
         TransportService transportService,
         ActionFilters actionFilters,
         JudgmentDao judgmentDao,
+        QuerySetDao querySetDao,
+        SearchConfigurationDao searchConfigurationDao,
         JudgmentsProcessorFactory judgmentsProcessorFactory
     ) {
         super(PutJudgmentAction.NAME, transportService, actionFilters, PutUbiJudgmentRequest::new);
         this.clusterService = clusterService;
         this.judgmentDao = judgmentDao;
+        this.querySetDao = querySetDao;
+        this.searchConfigurationDao = searchConfigurationDao;
         this.judgmentsProcessorFactory = judgmentsProcessorFactory;
     }
 
@@ -65,6 +76,24 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
             listener.onFailure(new SearchRelevanceException("Request cannot be null", RestStatus.BAD_REQUEST));
             return;
         }
+        try {
+            // Validate references for LLM_JUDGMENT type
+            if (request.getType() == JudgmentType.LLM_JUDGMENT) {
+                PutLlmJudgmentRequest llmRequest = (PutLlmJudgmentRequest) request;
+                validateLlmJudgmentReferences(
+                    llmRequest,
+                    ActionListener.wrap(v -> { createJudgment(request, listener); }, listener::onFailure)
+                );
+            } else {
+                createJudgment(request, listener);
+            }
+        } catch (Exception e) {
+            LOGGER.error("Failed to process judgment request", e);
+            listener.onFailure(new SearchRelevanceException("Failed to process judgment request", e, RestStatus.INTERNAL_SERVER_ERROR));
+        }
+    }
+
+    private void createJudgment(PutJudgmentRequest request, ActionListener<IndexResponse> listener) {
         try {
             String id = UUID.randomUUID().toString();
             Judgment initialJudgment = new Judgment(
@@ -87,10 +116,41 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
                 LOGGER.error("Failed to create initial judgment", e);
                 listener.onFailure(new SearchRelevanceException("Failed to create initial judgment", e, RestStatus.INTERNAL_SERVER_ERROR));
             }));
-
         } catch (Exception e) {
-            LOGGER.error("Failed to process judgment request", e);
-            listener.onFailure(new SearchRelevanceException("Failed to process judgment request", e, RestStatus.INTERNAL_SERVER_ERROR));
+            LOGGER.error("Failed to create judgment", e);
+            listener.onFailure(new SearchRelevanceException("Failed to create judgment", e, RestStatus.INTERNAL_SERVER_ERROR));
+        }
+    }
+
+    private void validateLlmJudgmentReferences(PutLlmJudgmentRequest request, ActionListener<Void> listener) {
+        int totalValidations = 1; // QuerySet
+        if (request.getSearchConfigurationList() != null && !request.getSearchConfigurationList().isEmpty()) {
+            totalValidations += request.getSearchConfigurationList().size();
+        }
+
+        GroupedActionListener<Void> groupedListener = new GroupedActionListener<>(
+            ActionListener.wrap(results -> listener.onResponse(null), listener::onFailure),
+            totalValidations
+        );
+
+        // Validate QuerySet
+        ReferenceValidationUtil.validateEntityExists(
+            request.getQuerySetId(),
+            "QuerySet",
+            querySetDao::checkQuerySetExists,
+            groupedListener
+        );
+
+        // Validate Search Configurations
+        if (request.getSearchConfigurationList() != null && !request.getSearchConfigurationList().isEmpty()) {
+            for (String configId : request.getSearchConfigurationList()) {
+                ReferenceValidationUtil.validateEntityExists(
+                    configId,
+                    "SearchConfiguration",
+                    searchConfigurationDao::checkSearchConfigurationExists,
+                    groupedListener
+                );
+            }
         }
     }
 

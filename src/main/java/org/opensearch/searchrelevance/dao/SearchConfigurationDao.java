@@ -190,4 +190,18 @@ public class SearchConfigurationDao {
             (String) source.get(SearchConfiguration.DESCRIPTION)
         );
     }
+
+    /**
+     * Check if a search configuration exists by searchConfigurationId
+     * @param searchConfigurationId - id to check
+     * @param listener - action listener for async operation
+     */
+    public void checkSearchConfigurationExists(String searchConfigurationId, ActionListener<SearchResponse> listener) {
+        if (searchConfigurationId == null || searchConfigurationId.isEmpty()) {
+            listener.onFailure(new SearchRelevanceException("searchConfigurationId must not be null or empty", RestStatus.BAD_REQUEST));
+            return;
+        }
+        SearchSourceBuilder sourceBuilder = new SearchSourceBuilder().query(QueryBuilders.termQuery("_id", searchConfigurationId)).size(1);
+        searchRelevanceIndicesManager.listDocsBySearchRequest(sourceBuilder, SEARCH_CONFIGURATION, listener);
+    }
 }

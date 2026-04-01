@@ -13,6 +13,7 @@ import java.util.UUID;
 
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.support.ActionFilters;
+import org.opensearch.action.support.GroupedActionListener;
 import org.opensearch.action.support.HandledTransportAction;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.core.action.ActionListener;
@@ -31,6 +32,7 @@ import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.Experiment;
 import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
+import org.opensearch.searchrelevance.utils.ReferenceValidationUtil;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.tasks.Task;
 import org.opensearch.threadpool.ThreadPool;
@@ -50,6 +52,7 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
     private final ExperimentDao experimentDao;
     private final QuerySetDao querySetDao;
     private final SearchConfigurationDao searchConfigurationDao;
+    private final JudgmentDao judgmentDao;
     private final MetricsHelper metricsHelper;
     private final HybridOptimizerExperimentProcessor hybridOptimizerExperimentProcessor;
     private final PointwiseExperimentProcessor pointwiseExperimentProcessor;
@@ -73,6 +76,7 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
         this.experimentDao = experimentDao;
         this.querySetDao = querySetDao;
         this.searchConfigurationDao = searchConfigurationDao;
+        this.judgmentDao = judgmentDao;
         this.metricsHelper = metricsHelper;
         this.hybridOptimizerExperimentProcessor = new HybridOptimizerExperimentProcessor(judgmentDao, experimentTaskManager);
         this.pointwiseExperimentProcessor = new PointwiseExperimentProcessor(judgmentDao, experimentTaskManager);
@@ -86,6 +90,15 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
             return;
         }
 
+        try {
+            validateExperimentReferences(request, ActionListener.wrap(v -> { createExperiment(request, listener); }, listener::onFailure));
+        } catch (Exception e) {
+            log.error("Failed to process experiment request", e);
+            listener.onFailure(new SearchRelevanceException("Failed to process experiment request", e, RestStatus.INTERNAL_SERVER_ERROR));
+        }
+    }
+
+    private void createExperiment(PutExperimentRequest request, ActionListener<IndexResponse> listener) {
         try {
             String id = UUID.randomUUID().toString();
             final String experimentName = (request.getName() != null && !request.getName().trim().isEmpty())
@@ -119,10 +132,51 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
                     new SearchRelevanceException("Failed to create initial experiment", e, RestStatus.INTERNAL_SERVER_ERROR)
                 );
             }));
-
         } catch (Exception e) {
-            log.error("Failed to process experiment request", e);
-            listener.onFailure(new SearchRelevanceException("Failed to process experiment request", e, RestStatus.INTERNAL_SERVER_ERROR));
+            log.error("Failed to create experiment", e);
+            listener.onFailure(new SearchRelevanceException("Failed to create experiment", e, RestStatus.INTERNAL_SERVER_ERROR));
+        }
+    }
+
+    private void validateExperimentReferences(PutExperimentRequest request, ActionListener<Void> listener) {
+        int totalValidations = 1; // QuerySet
+        if (request.getSearchConfigurationList() != null && !request.getSearchConfigurationList().isEmpty()) {
+            totalValidations += request.getSearchConfigurationList().size();
+        }
+        if (request.getJudgmentList() != null && !request.getJudgmentList().isEmpty()) {
+            totalValidations += request.getJudgmentList().size();
+        }
+
+        GroupedActionListener<Void> groupedListener = new GroupedActionListener<>(
+            ActionListener.wrap(results -> listener.onResponse(null), listener::onFailure),
+            totalValidations
+        );
+
+        // Validate QuerySet
+        ReferenceValidationUtil.validateEntityExists(
+            request.getQuerySetId(),
+            "QuerySet",
+            querySetDao::checkQuerySetExists,
+            groupedListener
+        );
+
+        // Validate Search Configurations
+        if (request.getSearchConfigurationList() != null && !request.getSearchConfigurationList().isEmpty()) {
+            for (String configId : request.getSearchConfigurationList()) {
+                ReferenceValidationUtil.validateEntityExists(
+                    configId,
+                    "SearchConfiguration",
+                    searchConfigurationDao::checkSearchConfigurationExists,
+                    groupedListener
+                );
+            }
+        }
+
+        // Validate Judgments
+        if (request.getJudgmentList() != null && !request.getJudgmentList().isEmpty()) {
+            for (String judgmentId : request.getJudgmentList()) {
+                ReferenceValidationUtil.validateEntityExists(judgmentId, "Judgment", judgmentDao::checkJudgmentExists, groupedListener);
+            }
         }
     }
 

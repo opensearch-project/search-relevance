@@ -104,8 +104,8 @@ public class PutExperimentTransportActionTests extends OpenSearchTestCase {
         PutExperimentRequest request = new PutExperimentRequest(
             ExperimentType.PAIRWISE_COMPARISON,
             null,
-            "Test Experiment",
-            "Test Description",
+            null,
+            null,
             "test-queryset-id",
             List.of("config1"),
             List.of("judgment1"),
@@ -129,11 +129,43 @@ public class PutExperimentTransportActionTests extends OpenSearchTestCase {
         SearchHits searchHits = new SearchHits(new SearchHit[] { searchHit }, new TotalHits(1, TotalHits.Relation.EQUAL_TO), 1.0f);
         when(mockQuerySetResponse.getHits()).thenReturn(searchHits);
 
+        // Mock validation passing - QuerySet exists
+        SearchResponse mockValidationResponse = mock(SearchResponse.class);
+        SearchHits validationHits = new SearchHits(new SearchHit[0], new TotalHits(1, TotalHits.Relation.EQUAL_TO), 0.0f);
+        when(mockValidationResponse.getHits()).thenReturn(validationHits);
+
+        doAnswer(invocation -> {
+            ActionListener<SearchResponse> listener = invocation.getArgument(1);
+            listener.onResponse(mockValidationResponse);
+            return null;
+        }).when(querySetDao).checkQuerySetExists(eq("test-queryset-id"), any(ActionListener.class));
+
+        // Mock actual QuerySet retrieval for processing
         doAnswer(invocation -> {
             ActionListener<SearchResponse> listener = invocation.getArgument(1);
             listener.onResponse(mockQuerySetResponse);
             return null;
         }).when(querySetDao).getQuerySet(eq("test-queryset-id"), any(ActionListener.class));
+
+        // Mock SearchConfiguration validation passing
+        SearchResponse mockConfigValidationResponse = mock(SearchResponse.class);
+        SearchHits configValidationHits = new SearchHits(new SearchHit[0], new TotalHits(1, TotalHits.Relation.EQUAL_TO), 0.0f);
+        when(mockConfigValidationResponse.getHits()).thenReturn(configValidationHits);
+        doAnswer(invocation -> {
+            ActionListener<SearchResponse> listener = invocation.getArgument(1);
+            listener.onResponse(mockConfigValidationResponse);
+            return null;
+        }).when(searchConfigurationDao).checkSearchConfigurationExists(eq("config1"), any(ActionListener.class));
+
+        // Mock Judgment validation passing
+        SearchResponse mockJudgmentValidationResponse = mock(SearchResponse.class);
+        SearchHits judgmentValidationHits = new SearchHits(new SearchHit[0], new TotalHits(1, TotalHits.Relation.EQUAL_TO), 0.0f);
+        when(mockJudgmentValidationResponse.getHits()).thenReturn(judgmentValidationHits);
+        doAnswer(invocation -> {
+            ActionListener<SearchResponse> listener = invocation.getArgument(1);
+            listener.onResponse(mockJudgmentValidationResponse);
+            return null;
+        }).when(judgmentDao).checkJudgmentExists(eq("judgment1"), any(ActionListener.class));
 
         ActionListener<IndexResponse> responseListener = mock(ActionListener.class);
         transportAction.doExecute(null, request, responseListener);
@@ -164,8 +196,8 @@ public class PutExperimentTransportActionTests extends OpenSearchTestCase {
         PutExperimentRequest request = new PutExperimentRequest(
             ExperimentType.PAIRWISE_COMPARISON,
             null,
-            "Test Experiment",
-            "Test Description",
+            null,
+            null,
             "nonexistent-queryset",
             List.of("config1"),
             List.of("judgment1"),
@@ -179,11 +211,43 @@ public class PutExperimentTransportActionTests extends OpenSearchTestCase {
             return null;
         }).when(experimentDao).putExperiment(any(Experiment.class), any(ActionListener.class));
 
+        // Mock validation passing - QuerySet exists
+        SearchResponse mockValidationResponse = mock(SearchResponse.class);
+        SearchHits validationHits = new SearchHits(new SearchHit[0], new TotalHits(1, TotalHits.Relation.EQUAL_TO), 0.0f);
+        when(mockValidationResponse.getHits()).thenReturn(validationHits);
+
+        doAnswer(invocation -> {
+            ActionListener<SearchResponse> listener = invocation.getArgument(1);
+            listener.onResponse(mockValidationResponse);
+            return null;
+        }).when(querySetDao).checkQuerySetExists(eq("nonexistent-queryset"), any(ActionListener.class));
+
+        // Mock actual QuerySet retrieval failing during processing
         doAnswer(invocation -> {
             ActionListener<SearchResponse> listener = invocation.getArgument(1);
             listener.onFailure(new RuntimeException("QuerySet not found"));
             return null;
         }).when(querySetDao).getQuerySet(eq("nonexistent-queryset"), any(ActionListener.class));
+
+        // Mock SearchConfiguration validation passing
+        SearchResponse mockConfigValidationResponse = mock(SearchResponse.class);
+        SearchHits configValidationHits = new SearchHits(new SearchHit[0], new TotalHits(1, TotalHits.Relation.EQUAL_TO), 0.0f);
+        when(mockConfigValidationResponse.getHits()).thenReturn(configValidationHits);
+        doAnswer(invocation -> {
+            ActionListener<SearchResponse> listener = invocation.getArgument(1);
+            listener.onResponse(mockConfigValidationResponse);
+            return null;
+        }).when(searchConfigurationDao).checkSearchConfigurationExists(eq("config1"), any(ActionListener.class));
+
+        // Mock Judgment validation passing
+        SearchResponse mockJudgmentValidationResponse = mock(SearchResponse.class);
+        SearchHits judgmentValidationHits = new SearchHits(new SearchHit[0], new TotalHits(1, TotalHits.Relation.EQUAL_TO), 0.0f);
+        when(mockJudgmentValidationResponse.getHits()).thenReturn(judgmentValidationHits);
+        doAnswer(invocation -> {
+            ActionListener<SearchResponse> listener = invocation.getArgument(1);
+            listener.onResponse(mockJudgmentValidationResponse);
+            return null;
+        }).when(judgmentDao).checkJudgmentExists(eq("judgment1"), any(ActionListener.class));
 
         ActionListener<IndexResponse> responseListener = mock(ActionListener.class);
         transportAction.doExecute(null, request, responseListener);
@@ -201,19 +265,51 @@ public class PutExperimentTransportActionTests extends OpenSearchTestCase {
         PutExperimentRequest request = new PutExperimentRequest(
             ExperimentType.PAIRWISE_COMPARISON,
             null,
-            "Test Experiment",
-            "Test Description",
+            null,
+            null,
             "test-queryset-id",
             List.of("config1"),
             List.of("judgment1"),
             10
         );
 
+        // Mock validation passing - QuerySet exists
+        SearchResponse mockValidationResponse = mock(SearchResponse.class);
+        SearchHits validationHits = new SearchHits(new SearchHit[0], new TotalHits(1, TotalHits.Relation.EQUAL_TO), 0.0f);
+        when(mockValidationResponse.getHits()).thenReturn(validationHits);
+
+        doAnswer(invocation -> {
+            ActionListener<SearchResponse> listener = invocation.getArgument(1);
+            listener.onResponse(mockValidationResponse);
+            return null;
+        }).when(querySetDao).checkQuerySetExists(eq("test-queryset-id"), any(ActionListener.class));
+
+        // Mock experiment creation failing
         doAnswer(invocation -> {
             ActionListener<IndexResponse> listener = invocation.getArgument(1);
             listener.onFailure(new RuntimeException("Database error"));
             return null;
         }).when(experimentDao).putExperiment(any(Experiment.class), any(ActionListener.class));
+
+        // Mock SearchConfiguration validation passing
+        SearchResponse mockConfigValidationResponse = mock(SearchResponse.class);
+        SearchHits configValidationHits = new SearchHits(new SearchHit[0], new TotalHits(1, TotalHits.Relation.EQUAL_TO), 0.0f);
+        when(mockConfigValidationResponse.getHits()).thenReturn(configValidationHits);
+        doAnswer(invocation -> {
+            ActionListener<SearchResponse> listener = invocation.getArgument(1);
+            listener.onResponse(mockConfigValidationResponse);
+            return null;
+        }).when(searchConfigurationDao).checkSearchConfigurationExists(eq("config1"), any(ActionListener.class));
+
+        // Mock Judgment validation passing
+        SearchResponse mockJudgmentValidationResponse = mock(SearchResponse.class);
+        SearchHits judgmentValidationHits = new SearchHits(new SearchHit[0], new TotalHits(1, TotalHits.Relation.EQUAL_TO), 0.0f);
+        when(mockJudgmentValidationResponse.getHits()).thenReturn(judgmentValidationHits);
+        doAnswer(invocation -> {
+            ActionListener<SearchResponse> listener = invocation.getArgument(1);
+            listener.onResponse(mockJudgmentValidationResponse);
+            return null;
+        }).when(judgmentDao).checkJudgmentExists(eq("judgment1"), any(ActionListener.class));
 
         ActionListener<IndexResponse> responseListener = mock(ActionListener.class);
         transportAction.doExecute(null, request, responseListener);
@@ -223,6 +319,127 @@ public class PutExperimentTransportActionTests extends OpenSearchTestCase {
 
         Exception exception = exceptionCaptor.getValue();
         assertTrue(exception.getMessage().contains("Failed to create initial experiment"));
+    }
+
+    public void testValidation_QuerySetNotFound() {
+        PutExperimentRequest request = new PutExperimentRequest(
+            ExperimentType.POINTWISE_EVALUATION,
+            null,
+            null,
+            null,
+            "missing-queryset-id",
+            List.of(),
+            List.of(),
+            10
+        );
+
+        // Mock QuerySet DAO to return 0 hits (entity not found)
+        SearchResponse mockResponse = mock(SearchResponse.class);
+        SearchHits searchHits = new SearchHits(new SearchHit[0], new TotalHits(0, TotalHits.Relation.EQUAL_TO), 0.0f);
+        when(mockResponse.getHits()).thenReturn(searchHits);
+
+        doAnswer(invocation -> {
+            ActionListener<SearchResponse> listener = invocation.getArgument(1);
+            listener.onResponse(mockResponse);
+            return null;
+        }).when(querySetDao).checkQuerySetExists(eq("missing-queryset-id"), any(ActionListener.class));
+
+        ActionListener<IndexResponse> responseListener = mock(ActionListener.class);
+        transportAction.doExecute(null, request, responseListener);
+
+        ArgumentCaptor<Exception> exceptionCaptor = ArgumentCaptor.forClass(Exception.class);
+        verify(responseListener).onFailure(exceptionCaptor.capture());
+
+        Exception exception = exceptionCaptor.getValue();
+        assertTrue(exception.getMessage().contains("QuerySet [missing-queryset-id] does not exist"));
+    }
+
+    public void testValidation_SearchConfigurationNotFound() {
+        PutExperimentRequest request = new PutExperimentRequest(
+            ExperimentType.POINTWISE_EVALUATION,
+            null,
+            null,
+            null,
+            "valid-queryset-id",
+            List.of("missing-config-id"),
+            List.of(),
+            10
+        );
+
+        // Mock QuerySet exists
+        SearchResponse mockQuerySetResponse = mock(SearchResponse.class);
+        SearchHits querySetHits = new SearchHits(new SearchHit[0], new TotalHits(1, TotalHits.Relation.EQUAL_TO), 0.0f);
+        when(mockQuerySetResponse.getHits()).thenReturn(querySetHits);
+
+        doAnswer(invocation -> {
+            ActionListener<SearchResponse> listener = invocation.getArgument(1);
+            listener.onResponse(mockQuerySetResponse);
+            return null;
+        }).when(querySetDao).checkQuerySetExists(eq("valid-queryset-id"), any(ActionListener.class));
+
+        // Mock SearchConfiguration DAO to return 0 hits
+        SearchResponse mockResponse = mock(SearchResponse.class);
+        SearchHits searchHits = new SearchHits(new SearchHit[0], new TotalHits(0, TotalHits.Relation.EQUAL_TO), 0.0f);
+        when(mockResponse.getHits()).thenReturn(searchHits);
+
+        doAnswer(invocation -> {
+            ActionListener<SearchResponse> listener = invocation.getArgument(1);
+            listener.onResponse(mockResponse);
+            return null;
+        }).when(searchConfigurationDao).checkSearchConfigurationExists(eq("missing-config-id"), any(ActionListener.class));
+
+        ActionListener<IndexResponse> responseListener = mock(ActionListener.class);
+        transportAction.doExecute(null, request, responseListener);
+
+        ArgumentCaptor<Exception> exceptionCaptor = ArgumentCaptor.forClass(Exception.class);
+        verify(responseListener).onFailure(exceptionCaptor.capture());
+
+        Exception exception = exceptionCaptor.getValue();
+        assertTrue(exception.getMessage().contains("SearchConfiguration [missing-config-id] does not exist"));
+    }
+
+    public void testValidation_JudgmentNotFound() {
+        PutExperimentRequest request = new PutExperimentRequest(
+            ExperimentType.POINTWISE_EVALUATION,
+            null,
+            null,
+            null,
+            "valid-queryset-id",
+            List.of(),
+            List.of("missing-judgment-id"),
+            10
+        );
+
+        // Mock QuerySet exists
+        SearchResponse mockQuerySetResponse = mock(SearchResponse.class);
+        SearchHits querySetHits = new SearchHits(new SearchHit[0], new TotalHits(1, TotalHits.Relation.EQUAL_TO), 0.0f);
+        when(mockQuerySetResponse.getHits()).thenReturn(querySetHits);
+
+        doAnswer(invocation -> {
+            ActionListener<SearchResponse> listener = invocation.getArgument(1);
+            listener.onResponse(mockQuerySetResponse);
+            return null;
+        }).when(querySetDao).checkQuerySetExists(eq("valid-queryset-id"), any(ActionListener.class));
+
+        // Mock Judgment DAO to return 0 hits
+        SearchResponse mockResponse = mock(SearchResponse.class);
+        SearchHits searchHits = new SearchHits(new SearchHit[0], new TotalHits(0, TotalHits.Relation.EQUAL_TO), 0.0f);
+        when(mockResponse.getHits()).thenReturn(searchHits);
+
+        doAnswer(invocation -> {
+            ActionListener<SearchResponse> listener = invocation.getArgument(1);
+            listener.onResponse(mockResponse);
+            return null;
+        }).when(judgmentDao).checkJudgmentExists(eq("missing-judgment-id"), any(ActionListener.class));
+
+        ActionListener<IndexResponse> responseListener = mock(ActionListener.class);
+        transportAction.doExecute(null, request, responseListener);
+
+        ArgumentCaptor<Exception> exceptionCaptor = ArgumentCaptor.forClass(Exception.class);
+        verify(responseListener).onFailure(exceptionCaptor.capture());
+
+        Exception exception = exceptionCaptor.getValue();
+        assertTrue(exception.getMessage().contains("Judgment [missing-judgment-id] does not exist"));
     }
 
     // ============================================

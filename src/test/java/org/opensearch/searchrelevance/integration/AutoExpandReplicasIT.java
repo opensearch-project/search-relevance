@@ -20,6 +20,16 @@ public class AutoExpandReplicasIT extends BaseSearchRelevanceIT {
         // Create an index via plugin flow by creating a search configuration that references it
         String userIndexName = "test-auto-expand-replicas-index";
         String template = readTemplate("src/test/resources/searchconfig/CreateSearchConfigurationSimpleMatch.json");
+        // Create the required index first
+        makeRequest(
+            client(),
+            "PUT",
+            userIndexName,
+            null,
+            toHttpEntity("{\"settings\": {\"number_of_shards\": 1, \"number_of_replicas\": 0}}"),
+            null
+        );
+
         String body = template.replace("{{index_name}}", userIndexName);
 
         // call plugin to create a search configuration which will trigger the plugin's system index creation
