@@ -36,7 +36,7 @@ public class IndexMappingVersionIT extends BaseSearchRelevanceIT {
         // Create a search configuration to trigger system index creation
         String userIndexName = "test-schema-version-index";
 
-        // Ensure the index exists, required by referential integrity validator added in PR #360
+        // Ensure the index exists, required for referential integrity validation
         String indexConfig = "{ \"settings\": { \"number_of_shards\": 1, \"number_of_replicas\": 0 }, "
             + "\"mappings\": { \"properties\": { \"text\": { \"type\": \"text\" } } } }";
         createIndexWithConfiguration(userIndexName, indexConfig);
