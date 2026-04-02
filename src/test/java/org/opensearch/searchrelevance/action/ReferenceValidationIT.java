@@ -41,11 +41,11 @@ public class ReferenceValidationIT extends BaseSearchRelevanceIT {
             + "\"name\": \"test-experiment\","
             + "\"type\": \"POINTWISE_EVALUATION\","
             + "\"querySetId\": \"non-existent-queryset-id\","
-            + "\"searchConfigurationList\": [],"
+            + "\"searchConfigurationList\": [\"fake-config-id\"],"
             + "\"size\": 10"
             + "}";
 
-        expectThrows(
+        ResponseException ex = expectThrows(
             ResponseException.class,
             () -> makeRequest(
                 client(),
@@ -56,6 +56,7 @@ public class ReferenceValidationIT extends BaseSearchRelevanceIT {
                 ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
             )
         );
+        assertTrue(ex.getMessage().contains("does not exist"));
     }
 
     @SneakyThrows
@@ -68,7 +69,7 @@ public class ReferenceValidationIT extends BaseSearchRelevanceIT {
             + "\"size\": 10"
             + "}";
 
-        expectThrows(
+        ResponseException ex = expectThrows(
             ResponseException.class,
             () -> makeRequest(
                 client(),
@@ -79,6 +80,7 @@ public class ReferenceValidationIT extends BaseSearchRelevanceIT {
                 ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
             )
         );
+        assertTrue(ex.getMessage().contains("does not exist"));
     }
 
     @SneakyThrows
@@ -87,12 +89,12 @@ public class ReferenceValidationIT extends BaseSearchRelevanceIT {
             + "\"name\": \"test-experiment\","
             + "\"type\": \"POINTWISE_EVALUATION\","
             + "\"querySetId\": \"non-existent-queryset-id\","
-            + "\"searchConfigurationList\": [],"
+            + "\"searchConfigurationList\": [\"non-existent-config\"],"
             + "\"judgmentList\": [\"non-existent-judgment-id\"],"
             + "\"size\": 10"
             + "}";
 
-        expectThrows(
+        ResponseException ex = expectThrows(
             ResponseException.class,
             () -> makeRequest(
                 client(),
@@ -103,6 +105,7 @@ public class ReferenceValidationIT extends BaseSearchRelevanceIT {
                 ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
             )
         );
+        assertTrue(ex.getMessage().contains("does not exist"));
     }
 
     // --- Search Configuration API negative tests ---
@@ -115,7 +118,7 @@ public class ReferenceValidationIT extends BaseSearchRelevanceIT {
             + "\"query\": \"{\\\"query\\\": {\\\"match_all\\\": {}}}\""
             + "}";
 
-        expectThrows(
+        ResponseException ex = expectThrows(
             ResponseException.class,
             () -> makeRequest(
                 client(),
@@ -126,6 +129,7 @@ public class ReferenceValidationIT extends BaseSearchRelevanceIT {
                 ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
             )
         );
+        assertTrue(ex.getMessage().contains("Index [non-existent-index] does not exist"));
     }
 
     // --- Judgment API negative tests ---
@@ -137,11 +141,11 @@ public class ReferenceValidationIT extends BaseSearchRelevanceIT {
             + "\"type\": \"LLM_JUDGMENT\","
             + "\"modelId\": \"fake-model-id\","
             + "\"querySetId\": \"non-existent-queryset-id\","
-            + "\"searchConfigurationList\": [],"
+            + "\"searchConfigurationList\": [\"fake-config-id\"],"
             + "\"size\": 10"
             + "}";
 
-        expectThrows(
+        ResponseException ex = expectThrows(
             ResponseException.class,
             () -> makeRequest(
                 client(),
@@ -152,6 +156,7 @@ public class ReferenceValidationIT extends BaseSearchRelevanceIT {
                 ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
             )
         );
+        assertTrue(ex.getMessage().contains("does not exist"));
     }
 
     @SneakyThrows
@@ -165,7 +170,7 @@ public class ReferenceValidationIT extends BaseSearchRelevanceIT {
             + "\"size\": 10"
             + "}";
 
-        expectThrows(
+        ResponseException ex = expectThrows(
             ResponseException.class,
             () -> makeRequest(
                 client(),
@@ -176,5 +181,6 @@ public class ReferenceValidationIT extends BaseSearchRelevanceIT {
                 ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
             )
         );
+        assertTrue(ex.getMessage().contains("does not exist"));
     }
 }

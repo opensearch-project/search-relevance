@@ -10,7 +10,6 @@ package org.opensearch.searchrelevance.utils;
 import java.util.function.BiConsumer;
 
 import org.opensearch.action.search.SearchResponse;
-import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
@@ -37,29 +36,6 @@ public class ReferenceValidationUtil {
         public String getErrorMessage() {
             return errorMessage;
         }
-    }
-
-    /**
-     * Validates that a cluster index exists
-     *
-     * @param clusterService ClusterService instance
-     * @param indexName      Index name to validate
-     * @return ValidationResult indicating if the index exists
-     */
-    public static ValidationResult validateIndexExists(ClusterService clusterService, String indexName) {
-        if (clusterService == null) {
-            return new ValidationResult(false, "ClusterService is not available");
-        }
-
-        if (indexName == null || indexName.isEmpty()) {
-            return new ValidationResult(false, "Index name cannot be null or empty");
-        }
-
-        if (clusterService.state().metadata().hasIndex(indexName)) {
-            return new ValidationResult(true, null);
-        }
-
-        return new ValidationResult(false, "Index [" + indexName + "] does not exist");
     }
 
     /**

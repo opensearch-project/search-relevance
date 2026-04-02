@@ -256,8 +256,6 @@ public class LlmJudgmentTemplateIT extends BaseSearchRelevanceIT {
         bulkIngest(TEST_INDEX, bulkData);
 
         // Step 3: Create query set
-
-        // Create query set
         String querySetBody = Files.readString(Path.of(classLoader.getResource("llmjudgment/CreateQuerySetSimple.json").toURI()));
         Response querySetResponse = makeRequest(
             client(),
@@ -364,8 +362,6 @@ public class LlmJudgmentTemplateIT extends BaseSearchRelevanceIT {
         bulkIngest(TEST_INDEX, bulkData);
 
         // Step 3: Create query set
-
-        // Create query set
         String querySetBody = Files.readString(Path.of(classLoader.getResource("llmjudgment/CreateQuerySetSimple.json").toURI()));
         Response querySetResponse = makeRequest(
             client(),
