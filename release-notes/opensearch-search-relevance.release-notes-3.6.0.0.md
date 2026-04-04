@@ -4,14 +4,14 @@ Compatible with OpenSearch and OpenSearch Dashboards version 3.6.0
 
 ### Features
 
-* Add support for Recall@K, Mean Reciprocal Rank (MRR), and Discounted Cumulative Gain (DCG@K) search evaluation metrics ([#397](https://github.com/opensearch-project/search-relevance/pull/397))
-* Introduce dynamic relevance threshold for binary-dependent metrics calculation, replacing the fixed hard-coded threshold with a data-driven approach ([#394](https://github.com/opensearch-project/search-relevance/pull/394))
-* Add optional name and description fields to experiments with auto-generated defaults and a PATCH endpoint for updating metadata ([#408](https://github.com/opensearch-project/search-relevance/pull/408))
+* Add dynamic relevance threshold for binary metrics calculation to prevent inflated precision with graded judgments ([#394](https://github.com/opensearch-project/search-relevance/pull/394))
+* Extend search evaluation metrics with Recall@K, Mean Reciprocal Rank (MRR), and Discounted Cumulative Gain (DCG@K) ([#397](https://github.com/opensearch-project/search-relevance/pull/397))
+* Add optional name and description fields to experiments with auto-generated defaults and PATCH endpoint for updates ([#408](https://github.com/opensearch-project/search-relevance/pull/408))
 
 ### Bug Fixes
 
-* Fix thread pool starvation in LLM judgment processing by scheduling query batches sequentially instead of submitting all queries simultaneously ([#387](https://github.com/opensearch-project/search-relevance/pull/387))
-* Fix flaky DCG and MRR assertions in integration tests by using wider tolerance for position-sensitive metrics in multi-node clusters ([#427](https://github.com/opensearch-project/search-relevance/pull/427))
+* Fix thread pool starvation in LLM judgment processing by using sequential batches for queries ([#387](https://github.com/opensearch-project/search-relevance/pull/387))
+* Fix flaky DCG and MRR assertions in integration tests by widening tolerance for position-sensitive metrics ([#427](https://github.com/opensearch-project/search-relevance/pull/427))
 
 ### Infrastructure
 
@@ -24,7 +24,6 @@ Compatible with OpenSearch and OpenSearch Dashboards version 3.6.0
 
 ### Documentation
 
-* Add release notes for 3.5.0 ([#379](https://github.com/opensearch-project/search-relevance/pull/379))
 * Add release notes for 3.6.0 ([#435](https://github.com/opensearch-project/search-relevance/pull/435))
 
 ### Maintenance
@@ -39,4 +38,4 @@ Compatible with OpenSearch and OpenSearch Dashboards version 3.6.0
 
 ### Refactoring
 
-* Extract reusable BatchedAsyncExecutor abstraction and migrate LlmJudgmentTaskManager and ExperimentTaskManager to use it ([#392](https://github.com/opensearch-project/search-relevance/pull/392))
+* Extract reusable BatchedAsyncExecutor and migrate LlmJudgmentTaskManager and ExperimentTaskManager to use it ([#392](https://github.com/opensearch-project/search-relevance/pull/392))
