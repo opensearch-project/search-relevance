@@ -40,6 +40,7 @@ import org.opensearch.action.update.UpdateResponse;
 import org.opensearch.cluster.metadata.MappingMetadata;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.io.Streams;
+import org.opensearch.common.util.concurrent.ThreadContext;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.core.xcontent.XContentBuilder;
@@ -240,18 +241,18 @@ public class SearchRelevanceIndicesManager {
             org.opensearch.common.xcontent.XContentType.JSON
         );
         final CompletableFuture<Void> future = new CompletableFuture<>();
-        StashedThreadContext.run(client, () -> client.admin().indices().putMapping(putMappingRequest, new ActionListener<>() {
-            @Override
-            public void onResponse(org.opensearch.action.support.clustermanager.AcknowledgedResponse response) {
-                future.complete(null);
-            }
+        try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
+            client.admin().indices().putMapping(putMappingRequest, new ActionListener<>() {
+                @Override
+                public void onResponse(org.opensearch.action.support.clustermanager.AcknowledgedResponse response) {
+                    future.complete(null);
+                }
 
-            @Override
-            public void onFailure(Exception e) {
-                future.completeExceptionally(e);
-            }
-        }));
-        try {
+                @Override
+                public void onFailure(Exception e) {
+                    future.completeExceptionally(e);
+                }
+            });
             future.get(30, TimeUnit.SECONDS);
         } catch (TimeoutException e) {
             throw new SearchRelevanceException(
