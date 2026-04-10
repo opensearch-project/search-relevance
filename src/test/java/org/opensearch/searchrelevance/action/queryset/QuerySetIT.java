@@ -66,6 +66,9 @@ public class QuerySetIT extends BaseSearchRelevanceIT {
         assertNotNull(source.get("id"));
         assertEquals("query_set", source.get("name"));
         assertEquals("Test query set", source.get("description"));
+        assertEquals("COMPLETED", source.get("status"));
+        assertEquals("MANUAL_QUERY_SET", source.get("type"));
+        assertEquals(8, ((Number) source.get("numberOfQueryTerms")).intValue());
 
         String searchBody = "{" + "\"query\": {" + "\"term\": {" + "\"id\": \"" + querySetId + "\"" + "}" + "}" + "}";
         Response searchResponse = makeRequest(

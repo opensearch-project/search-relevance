@@ -9,6 +9,7 @@ package org.opensearch.searchrelevance.ubi;
 
 import static org.opensearch.searchrelevance.common.PluginConstants.UBI_QUERIES_INDEX;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -57,5 +58,9 @@ public abstract class QuerySampler {
             case TopNQuerySampler.NAME -> new TopNQuerySampler(size, client, ubiQueriesIndex);
             default -> throw new SearchRelevanceException("Unknown sampler type: " + name, RestStatus.BAD_REQUEST);
         };
+    }
+
+    public static List<String> getSamplingTechniquesSupportedByUBI() {
+        return List.of(ProbabilityProportionalToSizeQuerySampler.NAME, RandomQuerySampler.NAME, TopNQuerySampler.NAME);
     }
 }

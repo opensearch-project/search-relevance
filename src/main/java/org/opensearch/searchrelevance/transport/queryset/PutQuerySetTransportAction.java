@@ -7,23 +7,31 @@
  */
 package org.opensearch.searchrelevance.transport.queryset;
 
+import static org.opensearch.searchrelevance.common.PluginConstants.LLM_RANDOM;
+import static org.opensearch.searchrelevance.common.PluginConstants.MANUAL;
 import static org.opensearch.searchrelevance.model.QueryWithReference.DELIMITER;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.HandledTransportAction;
+import org.opensearch.cluster.metadata.MappingMetadata;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
+import org.opensearch.searchrelevance.common.validator.IndexValidator;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
+import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.QuerySet;
 import org.opensearch.searchrelevance.model.QuerySetEntry;
+import org.opensearch.searchrelevance.model.QuerySetType;
 import org.opensearch.searchrelevance.model.QueryWithReference;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.tasks.Task;
@@ -55,24 +63,87 @@ public class PutQuerySetTransportAction extends HandledTransportAction<PutQueryS
             listener.onFailure(new SearchRelevanceException("Request cannot be null", RestStatus.BAD_REQUEST));
             return;
         }
+
+        String sampling = request.getSampling();
+        QuerySet querySet;
+        if (MANUAL.equals(sampling)) {
+            querySet = manualSampling(request);
+        } else if (LLM_RANDOM.equals(sampling)) {
+            querySet = llmRandomSampling((PutLlmQuerySetRequest) request, listener);
+            if (querySet == null) {
+                return;
+            }
+        } else {
+            listener.onFailure(
+                new SearchRelevanceException(
+                    "Support sampling as manual and llm_random only. sampling: " + sampling,
+                    RestStatus.BAD_REQUEST
+                )
+            );
+            return;
+        }
+        querySetDao.putQuerySet(querySet, listener);
+    }
+
+    private QuerySet manualSampling(PutQuerySetRequest request) {
         String id = UUID.randomUUID().toString();
         String timestamp = TimeUtils.getTimestamp();
 
         String name = request.getName();
         String description = request.getDescription();
 
-        // Given sampling type by default "manual" to support manually uploaded querySetQueries.
-        String sampling = request.getSampling();
-        if (!"manual".equals(sampling)) {
-            listener.onFailure(
-                new SearchRelevanceException("Support sampling as manual only. sampling: " + sampling, RestStatus.BAD_REQUEST)
-            );
-        }
         List<QueryWithReference> queryWithReferenceList = request.getQuerySetQueries();
         List<QuerySetEntry> querySetQueries = convertQuerySetQueriesList(queryWithReferenceList);
+        return new QuerySet(
+            id,
+            name,
+            description,
+            timestamp,
+            request.getSampling(),
+            AsyncStatus.COMPLETED,
+            QuerySetType.MANUAL_QUERY_SET,
+            querySetQueries.size(),
+            querySetQueries
+        );
+    }
 
-        QuerySet querySet = new QuerySet(id, name, description, timestamp, sampling, querySetQueries);
-        querySetDao.putQuerySet(querySet, listener);
+    // TODO Add llm Random Sampling logic
+    private QuerySet llmRandomSampling(PutLlmQuerySetRequest request, ActionListener<IndexResponse> listener) {
+        String index = request.getIndex();
+        if (!IndexValidator.checkIndexAndMappingExists(clusterService, index)) {
+            listener.onFailure(
+                new SearchRelevanceException(
+                    String.format(Locale.ROOT, "Index with provided name [%s] does not exist", index),
+                    RestStatus.BAD_REQUEST
+                )
+            );
+            return null;
+        }
+        try {
+            MappingMetadata mappingMetadata = clusterService.state().metadata().index(index).mapping();
+            IndexValidator.validateFieldsExistInIndexMapping(mappingMetadata, request.getContextFields());
+        } catch (IllegalArgumentException e) {
+            listener.onFailure(new SearchRelevanceException(e.getMessage(), RestStatus.BAD_REQUEST));
+            return null;
+        }
+
+        String id = UUID.randomUUID().toString();
+        String timestamp = TimeUtils.getTimestamp();
+
+        String name = request.getName();
+        String description = request.getDescription();
+
+        return new QuerySet(
+            id,
+            name,
+            description,
+            timestamp,
+            request.getSampling(),
+            AsyncStatus.COMPLETED,
+            QuerySetType.LLM_QUERY_SET,
+            request.getNumberOfQueryTerms(),
+            new ArrayList<>()
+        );
     }
 
     /**

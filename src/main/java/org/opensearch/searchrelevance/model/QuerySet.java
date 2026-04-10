@@ -14,9 +14,16 @@ import org.opensearch.core.xcontent.ToXContent.Params;
 import org.opensearch.core.xcontent.ToXContentObject;
 import org.opensearch.core.xcontent.XContentBuilder;
 
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+
 /**
  * QuerySet is a system index object that represents all query set sampling/inserting params.
  */
+@Getter
+@AllArgsConstructor
+@Builder
 public class QuerySet implements ToXContentObject {
 
     public static final String ID = "id";
@@ -24,6 +31,9 @@ public class QuerySet implements ToXContentObject {
     public static final String DESCRIPTION = "description";
     public static final String TIME_STAMP = "timestamp";
     public static final String SAMPLING = "sampling";
+    public static final String STATUS = "status";
+    public static final String TYPE = "type";
+    public static final String NUMBER_OF_QUERY_TERMS = "numberOfQueryTerms";
     public static final String QUERY_SET_QUERIES = "querySetQueries";
 
     /**
@@ -32,18 +42,12 @@ public class QuerySet implements ToXContentObject {
     private final String id;
     private final String name;
     private final String description;
-    private final String sampling;
     private final String timestamp;
+    private final String sampling;
+    private final AsyncStatus status;
+    private final QuerySetType type;
+    private final int numberOfQueryTerms;
     private final List<QuerySetEntry> querySetQueries;
-
-    public QuerySet(String id, String name, String description, String timestamp, String sampling, List<QuerySetEntry> querySetQueries) {
-        this.id = id;
-        this.description = description;
-        this.name = name;
-        this.sampling = sampling;
-        this.timestamp = timestamp;
-        this.querySetQueries = querySetQueries;
-    }
 
     @Override
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
@@ -53,6 +57,9 @@ public class QuerySet implements ToXContentObject {
         xContentBuilder.field(DESCRIPTION, this.description == null ? "" : this.description.trim());
         xContentBuilder.field(SAMPLING, this.sampling == null ? "" : this.sampling.trim());
         xContentBuilder.field(TIME_STAMP, this.timestamp.trim());
+        xContentBuilder.field(STATUS, this.status.name().trim());
+        xContentBuilder.field(TYPE, this.type.name().trim());
+        xContentBuilder.field(NUMBER_OF_QUERY_TERMS, this.numberOfQueryTerms);
         // Add the query_set_queries field
         xContentBuilder.startArray(QUERY_SET_QUERIES);
         for (QuerySetEntry entry : querySetQueries) {
@@ -61,87 +68,4 @@ public class QuerySet implements ToXContentObject {
         xContentBuilder.endArray();
         return xContentBuilder.endObject();
     }
-
-    public static class Builder {
-        private String id;
-        private String name = "";
-        private String description = "";
-        private String sampling = "";
-        private String timestamp = "";
-        private List<QuerySetEntry> querySetQueries;
-
-        private Builder() {}
-
-        private Builder(QuerySet t) {
-            this.id = t.id;
-            this.name = t.name;
-            this.description = t.description;
-            this.sampling = t.sampling;
-            this.timestamp = t.timestamp;
-            this.querySetQueries = t.querySetQueries;
-        }
-
-        public Builder id(String id) {
-            this.id = id;
-            return this;
-        }
-
-        public Builder name(String name) {
-            this.name = name;
-            return this;
-        }
-
-        public Builder description(String description) {
-            this.description = description;
-            return this;
-        }
-
-        public Builder sampling(String sampling) {
-            this.sampling = sampling;
-            return this;
-        }
-
-        public Builder timestamp(String timestamp) {
-            this.timestamp = timestamp;
-            return this;
-        }
-
-        public Builder querySetQueries(List<QuerySetEntry> querySetQueries) {
-            this.querySetQueries = querySetQueries;
-            return this;
-        }
-
-        public QuerySet build() {
-            return new QuerySet(this.id, this.name, this.description, this.timestamp, this.sampling, this.querySetQueries);
-        }
-
-        public static Builder builder() {
-            return new Builder();
-        }
-
-        public static Builder builder(QuerySet t) {
-            return new Builder(t);
-        }
-    }
-
-    public String id() {
-        return id;
-    }
-
-    public String name() {
-        return name;
-    }
-
-    public String sampling() {
-        return sampling;
-    }
-
-    public String timestamp() {
-        return timestamp;
-    }
-
-    public List<QuerySetEntry> querySetQueries() {
-        return querySetQueries;
-    }
-
 }

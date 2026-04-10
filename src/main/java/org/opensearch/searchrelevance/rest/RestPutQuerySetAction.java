@@ -9,15 +9,27 @@ package org.opensearch.searchrelevance.rest;
 
 import static java.util.Collections.singletonList;
 import static org.opensearch.rest.RestRequest.Method.PUT;
+import static org.opensearch.searchrelevance.common.PluginConstants.CATEGORIES;
+import static org.opensearch.searchrelevance.common.PluginConstants.CONTEXT_FIELDS;
+import static org.opensearch.searchrelevance.common.PluginConstants.DEFAULT_CATEGORIES;
+import static org.opensearch.searchrelevance.common.PluginConstants.DEFAULT_NUMBER_OF_QUERY_TERMS;
 import static org.opensearch.searchrelevance.common.PluginConstants.DESCRIPTION;
+import static org.opensearch.searchrelevance.common.PluginConstants.INDEX;
+import static org.opensearch.searchrelevance.common.PluginConstants.LEXICAL;
+import static org.opensearch.searchrelevance.common.PluginConstants.LLM_QUERY_SET;
+import static org.opensearch.searchrelevance.common.PluginConstants.LLM_RANDOM;
 import static org.opensearch.searchrelevance.common.PluginConstants.MANUAL;
+import static org.opensearch.searchrelevance.common.PluginConstants.MODEL_ID;
 import static org.opensearch.searchrelevance.common.PluginConstants.NAME;
+import static org.opensearch.searchrelevance.common.PluginConstants.NUMBER_OF_QUERY_TERMS;
 import static org.opensearch.searchrelevance.common.PluginConstants.QUERYSETS_URL;
 import static org.opensearch.searchrelevance.common.PluginConstants.QUERY_SET_QUERIES;
 import static org.opensearch.searchrelevance.common.PluginConstants.SAMPLING;
+import static org.opensearch.searchrelevance.common.PluginConstants.SEMANTIC;
+import static org.opensearch.searchrelevance.common.PluginConstants.TYPE;
 
 import java.io.IOException;
-import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -35,8 +47,10 @@ import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.searchrelevance.model.QueryWithReference;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
+import org.opensearch.searchrelevance.transport.queryset.PutLlmQuerySetRequest;
 import org.opensearch.searchrelevance.transport.queryset.PutQuerySetAction;
 import org.opensearch.searchrelevance.transport.queryset.PutQuerySetRequest;
+import org.opensearch.searchrelevance.utils.ParserUtils;
 import org.opensearch.searchrelevance.utils.TextValidationUtil;
 import org.opensearch.transport.client.node.NodeClient;
 
@@ -69,56 +83,28 @@ public class RestPutQuerySetAction extends BaseRestHandler {
         XContentParser parser = request.contentParser();
         Map<String, Object> source = parser.map();
 
-        String name = (String) source.get(NAME);
-        RestChannelConsumer errorResponse = validateField(name, "name");
-        if (errorResponse != null) {
-            return errorResponse;
-        }
-
-        String description = (String) source.get(DESCRIPTION);
-        if (description != null) {
-            errorResponse = validateField(description, "description");
-            if (errorResponse != null) {
-                return errorResponse;
-            }
-        }
-        // Default values for sampling as manual
-        String sampling = (String) source.getOrDefault(SAMPLING, MANUAL);
-
-        List<QueryWithReference> querySetQueries;
-        if (sampling.equals(MANUAL)) {
-            List<Object> rawQueries = (List<Object>) source.get(QUERY_SET_QUERIES);
-            if (rawQueries.size() > settingsAccessor.getMaxQuerySetAllowed()) {
-                return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.FORBIDDEN, "Query Set Limit Exceeded."));
-            }
-
-            // Validate and parse each query using the utility method
-            try {
-                querySetQueries = rawQueries.stream().map(obj -> {
-                    Map<String, Object> queryMap = (Map<String, Object>) obj;
-                    TextValidationUtil.QueryValidationResult validationResult = TextValidationUtil.validateAndParseQuery(queryMap);
-
-                    if (!validationResult.isValid()) {
-                        throw new IllegalArgumentException(validationResult.getErrorMessage());
-                    }
-
-                    return validationResult.getQueryWithReference();
-                }).collect(Collectors.toList());
-            } catch (IllegalArgumentException e) {
-                return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.BAD_REQUEST, e.getMessage()));
-            }
-        } else {
-            querySetQueries = Collections.emptyList();
-        }
-
         PutQuerySetRequest putRequest;
         try {
-            putRequest = new PutQuerySetRequest(name, description, sampling, querySetQueries);
+            Object type = source.getOrDefault(TYPE, null);
+            if (type != null && !LLM_QUERY_SET.equals(type)) {
+                throw new IllegalArgumentException("Invalid type: must be '" + LLM_QUERY_SET + "' or absent");
+            }
+            if (LLM_QUERY_SET.equals(type)) {
+                putRequest = prepareLlmRandomQuerySetRequest(source);
+            } else {
+                putRequest = prepareManualQuerySetRequest(source);
+            }
         } catch (IllegalArgumentException e) {
             return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.BAD_REQUEST, e.getMessage()));
+        } catch (IllegalStateException e) {
+            return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.FORBIDDEN, e.getMessage()));
         }
 
-        return channel -> client.execute(PutQuerySetAction.INSTANCE, putRequest, new ActionListener<IndexResponse>() {
+        return executePutQuerySetRequest(client, putRequest);
+    }
+
+    private RestChannelConsumer executePutQuerySetRequest(NodeClient client, PutQuerySetRequest putRequest) {
+        return channel -> client.execute(PutQuerySetAction.INSTANCE, putRequest, new ActionListener<>() {
             @Override
             public void onResponse(IndexResponse response) {
                 try {
@@ -144,30 +130,117 @@ public class RestPutQuerySetAction extends BaseRestHandler {
         });
     }
 
-    /**
-     * Validates a field using TextValidationUtil and returns an error response if invalid
-     *
-     * @param fieldValue The value to validate
-     * @param fieldName The name of the field for error messages
-     * @return RestChannelConsumer with error response if invalid, null if valid
-     */
-    private RestChannelConsumer validateField(String fieldValue, String fieldName) {
+    private PutLlmQuerySetRequest prepareLlmRandomQuerySetRequest(Map<String, Object> source) {
+        String name = validateFieldOrThrow(source.get(NAME), "name");
+        String description = source.get(DESCRIPTION) != null ? validateFieldOrThrow(source.get(DESCRIPTION), "description") : null;
+        String sampling = validateSampling(source.getOrDefault(SAMPLING, LLM_RANDOM));
+        if (!LLM_RANDOM.equals(sampling)) {
+            throw new IllegalArgumentException("Sampling must be '" + LLM_RANDOM + "' for generating query sets by LLM");
+        }
+        String indexName = validateFieldOrThrow(source.get(INDEX), INDEX);
+        int numberOfQueryTerms = parseNumberOfQueryTerms(source);
+        String modelId = validateFieldOrThrow(source.get(MODEL_ID), MODEL_ID);
+        List<String> categories = parseCategories(source);
+
+        List<String> contextFields = ParserUtils.convertObjToList(source, CONTEXT_FIELDS);
+        if (contextFields.isEmpty()) {
+            throw new IllegalArgumentException("ContextFields cannot be empty");
+        }
+        return new PutLlmQuerySetRequest(name, description, sampling, indexName, modelId, numberOfQueryTerms, contextFields, categories);
+    }
+
+    private PutQuerySetRequest prepareManualQuerySetRequest(Map<String, Object> source) {
+        String name = validateFieldOrThrow(source.get(NAME), "name");
+        String description = source.get(DESCRIPTION) != null ? validateFieldOrThrow(source.get(DESCRIPTION), "description") : null;
+        String sampling = validateSampling(source.getOrDefault(SAMPLING, MANUAL));
+        if (!MANUAL.equals(sampling)) {
+            throw new IllegalArgumentException("Sampling must be '" + MANUAL + "' for manual query sets");
+        }
+        List<QueryWithReference> querySetQueries = parseAndValidateManualQuerySet(source);
+        return new PutQuerySetRequest(name, description, sampling, querySetQueries);
+    }
+
+    private String validateSampling(Object value) {
+        if (!MANUAL.equals(value) && !LLM_RANDOM.equals(value)) {
+            throw new IllegalArgumentException("Invalid sampling: must be '" + MANUAL + "' or '" + LLM_RANDOM + "'");
+        }
+        return (String) value;
+    }
+
+    private int parseNumberOfQueryTerms(Map<String, Object> source) {
+        Object rawValue = source.getOrDefault(NUMBER_OF_QUERY_TERMS, DEFAULT_NUMBER_OF_QUERY_TERMS);
+        if (rawValue instanceof Number) {
+            return ((Number) rawValue).intValue();
+        }
+        throw new IllegalArgumentException("Invalid numberOfQueryTerms: must be a number");
+    }
+
+    private List<String> parseCategories(Map<String, Object> source) {
+        List<String> categories = ParserUtils.convertObjToList(source, CATEGORIES);
+        if (categories.isEmpty()) {
+            return DEFAULT_CATEGORIES;
+        }
+        if (categories.size() != new HashSet<>(categories).size()) {
+            throw new IllegalArgumentException("Duplicate categories are not allowed");
+        }
+        if (!DEFAULT_CATEGORIES.containsAll(categories)) {
+            throw new IllegalArgumentException("Invalid categories: must be '" + LEXICAL + "' and/or '" + SEMANTIC + "'");
+        }
+        return categories;
+    }
+
+    private String validateFieldOrThrow(Object fieldValue, String fieldName) {
+        if (!(fieldValue instanceof String value)) {
+            throw new IllegalArgumentException("Invalid " + fieldName + ": must be a string");
+        }
         TextValidationUtil.ValidationResult validation;
-
         if ("name".equals(fieldName)) {
-            validation = TextValidationUtil.validateName(fieldValue);
+            validation = TextValidationUtil.validateName(value);
         } else if ("description".equals(fieldName)) {
-            validation = TextValidationUtil.validateDescription(fieldValue);
+            validation = TextValidationUtil.validateDescription(value);
         } else {
-            validation = TextValidationUtil.validateText(fieldValue);
+            validation = TextValidationUtil.validateText(value);
+        }
+        if (!validation.isValid()) {
+            throw new IllegalArgumentException("Invalid " + fieldName + ": " + validation.getErrorMessage());
+        }
+        return value;
+    }
+
+    /**
+     * Parses and validates manual query set queries from the request source.
+     *
+     * @param source the request body as a map
+     * @return list of validated QueryWithReference objects
+     * @throws IllegalStateException    if query set size exceeds the allowed limit
+     * @throws IllegalArgumentException if any query fails validation
+     */
+    private List<QueryWithReference> parseAndValidateManualQuerySet(Map<String, Object> source) {
+        Object rawQueriesObj = source.get(QUERY_SET_QUERIES);
+        if (!(rawQueriesObj instanceof List)) {
+            throw new IllegalArgumentException("Query set queries must be a list");
+        }
+        @SuppressWarnings("unchecked")
+        List<Object> rawQueries = (List<Object>) rawQueriesObj;
+        if (rawQueries.isEmpty()) {
+            throw new IllegalArgumentException("Query set queries cannot be empty for manual sampling");
+        }
+        if (rawQueries.size() > settingsAccessor.getMaxQuerySetAllowed()) {
+            throw new IllegalStateException("Query Set Limit Exceeded.");
         }
 
-        if (!validation.isValid()) {
-            return channel -> channel.sendResponse(
-                new BytesRestResponse(RestStatus.BAD_REQUEST, "Invalid " + fieldName + ": " + validation.getErrorMessage())
-            );
-        }
-        return null;
+        return rawQueries.stream().map(obj -> {
+            if (!(obj instanceof Map)) {
+                throw new IllegalArgumentException("Each query must be a JSON object");
+            }
+            @SuppressWarnings("unchecked")
+            Map<String, Object> queryMap = (Map<String, Object>) obj;
+            TextValidationUtil.QueryValidationResult validationResult = TextValidationUtil.validateAndParseQuery(queryMap);
+            if (!validationResult.isValid()) {
+                throw new IllegalArgumentException(validationResult.getErrorMessage());
+            }
+            return validationResult.getQueryWithReference();
+        }).collect(Collectors.toList());
     }
 
 }

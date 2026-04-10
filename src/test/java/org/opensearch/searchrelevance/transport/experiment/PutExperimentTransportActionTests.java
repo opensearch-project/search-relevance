@@ -40,6 +40,8 @@ import org.opensearch.searchrelevance.metrics.MetricsHelper;
 import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.Experiment;
 import org.opensearch.searchrelevance.model.ExperimentType;
+import org.opensearch.searchrelevance.model.QuerySet;
+import org.opensearch.searchrelevance.model.QuerySetType;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.test.OpenSearchTestCase;
 import org.opensearch.threadpool.ThreadPool;
@@ -128,6 +130,20 @@ public class PutExperimentTransportActionTests extends OpenSearchTestCase {
 
         SearchHits searchHits = new SearchHits(new SearchHit[] { searchHit }, new TotalHits(1, TotalHits.Relation.EQUAL_TO), 1.0f);
         when(mockQuerySetResponse.getHits()).thenReturn(searchHits);
+
+        when(querySetDao.convertToQuerySet(any(SearchResponse.class))).thenReturn(
+            QuerySet.builder()
+                .id("test-queryset-id")
+                .name("test-queryset")
+                .description("test description")
+                .timestamp("2023-01-01T00:00:00Z")
+                .sampling("random")
+                .status(AsyncStatus.COMPLETED)
+                .type(QuerySetType.UBI_QUERY_SET)
+                .numberOfQueryTerms(0)
+                .querySetQueries(List.of())
+                .build()
+        );
 
         doAnswer(invocation -> {
             ActionListener<SearchResponse> listener = invocation.getArgument(1);
