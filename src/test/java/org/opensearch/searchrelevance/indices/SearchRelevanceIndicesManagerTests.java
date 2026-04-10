@@ -584,6 +584,13 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         mappingSource.put("properties", new HashMap<>());
         when(mappingMetadata.sourceAsMap()).thenReturn(mappingSource);
 
+        // Mock putMapping to return an ActionFuture
+        org.opensearch.action.support.PlainActionFuture<
+            org.opensearch.action.support.clustermanager.AcknowledgedResponse> putMappingFuture =
+                new org.opensearch.action.support.PlainActionFuture<>();
+        putMappingFuture.onResponse(new org.opensearch.action.support.clustermanager.AcknowledgedResponse(true));
+        when(indicesAdminClient.putMapping(any(PutMappingRequest.class))).thenReturn(putMappingFuture);
+
         // Execute via putDoc
         QuerySet querySet = new QuerySet(
             "test_id",
@@ -783,6 +790,13 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         mappingSource.put("_meta", metaMap);
         mappingSource.put("properties", new HashMap<>());
         when(mappingMetadata.sourceAsMap()).thenReturn(mappingSource);
+
+        // Mock putMapping to return an ActionFuture
+        org.opensearch.action.support.PlainActionFuture<
+            org.opensearch.action.support.clustermanager.AcknowledgedResponse> putMappingFuture =
+                new org.opensearch.action.support.PlainActionFuture<>();
+        putMappingFuture.onResponse(new org.opensearch.action.support.clustermanager.AcknowledgedResponse(true));
+        when(indicesAdminClient.putMapping(any(PutMappingRequest.class))).thenReturn(putMappingFuture);
 
         // Execute via putDoc
         QuerySet querySet = new QuerySet(

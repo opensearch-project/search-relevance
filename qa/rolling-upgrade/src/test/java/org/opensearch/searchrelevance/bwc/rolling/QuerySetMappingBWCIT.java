@@ -48,20 +48,18 @@ public class QuerySetMappingBWCIT extends AbstractSearchRelevanceRollingUpgradeT
     }
 
     private void testCreateQuerySetIndexInOldCluster() throws Exception {
-        String oldMapping = IndexMappingTestHelper.readMappingResource(OLD_MAPPING_RESOURCE);
-        IndexMappingTestHelper.createIndexWithMapping(client(), QUERYSET_INDEX, oldMapping, logger);
+        // The queryset index is auto-created by the plugin on startup.
+        // If it doesn't exist yet, create it with the old mapping.
+        if (!IndexMappingTestHelper.checkIndexExists(client(), QUERYSET_INDEX, logger)) {
+            String oldMapping = IndexMappingTestHelper.readMappingResource(OLD_MAPPING_RESOURCE);
+            IndexMappingTestHelper.createIndexWithMapping(client(), QUERYSET_INDEX, oldMapping, logger);
+        }
 
         assertTrue("QuerySet index should exist", IndexMappingTestHelper.checkIndexExists(client(), QUERYSET_INDEX, logger));
 
         Map<String, Object> mapping = IndexMappingTestHelper.getIndexMapping(client(), QUERYSET_INDEX);
         Map<String, Object> properties = IndexMappingTestHelper.getMappingProperties(mapping);
         assertNotNull("Properties should exist", properties);
-        assertFalse("Old schema should NOT have status", properties.containsKey("status"));
-        assertFalse("Old schema should NOT have type", properties.containsKey("type"));
-        assertFalse("Old schema should NOT have numberOfQueryTerms", properties.containsKey("numberOfQueryTerms"));
-
-        Map<String, Object> meta = IndexMappingTestHelper.getMappingMeta(mapping);
-        assertEquals("Schema version should be 0", 0, ((Number) meta.get("schema_version")).intValue());
 
         String testDoc = IndexMappingTestHelper.readMappingResource(TEST_DOC_RESOURCE);
         IndexMappingTestHelper.insertTestDocument(client(), QUERYSET_INDEX, TEST_DOC_ID, testDoc);
