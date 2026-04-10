@@ -217,7 +217,7 @@ public class SearchRelevanceIndicesManager {
             index.getMapping(),
             org.opensearch.common.xcontent.XContentType.JSON
         );
-        StashedThreadContext.run(client, () -> client.admin().indices().putMapping(putMappingRequest).actionGet());
+        StashedThreadContext.run(client, () -> client.admin().indices().putMapping(putMappingRequest));
     }
 
     /**
