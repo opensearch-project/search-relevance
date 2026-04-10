@@ -700,9 +700,10 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
     }
 
     /**
-     * Test that when putMapping fails, the error is propagated as SearchRelevanceException.
+     * Test that when putMapping fails, the error is logged but does not block the operation.
+     * The mapping update is best-effort — reads work with old mapping, writes will retry.
      */
-    public void testCreateIndexIfAbsentSync_MappingUpdateFails_ThrowsException() throws IOException {
+    public void testCreateIndexIfAbsentSync_MappingUpdateFails_ContinuesWithWarning() throws IOException {
         when(metadata.hasIndex(QUERY_SET.getIndexName())).thenReturn(true);
 
         IndexMetadata indexMetadata = mock(IndexMetadata.class);
@@ -726,13 +727,21 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         QuerySet querySet = new QuerySet("test_id", "test_name", "test_description", "test_timestamp", "test_sampling", List.of());
         XContentBuilder xContentBuilder = querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
 
+        IndexRequestBuilder indexRequestBuilder = mock(IndexRequestBuilder.class);
+        when(client.prepareIndex(QUERY_SET.getIndexName())).thenReturn(indexRequestBuilder);
+        when(indexRequestBuilder.setId("test_id")).thenReturn(indexRequestBuilder);
+        when(indexRequestBuilder.setOpType(DocWriteRequest.OpType.CREATE)).thenReturn(indexRequestBuilder);
+        when(indexRequestBuilder.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)).thenReturn(indexRequestBuilder);
+        when(indexRequestBuilder.setSource(xContentBuilder)).thenReturn(indexRequestBuilder);
+
         @SuppressWarnings("unchecked")
         ActionListener<SearchResponse> listener = mock(ActionListener.class);
 
-        SearchRelevanceException exception = assertThrows(SearchRelevanceException.class, () -> {
-            indicesManager.putDoc("test_id", xContentBuilder, QUERY_SET, listener);
-        });
-        assertTrue(exception.getMessage().contains("Failed to update mapping"));
+        // Should NOT throw — mapping update failure is best-effort
+        indicesManager.putDoc("test_id", xContentBuilder, QUERY_SET, listener);
+
+        // Verify putMapping was attempted
+        verify(indicesAdminClient).putMapping(any(PutMappingRequest.class), any(ActionListener.class));
     }
 
     // ==================== Async createIndexIfAbsent with Retry Tests ====================

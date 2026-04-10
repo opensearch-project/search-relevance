@@ -16,6 +16,10 @@ import java.io.InputStream;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.BiConsumer;
 
 import org.opensearch.ResourceAlreadyExistsException;
@@ -157,9 +161,22 @@ public class SearchRelevanceIndicesManager {
             return;
         }
 
-        // Existing version is older - update mapping
-        log.info("Updating index [{}] mapping from schema version [{}] to [{}]", indexName, existingVersion, currentVersion);
-        updateMappingSync(index);
+        // Existing version is older - update mapping (best-effort)
+        // If the update fails or times out (e.g., during rolling upgrade cluster transitions),
+        // log a warning and continue. Reads work fine with the old mapping, and the next
+        // write operation will retry the update.
+        try {
+            log.info("Updating index [{}] mapping from schema version [{}] to [{}]", indexName, existingVersion, currentVersion);
+            updateMappingSync(index);
+        } catch (Exception e) {
+            log.warn(
+                "Failed to update mapping for index [{}] from version [{}] to [{}]: {}. " + "Will retry on next operation.",
+                indexName,
+                existingVersion,
+                currentVersion,
+                e.getMessage()
+            );
+        }
     }
 
     /**
@@ -210,9 +227,9 @@ public class SearchRelevanceIndicesManager {
 
     /**
      * Update the mapping for an existing index synchronously.
-     * Uses a CountDownLatch to wait for the async putMapping to complete,
+     * Uses a CompletableFuture to wait for the async putMapping to complete,
      * ensuring the mapping is fully applied before any document write occurs.
-     * Note: CountDownLatch.await() is used instead of ActionFuture.actionGet()
+     * Note: CompletableFuture.get() is used instead of ActionFuture.actionGet()
      * because actionGet() is forbidden on transport threads.
      * @param index the index whose mapping should be updated
      * @throws SearchRelevanceException if the mapping update fails or times out
@@ -222,27 +239,25 @@ public class SearchRelevanceIndicesManager {
             index.getMapping(),
             org.opensearch.common.xcontent.XContentType.JSON
         );
-        final java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
-        final java.util.concurrent.atomic.AtomicReference<Exception> error = new java.util.concurrent.atomic.AtomicReference<>();
+        final CompletableFuture<Void> future = new CompletableFuture<>();
         StashedThreadContext.run(client, () -> client.admin().indices().putMapping(putMappingRequest, new ActionListener<>() {
             @Override
             public void onResponse(org.opensearch.action.support.clustermanager.AcknowledgedResponse response) {
-                latch.countDown();
+                future.complete(null);
             }
 
             @Override
             public void onFailure(Exception e) {
-                error.set(e);
-                latch.countDown();
+                future.completeExceptionally(e);
             }
         }));
         try {
-            if (!latch.await(30, java.util.concurrent.TimeUnit.SECONDS)) {
-                throw new SearchRelevanceException(
-                    String.format(Locale.ROOT, "Timeout waiting for mapping update on index [%s]", index.getIndexName()),
-                    RestStatus.INTERNAL_SERVER_ERROR
-                );
-            }
+            future.get(30, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            throw new SearchRelevanceException(
+                String.format(Locale.ROOT, "Timeout waiting for mapping update on index [%s]", index.getIndexName()),
+                RestStatus.INTERNAL_SERVER_ERROR
+            );
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new SearchRelevanceException(
@@ -250,11 +265,10 @@ public class SearchRelevanceIndicesManager {
                 e,
                 RestStatus.INTERNAL_SERVER_ERROR
             );
-        }
-        if (error.get() != null) {
+        } catch (ExecutionException e) {
             throw new SearchRelevanceException(
                 String.format(Locale.ROOT, "Failed to update mapping for index [%s]", index.getIndexName()),
-                error.get(),
+                e.getCause(),
                 RestStatus.INTERNAL_SERVER_ERROR
             );
         }
