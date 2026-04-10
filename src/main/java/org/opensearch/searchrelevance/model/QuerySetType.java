@@ -7,6 +7,9 @@
  */
 package org.opensearch.searchrelevance.model;
 
+/**
+ * Enum representing the origin type of a query set.
+ */
 public enum QuerySetType {
     LLM_QUERY_SET,
     MANUAL_QUERY_SET,

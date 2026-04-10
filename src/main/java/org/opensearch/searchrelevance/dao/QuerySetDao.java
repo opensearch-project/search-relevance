@@ -166,6 +166,14 @@ public class QuerySetDao {
         });
     }
 
+    /**
+     * Converts a SearchResponse into a QuerySet object. Handles backward compatibility
+     * for documents missing status, type, or numberOfQueryTerms fields.
+     *
+     * @param response the search response containing the query set document
+     * @return the parsed QuerySet
+     * @throws SearchRelevanceException if no query set is found
+     */
     public QuerySet convertToQuerySet(SearchResponse response) {
         if (response.getHits().getTotalHits().value() == 0) {
             throw new SearchRelevanceException("QuerySet not found", RestStatus.NOT_FOUND);

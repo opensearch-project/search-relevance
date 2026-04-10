@@ -14,13 +14,16 @@ import java.util.Map;
 import org.opensearch.cluster.metadata.MappingMetadata;
 import org.opensearch.cluster.service.ClusterService;
 
+/**
+ * Utility class for validating index existence and mapping fields.
+ */
 public class IndexValidator {
 
     /**
-     * Checks if UBI queries index exists in the cluster and has required fields
+     * Checks if the given index exists in the cluster and has a mapping.
      * @param clusterService opensearch cluster instance
      * @param index the index name
-     * @return true if queries index exists with required fields, false otherwise
+     * @return true if index exists with a mapping, false otherwise
      */
     public static boolean checkIndexAndMappingExists(ClusterService clusterService, String index) {
         if (clusterService == null || !clusterService.state().metadata().hasIndex(index)) {

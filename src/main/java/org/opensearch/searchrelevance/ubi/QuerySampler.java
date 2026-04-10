@@ -60,6 +60,11 @@ public abstract class QuerySampler {
         };
     }
 
+    /**
+     * Returns the list of sampling technique names supported by UBI-based query set creation.
+     *
+     * @return list of supported UBI sampling technique names
+     */
     public static List<String> getSamplingTechniquesSupportedByUBI() {
         return List.of(ProbabilityProportionalToSizeQuerySampler.NAME, RandomQuerySampler.NAME, TopNQuerySampler.NAME);
     }

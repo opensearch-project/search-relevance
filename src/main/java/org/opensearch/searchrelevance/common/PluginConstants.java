@@ -114,5 +114,5 @@ public class PluginConstants {
     public static final String MODEL_ID = "modelId";
     public static final String LEXICAL = "lexical";
     public static final String SEMANTIC = "semantic";
-    public static List<String> DEFAULT_CATEGORIES = List.of(LEXICAL, SEMANTIC);
+    public static final List<String> DEFAULT_CATEGORIES = List.of(LEXICAL, SEMANTIC);
 }

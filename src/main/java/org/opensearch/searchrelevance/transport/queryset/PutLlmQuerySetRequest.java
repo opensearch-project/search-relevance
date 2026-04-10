@@ -59,8 +59,8 @@ public class PutLlmQuerySetRequest extends PutQuerySetRequest {
         out.writeString(index);
         out.writeString(modelId);
         out.writeInt(numberOfQueryTerms);
-        out.writeStringArray(contextFields.toArray(new String[0]));
-        out.writeStringArray(categories.toArray(new String[0]));
+        out.writeStringCollection(contextFields);
+        out.writeStringCollection(categories);
     }
 
     public String getIndex() {
