@@ -1,0 +1,11 @@
+{
+  "id": "test-queryset-bwc",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "name": "bwc-test-queryset",
+  "description": "BWC test query set",
+  "sampling": "manual",
+  "querySetQueries": [
+    { "queryText": "test query 1" },
+    { "queryText": "test query 2" }
+  ]
+}
