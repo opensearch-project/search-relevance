@@ -69,8 +69,10 @@ public class QuerySetMappingBWCIT extends AbstractSearchRelevanceRollingUpgradeT
     }
 
     private void testMixedCluster() throws Exception {
-        assertTrue("QuerySet index should exist in MIXED cluster",
-            IndexMappingTestHelper.checkIndexExists(client(), QUERYSET_INDEX, logger));
+        assertTrue(
+            "QuerySet index should exist in MIXED cluster",
+            IndexMappingTestHelper.checkIndexExists(client(), QUERYSET_INDEX, logger)
+        );
 
         Map<String, Object> doc = IndexMappingTestHelper.getDocument(client(), QUERYSET_INDEX, TEST_DOC_ID, logger);
         assertNotNull("Test document should be accessible in MIXED cluster", doc);
@@ -87,8 +89,7 @@ public class QuerySetMappingBWCIT extends AbstractSearchRelevanceRollingUpgradeT
      *   → document write with status/type/numberOfQueryTerms fields
      */
     private void testUpgradedCluster() throws Exception {
-        assertTrue("QuerySet index should exist after upgrade",
-            IndexMappingTestHelper.checkIndexExists(client(), QUERYSET_INDEX, logger));
+        assertTrue("QuerySet index should exist after upgrade", IndexMappingTestHelper.checkIndexExists(client(), QUERYSET_INDEX, logger));
 
         // Verify old data survives
         Map<String, Object> oldDoc = IndexMappingTestHelper.getDocument(client(), QUERYSET_INDEX, TEST_DOC_ID, logger);

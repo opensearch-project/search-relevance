@@ -511,7 +511,7 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
 
         // Verify: create index was called (sync version), putMapping was NOT called
         verify(indicesAdminClient).create(any(CreateIndexRequest.class));
-        verify(indicesAdminClient, never()).putMapping(any(PutMappingRequest.class));
+        verify(indicesAdminClient, never()).putMapping(any(PutMappingRequest.class), any(ActionListener.class));
     }
 
     /**
@@ -561,7 +561,7 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
 
         // Verify: create index NOT called, putMapping NOT called (version is same)
         verify(indicesAdminClient, never()).create(any(CreateIndexRequest.class), any(ActionListener.class));
-        verify(indicesAdminClient, never()).putMapping(any(PutMappingRequest.class));
+        verify(indicesAdminClient, never()).putMapping(any(PutMappingRequest.class), any(ActionListener.class));
     }
 
     /**
@@ -618,7 +618,7 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
 
         // Verify: create index NOT called, putMapping IS called (version 0 < 1)
         verify(indicesAdminClient, never()).create(any(CreateIndexRequest.class), any(ActionListener.class));
-        verify(indicesAdminClient).putMapping(any(PutMappingRequest.class));
+        verify(indicesAdminClient, never()).putMapping(any(PutMappingRequest.class), any(ActionListener.class));
     }
 
     /**
@@ -713,7 +713,7 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
 
         // Verify: putMapping NOT called (explicit version 1 >= current version 1)
         verify(indicesAdminClient, never()).create(any(CreateIndexRequest.class), any(ActionListener.class));
-        verify(indicesAdminClient, never()).putMapping(any(PutMappingRequest.class));
+        verify(indicesAdminClient, never()).putMapping(any(PutMappingRequest.class), any(ActionListener.class));
     }
 
     /**
@@ -764,7 +764,7 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
 
         // Verify: putMapping NOT called (version 5 >= current version 0)
         verify(indicesAdminClient, never()).create(any(CreateIndexRequest.class), any(ActionListener.class));
-        verify(indicesAdminClient, never()).putMapping(any(PutMappingRequest.class));
+        verify(indicesAdminClient, never()).putMapping(any(PutMappingRequest.class), any(ActionListener.class));
     }
 
     /**
@@ -791,12 +791,12 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         mappingSource.put("properties", new HashMap<>());
         when(mappingMetadata.sourceAsMap()).thenReturn(mappingSource);
 
-        // Mock putMapping to return an ActionFuture
-        org.opensearch.action.support.PlainActionFuture<
-            org.opensearch.action.support.clustermanager.AcknowledgedResponse> putMappingFuture =
-                new org.opensearch.action.support.PlainActionFuture<>();
-        putMappingFuture.onResponse(new org.opensearch.action.support.clustermanager.AcknowledgedResponse(true));
-        when(indicesAdminClient.putMapping(any(PutMappingRequest.class))).thenReturn(putMappingFuture);
+        // Mock putMapping to invoke listener (async 2-arg version)
+        doAnswer(invocation -> {
+            ActionListener<org.opensearch.action.support.clustermanager.AcknowledgedResponse> putListener = invocation.getArgument(1);
+            putListener.onResponse(new org.opensearch.action.support.clustermanager.AcknowledgedResponse(true));
+            return null;
+        }).when(indicesAdminClient).putMapping(any(PutMappingRequest.class), any(ActionListener.class));
 
         // Execute via putDoc
         QuerySet querySet = new QuerySet(
@@ -825,7 +825,62 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
 
         // Verify: putMapping WAS called (version -2 < current version 0)
         verify(indicesAdminClient, never()).create(any(CreateIndexRequest.class), any(ActionListener.class));
-        verify(indicesAdminClient).putMapping(any(PutMappingRequest.class));
+        verify(indicesAdminClient).putMapping(any(PutMappingRequest.class), any(ActionListener.class));
+    }
+
+    /**
+     * Test that when putMapping fails, the error is logged but does not block the operation.
+     * The mapping update is best-effort — reads work with old mapping, writes will retry.
+     */
+    public void testCreateIndexIfAbsentSync_MappingUpdateFails_ContinuesWithWarning() throws IOException {
+        when(metadata.hasIndex(QUERY_SET.getIndexName())).thenReturn(true);
+
+        IndexMetadata indexMetadata = mock(IndexMetadata.class);
+        MappingMetadata mappingMetadata = mock(MappingMetadata.class);
+        when(metadata.index(QUERY_SET.getIndexName())).thenReturn(indexMetadata);
+        when(indexMetadata.mapping()).thenReturn(mappingMetadata);
+
+        Map<String, Object> metaMap = new HashMap<>();
+        metaMap.put(SearchRelevanceIndices.META_SCHEMA_VERSION_KEY, -1);
+        Map<String, Object> mappingSource = new HashMap<>();
+        mappingSource.put("_meta", metaMap);
+        when(mappingMetadata.sourceAsMap()).thenReturn(mappingSource);
+
+        // Mock putMapping to fail
+        doAnswer(invocation -> {
+            ActionListener<org.opensearch.action.support.clustermanager.AcknowledgedResponse> putListener = invocation.getArgument(1);
+            putListener.onFailure(new RuntimeException("Mapping update failed"));
+            return null;
+        }).when(indicesAdminClient).putMapping(any(PutMappingRequest.class), any(ActionListener.class));
+
+        QuerySet querySet = new QuerySet(
+            "test_id",
+            "test_name",
+            "test_description",
+            "test_timestamp",
+            "test_sampling",
+            AsyncStatus.COMPLETED,
+            QuerySetType.MANUAL_QUERY_SET,
+            0,
+            List.of()
+        );
+        XContentBuilder xContentBuilder = querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
+
+        IndexRequestBuilder indexRequestBuilder = mock(IndexRequestBuilder.class);
+        when(client.prepareIndex(QUERY_SET.getIndexName())).thenReturn(indexRequestBuilder);
+        when(indexRequestBuilder.setId("test_id")).thenReturn(indexRequestBuilder);
+        when(indexRequestBuilder.setOpType(DocWriteRequest.OpType.CREATE)).thenReturn(indexRequestBuilder);
+        when(indexRequestBuilder.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)).thenReturn(indexRequestBuilder);
+        when(indexRequestBuilder.setSource(xContentBuilder)).thenReturn(indexRequestBuilder);
+
+        @SuppressWarnings("unchecked")
+        ActionListener<SearchResponse> listener = mock(ActionListener.class);
+
+        // Should NOT throw — mapping update failure is best-effort
+        indicesManager.putDoc("test_id", xContentBuilder, QUERY_SET, listener);
+
+        // Verify putMapping was attempted
+        verify(indicesAdminClient).putMapping(any(PutMappingRequest.class), any(ActionListener.class));
     }
 
     // ==================== Async createIndexIfAbsent with Retry Tests ====================
@@ -849,18 +904,18 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         mappingSource.put("_meta", metaMap);
         when(mappingMetadata.sourceAsMap()).thenReturn(mappingSource);
 
-        // Mock successful putMapping
-        org.opensearch.action.support.PlainActionFuture<
-            org.opensearch.action.support.clustermanager.AcknowledgedResponse> putMappingFuture =
-                new org.opensearch.action.support.PlainActionFuture<>();
-        putMappingFuture.onResponse(new org.opensearch.action.support.clustermanager.AcknowledgedResponse(true));
-        when(indicesAdminClient.putMapping(any(PutMappingRequest.class))).thenReturn(putMappingFuture);
+        // Mock successful putMapping (async 2-arg version used by updateMappingSync)
+        doAnswer(invocation -> {
+            ActionListener<org.opensearch.action.support.clustermanager.AcknowledgedResponse> putListener = invocation.getArgument(1);
+            putListener.onResponse(new org.opensearch.action.support.clustermanager.AcknowledgedResponse(true));
+            return null;
+        }).when(indicesAdminClient).putMapping(any(PutMappingRequest.class), any(ActionListener.class));
 
         StepListener<Void> stepListener = new StepListener<>();
         indicesManager.createIndexIfAbsent(QUERY_SET, stepListener);
 
         // Verify: putMapping was called once
-        verify(indicesAdminClient).putMapping(any(PutMappingRequest.class));
+        verify(indicesAdminClient).putMapping(any(PutMappingRequest.class), any(ActionListener.class));
 
         // Verify: stepListener was called with success (no exception)
         assertNull(stepListener.result());
@@ -885,14 +940,18 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         mappingSource.put("_meta", metaMap);
         when(mappingMetadata.sourceAsMap()).thenReturn(mappingSource);
 
-        // Mock putMapping to always fail
-        when(indicesAdminClient.putMapping(any(PutMappingRequest.class))).thenThrow(new RuntimeException("Mapping update failed"));
+        // Mock putMapping to always fail (async 2-arg version)
+        doAnswer(invocation -> {
+            ActionListener<org.opensearch.action.support.clustermanager.AcknowledgedResponse> putListener = invocation.getArgument(1);
+            putListener.onFailure(new RuntimeException("Mapping update failed"));
+            return null;
+        }).when(indicesAdminClient).putMapping(any(PutMappingRequest.class), any(ActionListener.class));
 
         StepListener<Void> stepListener = new StepListener<>();
         indicesManager.createIndexIfAbsent(QUERY_SET, stepListener);
 
         // Verify: putMapping was called 3 times (initial + 2 retries)
-        verify(indicesAdminClient, org.mockito.Mockito.times(3)).putMapping(any(PutMappingRequest.class));
+        verify(indicesAdminClient, org.mockito.Mockito.times(3)).putMapping(any(PutMappingRequest.class), any(ActionListener.class));
 
         // Verify: stepListener was called with failure
         try {
@@ -920,7 +979,7 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         indicesManager.createIndexIfAbsent(QUERY_SET, stepListener);
 
         // Verify: putMapping was NOT called (failed before getting there)
-        verify(indicesAdminClient, never()).putMapping(any(PutMappingRequest.class));
+        verify(indicesAdminClient, never()).putMapping(any(PutMappingRequest.class), any(ActionListener.class));
 
         // Verify: stepListener was called with failure
         try {
@@ -955,7 +1014,7 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         indicesManager.createIndexIfAbsent(QUERY_SET, stepListener);
 
         // Verify: putMapping was NOT called (versions are same)
-        verify(indicesAdminClient, never()).putMapping(any(PutMappingRequest.class));
+        verify(indicesAdminClient, never()).putMapping(any(PutMappingRequest.class), any(ActionListener.class));
 
         // Verify: stepListener was called with success
         assertNull(stepListener.result());

@@ -9,6 +9,6 @@
     "index": { "type": "keyword" },
     "queryBody": { "type": "text" },
     "searchPipeline": { "type": "keyword" },
-    "description": {"type": "text"}
+    "description": { "type": "text" }
   }
 }
