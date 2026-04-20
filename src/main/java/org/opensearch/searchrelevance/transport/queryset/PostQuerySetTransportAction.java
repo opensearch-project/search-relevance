@@ -100,17 +100,17 @@ public class PostQuerySetTransportAction extends HandledTransportAction<PostQuer
             .map(entry -> QuerySetEntry.Builder.builder().queryText(entry.getKey()).build())
             .collect(Collectors.toList());
 
-        QuerySet querySet = new QuerySet(
-            id,
-            name,
-            description,
-            timestamp,
-            sampling,
-            AsyncStatus.COMPLETED,
-            QuerySetType.UBI_QUERY_SET,
-            querySetEntries.size(),
-            querySetEntries
-        );
+        QuerySet querySet = QuerySet.builder()
+            .id(id)
+            .name(name)
+            .description(description)
+            .timestamp(timestamp)
+            .sampling(sampling)
+            .status(AsyncStatus.COMPLETED)
+            .type(QuerySetType.UBI_QUERY_SET)
+            .numberOfQueryTerms(querySetEntries.size())
+            .querySetQueries(querySetEntries)
+            .build();
         querySetDao.putQuerySet(querySet, listener);
     }
 }

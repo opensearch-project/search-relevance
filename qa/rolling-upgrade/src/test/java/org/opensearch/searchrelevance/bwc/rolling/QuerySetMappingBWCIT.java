@@ -116,6 +116,10 @@ public class QuerySetMappingBWCIT extends AbstractSearchRelevanceRollingUpgradeT
         assertTrue("Mapping should have status field", properties.containsKey("status"));
         assertTrue("Mapping should have type field", properties.containsKey("type"));
         assertTrue("Mapping should have numberOfQueryTerms field", properties.containsKey("numberOfQueryTerms"));
+        assertTrue("Mapping should have modelId field", properties.containsKey("modelId"));
+        assertTrue("Mapping should have sourceIndex field", properties.containsKey("sourceIndex"));
+        assertTrue("Mapping should have contextFields field", properties.containsKey("contextFields"));
+        assertTrue("Mapping should have categories field", properties.containsKey("categories"));
 
         // Verify schema_version updated
         Map<String, Object> meta = IndexMappingTestHelper.getMappingMeta(mapping);

@@ -69,7 +69,7 @@ public class PutQuerySetTransportAction extends HandledTransportAction<PutQueryS
         if (MANUAL.equals(sampling)) {
             querySet = manualSampling(request);
         } else if (LLM_RANDOM.equals(sampling)) {
-            querySet = llmRandomSampling((PutLlmQuerySetRequest) request, listener);
+            querySet = llmRandomSampling(request, listener);
             if (querySet == null) {
                 return;
             }
@@ -94,21 +94,21 @@ public class PutQuerySetTransportAction extends HandledTransportAction<PutQueryS
 
         List<QueryWithReference> queryWithReferenceList = request.getQuerySetQueries();
         List<QuerySetEntry> querySetQueries = convertQuerySetQueriesList(queryWithReferenceList);
-        return new QuerySet(
-            id,
-            name,
-            description,
-            timestamp,
-            request.getSampling(),
-            AsyncStatus.COMPLETED,
-            QuerySetType.MANUAL_QUERY_SET,
-            querySetQueries.size(),
-            querySetQueries
-        );
+        return QuerySet.builder()
+            .id(id)
+            .name(name)
+            .description(description)
+            .timestamp(timestamp)
+            .sampling(request.getSampling())
+            .status(AsyncStatus.COMPLETED)
+            .type(QuerySetType.MANUAL_QUERY_SET)
+            .numberOfQueryTerms(querySetQueries.size())
+            .querySetQueries(querySetQueries)
+            .build();
     }
 
     // TODO Add llm Random Sampling logic
-    private QuerySet llmRandomSampling(PutLlmQuerySetRequest request, ActionListener<IndexResponse> listener) {
+    private QuerySet llmRandomSampling(PutQuerySetRequest request, ActionListener<IndexResponse> listener) {
         String index = request.getIndex();
         if (!IndexValidator.checkIndexAndMappingExists(clusterService, index)) {
             listener.onFailure(
@@ -133,17 +133,21 @@ public class PutQuerySetTransportAction extends HandledTransportAction<PutQueryS
         String name = request.getName();
         String description = request.getDescription();
 
-        return new QuerySet(
-            id,
-            name,
-            description,
-            timestamp,
-            request.getSampling(),
-            AsyncStatus.COMPLETED,
-            QuerySetType.LLM_QUERY_SET,
-            request.getNumberOfQueryTerms(),
-            new ArrayList<>()
-        );
+        return QuerySet.builder()
+            .id(id)
+            .name(name)
+            .description(description)
+            .timestamp(timestamp)
+            .sampling(request.getSampling())
+            .status(AsyncStatus.COMPLETED)
+            .type(QuerySetType.LLM_QUERY_SET)
+            .numberOfQueryTerms(request.getNumberOfQueryTerms())
+            .modelId(request.getModelId())
+            .sourceIndex(request.getIndex())
+            .contextFields(request.getContextFields())
+            .categories(request.getCategories())
+            .querySetQueries(new ArrayList<>())
+            .build();
     }
 
     /**

@@ -60,26 +60,51 @@ public class QuerySetMappingRestartIT extends AbstractSearchRelevanceRestartUpgr
         assertNotNull("Old document should survive restart upgrade", oldDoc);
         assertNull("Old document should not have status field", oldDoc.get("status"));
 
-        // Create via plugin API — triggers auto-migration
-        Request request = new Request("PUT", QUERYSET_ENDPOINT);
-        request.setJsonEntity(
-            "{"
-                + "\"name\": \"bwc-restart-queryset\","
-                + "\"description\": \"Created after restart to test auto-migration\","
-                + "\"sampling\": \"manual\","
-                + "\"querySetQueries\": [{\"queryText\": \"test query\"}]"
-                + "}"
-        );
+        // Trigger auto-migration by calling plugin API multiple times if needed.
+        // During restart upgrades, the first attempt may fail (cluster stabilizing)
+        // and the best-effort catch allows it to proceed. A second call retries.
+        for (int attempt = 0; attempt < 3; attempt++) {
+            Request request = new Request("PUT", QUERYSET_ENDPOINT);
+            request.setJsonEntity(
+                "{"
+                    + "\"name\": \"bwc-restart-queryset-"
+                    + attempt
+                    + "\","
+                    + "\"description\": \"Created after restart to test auto-migration\","
+                    + "\"sampling\": \"manual\","
+                    + "\"querySetQueries\": [{\"queryText\": \"test query\"}]"
+                    + "}"
+            );
+            Response response = client().performRequest(request);
+            assertEquals("Plugin API should succeed", 200, response.getStatusLine().getStatusCode());
 
-        Response response = client().performRequest(request);
-        assertEquals("Plugin API should succeed after auto-migration", 200, response.getStatusLine().getStatusCode());
+            Map<String, Object> meta = IndexMappingTestHelper.getMappingMeta(
+                IndexMappingTestHelper.getIndexMapping(client(), QUERYSET_INDEX)
+            );
+            if (meta != null && meta.get("schema_version") instanceof Number && ((Number) meta.get("schema_version")).intValue() >= 1) {
+                break;
+            }
+            logger.info("Mapping not yet updated after attempt {}, retrying...", attempt + 1);
+            Thread.sleep(2000);
+        }
 
         // Verify mapping updated
+        IndexMappingTestHelper.waitForMappingUpdate(
+            client(),
+            QUERYSET_INDEX,
+            new String[] { "status", "type", "numberOfQueryTerms", "modelId", "sourceIndex", "contextFields", "categories" },
+            30,
+            logger
+        );
         Map<String, Object> mapping = IndexMappingTestHelper.getIndexMapping(client(), QUERYSET_INDEX);
         Map<String, Object> properties = IndexMappingTestHelper.getMappingProperties(mapping);
         assertTrue("Mapping should have status field", properties.containsKey("status"));
         assertTrue("Mapping should have type field", properties.containsKey("type"));
         assertTrue("Mapping should have numberOfQueryTerms field", properties.containsKey("numberOfQueryTerms"));
+        assertTrue("Mapping should have modelId field", properties.containsKey("modelId"));
+        assertTrue("Mapping should have sourceIndex field", properties.containsKey("sourceIndex"));
+        assertTrue("Mapping should have contextFields field", properties.containsKey("contextFields"));
+        assertTrue("Mapping should have categories field", properties.containsKey("categories"));
 
         Map<String, Object> meta = IndexMappingTestHelper.getMappingMeta(mapping);
         assertEquals("Schema version should be 1", 1, ((Number) meta.get("schema_version")).intValue());

@@ -16,7 +16,6 @@ import static org.opensearch.searchrelevance.common.PluginConstants.DEFAULT_NUMB
 import static org.opensearch.searchrelevance.common.PluginConstants.DESCRIPTION;
 import static org.opensearch.searchrelevance.common.PluginConstants.INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.LEXICAL;
-import static org.opensearch.searchrelevance.common.PluginConstants.LLM_QUERY_SET;
 import static org.opensearch.searchrelevance.common.PluginConstants.LLM_RANDOM;
 import static org.opensearch.searchrelevance.common.PluginConstants.MANUAL;
 import static org.opensearch.searchrelevance.common.PluginConstants.MODEL_ID;
@@ -29,6 +28,7 @@ import static org.opensearch.searchrelevance.common.PluginConstants.SEMANTIC;
 import static org.opensearch.searchrelevance.common.PluginConstants.TYPE;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -45,9 +45,9 @@ import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.rest.BaseRestHandler;
 import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestRequest;
+import org.opensearch.searchrelevance.model.QuerySetType;
 import org.opensearch.searchrelevance.model.QueryWithReference;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
-import org.opensearch.searchrelevance.transport.queryset.PutLlmQuerySetRequest;
 import org.opensearch.searchrelevance.transport.queryset.PutQuerySetAction;
 import org.opensearch.searchrelevance.transport.queryset.PutQuerySetRequest;
 import org.opensearch.searchrelevance.utils.ParserUtils;
@@ -85,11 +85,12 @@ public class RestPutQuerySetAction extends BaseRestHandler {
 
         PutQuerySetRequest putRequest;
         try {
-            Object type = source.getOrDefault(TYPE, null);
-            if (type != null && !LLM_QUERY_SET.equals(type)) {
-                throw new IllegalArgumentException("Invalid type: must be '" + LLM_QUERY_SET + "' or absent");
+            String typeStr = (String) source.getOrDefault(TYPE, null);
+            QuerySetType querySetType = typeStr != null ? QuerySetType.fromString(typeStr) : null;
+            if (typeStr != null && querySetType == null) {
+                throw new IllegalArgumentException("Invalid type: must be one of " + java.util.Arrays.toString(QuerySetType.values()));
             }
-            if (LLM_QUERY_SET.equals(type)) {
+            if (querySetType == QuerySetType.LLM_QUERY_SET) {
                 putRequest = prepareLlmRandomQuerySetRequest(source);
             } else {
                 putRequest = prepareManualQuerySetRequest(source);
@@ -130,7 +131,7 @@ public class RestPutQuerySetAction extends BaseRestHandler {
         });
     }
 
-    private PutLlmQuerySetRequest prepareLlmRandomQuerySetRequest(Map<String, Object> source) {
+    private PutQuerySetRequest prepareLlmRandomQuerySetRequest(Map<String, Object> source) {
         String name = validateFieldOrThrow(source.get(NAME), "name");
         String description = source.get(DESCRIPTION) != null ? validateFieldOrThrow(source.get(DESCRIPTION), "description") : null;
         String sampling = validateSampling(source.getOrDefault(SAMPLING, LLM_RANDOM));
@@ -146,7 +147,17 @@ public class RestPutQuerySetAction extends BaseRestHandler {
         if (contextFields.isEmpty()) {
             throw new IllegalArgumentException("ContextFields cannot be empty");
         }
-        return new PutLlmQuerySetRequest(name, description, sampling, indexName, modelId, numberOfQueryTerms, contextFields, categories);
+        return new PutQuerySetRequest(
+            name,
+            description,
+            sampling,
+            Collections.emptyList(),
+            indexName,
+            modelId,
+            numberOfQueryTerms,
+            contextFields,
+            categories
+        );
     }
 
     private PutQuerySetRequest prepareManualQuerySetRequest(Map<String, Object> source) {

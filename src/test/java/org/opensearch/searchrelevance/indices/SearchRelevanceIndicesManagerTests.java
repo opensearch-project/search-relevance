@@ -162,17 +162,17 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
     }
 
     public void testPutDocWhenSucceeded() throws IOException {
-        QuerySet querySet = new QuerySet(
-            "test_id",
-            "test_name",
-            "test_description",
-            "test_timestamp",
-            "test_sampling",
-            AsyncStatus.COMPLETED,
-            QuerySetType.MANUAL_QUERY_SET,
-            0,
-            List.of()
-        );
+        QuerySet querySet = QuerySet.builder()
+            .id("test_id")
+            .name("test_name")
+            .description("test_description")
+            .timestamp("test_timestamp")
+            .sampling("test_sampling")
+            .status(AsyncStatus.COMPLETED)
+            .type(QuerySetType.MANUAL_QUERY_SET)
+            .numberOfQueryTerms(0)
+            .querySetQueries(List.of())
+            .build();
         XContentBuilder xContentBuilder = querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
 
         IndexRequestBuilder indexRequestBuilder = mock(IndexRequestBuilder.class);
@@ -194,17 +194,17 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
     }
 
     public void testPutDocWhenFailed() throws IOException {
-        QuerySet querySet = new QuerySet(
-            "test_id",
-            "test_name",
-            "test_description",
-            "test_timestamp",
-            "test_sampling",
-            AsyncStatus.COMPLETED,
-            QuerySetType.MANUAL_QUERY_SET,
-            0,
-            List.of()
-        );
+        QuerySet querySet = QuerySet.builder()
+            .id("test_id")
+            .name("test_name")
+            .description("test_description")
+            .timestamp("test_timestamp")
+            .sampling("test_sampling")
+            .status(AsyncStatus.COMPLETED)
+            .type(QuerySetType.MANUAL_QUERY_SET)
+            .numberOfQueryTerms(0)
+            .querySetQueries(List.of())
+            .build();
         XContentBuilder xContentBuilder = querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
 
         when(client.prepareIndex(QUERY_SET.getIndexName())).thenThrow(
@@ -224,17 +224,17 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
 
     public void testGetDocByDocIdWhenSucceeded() throws IOException {
         String docId = "test_id";
-        QuerySet querySet = new QuerySet(
-            docId,
-            "test_name",
-            "test_description",
-            "test_timestamp",
-            "test_sampling",
-            AsyncStatus.COMPLETED,
-            QuerySetType.MANUAL_QUERY_SET,
-            0,
-            List.of()
-        );
+        QuerySet querySet = QuerySet.builder()
+            .id(docId)
+            .name("test_name")
+            .description("test_description")
+            .timestamp("test_timestamp")
+            .sampling("test_sampling")
+            .status(AsyncStatus.COMPLETED)
+            .type(QuerySetType.MANUAL_QUERY_SET)
+            .numberOfQueryTerms(0)
+            .querySetQueries(List.of())
+            .build();
         XContentBuilder xContentBuilder = querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
 
         Map<String, Object> sourceMap = new HashMap<>();
@@ -299,28 +299,28 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
     }
 
     public void testListDocsWhenSucceeded() throws IOException {
-        QuerySet querySet1 = new QuerySet(
-            "id1",
-            "name1",
-            "desc1",
-            "timestamp1",
-            "sampling1",
-            AsyncStatus.COMPLETED,
-            QuerySetType.MANUAL_QUERY_SET,
-            0,
-            List.of()
-        );
-        QuerySet querySet2 = new QuerySet(
-            "id2",
-            "name2",
-            "desc2",
-            "timestamp2",
-            "sampling2",
-            AsyncStatus.COMPLETED,
-            QuerySetType.MANUAL_QUERY_SET,
-            0,
-            List.of()
-        );
+        QuerySet querySet1 = QuerySet.builder()
+            .id("id1")
+            .name("name1")
+            .description("desc1")
+            .timestamp("timestamp1")
+            .sampling("sampling1")
+            .status(AsyncStatus.COMPLETED)
+            .type(QuerySetType.MANUAL_QUERY_SET)
+            .numberOfQueryTerms(0)
+            .querySetQueries(List.of())
+            .build();
+        QuerySet querySet2 = QuerySet.builder()
+            .id("id2")
+            .name("name2")
+            .description("desc2")
+            .timestamp("timestamp2")
+            .sampling("sampling2")
+            .status(AsyncStatus.COMPLETED)
+            .type(QuerySetType.MANUAL_QUERY_SET)
+            .numberOfQueryTerms(0)
+            .querySetQueries(List.of())
+            .build();
 
         SearchHit[] hits = new SearchHit[] {
             new SearchHit(1, "id1", Map.of(), Map.of()).sourceRef(
@@ -485,17 +485,17 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         when(indicesAdminClient.create(any(CreateIndexRequest.class))).thenReturn(createFuture);
 
         // Execute via putDoc (which calls executeWithIndexCreationSynchronizedMode -> createIndexIfAbsentSync)
-        QuerySet querySet = new QuerySet(
-            "test_id",
-            "test_name",
-            "test_description",
-            "test_timestamp",
-            "test_sampling",
-            AsyncStatus.COMPLETED,
-            QuerySetType.MANUAL_QUERY_SET,
-            0,
-            List.of()
-        );
+        QuerySet querySet = QuerySet.builder()
+            .id("test_id")
+            .name("test_name")
+            .description("test_description")
+            .timestamp("test_timestamp")
+            .sampling("test_sampling")
+            .status(AsyncStatus.COMPLETED)
+            .type(QuerySetType.MANUAL_QUERY_SET)
+            .numberOfQueryTerms(0)
+            .querySetQueries(List.of())
+            .build();
         XContentBuilder xContentBuilder = querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
 
         IndexRequestBuilder indexRequestBuilder = mock(IndexRequestBuilder.class);
@@ -535,17 +535,17 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         when(mappingMetadata.sourceAsMap()).thenReturn(mappingSource);
 
         // Execute via putDoc
-        QuerySet querySet = new QuerySet(
-            "test_id",
-            "test_name",
-            "test_description",
-            "test_timestamp",
-            "test_sampling",
-            AsyncStatus.COMPLETED,
-            QuerySetType.MANUAL_QUERY_SET,
-            0,
-            List.of()
-        );
+        QuerySet querySet = QuerySet.builder()
+            .id("test_id")
+            .name("test_name")
+            .description("test_description")
+            .timestamp("test_timestamp")
+            .sampling("test_sampling")
+            .status(AsyncStatus.COMPLETED)
+            .type(QuerySetType.MANUAL_QUERY_SET)
+            .numberOfQueryTerms(0)
+            .querySetQueries(List.of())
+            .build();
         XContentBuilder xContentBuilder = querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
 
         IndexRequestBuilder indexRequestBuilder = mock(IndexRequestBuilder.class);
@@ -584,25 +584,25 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         mappingSource.put("properties", new HashMap<>());
         when(mappingMetadata.sourceAsMap()).thenReturn(mappingSource);
 
-        // Mock putMapping to return an ActionFuture
-        org.opensearch.action.support.PlainActionFuture<
-            org.opensearch.action.support.clustermanager.AcknowledgedResponse> putMappingFuture =
-                new org.opensearch.action.support.PlainActionFuture<>();
-        putMappingFuture.onResponse(new org.opensearch.action.support.clustermanager.AcknowledgedResponse(true));
-        when(indicesAdminClient.putMapping(any(PutMappingRequest.class))).thenReturn(putMappingFuture);
+        // Mock putMapping with 2-arg overload (request, listener) used by updateMappingSync
+        doAnswer(invocation -> {
+            ActionListener<org.opensearch.action.support.clustermanager.AcknowledgedResponse> actionListener = invocation.getArgument(1);
+            actionListener.onResponse(new org.opensearch.action.support.clustermanager.AcknowledgedResponse(true));
+            return null;
+        }).when(indicesAdminClient).putMapping(any(PutMappingRequest.class), any(ActionListener.class));
 
         // Execute via putDoc
-        QuerySet querySet = new QuerySet(
-            "test_id",
-            "test_name",
-            "test_description",
-            "test_timestamp",
-            "test_sampling",
-            AsyncStatus.COMPLETED,
-            QuerySetType.MANUAL_QUERY_SET,
-            0,
-            List.of()
-        );
+        QuerySet querySet = QuerySet.builder()
+            .id("test_id")
+            .name("test_name")
+            .description("test_description")
+            .timestamp("test_timestamp")
+            .sampling("test_sampling")
+            .status(AsyncStatus.COMPLETED)
+            .type(QuerySetType.MANUAL_QUERY_SET)
+            .numberOfQueryTerms(0)
+            .querySetQueries(List.of())
+            .build();
         XContentBuilder xContentBuilder = querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
 
         IndexRequestBuilder indexRequestBuilder = mock(IndexRequestBuilder.class);
@@ -618,7 +618,7 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
 
         // Verify: create index NOT called, putMapping IS called (version 0 < 1)
         verify(indicesAdminClient, never()).create(any(CreateIndexRequest.class), any(ActionListener.class));
-        verify(indicesAdminClient, never()).putMapping(any(PutMappingRequest.class), any(ActionListener.class));
+        verify(indicesAdminClient).putMapping(any(PutMappingRequest.class), any(ActionListener.class));
     }
 
     /**
@@ -634,17 +634,17 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         when(indexMetadata.mapping()).thenReturn(null); // No mapping = unexpected state
 
         // Execute via putDoc
-        QuerySet querySet = new QuerySet(
-            "test_id",
-            "test_name",
-            "test_description",
-            "test_timestamp",
-            "test_sampling",
-            AsyncStatus.COMPLETED,
-            QuerySetType.MANUAL_QUERY_SET,
-            0,
-            List.of()
-        );
+        QuerySet querySet = QuerySet.builder()
+            .id("test_id")
+            .name("test_name")
+            .description("test_description")
+            .timestamp("test_timestamp")
+            .sampling("test_sampling")
+            .status(AsyncStatus.COMPLETED)
+            .type(QuerySetType.MANUAL_QUERY_SET)
+            .numberOfQueryTerms(0)
+            .querySetQueries(List.of())
+            .build();
         XContentBuilder xContentBuilder = querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
 
         IndexRequestBuilder indexRequestBuilder = mock(IndexRequestBuilder.class);
@@ -687,17 +687,17 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         when(mappingMetadata.sourceAsMap()).thenReturn(mappingSource);
 
         // Execute via putDoc
-        QuerySet querySet = new QuerySet(
-            "test_id",
-            "test_name",
-            "test_description",
-            "test_timestamp",
-            "test_sampling",
-            AsyncStatus.COMPLETED,
-            QuerySetType.MANUAL_QUERY_SET,
-            0,
-            List.of()
-        );
+        QuerySet querySet = QuerySet.builder()
+            .id("test_id")
+            .name("test_name")
+            .description("test_description")
+            .timestamp("test_timestamp")
+            .sampling("test_sampling")
+            .status(AsyncStatus.COMPLETED)
+            .type(QuerySetType.MANUAL_QUERY_SET)
+            .numberOfQueryTerms(0)
+            .querySetQueries(List.of())
+            .build();
         XContentBuilder xContentBuilder = querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
 
         IndexRequestBuilder indexRequestBuilder = mock(IndexRequestBuilder.class);
@@ -738,17 +738,17 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         when(mappingMetadata.sourceAsMap()).thenReturn(mappingSource);
 
         // Execute via putDoc
-        QuerySet querySet = new QuerySet(
-            "test_id",
-            "test_name",
-            "test_description",
-            "test_timestamp",
-            "test_sampling",
-            AsyncStatus.COMPLETED,
-            QuerySetType.MANUAL_QUERY_SET,
-            0,
-            List.of()
-        );
+        QuerySet querySet = QuerySet.builder()
+            .id("test_id")
+            .name("test_name")
+            .description("test_description")
+            .timestamp("test_timestamp")
+            .sampling("test_sampling")
+            .status(AsyncStatus.COMPLETED)
+            .type(QuerySetType.MANUAL_QUERY_SET)
+            .numberOfQueryTerms(0)
+            .querySetQueries(List.of())
+            .build();
         XContentBuilder xContentBuilder = querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
 
         IndexRequestBuilder indexRequestBuilder = mock(IndexRequestBuilder.class);
@@ -799,17 +799,17 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         }).when(indicesAdminClient).putMapping(any(PutMappingRequest.class), any(ActionListener.class));
 
         // Execute via putDoc
-        QuerySet querySet = new QuerySet(
-            "test_id",
-            "test_name",
-            "test_description",
-            "test_timestamp",
-            "test_sampling",
-            AsyncStatus.COMPLETED,
-            QuerySetType.MANUAL_QUERY_SET,
-            0,
-            List.of()
-        );
+        QuerySet querySet = QuerySet.builder()
+            .id("test_id")
+            .name("test_name")
+            .description("test_description")
+            .timestamp("test_timestamp")
+            .sampling("test_sampling")
+            .status(AsyncStatus.COMPLETED)
+            .type(QuerySetType.MANUAL_QUERY_SET)
+            .numberOfQueryTerms(0)
+            .querySetQueries(List.of())
+            .build();
         XContentBuilder xContentBuilder = querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
 
         IndexRequestBuilder indexRequestBuilder = mock(IndexRequestBuilder.class);
@@ -853,17 +853,17 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
             return null;
         }).when(indicesAdminClient).putMapping(any(PutMappingRequest.class), any(ActionListener.class));
 
-        QuerySet querySet = new QuerySet(
-            "test_id",
-            "test_name",
-            "test_description",
-            "test_timestamp",
-            "test_sampling",
-            AsyncStatus.COMPLETED,
-            QuerySetType.MANUAL_QUERY_SET,
-            0,
-            List.of()
-        );
+        QuerySet querySet = QuerySet.builder()
+            .id("test_id")
+            .name("test_name")
+            .description("test_description")
+            .timestamp("test_timestamp")
+            .sampling("test_sampling")
+            .status(AsyncStatus.COMPLETED)
+            .type(QuerySetType.MANUAL_QUERY_SET)
+            .numberOfQueryTerms(0)
+            .querySetQueries(List.of())
+            .build();
         XContentBuilder xContentBuilder = querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
 
         IndexRequestBuilder indexRequestBuilder = mock(IndexRequestBuilder.class);

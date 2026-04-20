@@ -42,24 +42,24 @@ public class QuerySetTests extends OpenSearchTestCase {
     }
 
     public void testToXContentIncludesNewFields() throws IOException {
-        QuerySet querySet = new QuerySet(
-            "id-1",
-            "name-1",
-            "desc-1",
-            "2024-01-01T00:00:00Z",
-            "manual",
-            AsyncStatus.COMPLETED,
-            QuerySetType.MANUAL_QUERY_SET,
-            5,
-            List.of()
-        );
+        QuerySet querySet = QuerySet.builder()
+            .id("id-1")
+            .name("name-1")
+            .description("desc-1")
+            .timestamp("2024-01-01T00:00:00Z")
+            .sampling("manual")
+            .status(AsyncStatus.COMPLETED)
+            .type(QuerySetType.MANUAL_QUERY_SET)
+            .numberOfQueryTerms(5)
+            .querySetQueries(List.of())
+            .build();
 
         XContentBuilder builder = XContentFactory.jsonBuilder();
         querySet.toXContent(builder, ToXContent.EMPTY_PARAMS);
         String json = builder.toString();
 
         assertTrue(json.contains("\"status\":\"COMPLETED\""));
-        assertTrue(json.contains("\"type\":\"MANUAL_QUERY_SET\""));
+        assertTrue(json.contains("\"type\":\"manual_query_set\""));
         assertTrue(json.contains("\"numberOfQueryTerms\":5"));
         assertTrue(json.contains("\"id\":\"id-1\""));
         assertTrue(json.contains("\"name\":\"name-1\""));
@@ -67,46 +67,46 @@ public class QuerySetTests extends OpenSearchTestCase {
     }
 
     public void testToXContentWithUbiType() throws IOException {
-        QuerySet querySet = new QuerySet(
-            "id-2",
-            "ubi-qs",
-            null,
-            "2024-01-01T00:00:00Z",
-            "pps",
-            AsyncStatus.COMPLETED,
-            QuerySetType.UBI_QUERY_SET,
-            10,
-            List.of()
-        );
+        QuerySet querySet = QuerySet.builder()
+            .id("id-2")
+            .name("ubi-qs")
+            .description(null)
+            .timestamp("2024-01-01T00:00:00Z")
+            .sampling("pps")
+            .status(AsyncStatus.COMPLETED)
+            .type(QuerySetType.UBI_QUERY_SET)
+            .numberOfQueryTerms(10)
+            .querySetQueries(List.of())
+            .build();
 
         XContentBuilder builder = XContentFactory.jsonBuilder();
         querySet.toXContent(builder, ToXContent.EMPTY_PARAMS);
         String json = builder.toString();
 
-        assertTrue(json.contains("\"type\":\"UBI_QUERY_SET\""));
+        assertTrue(json.contains("\"type\":\"ubi_query_set\""));
         assertTrue(json.contains("\"numberOfQueryTerms\":10"));
         assertTrue(json.contains("\"description\":\"\""));
     }
 
     public void testToXContentWithProcessingStatus() throws IOException {
-        QuerySet querySet = new QuerySet(
-            "id-3",
-            "llm-qs",
-            "llm desc",
-            "2024-01-01T00:00:00Z",
-            "llm_random",
-            AsyncStatus.PROCESSING,
-            QuerySetType.LLM_QUERY_SET,
-            1000,
-            List.of()
-        );
+        QuerySet querySet = QuerySet.builder()
+            .id("id-3")
+            .name("llm-qs")
+            .description("llm desc")
+            .timestamp("2024-01-01T00:00:00Z")
+            .sampling("llm_random")
+            .status(AsyncStatus.PROCESSING)
+            .type(QuerySetType.LLM_QUERY_SET)
+            .numberOfQueryTerms(1000)
+            .querySetQueries(List.of())
+            .build();
 
         XContentBuilder builder = XContentFactory.jsonBuilder();
         querySet.toXContent(builder, ToXContent.EMPTY_PARAMS);
         String json = builder.toString();
 
         assertTrue(json.contains("\"status\":\"PROCESSING\""));
-        assertTrue(json.contains("\"type\":\"LLM_QUERY_SET\""));
+        assertTrue(json.contains("\"type\":\"llm_query_set\""));
         assertTrue(json.contains("\"numberOfQueryTerms\":1000"));
     }
 

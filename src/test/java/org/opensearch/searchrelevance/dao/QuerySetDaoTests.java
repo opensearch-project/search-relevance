@@ -50,7 +50,7 @@ public class QuerySetDaoTests extends OpenSearchTestCase {
         sourceMap.put("timestamp", "2024-01-01T00:00:00Z");
         sourceMap.put("sampling", "manual");
         sourceMap.put("status", "COMPLETED");
-        sourceMap.put("type", "MANUAL_QUERY_SET");
+        sourceMap.put("type", "manual_query_set");
         sourceMap.put("numberOfQueryTerms", 3);
         sourceMap.put("querySetQueries", List.of(Map.of("queryText", "q1"), Map.of("queryText", "q2"), Map.of("queryText", "q3")));
 
@@ -114,7 +114,7 @@ public class QuerySetDaoTests extends OpenSearchTestCase {
         sourceMap.put("timestamp", "2024-01-01T00:00:00Z");
         sourceMap.put("sampling", "manual");
         sourceMap.put("status", "COMPLETED");
-        sourceMap.put("type", "MANUAL_QUERY_SET");
+        sourceMap.put("type", "manual_query_set");
         sourceMap.put("numberOfQueryTerms", 0);
 
         SearchResponse response = buildSearchResponse(sourceMap);

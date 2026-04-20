@@ -8,6 +8,7 @@
 package org.opensearch.searchrelevance.dao;
 
 import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_QUERY_TEXT_FIELD_NAME;
+import static org.opensearch.searchrelevance.common.PluginConstants.LLM_RANDOM;
 import static org.opensearch.searchrelevance.common.PluginConstants.MANUAL;
 import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.QUERY_SET;
 
@@ -197,15 +198,20 @@ public class QuerySetDao {
             ? AsyncStatus.valueOf((String) sourceMap.get(QuerySet.STATUS))
             : AsyncStatus.COMPLETED;
 
-        QuerySetType type;
+        QuerySetType type = null;
         if (sourceMap.containsKey(QuerySet.TYPE)) {
-            type = QuerySetType.valueOf((String) sourceMap.get(QuerySet.TYPE));
-        } else if (MANUAL.equals(sampling)) {
-            type = QuerySetType.MANUAL_QUERY_SET;
-        } else if (QuerySampler.getSamplingTechniquesSupportedByUBI().contains(sampling)) {
-            type = QuerySetType.UBI_QUERY_SET;
-        } else {
-            type = QuerySetType.LLM_QUERY_SET;
+            type = QuerySetType.fromString((String) sourceMap.get(QuerySet.TYPE));
+        }
+        if (type == null) {
+            if (MANUAL.equals(sampling)) {
+                type = QuerySetType.MANUAL_QUERY_SET;
+            } else if (QuerySampler.getSamplingTechniquesSupportedByUBI().contains(sampling)) {
+                type = QuerySetType.UBI_QUERY_SET;
+            } else if (LLM_RANDOM.equals(sampling)) {
+                type = QuerySetType.LLM_QUERY_SET;
+            } else {
+                throw new IllegalStateException("Unknown sampling technique: " + sampling);
+            }
         }
 
         int numberOfQueryTerms = sourceMap.containsKey(QuerySet.NUMBER_OF_QUERY_TERMS)
@@ -221,6 +227,10 @@ public class QuerySetDao {
             .status(status)
             .type(type)
             .numberOfQueryTerms(numberOfQueryTerms)
+            .modelId((String) sourceMap.get(QuerySet.MODEL_ID))
+            .sourceIndex((String) sourceMap.get(QuerySet.SOURCE_INDEX))
+            .contextFields(sourceMap.containsKey(QuerySet.CONTEXT_FIELDS) ? (List<String>) sourceMap.get(QuerySet.CONTEXT_FIELDS) : null)
+            .categories(sourceMap.containsKey(QuerySet.CATEGORIES) ? (List<String>) sourceMap.get(QuerySet.CATEGORIES) : null)
             .querySetQueries(querySetEntries)
             .build();
     }

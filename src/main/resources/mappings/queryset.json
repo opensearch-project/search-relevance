@@ -9,7 +9,11 @@
     "description": { "type": "text" },
     "type": { "type": "keyword" },
     "status": { "type": "keyword" },
-    "numberOfQueryTerms":     { "type" : "integer" },
+    "numberOfQueryTerms": { "type": "integer" },
+    "modelId": { "type": "keyword" },
+    "sourceIndex": { "type": "keyword" },
+    "contextFields": { "type": "keyword" },
+    "categories": { "type": "keyword" },
     "querySetQueries": {
       "type": "nested",
       "properties": {
