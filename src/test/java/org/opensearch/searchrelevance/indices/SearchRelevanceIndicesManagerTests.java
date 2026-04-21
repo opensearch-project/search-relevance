@@ -678,9 +678,9 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         when(metadata.index(QUERY_SET.getIndexName())).thenReturn(indexMetadata);
         when(indexMetadata.mapping()).thenReturn(mappingMetadata);
 
-        // Set explicit schema_version = 0 (same as current JSON version)
+        // Set explicit schema_version = 1 (same as current JSON version)
         Map<String, Object> metaMap = new HashMap<>();
-        metaMap.put(SearchRelevanceIndices.META_SCHEMA_VERSION_KEY, 0);
+        metaMap.put(SearchRelevanceIndices.META_SCHEMA_VERSION_KEY, QUERY_SET.getSchemaVersion());
         Map<String, Object> mappingSource = new HashMap<>();
         mappingSource.put("_meta", metaMap);
         mappingSource.put("properties", new HashMap<>());
@@ -711,7 +711,7 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         ActionListener<SearchResponse> listener = mock(ActionListener.class);
         indicesManager.putDoc("test_id", xContentBuilder, QUERY_SET, listener);
 
-        // Verify: putMapping NOT called (explicit version 0 >= current version 0)
+        // Verify: putMapping NOT called (explicit version >= current version)
         verify(indicesAdminClient, never()).create(any(CreateIndexRequest.class), any(ActionListener.class));
         verify(indicesAdminClient, never()).putMapping(any(PutMappingRequest.class), any(ActionListener.class));
     }
