@@ -30,8 +30,11 @@ import org.opensearch.search.SearchHit;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager;
+import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.QuerySet;
 import org.opensearch.searchrelevance.model.QuerySetEntry;
+import org.opensearch.searchrelevance.model.QuerySetType;
+import org.opensearch.searchrelevance.ubi.QuerySampler;
 
 /**
  * Data access object layer for query set system index
@@ -65,7 +68,7 @@ public class QuerySetDao {
         }
         try {
             searchRelevanceIndicesManager.putDoc(
-                querySet.id(),
+                querySet.getId(),
                 querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS),
                 QUERY_SET,
                 listener
@@ -145,7 +148,7 @@ public class QuerySetDao {
 
                     results.put(
                         METRICS_QUERY_TEXT_FIELD_NAME,
-                        querySet.querySetQueries().stream().map(QuerySetEntry::queryText).collect(Collectors.toList())
+                        querySet.getQuerySetQueries().stream().map(QuerySetEntry::queryText).collect(Collectors.toList())
                     );
                     stepListener.onResponse(results);
                 } catch (Exception e) {
@@ -162,7 +165,8 @@ public class QuerySetDao {
         });
     }
 
-    private QuerySet convertToQuerySet(SearchResponse response) {
+    @SuppressWarnings("unchecked")
+    public QuerySet convertToQuerySet(SearchResponse response) {
         SearchHit hit = response.getHits().getHits()[0];
         Map<String, Object> sourceMap = hit.getSourceAsMap();
 
@@ -176,12 +180,48 @@ public class QuerySetDao {
                 .collect(Collectors.toList());
         }
 
-        return QuerySet.Builder.builder()
+        String sampling = (String) sourceMap.get(QuerySet.SAMPLING);
+
+        AsyncStatus status = AsyncStatus.COMPLETED;
+        if (sourceMap.containsKey(QuerySet.STATUS)) {
+            try {
+                status = AsyncStatus.valueOf((String) sourceMap.get(QuerySet.STATUS));
+            } catch (IllegalArgumentException e) {
+                // Fall back to COMPLETED for unrecognized values
+            }
+        }
+
+        QuerySetType type = null;
+        if (sourceMap.containsKey(QuerySet.TYPE)) {
+            type = QuerySetType.fromString((String) sourceMap.get(QuerySet.TYPE));
+        }
+        if (type == null) {
+            if ("manual".equals(sampling)) {
+                type = QuerySetType.MANUAL_QUERY_SET;
+            } else if (QuerySampler.getSamplingTechniquesSupportedByUBI().contains(sampling)) {
+                type = QuerySetType.UBI_QUERY_SET;
+            } else {
+                type = QuerySetType.LLM_QUERY_SET;
+            }
+        }
+
+        int numberOfQueryTerms = sourceMap.containsKey(QuerySet.NUMBER_OF_QUERY_TERMS)
+            ? ((Number) sourceMap.get(QuerySet.NUMBER_OF_QUERY_TERMS)).intValue()
+            : querySetEntries.size();
+
+        return QuerySet.builder()
             .id((String) sourceMap.get(QuerySet.ID))
             .name((String) sourceMap.get(QuerySet.NAME))
             .description((String) sourceMap.get(QuerySet.DESCRIPTION))
             .timestamp((String) sourceMap.get(QuerySet.TIME_STAMP))
-            .sampling((String) sourceMap.get(QuerySet.SAMPLING))
+            .sampling(sampling)
+            .status(status)
+            .type(type)
+            .numberOfQueryTerms(numberOfQueryTerms)
+            .modelId((String) sourceMap.get(QuerySet.MODEL_ID))
+            .sourceIndex((String) sourceMap.get(QuerySet.SOURCE_INDEX))
+            .contextFields(sourceMap.containsKey(QuerySet.CONTEXT_FIELDS) ? (List<String>) sourceMap.get(QuerySet.CONTEXT_FIELDS) : null)
+            .categories(sourceMap.containsKey(QuerySet.CATEGORIES) ? (List<String>) sourceMap.get(QuerySet.CATEGORIES) : null)
             .querySetQueries(querySetEntries)
             .build();
     }
