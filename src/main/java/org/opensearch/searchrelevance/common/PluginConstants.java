@@ -7,6 +7,8 @@
  */
 package org.opensearch.searchrelevance.common;
 
+import java.util.List;
+
 /**
  * Plugin constants that shared cross the project.
  */
@@ -68,7 +70,7 @@ public class PluginConstants {
     public static final String UBI_EVENTS_INDEX = "ubi_events";
 
     public static final String CLICK_MODEL = "clickModel";
-    public static final String NAX_RANK = "maxRank";
+    public static final String MAX_RANK = "maxRank";
     public static final String START_DATE = "startDate";
     public static final String END_DATE = "endDate";
     /* The customized UBI index names */
@@ -100,6 +102,14 @@ public class PluginConstants {
 
     public static final int DEFAULTED_QUERY_SET_SIZE = 10;
     public static final String MANUAL = "manual";
+    public static final String LLM_RANDOM = "llm_random";
+    public static final String MODEL_ID = "modelId";
+    public static final String NUMBER_OF_QUERY_TERMS = "numberOfQueryTerms";
+    public static final String CATEGORIES = "categories";
+    public static final String LEXICAL = "lexical";
+    public static final String SEMANTIC = "semantic";
+    public static final int DEFAULT_NUMBER_OF_QUERY_TERMS = 100;
+    public static final List<String> DEFAULT_CATEGORIES = List.of("lexical", "semantic");
     public static final String PROCEED = "proceed";
     public static final String ABORT = "abort";
     public static final int BATCH_SIZE_FOR_DELETE_BY_QUERY = 1000;
