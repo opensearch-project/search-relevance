@@ -245,7 +245,7 @@ public class HybridOptimizerExperimentProcessor {
                 if (hasFailure.compareAndSet(false, true)) {
                     finalListener.onFailure(new TimeoutException("Timed out when processing search configurations"));
                 }
-                log.info("When processing search configurations in HybridOptimizerExperimentProcessor, a timeout cancellation occured");
+                log.info("When processing search configurations in HybridOptimizerExperimentProcessor, a timeout cancellation occurred");
                 break;
             }
             String searchConfigId = entry.getKey();
