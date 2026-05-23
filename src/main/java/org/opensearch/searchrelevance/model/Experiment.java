@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
+import org.opensearch.core.xcontent.ToXContent;
 import org.opensearch.core.xcontent.ToXContentObject;
 import org.opensearch.core.xcontent.XContentBuilder;
 
@@ -54,6 +55,7 @@ public class Experiment implements ToXContentObject {
     private final boolean isScheduled;
     private final String scheduledExperimentJobId;
     private final List<Map<String, Object>> results;
+    private final ExperimentInputSignature inputSignature;
 
     public Experiment(
         String id,
@@ -68,6 +70,23 @@ public class Experiment implements ToXContentObject {
         int size,
         List<Map<String, Object>> results
     ) {
+        this(id, timestamp, name, description, type, status, querySetId, searchConfigurationList, judgmentList, size, results, null);
+    }
+
+    public Experiment(
+        String id,
+        String timestamp,
+        String name,
+        String description,
+        ExperimentType type,
+        AsyncStatus status,
+        String querySetId,
+        List<String> searchConfigurationList,
+        List<String> judgmentList,
+        int size,
+        List<Map<String, Object>> results,
+        ExperimentInputSignature inputSignature
+    ) {
         this.id = Objects.requireNonNull(id, "Experiment ID cannot be null");
         this.timestamp = Objects.requireNonNull(timestamp, "Timestamp cannot be null");
         this.name = name; // Optional field, can be null
@@ -81,6 +100,7 @@ public class Experiment implements ToXContentObject {
         this.isScheduled = false;
         this.scheduledExperimentJobId = null;
         this.results = results;
+        this.inputSignature = inputSignature;
     }
 
     public Experiment(Experiment previousExperiment, boolean isScheduled, String scheduledExperimentJobId) {
@@ -98,10 +118,11 @@ public class Experiment implements ToXContentObject {
         this.isScheduled = isScheduled;
         this.scheduledExperimentJobId = scheduledExperimentJobId;
         this.results = previousExperiment.results();
+        this.inputSignature = previousExperiment.inputSignature();
     }
 
     @Override
-    public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
+    public XContentBuilder toXContent(XContentBuilder builder, ToXContent.Params params) throws IOException {
         XContentBuilder xContentBuilder = builder.startObject();
         xContentBuilder.field(ID, this.id.trim());
         xContentBuilder.field(TIME_STAMP, this.timestamp.trim());
@@ -123,6 +144,13 @@ public class Experiment implements ToXContentObject {
         xContentBuilder.field(IS_SCHEDULED, isScheduled);
         xContentBuilder.field(SCHEDULED_EXPERIMENT_JOB_ID, scheduledExperimentJobId);
         xContentBuilder.field(RESULTS, this.results);
+        if (this.inputSignature != null) {
+            xContentBuilder.startObject(ExperimentInputSignature.FIELD);
+            xContentBuilder.field(ExperimentInputSignature.QUERY_SET, this.inputSignature.querySetSha256());
+            xContentBuilder.field(ExperimentInputSignature.JUDGMENT_LIST, this.inputSignature.judgmentListSha256());
+            xContentBuilder.field(ExperimentInputSignature.SEARCH_CONFIGURATIONS, this.inputSignature.searchConfigurationsSha256());
+            xContentBuilder.endObject();
+        }
         return xContentBuilder.endObject();
     }
 
@@ -176,6 +204,13 @@ public class Experiment implements ToXContentObject {
 
     public List<Map<String, Object>> results() {
         return results;
+    }
+
+    /**
+     * Fingerprints of inputs at execution time, or null for legacy experiments and in-flight runs.
+     */
+    public ExperimentInputSignature inputSignature() {
+        return inputSignature;
     }
 
 }

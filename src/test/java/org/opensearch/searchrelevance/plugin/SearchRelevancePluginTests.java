@@ -64,6 +64,7 @@ import org.opensearch.searchrelevance.stats.info.InfoStatsManager;
 import org.opensearch.searchrelevance.transport.experiment.DeleteExperimentAction;
 import org.opensearch.searchrelevance.transport.experiment.GetExperimentAction;
 import org.opensearch.searchrelevance.transport.experiment.PutExperimentAction;
+import org.opensearch.searchrelevance.transport.experiment.ValidateExperimentAction;
 import org.opensearch.searchrelevance.transport.queryset.DeleteQuerySetAction;
 import org.opensearch.searchrelevance.transport.queryset.GetQuerySetAction;
 import org.opensearch.searchrelevance.transport.queryset.PostQuerySetAction;
@@ -201,7 +202,7 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
     }
 
     public void testTotalRestHandlers() {
-        assertEquals(22, plugin.getRestHandlers(Settings.EMPTY, null, null, null, null, null, null).size());
+        assertEquals(23, plugin.getRestHandlers(Settings.EMPTY, null, null, null, null, null, null).size());
     }
 
     public void testQuerySetTransportIsAdded() {
@@ -225,6 +226,7 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
         assertEquals(1, actions.stream().filter(actionHandler -> actionHandler.getAction() instanceof PutExperimentAction).count());
         assertEquals(1, actions.stream().filter(actionHandler -> actionHandler.getAction() instanceof GetExperimentAction).count());
         assertEquals(1, actions.stream().filter(actionHandler -> actionHandler.getAction() instanceof DeleteExperimentAction).count());
+        assertEquals(1, actions.stream().filter(actionHandler -> actionHandler.getAction() instanceof ValidateExperimentAction).count());
     }
 
     public void testGetSettings() {

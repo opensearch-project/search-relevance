@@ -76,6 +76,9 @@ public class SearchRelevanceIndicesManager {
 
     private static final int MAX_MAPPING_UPDATE_RETRIES = 3;
 
+    /** Upper bound for awaiting putMapping acknowledgement; accommodates slow cluster-state publication on busy clusters. */
+    private static final int MAPPING_UPDATE_ACK_TIMEOUT_SECONDS = 120;
+
     /**
      * Create a search relevance index if not exists, or update mapping if index exists but has older schema version.
      * @param index - index to be created or updated
@@ -253,7 +256,7 @@ public class SearchRelevanceIndicesManager {
                     future.completeExceptionally(e);
                 }
             });
-            future.get(30, TimeUnit.SECONDS);
+            future.get(MAPPING_UPDATE_ACK_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         } catch (TimeoutException e) {
             throw new SearchRelevanceException(
                 String.format(Locale.ROOT, "Timeout waiting for mapping update on index [%s]", index.getIndexName()),

@@ -131,6 +131,35 @@ public class ExperimentTests extends OpenSearchTestCase {
         assertEquals("scheduled-job-id", copy.scheduledExperimentJobId());
     }
 
+    public void testToXContentIncludesInputSignatureWhenPresent() throws IOException {
+        ExperimentInputSignature sig = new ExperimentInputSignature(
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        );
+        Experiment experiment = new Experiment(
+            "test-id",
+            "2024-01-01T00:00:00Z",
+            "n",
+            "d",
+            ExperimentType.PAIRWISE_COMPARISON,
+            AsyncStatus.COMPLETED,
+            "queryset-id",
+            List.of("c1"),
+            List.of("j1"),
+            10,
+            new ArrayList<>(),
+            sig
+        );
+        XContentBuilder builder = XContentFactory.jsonBuilder();
+        experiment.toXContent(builder, ToXContent.EMPTY_PARAMS);
+        String json = builder.toString();
+        assertTrue(json.contains("\"inputSignature\""));
+        assertTrue(json.contains("\"query_set\""));
+        assertTrue(json.contains("\"judgment_list\""));
+        assertTrue(json.contains("\"search_configurations\""));
+    }
+
     public void testExperimentFieldConstants() {
         assertEquals("id", Experiment.ID);
         assertEquals("timestamp", Experiment.TIME_STAMP);

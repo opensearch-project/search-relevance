@@ -30,20 +30,25 @@ import org.opensearch.common.util.concurrent.FutureUtils;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.searchrelevance.dao.ExperimentDao;
+import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
 import org.opensearch.searchrelevance.dao.ScheduledExperimentHistoryDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.experiment.HybridOptimizerExperimentProcessor;
 import org.opensearch.searchrelevance.experiment.PointwiseExperimentProcessor;
+import org.opensearch.searchrelevance.experiment.signature.ExperimentInputSignatureComputer;
 import org.opensearch.searchrelevance.metrics.MetricsHelper;
 import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.Experiment;
+import org.opensearch.searchrelevance.model.ExperimentInputSignature;
 import org.opensearch.searchrelevance.model.ExperimentType;
+import org.opensearch.searchrelevance.model.Judgment;
 import org.opensearch.searchrelevance.model.QuerySet;
 import org.opensearch.searchrelevance.model.ScheduledExperimentResult;
 import org.opensearch.searchrelevance.model.SearchConfiguration;
 import org.opensearch.searchrelevance.model.SearchConfigurationDetails;
+import org.opensearch.searchrelevance.model.SystemIndexConverters;
 import org.opensearch.searchrelevance.scheduler.ExperimentCancellationToken;
 import org.opensearch.searchrelevance.scheduler.ScheduledExperimentRunnerManager;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
@@ -53,7 +58,6 @@ import org.opensearch.threadpool.ThreadPool;
 
 import com.google.common.annotations.VisibleForTesting;
 
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
 
@@ -72,11 +76,11 @@ import lombok.extern.log4j.Log4j2;
  * or {@link PointwiseExperimentProcessor}
  */
 @Log4j2
-@AllArgsConstructor
 public class ExperimentRunningManager {
     private ExperimentDao experimentDao;
     private QuerySetDao querySetDao;
     private SearchConfigurationDao searchConfigurationDao;
+    private JudgmentDao judgmentDao;
     private ScheduledExperimentHistoryDao scheduledExperimentHistoryDao;
     private MetricsHelper metricsHelper;
     private HybridOptimizerExperimentProcessor hybridOptimizerExperimentProcessor;
@@ -94,6 +98,30 @@ public class ExperimentRunningManager {
      * the unique instance of {@link ScheduledExperimentRunnerManager}.
      */
     private final Map<String, List<Future<?>>> runningFutures = new ConcurrentHashMap<>();
+
+    public ExperimentRunningManager(
+        ExperimentDao experimentDao,
+        QuerySetDao querySetDao,
+        SearchConfigurationDao searchConfigurationDao,
+        JudgmentDao judgmentDao,
+        ScheduledExperimentHistoryDao scheduledExperimentHistoryDao,
+        MetricsHelper metricsHelper,
+        HybridOptimizerExperimentProcessor hybridOptimizerExperimentProcessor,
+        PointwiseExperimentProcessor pointwiseExperimentProcessor,
+        ThreadPool threadPool,
+        SearchRelevanceSettingsAccessor settingsAccessor
+    ) {
+        this.experimentDao = experimentDao;
+        this.querySetDao = querySetDao;
+        this.searchConfigurationDao = searchConfigurationDao;
+        this.judgmentDao = judgmentDao;
+        this.scheduledExperimentHistoryDao = scheduledExperimentHistoryDao;
+        this.metricsHelper = metricsHelper;
+        this.hybridOptimizerExperimentProcessor = hybridOptimizerExperimentProcessor;
+        this.pointwiseExperimentProcessor = pointwiseExperimentProcessor;
+        this.threadPool = threadPool;
+        this.settingsAccessor = settingsAccessor;
+    }
 
     /**
      * Starts the experiment by setting up cancellation callback for the cancellation token and also retrieves the queryset.
@@ -113,14 +141,11 @@ public class ExperimentRunningManager {
         ExperimentCancellationToken cancellationToken,
         CountDownLatch actuallyFinished
     ) {
-        // Create context to carry resolved name and description through async callbacks
-        final ExperimentContext context = new ExperimentContext(experimentId, request, experimentName, experimentDescription);
-
         List<Future<?>> futures = new ArrayList<>();
         if (request.getScheduledExperimentResultId() != null) {
             if (runningFutures.containsKey(request.getScheduledExperimentResultId())) {
                 handleAsyncFailure(
-                    context,
+                    new ExperimentContext(experimentId, request, experimentName, experimentDescription, null),
                     "There is a running scheduled run with the same scheduled experiment id",
                     new Exception("Cannot run experiment!"),
                     actuallyFinished
@@ -144,24 +169,25 @@ public class ExperimentRunningManager {
         querySetDao.getQuerySet(request.getQuerySetId(), ActionListener.wrap(querySetResponse -> {
             try {
                 QuerySet querySet = convertToQuerySet(querySetResponse);
+                ExperimentContext context = new ExperimentContext(experimentId, request, experimentName, experimentDescription, querySet);
                 List<String> queryTextWithReferences = querySet.querySetQueries()
                     .stream()
                     .map(e -> e.queryText())
                     .collect(Collectors.toList());
 
-                // Check if queryTexts is empty and complete experiment immediately
                 if (queryTextWithReferences.isEmpty()) {
-                    log.info("Experiment {} completed with 0 query texts", experimentId);
-                    updateFinalExperiment(context, new ArrayList<>(), request.getJudgmentList(), actuallyFinished);
-                    return;
+                    log.info("Experiment {} has 0 query texts; finalizing after input signature capture", experimentId);
                 }
 
-                // Then get SearchConfigurations asynchronously (this will also start the experiment)
                 fetchSearchConfigurationsAsync(context, queryTextWithReferences, cancellationToken, actuallyFinished);
             } catch (Exception e) {
+                ExperimentContext context = new ExperimentContext(experimentId, request, experimentName, experimentDescription, null);
                 handleAsyncFailure(context, "Failed to process QuerySet", e, actuallyFinished);
             }
-        }, e -> { handleAsyncFailure(context, "Failed to fetch QuerySet", e, actuallyFinished); }));
+        }, e -> {
+            ExperimentContext context = new ExperimentContext(experimentId, request, experimentName, experimentDescription, null);
+            handleAsyncFailure(context, "Failed to fetch QuerySet", e, actuallyFinished);
+        }));
     }
 
     @VisibleForTesting
@@ -222,9 +248,108 @@ public class ExperimentRunningManager {
             throw new IllegalStateException("Missing required data for metrics calculation");
         }
 
+        loadJudgmentsThenContinue(context, searchConfigurations, queryTextWithReferences, hasFailure, cancellationToken, actuallyFinished);
+    }
+
+    private void loadJudgmentsThenContinue(
+        ExperimentContext context,
+        Map<String, SearchConfigurationDetails> searchConfigurations,
+        List<String> queryTextWithReferences,
+        AtomicBoolean hasFailure,
+        ExperimentCancellationToken cancellationToken,
+        CountDownLatch actuallyFinished
+    ) {
+        if (hasFailure.get() || checkIfCancelled(cancellationToken)) {
+            handleFailure(null, hasFailure, context, actuallyFinished);
+            return;
+        }
+        List<String> judgmentIds = context.getRequest().getJudgmentList();
+        if (judgmentIds == null || judgmentIds.isEmpty()) {
+            finishAfterSignatureReady(
+                context,
+                searchConfigurations,
+                queryTextWithReferences,
+                List.of(),
+                hasFailure,
+                cancellationToken,
+                actuallyFinished
+            );
+            return;
+        }
+        List<Judgment> buffer = Collections.synchronizedList(new ArrayList<>(Collections.nCopies(judgmentIds.size(), null)));
+        AtomicInteger pending = new AtomicInteger(judgmentIds.size());
+        AtomicBoolean judgmentFailure = new AtomicBoolean(false);
+        for (int i = 0; i < judgmentIds.size(); i++) {
+            final int idx = i;
+            String judgmentId = judgmentIds.get(i);
+            judgmentDao.getJudgment(judgmentId, ActionListener.wrap(response -> {
+                if (hasFailure.get() || checkIfCancelled(cancellationToken) || judgmentFailure.get()) {
+                    return;
+                }
+                try {
+                    buffer.set(idx, SystemIndexConverters.toJudgment(response));
+                } catch (Exception e) {
+                    if (judgmentFailure.compareAndSet(false, true)) {
+                        handleAsyncFailure(context, "Failed to parse judgment " + judgmentId, e, actuallyFinished);
+                    }
+                    return;
+                }
+                if (pending.decrementAndGet() == 0 && !judgmentFailure.get() && !hasFailure.get()) {
+                    finishAfterSignatureReady(
+                        context,
+                        searchConfigurations,
+                        queryTextWithReferences,
+                        new ArrayList<>(buffer),
+                        hasFailure,
+                        cancellationToken,
+                        actuallyFinished
+                    );
+                }
+            }, e -> {
+                if (judgmentFailure.compareAndSet(false, true)) {
+                    handleAsyncFailure(context, "Failed to fetch judgment: " + judgmentId, e, actuallyFinished);
+                }
+            }));
+        }
+    }
+
+    private void finishAfterSignatureReady(
+        ExperimentContext context,
+        Map<String, SearchConfigurationDetails> searchConfigurations,
+        List<String> queryTextWithReferences,
+        List<Judgment> judgments,
+        AtomicBoolean hasFailure,
+        ExperimentCancellationToken cancellationToken,
+        CountDownLatch actuallyFinished
+    ) {
+        if (hasFailure.get() || checkIfCancelled(cancellationToken)) {
+            handleFailure(null, hasFailure, context, actuallyFinished);
+            return;
+        }
+        if (context.getQuerySet() == null) {
+            handleAsyncFailure(context, "Missing query set in experiment context", new IllegalStateException(), actuallyFinished);
+            return;
+        }
+        try {
+            ExperimentInputSignature signature = ExperimentInputSignatureComputer.compute(
+                context.getQuerySet(),
+                context.getRequest().getSearchConfigurationList(),
+                searchConfigurations,
+                judgments
+            );
+            context.setInputSignature(signature);
+        } catch (Exception e) {
+            handleAsyncFailure(context, "Failed to compute experiment input signature", e, actuallyFinished);
+            return;
+        }
+
+        if (queryTextWithReferences.isEmpty()) {
+            updateFinalExperiment(context, new ArrayList<>(), context.getRequest().getJudgmentList(), actuallyFinished);
+            return;
+        }
+
         List<Map<String, Object>> finalResults = Collections.synchronizedList(new ArrayList<>());
         AtomicInteger pendingQueries = new AtomicInteger(queryTextWithReferences.size());
-
         executeExperimentEvaluation(
             context,
             searchConfigurations,
@@ -232,7 +357,7 @@ public class ExperimentRunningManager {
             finalResults,
             pendingQueries,
             hasFailure,
-            request.getJudgmentList(),
+            context.getRequest().getJudgmentList(),
             cancellationToken,
             actuallyFinished
         );
@@ -263,7 +388,7 @@ public class ExperimentRunningManager {
                     return;
                 }
 
-                SearchConfiguration config = convertToSearchConfiguration(searchConfigResponse);
+                SearchConfiguration config = SystemIndexConverters.toSearchConfiguration(searchConfigResponse);
 
                 future.complete(
                     Map.entry(
@@ -291,51 +416,7 @@ public class ExperimentRunningManager {
     }
 
     private QuerySet convertToQuerySet(SearchResponse response) {
-        if (response.getHits().getTotalHits().value() == 0) {
-            throw new SearchRelevanceException("QuerySet not found", RestStatus.NOT_FOUND);
-        }
-
-        Map<String, Object> sourceMap = response.getHits().getHits()[0].getSourceAsMap();
-
-        // Convert querySetQueries from list of maps to List<QuerySetEntry>
-        List<org.opensearch.searchrelevance.model.QuerySetEntry> querySetEntries = new ArrayList<>();
-        Object querySetQueriesObj = sourceMap.get("querySetQueries");
-        if (querySetQueriesObj instanceof List) {
-            List<Map<String, Object>> querySetQueriesList = (List<Map<String, Object>>) querySetQueriesObj;
-            querySetEntries = querySetQueriesList.stream()
-                .map(
-                    entryMap -> org.opensearch.searchrelevance.model.QuerySetEntry.Builder.builder()
-                        .queryText((String) entryMap.get("queryText"))
-                        .build()
-                )
-                .collect(Collectors.toList());
-        }
-
-        return org.opensearch.searchrelevance.model.QuerySet.Builder.builder()
-            .id((String) sourceMap.get("id"))
-            .name((String) sourceMap.get("name"))
-            .description((String) sourceMap.get("description"))
-            .timestamp((String) sourceMap.get("timestamp"))
-            .sampling((String) sourceMap.get("sampling"))
-            .querySetQueries(querySetEntries)
-            .build();
-    }
-
-    private SearchConfiguration convertToSearchConfiguration(SearchResponse response) {
-        if (response.getHits().getTotalHits().value() == 0) {
-            throw new SearchRelevanceException("SearchConfiguration not found", RestStatus.NOT_FOUND);
-        }
-
-        Map<String, Object> source = response.getHits().getHits()[0].getSourceAsMap();
-        return new SearchConfiguration(
-            (String) source.get("id"),
-            (String) source.get("name"),
-            (String) source.get("timestamp"),
-            (String) source.get("index"),
-            (String) source.get("query"),
-            (String) source.get("searchPipeline"),
-            (String) source.get("description")
-        );
+        return SystemIndexConverters.toQuerySet(response);
     }
 
     @VisibleForTesting
@@ -553,7 +634,8 @@ public class ExperimentRunningManager {
             request.getSearchConfigurationList(),
             judgmentList,
             request.getSize(),
-            finalResults
+            finalResults,
+            context.getInputSignature()
         );
 
         experimentDao.updateExperiment(
@@ -620,11 +702,28 @@ public class ExperimentRunningManager {
      * async callbacks.
      */
     @Getter
-    @AllArgsConstructor
     static class ExperimentContext {
         private final String experimentId;
         private final PutExperimentRequest request;
         private final String name;
         private final String description;
+        private final QuerySet querySet;
+        private ExperimentInputSignature inputSignature;
+
+        ExperimentContext(String experimentId, PutExperimentRequest request, String name, String description, QuerySet querySet) {
+            this.experimentId = experimentId;
+            this.request = request;
+            this.name = name;
+            this.description = description;
+            this.querySet = querySet;
+        }
+
+        void setInputSignature(ExperimentInputSignature inputSignature) {
+            this.inputSignature = inputSignature;
+        }
+
+        ExperimentInputSignature getInputSignature() {
+            return inputSignature;
+        }
     }
 }

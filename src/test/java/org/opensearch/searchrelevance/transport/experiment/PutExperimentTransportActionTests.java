@@ -16,7 +16,9 @@ import static org.mockito.Mockito.when;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.lucene.search.TotalHits;
 import org.junit.Before;
@@ -26,6 +28,7 @@ import org.mockito.MockitoAnnotations;
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.support.ActionFilters;
+import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.bytes.BytesReference;
 import org.opensearch.search.SearchHit;
@@ -33,6 +36,7 @@ import org.opensearch.search.SearchHits;
 import org.opensearch.searchrelevance.dao.ExperimentDao;
 import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
+import org.opensearch.searchrelevance.dao.ScheduledExperimentHistoryDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
 import org.opensearch.searchrelevance.executors.ExperimentRunningManager;
 import org.opensearch.searchrelevance.executors.ExperimentTaskManager;
@@ -58,6 +62,8 @@ public class PutExperimentTransportActionTests extends OpenSearchTestCase {
     @Mock
     private SearchConfigurationDao searchConfigurationDao;
     @Mock
+    private ScheduledExperimentHistoryDao scheduledExperimentHistoryDao;
+    @Mock
     private MetricsHelper metricsHelper;
     @Mock
     private JudgmentDao judgmentDao;
@@ -78,7 +84,8 @@ public class PutExperimentTransportActionTests extends OpenSearchTestCase {
             experimentDao,
             querySetDao,
             searchConfigurationDao,
-            null,
+            judgmentDao,
+            scheduledExperimentHistoryDao,
             metricsHelper,
             null,
             null,
@@ -98,6 +105,18 @@ public class PutExperimentTransportActionTests extends OpenSearchTestCase {
             threadPool,
             settingsAccessor
         );
+
+        doAnswer(invocation -> {
+            ActionListener<SearchResponse> listener = invocation.getArgument(1);
+            listener.onResponse(createSearchConfigurationHit());
+            return null;
+        }).when(searchConfigurationDao).getSearchConfiguration(any(String.class), any(ActionListener.class));
+
+        doAnswer(invocation -> {
+            ActionListener<SearchResponse> listener = invocation.getArgument(1);
+            listener.onResponse(createJudgmentHit());
+            return null;
+        }).when(judgmentDao).getJudgment(any(String.class), any(ActionListener.class));
     }
 
     public void testEmptyQueryTextsCompletesExperimentImmediately() {
@@ -147,6 +166,7 @@ public class PutExperimentTransportActionTests extends OpenSearchTestCase {
         assertEquals(AsyncStatus.COMPLETED, finalExperiment.status());
         assertTrue(finalExperiment.results().isEmpty());
         assertEquals(request.getJudgmentList(), finalExperiment.judgmentList());
+        assertNotNull(finalExperiment.inputSignature());
     }
 
     public void testNullRequestReturnsError() {
@@ -280,5 +300,47 @@ public class PutExperimentTransportActionTests extends OpenSearchTestCase {
             "HYBRID_OPTIMIZER-test-uui",
             PutExperimentTransportAction.generateDefaultExperimentName(ExperimentType.HYBRID_OPTIMIZER, id)
         );
+    }
+
+    private SearchResponse createSearchConfigurationHit() {
+        try {
+            SearchResponse response = mock(SearchResponse.class);
+            Map<String, Object> sourceMap = new HashMap<>();
+            sourceMap.put("id", "config1");
+            sourceMap.put("name", "cfg");
+            sourceMap.put("timestamp", "2024-01-01T00:00:00Z");
+            sourceMap.put("index", "idx");
+            sourceMap.put("query", "{}");
+            sourceMap.put("searchPipeline", "");
+            sourceMap.put("description", "");
+            SearchHit hit = new SearchHit(1, "config1", Map.of(), Map.of());
+            hit.sourceRef(BytesReference.bytes(XContentFactory.jsonBuilder().map(sourceMap)));
+            SearchHits hits = new SearchHits(new SearchHit[] { hit }, new TotalHits(1, TotalHits.Relation.EQUAL_TO), 1.0f);
+            when(response.getHits()).thenReturn(hits);
+            return response;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private SearchResponse createJudgmentHit() {
+        try {
+            SearchResponse response = mock(SearchResponse.class);
+            Map<String, Object> sourceMap = new HashMap<>();
+            sourceMap.put("id", "judgment1");
+            sourceMap.put("timestamp", "2024-01-01T00:00:00Z");
+            sourceMap.put("name", "j");
+            sourceMap.put("status", "COMPLETED");
+            sourceMap.put("type", "IMPORT_JUDGMENT");
+            sourceMap.put("metadata", Map.of());
+            sourceMap.put("judgmentRatings", List.of());
+            SearchHit hit = new SearchHit(1, "judgment1", Map.of(), Map.of());
+            hit.sourceRef(BytesReference.bytes(XContentFactory.jsonBuilder().map(sourceMap)));
+            SearchHits hits = new SearchHits(new SearchHit[] { hit }, new TotalHits(1, TotalHits.Relation.EQUAL_TO), 1.0f);
+            when(response.getHits()).thenReturn(hits);
+            return response;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 }

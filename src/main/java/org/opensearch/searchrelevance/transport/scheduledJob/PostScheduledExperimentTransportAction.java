@@ -7,12 +7,8 @@
  */
 package org.opensearch.searchrelevance.transport.scheduledJob;
 
-import static org.opensearch.searchrelevance.common.PluginConstants.DESCRIPTION;
-import static org.opensearch.searchrelevance.common.PluginConstants.NAME;
-
 import java.time.Instant;
 import java.time.ZoneId;
-import java.util.List;
 import java.util.Map;
 
 import org.apache.logging.log4j.LogManager;
@@ -31,9 +27,8 @@ import org.opensearch.jobscheduler.spi.schedule.Schedule;
 import org.opensearch.searchrelevance.dao.ExperimentDao;
 import org.opensearch.searchrelevance.dao.ScheduledJobsDao;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
-import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.Experiment;
-import org.opensearch.searchrelevance.model.ExperimentType;
+import org.opensearch.searchrelevance.model.ExperimentDocumentParser;
 import org.opensearch.searchrelevance.model.ScheduledJob;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.tasks.Task;
@@ -111,19 +106,6 @@ public class PostScheduledExperimentTransportAction extends HandledTransportActi
         }
 
         Map<String, Object> sourceMap = response.getHits().getHits()[0].getSourceAsMap();
-
-        return new Experiment(
-            (String) sourceMap.get("id"),
-            TimeUtils.getTimestamp(),
-            (String) sourceMap.get(NAME),
-            (String) sourceMap.get(DESCRIPTION),
-            ExperimentType.valueOf((String) sourceMap.get("type")),
-            AsyncStatus.valueOf((String) sourceMap.get("status")),
-            (String) sourceMap.get("querySetId"),
-            (List<String>) sourceMap.get("searchConfigurationList"),
-            (List<String>) sourceMap.get("judgmentList"),
-            (int) sourceMap.get("size"),
-            (List<Map<String, Object>>) sourceMap.get("results")
-        );
+        return ExperimentDocumentParser.fromSourceMapWithTimestamp(sourceMap, TimeUtils.getTimestamp());
     }
 }

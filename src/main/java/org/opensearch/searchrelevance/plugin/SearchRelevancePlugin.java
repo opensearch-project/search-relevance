@@ -94,6 +94,7 @@ import org.opensearch.searchrelevance.rest.RestSearchJudgmentAction;
 import org.opensearch.searchrelevance.rest.RestSearchQuerySetAction;
 import org.opensearch.searchrelevance.rest.RestSearchRelevanceStatsAction;
 import org.opensearch.searchrelevance.rest.RestSearchSearchConfigurationAction;
+import org.opensearch.searchrelevance.rest.RestValidateExperimentAction;
 import org.opensearch.searchrelevance.scheduler.ScheduledExperimentRunnerManager;
 import org.opensearch.searchrelevance.scheduler.SearchRelevanceJobParameters;
 import org.opensearch.searchrelevance.scheduler.SearchRelevanceJobRunner;
@@ -110,6 +111,8 @@ import org.opensearch.searchrelevance.transport.experiment.PutExperimentAction;
 import org.opensearch.searchrelevance.transport.experiment.PutExperimentTransportAction;
 import org.opensearch.searchrelevance.transport.experiment.SearchExperimentAction;
 import org.opensearch.searchrelevance.transport.experiment.SearchExperimentTransportAction;
+import org.opensearch.searchrelevance.transport.experiment.ValidateExperimentAction;
+import org.opensearch.searchrelevance.transport.experiment.ValidateExperimentTransportAction;
 import org.opensearch.searchrelevance.transport.judgment.DeleteJudgmentAction;
 import org.opensearch.searchrelevance.transport.judgment.DeleteJudgmentTransportAction;
 import org.opensearch.searchrelevance.transport.judgment.GetJudgmentAction;
@@ -234,6 +237,7 @@ public class SearchRelevancePlugin extends Plugin
             experimentDao,
             querySetDao,
             searchConfigurationDao,
+            judgmentDao,
             scheduledExperimentHistoryDao,
             metricsHelper,
             new HybridOptimizerExperimentProcessor(judgmentDao, experimentTaskManager),
@@ -302,6 +306,7 @@ public class SearchRelevancePlugin extends Plugin
             new RestGetExperimentAction(settingsAccessor),
             new RestDeleteExperimentAction(settingsAccessor),
             new RestSearchExperimentAction(settingsAccessor),
+            new RestValidateExperimentAction(settingsAccessor),
             new RestSearchRelevanceStatsAction(settingsAccessor, clusterUtil),
             new RestPostScheduledExperimentAction(settingsAccessor, cronUtil),
             new RestDeleteScheduledExperimentAction(settingsAccessor),
@@ -330,6 +335,7 @@ public class SearchRelevancePlugin extends Plugin
             new ActionHandler<>(DeleteExperimentAction.INSTANCE, DeleteExperimentTransportAction.class),
             new ActionHandler<>(GetExperimentAction.INSTANCE, GetExperimentTransportAction.class),
             new ActionHandler<>(SearchExperimentAction.INSTANCE, SearchExperimentTransportAction.class),
+            new ActionHandler<>(ValidateExperimentAction.INSTANCE, ValidateExperimentTransportAction.class),
             new ActionHandler<>(SearchRelevanceStatsAction.INSTANCE, SearchRelevanceStatsTransportAction.class),
             new ActionHandler<>(PostScheduledExperimentAction.INSTANCE, PostScheduledExperimentTransportAction.class),
             new ActionHandler<>(DeleteScheduledExperimentAction.INSTANCE, DeleteScheduledExperimentTransportAction.class),

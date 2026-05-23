@@ -1,6 +1,6 @@
 {
   "_meta": {
-    "schema_version": 1
+    "schema_version": 2
   },
   "properties": {
     "id": { "type": "keyword" },
@@ -15,6 +15,15 @@
     "size": {"type":  "keyword"},
     "isScheduled": {"type":  "keyword"},
     "scheduledExperimentJobId": {"type":  "keyword"},
-    "results": { "type": "object", "dynamic": false }
+    "results": { "type": "object", "dynamic": false },
+    "inputSignature": {
+      "type": "object",
+      "dynamic": false,
+      "properties": {
+        "query_set": { "type": "keyword", "ignore_above": 128 },
+        "judgment_list": { "type": "keyword", "ignore_above": 128 },
+        "search_configurations": { "type": "keyword", "ignore_above": 128 }
+      }
+    }
   }
 }
