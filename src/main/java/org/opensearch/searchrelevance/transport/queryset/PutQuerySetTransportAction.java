@@ -29,8 +29,8 @@ import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 public class PutQuerySetTransportAction extends HandledTransportAction<PutQuerySetRequest, IndexResponse> {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -98,7 +98,7 @@ public class PutQuerySetTransportAction extends HandledTransportAction<PutQueryS
                 try {
                     queryTextBuilder.append(DELIMITER);
                     queryTextBuilder.append(OBJECT_MAPPER.writeValueAsString(queryWithReference.getCustomizedKeyValueMap()));
-                } catch (JsonProcessingException e) {
+                } catch (JacksonException e) {
                     throw new SearchRelevanceException(
                         "Failed to serialize custom fields to JSON: " + e.getMessage(),
                         RestStatus.INTERNAL_SERVER_ERROR

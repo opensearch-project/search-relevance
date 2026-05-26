@@ -26,8 +26,8 @@ import org.opensearch.rest.RestRequest;
 import org.opensearch.searchrelevance.model.QueryWithReference;
 import org.opensearch.searchrelevance.model.SearchParams;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
 public class ParserUtils {
     private static final Logger LOGGER = LogManager.getLogger(ParserUtils.class);

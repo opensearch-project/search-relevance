@@ -56,15 +56,20 @@ import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.client.Client;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import lombok.extern.log4j.Log4j2;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.introspect.DefaultAccessorNamingStrategy;
+import tools.jackson.databind.json.JsonMapper;
 
 @Log4j2
 public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final ObjectMapper OBJECT_MAPPER = JsonMapper.builder()
+        .accessorNaming(new DefaultAccessorNamingStrategy.Provider().withFirstCharAcceptance(true, true))
+        .configure(DeserializationFeature.FAIL_ON_TRAILING_TOKENS, false)
+        .build();
     private final MLAccessor mlAccessor;
     private final QuerySetDao querySetDao;
     private final SearchConfigurationDao searchConfigurationDao;
@@ -660,7 +665,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
             }
             return hit.getSourceAsString();
 
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             log.error("Failed to process context source for hit: {}", hit.getId(), e);
             throw new RuntimeException("Failed to process context source", e);
         }
