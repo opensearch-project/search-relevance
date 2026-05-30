@@ -19,6 +19,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.searchrelevance.model.QuerySetEntry;
 import org.opensearch.test.OpenSearchTestCase;
 import org.opensearch.threadpool.TestThreadPool;
 import org.opensearch.threadpool.ThreadPool;
@@ -83,7 +84,9 @@ public class LlmJudgmentTaskManagerThreadStarvationTests extends OpenSearchTestC
             LlmJudgmentTaskManager taskManager = new LlmJudgmentTaskManager(threadPool);
 
             int numQueries = calculateQueryCountForSaturation();
-            List<String> queries = IntStream.range(0, numQueries).mapToObj(i -> "query_" + i).collect(Collectors.toList());
+            List<QuerySetEntry> queries = IntStream.range(0, numQueries)
+                .mapToObj(i -> QuerySetEntry.Builder.builder().queryText("query_" + i).customFields(Map.of()).build())
+                .collect(Collectors.toList());
 
             logger.info(
                 "Running starvation test with {} queries (processors: {}, estimated GENERIC pool max: {})",
@@ -97,7 +100,8 @@ public class LlmJudgmentTaskManagerThreadStarvationTests extends OpenSearchTestC
             AtomicReference<Exception> errorRef = new AtomicReference<>();
             AtomicInteger starvationTimeouts = new AtomicInteger(0);
 
-            taskManager.scheduleTasksAsync(queries, queryText -> {
+            taskManager.scheduleTasksAsync(queries, querySetEntry -> {
+                String queryText = querySetEntry.queryText();
                 // Simulate 3 nested blocking operations on the GENERIC pool
                 for (int step = 0; step < 3; step++) {
                     CompletableFuture<String> innerWork = CompletableFuture.supplyAsync(() -> {
@@ -193,13 +197,16 @@ public class LlmJudgmentTaskManagerThreadStarvationTests extends OpenSearchTestC
             LlmJudgmentTaskManager taskManager = new LlmJudgmentTaskManager(threadPool);
 
             int numQueries = 3;
-            List<String> queries = IntStream.range(0, numQueries).mapToObj(i -> "query_" + i).collect(Collectors.toList());
+            List<QuerySetEntry> queries = IntStream.range(0, numQueries)
+                .mapToObj(i -> QuerySetEntry.Builder.builder().queryText("query_" + i).customFields(Map.of()).build())
+                .collect(Collectors.toList());
 
             CountDownLatch completionLatch = new CountDownLatch(1);
             AtomicReference<List<Map<String, Object>>> resultRef = new AtomicReference<>();
             AtomicReference<Exception> errorRef = new AtomicReference<>();
 
-            taskManager.scheduleTasksAsync(queries, queryText -> {
+            taskManager.scheduleTasksAsync(queries, querySetEntry -> {
+                String queryText = querySetEntry.queryText();
                 CompletableFuture<String> innerWork = CompletableFuture.supplyAsync(() -> {
                     try {
                         Thread.sleep(10);

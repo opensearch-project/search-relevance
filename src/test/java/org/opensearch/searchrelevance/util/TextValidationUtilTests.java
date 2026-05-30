@@ -139,7 +139,12 @@ public class TextValidationUtilTests extends SearchRelevanceRestTestCase {
             "$price",
             "value=123",
             "a+b",
-            "item1;item2"
+            "item1;item2",
+            "What is C#?",
+            "color #FF0000",
+            "key: value",
+            "time is 2:30 PM",
+            "text with # hash and : colon"
         );
 
         for (String value : validValues) {
@@ -154,42 +159,40 @@ public class TextValidationUtilTests extends SearchRelevanceRestTestCase {
         String valueWithNewline = "text with\nnewline";
         TextValidationUtil.ValidationResult result = TextValidationUtil.validateQuerySetValue(valueWithNewline);
         assertFalse("Value with newline should be invalid", result.isValid());
-        assertEquals("Text contains reserved characters (newline, #, or : are not allowed in QuerySet values)", result.getErrorMessage());
+        assertEquals("Text contains reserved characters (newline is not allowed in QuerySet values)", result.getErrorMessage());
     }
 
-    public void testValidateQuerySetValue_ReservedCharacter_Hash() {
-        // Test that hash character is rejected
+    public void testValidateQuerySetValue_AllowsHash() {
+        // Test that hash character is now allowed
         String valueWithHash = "text with # hash";
         TextValidationUtil.ValidationResult result = TextValidationUtil.validateQuerySetValue(valueWithHash);
-        assertFalse("Value with # should be invalid", result.isValid());
-        assertEquals("Text contains reserved characters (newline, #, or : are not allowed in QuerySet values)", result.getErrorMessage());
+        assertTrue("Value with # should be valid", result.isValid());
+        assertNull(result.getErrorMessage());
     }
 
-    public void testValidateQuerySetValue_ReservedCharacter_Colon() {
-        // Test that colon character is rejected
+    public void testValidateQuerySetValue_AllowsColon() {
+        // Test that colon character is now allowed
         String valueWithColon = "text with: colon";
         TextValidationUtil.ValidationResult result = TextValidationUtil.validateQuerySetValue(valueWithColon);
-        assertFalse("Value with : should be invalid", result.isValid());
-        assertEquals("Text contains reserved characters (newline, #, or : are not allowed in QuerySet values)", result.getErrorMessage());
+        assertTrue("Value with : should be valid", result.isValid());
+        assertNull(result.getErrorMessage());
     }
 
-    public void testValidateQuerySetValue_MultipleReservedCharacters() {
-        // Test values with multiple reserved characters
-        List<String> invalidValues = List.of(
-            "query#text",
-            "key: value",
-            "line1\nline2",
-            "query#\nkey: value",
-            "text#with:multiple\nreserved"
-        );
+    public void testValidateQuerySetValue_NewlineStillInvalid() {
+        // Test that values with newlines are still invalid
+        List<String> invalidValues = List.of("line1\nline2", "query\nkey: value", "text with\nnewline");
 
         for (String value : invalidValues) {
             TextValidationUtil.ValidationResult result = TextValidationUtil.validateQuerySetValue(value);
-            assertFalse("Value should be invalid: " + value, result.isValid());
-            assertEquals(
-                "Text contains reserved characters (newline, #, or : are not allowed in QuerySet values)",
-                result.getErrorMessage()
-            );
+            assertFalse("Value with newline should be invalid: " + value, result.isValid());
+            assertEquals("Text contains reserved characters (newline is not allowed in QuerySet values)", result.getErrorMessage());
+        }
+
+        // But # and : alone (without newlines) should be valid
+        List<String> validValues = List.of("query#text", "key: value", "C# programming");
+        for (String value : validValues) {
+            TextValidationUtil.ValidationResult result = TextValidationUtil.validateQuerySetValue(value);
+            assertTrue("Value without newline should be valid: " + value, result.isValid());
         }
     }
 
@@ -267,13 +270,20 @@ public class TextValidationUtilTests extends SearchRelevanceRestTestCase {
     }
 
     public void testValidateQuerySetKey_ReservedCharacters() {
-        // Test keys with reserved characters
-        List<String> invalidKeys = List.of("key#with#hash", "key:with:colon", "key\nwith\nnewline", "key#with:multiple\nreserved");
+        // Test keys with newlines are still invalid
+        List<String> invalidKeys = List.of("key\nwith\nnewline", "key\rwith\rcarriage");
 
         for (String key : invalidKeys) {
             TextValidationUtil.ValidationResult result = TextValidationUtil.validateQuerySetKey(key);
-            assertFalse("Key with reserved char should be invalid: " + key, result.isValid());
-            assertEquals("Key contains reserved characters (newline, #, or : are not allowed in QuerySet keys)", result.getErrorMessage());
+            assertFalse("Key with newline should be invalid: " + key, result.isValid());
+            assertEquals("Key contains reserved characters (newline is not allowed in QuerySet keys)", result.getErrorMessage());
+        }
+
+        // But # and : in keys should now be valid
+        List<String> validKeys = List.of("key#with#hash", "key:with:colon");
+        for (String key : validKeys) {
+            TextValidationUtil.ValidationResult result = TextValidationUtil.validateQuerySetKey(key);
+            assertTrue("Key with # or : should be valid: " + key, result.isValid());
         }
     }
 
@@ -354,19 +364,23 @@ public class TextValidationUtilTests extends SearchRelevanceRestTestCase {
     }
 
     public void testQuerySetValidation_InvalidScenarios() {
-        // Test invalid queryText with reserved character
-        String invalidQueryText = "query#with#hash";
-        TextValidationUtil.ValidationResult result = TextValidationUtil.validateQuerySetValue(invalidQueryText);
-        assertFalse("QueryText with # should be invalid", result.isValid());
+        // Test that # and : are now valid in queryText
+        String queryWithHash = "query#with#hash";
+        TextValidationUtil.ValidationResult result = TextValidationUtil.validateQuerySetValue(queryWithHash);
+        assertTrue("QueryText with # should now be valid", result.isValid());
+
+        String queryWithColon = "value: with colon";
+        result = TextValidationUtil.validateQuerySetValue(queryWithColon);
+        assertTrue("Value with : should now be valid", result.isValid());
 
         // Test invalid key name (reserved)
         result = TextValidationUtil.validateQuerySetKey("queryText");
         assertFalse("Reserved key 'queryText' should be invalid", result.isValid());
 
-        // Test invalid value with colon
-        String invalidValue = "value: with colon";
+        // Test invalid key with newline
+        String invalidValue = "value\nwith\nnewline";
         result = TextValidationUtil.validateQuerySetValue(invalidValue);
-        assertFalse("Value with : should be invalid", result.isValid());
+        assertFalse("Value with newline should be invalid", result.isValid());
 
         // Test invalid key with newline
         String invalidKey = "key\nwith\nnewline";
@@ -501,15 +515,20 @@ public class TextValidationUtilTests extends SearchRelevanceRestTestCase {
         assertNull(result.getErrorMessage());
     }
 
-    public void testValidatePromptTemplate_ContainsDelimiter() {
-        // Test that template cannot contain the reserved delimiter character (#)
+    public void testValidatePromptTemplate_DelimiterNoLongerReserved() {
+        // Delimiter-based concatenation has been removed; \u001F is just a regular character
+        String template = "Query: {{queryText}}\u001FDocuments: {{hits}}";
+        TextValidationUtil.ValidationResult result = TextValidationUtil.validatePromptTemplate(template);
+        assertTrue("Template with former delimiter character should be valid", result.isValid());
+        assertNull(result.getErrorMessage());
+    }
+
+    public void testValidatePromptTemplate_HashIsAllowed() {
+        // # character has always been allowed in templates
         String template = "Query: {{queryText}}#Documents: {{hits}}";
         TextValidationUtil.ValidationResult result = TextValidationUtil.validatePromptTemplate(template);
-        assertFalse("Template with delimiter character should be invalid", result.isValid());
-        assertTrue(
-            "Error should mention delimiter character",
-            result.getErrorMessage().contains("reserved delimiter character") && result.getErrorMessage().contains("#")
-        );
+        assertTrue("Template with # should be valid", result.isValid());
+        assertNull(result.getErrorMessage());
     }
 
     public void testValidatePromptTemplate_ExceedsMaxLength() {
