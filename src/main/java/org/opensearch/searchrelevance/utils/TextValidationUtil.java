@@ -26,9 +26,6 @@ public class TextValidationUtil {
     private static final int MAX_PROMPT_TEMPLATE_LENGTH = 10000;
     // Characters that could break JSON or cause security issues
     private static final String DANGEROUS_CHARS_PATTERN = "[\"\\\\<>]+";  // Excludes quotes, backslashes, and HTML tags
-    // Characters that could break QuerySet parsing logic
-    // Newline (\n), delimiter (#), and colon (:) are reserved for the format: "queryText#\nkey: value"
-    private static final String QUERYSET_RESERVED_CHARS_PATTERN = "[\\r\\n#:]+";  // Excludes newline, carriage return, #, and colon
 
     public static class ValidationResult {
         private final boolean valid;
@@ -244,9 +241,8 @@ public class TextValidationUtil {
     /**
      * Validates QuerySet field values (queryText and custom field values).
      * Checks for reserved characters that would break the QuerySet parsing logic:
-     * - Newline (\n) - used to separate key-value pairs in the new format
-     * - Hash (#) - used as delimiter between queryText and custom fields
-     * - Colon (:) - used to separate keys from values in the new format
+     * - Newline (\n) - used to separate entries
+     * - Carriage return (\r) - used with newline on some systems
      *
      * @param text The text to validate
      * @return ValidationResult indicating if the text is valid for QuerySet
@@ -258,9 +254,8 @@ public class TextValidationUtil {
     /**
      * Validates QuerySet field values with a specified maximum length.
      * Checks for reserved characters that would break the QuerySet parsing logic:
-     * - Newline (\n) - used to separate key-value pairs in the new format
-     * - Hash (#) - used as delimiter between queryText and custom fields
-     * - Colon (:) - used to separate keys from values in the new format
+     * - Newline (\n) - used to separate entries
+     * - Carriage return (\r) - used with newline on some systems
      *
      * @param text The text to validate
      * @param maxLength The maximum allowed length
@@ -283,9 +278,9 @@ public class TextValidationUtil {
             return new ValidationResult(false, "Text contains invalid characters (quotes, backslashes, or HTML tags are not allowed)");
         }
 
-        // Check for reserved characters - use contains() for better detection including newlines
-        if (text.contains("\n") || text.contains("\r") || text.contains("#") || text.contains(":")) {
-            return new ValidationResult(false, "Text contains reserved characters (newline, #, or : are not allowed in QuerySet values)");
+        // Check for reserved characters - newlines are not allowed in values
+        if (text.contains("\n") || text.contains("\r")) {
+            return new ValidationResult(false, "Text contains reserved characters (newline is not allowed in QuerySet values)");
         }
 
         return new ValidationResult(true, null);
@@ -311,9 +306,10 @@ public class TextValidationUtil {
             return new ValidationResult(false, "Key exceeds maximum length of " + MAX_NAME_LENGTH + " characters");
         }
 
-        // Keys should not contain reserved characters - use contains() for better detection including newlines
-        if (key.contains("\n") || key.contains("\r") || key.contains("#") || key.contains(":")) {
-            return new ValidationResult(false, "Key contains reserved characters (newline, #, or : are not allowed in QuerySet keys)");
+        // Keys should not contain reserved characters - newlines are not allowed in
+        // keys
+        if (key.contains("\n") || key.contains("\r")) {
+            return new ValidationResult(false, "Key contains reserved characters (newline is not allowed in QuerySet keys)");
         }
 
         // Keys should not contain whitespace (except single spaces within the key, not at start/end)
@@ -368,7 +364,6 @@ public class TextValidationUtil {
      * Validates that a prompt template contains the required placeholders and meets formatting requirements.
      * - Must contain {{hits}} or {{results}} to provide documents to the LLM for rating
      * - Must contain {{queryText}} or {{searchText}} to provide the search query
-     * - Must not contain the reserved delimiter character (#)
      * - Must not exceed maximum length
      *
      * @param promptTemplate The prompt template to validate
@@ -385,15 +380,8 @@ public class TextValidationUtil {
             return new ValidationResult(false, "Prompt template exceeds maximum length of " + MAX_PROMPT_TEMPLATE_LENGTH + " characters");
         }
 
-        // Check for reserved delimiter character
-        if (promptTemplate.contains(QueryWithReference.DELIMITER)) {
-            return new ValidationResult(
-                false,
-                "Prompt template cannot contain the reserved delimiter character '"
-                    + QueryWithReference.DELIMITER
-                    + "' which is used to separate query text from custom fields"
-            );
-        }
+        // Delimiter-based concatenation has been removed; queryText and customFields
+        // are stored as separate fields. No reserved delimiter character check needed.
 
         // Check if template contains {{hits}} or {{results}} placeholder
         boolean hasHits = promptTemplate.contains("{{" + PLACEHOLDER_HITS + "}}")

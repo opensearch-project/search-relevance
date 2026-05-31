@@ -303,11 +303,7 @@ public class ExperimentRunningManager {
         if (querySetQueriesObj instanceof List) {
             List<Map<String, Object>> querySetQueriesList = (List<Map<String, Object>>) querySetQueriesObj;
             querySetEntries = querySetQueriesList.stream()
-                .map(
-                    entryMap -> org.opensearch.searchrelevance.model.QuerySetEntry.Builder.builder()
-                        .queryText((String) entryMap.get("queryText"))
-                        .build()
-                )
+                .map(org.opensearch.searchrelevance.model.QuerySetEntry::fromStoredMap)
                 .collect(Collectors.toList());
         }
 
