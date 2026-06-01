@@ -1,6 +1,6 @@
 {
   "_meta": {
-    "schema_version": 0
+    "schema_version": 1
   },
   "properties": {
     "id": { "type": "keyword" },
@@ -10,7 +10,11 @@
     "querySetQueries": {
       "type": "nested",
       "properties": {
-        "queryText": { "type": "text" }
+        "queryText": { "type": "text" },
+        "customFields": {
+          "type": "object",
+          "dynamic": true
+        }
       }
     },
     "sampling": { "type": "keyword" }

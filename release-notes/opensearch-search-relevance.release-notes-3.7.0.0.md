@@ -8,6 +8,7 @@ Compatible with OpenSearch and OpenSearch Dashboards version 3.7.0
 
 ### Bug Fixes
 
+* Fixed QuerySet creation failing when query or answer text contains `#` or `:` characters ([#414](https://github.com/opensearch-project/search-relevance/pull/414))
 * Fix race condition in index mapping migration that crashes nodes during rolling upgrades ([#443](https://github.com/opensearch-project/search-relevance/pull/443))
 * Fix typo in log message: "occured" → "occurred" ([#461](https://github.com/opensearch-project/search-relevance/pull/461))
 * Fix typo in log message: "occured" → "occurred" ([#462](https://github.com/opensearch-project/search-relevance/pull/462))

@@ -15,7 +15,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -23,15 +22,10 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.rest.RestRequest;
-import org.opensearch.searchrelevance.model.QueryWithReference;
 import org.opensearch.searchrelevance.model.SearchParams;
-
-import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.ObjectMapper;
 
 public class ParserUtils {
     private static final Logger LOGGER = LogManager.getLogger(ParserUtils.class);
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final String SHA_256_ALGORITHM = "SHA-256";
 
     public static SearchParams parseSearchParams(RestRequest request) throws IOException {
@@ -174,47 +168,4 @@ public class ParserUtils {
             throw new RuntimeException("SHA-256 algorithm not available", e);
         }
     }
-
-    /**
-     * Parse query text with custom input to extract query and reference data.
-     * Supports two formats:
-     * - Current format: "queryText#{"key1":"value1","key2":"value2"}" (JSON)
-     * - Legacy format: "queryText#referenceAnswer" (plain text)
-     *
-     * @param queryTextWithCustomInput the query text with optional custom input
-     * @return a map with "queryText" and optional reference data entries
-     */
-    public static Map<String, String> parseQueryTextWithCustomInput(String queryTextWithCustomInput) {
-        Map<String, String> result = new HashMap<>();
-        String[] queryTextRefArr = queryTextWithCustomInput.split(QueryWithReference.DELIMITER, 2);
-        String queryText = queryTextRefArr[0];
-        result.put("queryText", queryText);
-
-        if (queryTextRefArr.length > 1 && !queryTextRefArr[1].isEmpty()) {
-            String referenceContent = queryTextRefArr[1];
-
-            // Try to parse as JSON first (current format)
-            if (referenceContent.trim().startsWith("{") && referenceContent.trim().endsWith("}")) {
-                try {
-                    Map<String, String> jsonMap = OBJECT_MAPPER.readValue(referenceContent, new TypeReference<Map<String, String>>() {
-                    });
-                    result.putAll(jsonMap);
-                    return result;
-                } catch (Exception e) {
-                    LOGGER.debug(
-                        "Failed to parse reference content as JSON, falling back to legacy format. Content: '{}', Error: {}",
-                        referenceContent,
-                        e.getMessage()
-                    );
-                    // Not valid JSON, fall through to legacy format
-                }
-            }
-
-            // Legacy format: queryText#referenceAnswer
-            result.put("referenceAnswer", referenceContent);
-        }
-
-        return result;
-    }
-
 }

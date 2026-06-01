@@ -496,9 +496,9 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
      * Test that when index exists without _meta.schema_version (legacy index, version 0),
      * NO mapping update occurs when current version is also 0.
      */
-    public void testCreateIndexIfAbsentSync_LegacyIndexWithoutSchemaVersion_NoUpdate() throws IOException {
+    public void testCreateIndexIfAbsentSync_LegacyIndexWithoutSchemaVersion_UpdatesMapping() throws IOException {
         // Setup: index exists with no schema version (legacy index = version 0)
-        // Current JSON schema_version is also 0, so no update needed
+        // Current JSON schema_version is 1, so mapping update IS needed
         when(metadata.hasIndex(QUERY_SET.getIndexName())).thenReturn(true);
 
         // Mock IndexMetadata with no _meta field (legacy index)
@@ -527,9 +527,9 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         ActionListener<SearchResponse> listener = mock(ActionListener.class);
         indicesManager.putDoc("test_id", xContentBuilder, QUERY_SET, listener);
 
-        // Verify: create index NOT called, putMapping NOT called (version 0 >= 0)
+        // Verify: create index NOT called, putMapping IS called (version 0 < 1)
         verify(indicesAdminClient, never()).create(any(CreateIndexRequest.class), any(ActionListener.class));
-        verify(indicesAdminClient, never()).putMapping(any(PutMappingRequest.class), any(ActionListener.class));
+        verify(indicesAdminClient).putMapping(any(PutMappingRequest.class), any(ActionListener.class));
     }
 
     /**
@@ -571,7 +571,7 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
      * NO mapping update occurs.
      */
     public void testCreateIndexIfAbsentSync_IndexExistsWithSameExplicitVersion_NoUpdate() throws IOException {
-        // Setup: index exists with explicit schema version 0 (same as current)
+        // Setup: index exists with explicit schema version 1 (same as current)
         when(metadata.hasIndex(QUERY_SET.getIndexName())).thenReturn(true);
 
         IndexMetadata indexMetadata = mock(IndexMetadata.class);
@@ -579,9 +579,9 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         when(metadata.index(QUERY_SET.getIndexName())).thenReturn(indexMetadata);
         when(indexMetadata.mapping()).thenReturn(mappingMetadata);
 
-        // Set explicit schema_version = 0 (same as current JSON version)
+        // Set explicit schema_version = 1 (same as current JSON version)
         Map<String, Object> metaMap = new HashMap<>();
-        metaMap.put(SearchRelevanceIndices.META_SCHEMA_VERSION_KEY, 0);
+        metaMap.put(SearchRelevanceIndices.META_SCHEMA_VERSION_KEY, 1);
         Map<String, Object> mappingSource = new HashMap<>();
         mappingSource.put("_meta", metaMap);
         mappingSource.put("properties", new HashMap<>());
@@ -602,7 +602,7 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         ActionListener<SearchResponse> listener = mock(ActionListener.class);
         indicesManager.putDoc("test_id", xContentBuilder, QUERY_SET, listener);
 
-        // Verify: putMapping NOT called (explicit version 0 >= current version 0)
+        // Verify: putMapping NOT called (explicit version 1 >= current version 1)
         verify(indicesAdminClient, never()).create(any(CreateIndexRequest.class), any(ActionListener.class));
         verify(indicesAdminClient, never()).putMapping(any(PutMappingRequest.class), any(ActionListener.class));
     }
