@@ -442,6 +442,107 @@ public class ValidateExperimentTransportActionTests extends OpenSearchTestCase {
     }
 
     // ============================================
+    // 9. Multiple inputs changed simultaneously -> DRIFTED with all in drifted_inputs
+    // ============================================
+    public void testMultipleInputsDriftedReturnsAllDriftedFields() {
+        // Use original inputs to compute the stored signature
+        QuerySet originalQuerySet = QuerySet.Builder.builder()
+            .id(QUERY_SET_ID)
+            .name("qs-name")
+            .description("qs-desc")
+            .timestamp("2024-01-01T00:00:00Z")
+            .sampling("random")
+            .querySetQueries(List.of(QuerySetEntry.Builder.builder().queryText("original-query").build()))
+            .build();
+
+        SearchConfigurationDetails originalConfig = SearchConfigurationDetails.builder()
+            .index("test-index")
+            .query("{\"match_all\":{}}")
+            .pipeline("")
+            .build();
+
+        Map<String, Object> originalRow = new HashMap<>();
+        originalRow.put("query", "q1");
+        originalRow.put("ratings", List.of(Map.of("doc", "d1", "rating", 3)));
+        Judgment originalJudgment = new Judgment(
+            JUDGMENT_ID,
+            "2024-01-01T00:00:00Z",
+            "judgment-name",
+            AsyncStatus.COMPLETED,
+            JudgmentType.IMPORT_JUDGMENT,
+            Map.of(),
+            List.of(originalRow)
+        );
+
+        ExperimentInputSignature signature = ExperimentInputSignatureComputer.compute(
+            originalQuerySet,
+            List.of(CONFIG_ID),
+            Map.of(CONFIG_ID, originalConfig),
+            List.of(originalJudgment)
+        );
+
+        Experiment experiment = new Experiment(
+            EXPERIMENT_ID,
+            "2024-01-01T00:00:00Z",
+            "Test",
+            "Desc",
+            ExperimentType.PAIRWISE_COMPARISON,
+            AsyncStatus.COMPLETED,
+            QUERY_SET_ID,
+            List.of(CONFIG_ID),
+            List.of(JUDGMENT_ID),
+            10,
+            List.of(),
+            signature
+        );
+
+        // Changed inputs: different query, different config, different judgment
+        QuerySet changedQuerySet = QuerySet.Builder.builder()
+            .id(QUERY_SET_ID)
+            .name("qs-name")
+            .description("qs-desc")
+            .timestamp("2024-01-01T00:00:00Z")
+            .sampling("random")
+            .querySetQueries(List.of(QuerySetEntry.Builder.builder().queryText("changed-query").build()))
+            .build();
+
+        SearchConfigurationDetails changedConfig = SearchConfigurationDetails.builder()
+            .index("different-index")
+            .query("{\"match_all\":{}}")
+            .pipeline("")
+            .build();
+
+        Map<String, Object> changedRow = new HashMap<>();
+        changedRow.put("query", "q1");
+        changedRow.put("ratings", List.of(Map.of("doc", "d1", "rating", 5)));
+        Judgment changedJudgment = new Judgment(
+            JUDGMENT_ID,
+            "2024-01-01T00:00:00Z",
+            "judgment-name",
+            AsyncStatus.COMPLETED,
+            JudgmentType.IMPORT_JUDGMENT,
+            Map.of(),
+            List.of(changedRow)
+        );
+
+        setupMocksForExperiment(experiment, changedQuerySet, changedConfig, changedJudgment);
+
+        ActionListener<ValidateExperimentResponse> responseListener = mock(ActionListener.class);
+        transportAction.doExecute(null, new OpenSearchDocRequest(EXPERIMENT_ID), responseListener);
+
+        ArgumentCaptor<ValidateExperimentResponse> responseCaptor = ArgumentCaptor.forClass(ValidateExperimentResponse.class);
+        verify(responseListener).onResponse(responseCaptor.capture());
+
+        ValidateExperimentResponse response = responseCaptor.getValue();
+        assertEquals(ValidateExperimentResponse.STATUS_DRIFTED, response.status());
+        assertEquals(3, response.driftedInputs().size());
+        assertTrue(response.driftedInputs().contains(ExperimentInputSignature.QUERY_SET));
+        assertTrue(response.driftedInputs().contains(ExperimentInputSignature.JUDGMENT_LIST));
+        assertTrue(response.driftedInputs().contains(ExperimentInputSignature.SEARCH_CONFIGURATIONS));
+        assertTrue(response.message().contains("One or more experiment inputs"));
+    }
+
+    // ============================================
     // Helper methods
     // ============================================
 

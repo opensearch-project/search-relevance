@@ -24,19 +24,23 @@ import org.opensearch.searchrelevance.model.QuerySet;
 import org.opensearch.searchrelevance.model.QuerySetEntry;
 import org.opensearch.searchrelevance.model.SearchConfigurationDetails;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.MapperFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.MapperFeature;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.SerializationFeature;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Computes stable SHA-256 fingerprints for experiment inputs using canonical JSON serialization.
  */
 public final class ExperimentInputSignatureComputer {
-    private static final ObjectMapper CANONICAL_JSON = new ObjectMapper().enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
-        .configure(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY, true);
+    private static final char[] HEX_DIGITS = "0123456789abcdef".toCharArray();
+    private static final ObjectMapper CANONICAL_JSON = JsonMapper.builder()
+        .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true)
+        .configure(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY, true)
+        .build();
 
     private ExperimentInputSignatureComputer() {}
 
@@ -107,7 +111,16 @@ public final class ExperimentInputSignatureComputer {
                     }
                 }
             }
-            ratings.sort(Comparator.comparing(ExperimentInputSignatureComputer::canonicalJson));
+            // Pre-compute canonical JSON once per rating to avoid O(M log M) Jackson serializations.
+            List<Map.Entry<String, Map<String, Object>>> canonicalPairs = new ArrayList<>(ratings.size());
+            for (Map<String, Object> rating : ratings) {
+                canonicalPairs.add(Map.entry(canonicalJson(rating), rating));
+            }
+            canonicalPairs.sort(Map.Entry.comparingByKey());
+            ratings.clear();
+            for (Map.Entry<String, Map<String, Object>> pair : canonicalPairs) {
+                ratings.add(pair.getValue());
+            }
             Map<String, Object> row = new TreeMap<>();
             row.put("query", queryKey);
             row.put("ratings", ratings);
@@ -163,7 +176,7 @@ public final class ExperimentInputSignatureComputer {
                 obj.remove("size");
                 return CANONICAL_JSON.writeValueAsString(obj);
             }
-        } catch (JsonProcessingException ignored) {
+        } catch (JacksonException ignored) {
             // fall through to literal
         }
         return trimmed;
@@ -172,20 +185,21 @@ public final class ExperimentInputSignatureComputer {
     static String canonicalJson(Object value) {
         try {
             return CANONICAL_JSON.writeValueAsString(value);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("Failed to serialize value for experiment signature", e);
         }
     }
 
     static String sha256Hex(String utf8) {
         try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] encoded = digest.digest(utf8.getBytes(StandardCharsets.UTF_8));
-            StringBuilder hex = new StringBuilder(encoded.length * 2);
-            for (byte b : encoded) {
-                hex.append(String.format(java.util.Locale.ROOT, "%02x", b));
+            byte[] encoded = MessageDigest.getInstance("SHA-256").digest(utf8.getBytes(StandardCharsets.UTF_8));
+            char[] hex = new char[encoded.length * 2];
+            for (int i = 0; i < encoded.length; i++) {
+                int v = encoded[i] & 0xFF;
+                hex[i * 2] = HEX_DIGITS[v >>> 4];
+                hex[i * 2 + 1] = HEX_DIGITS[v & 0x0F];
             }
-            return hex.toString();
+            return new String(hex);
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 not available", e);
         }

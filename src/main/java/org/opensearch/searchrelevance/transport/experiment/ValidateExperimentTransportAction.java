@@ -94,7 +94,7 @@ public class ValidateExperimentTransportAction extends HandledTransportAction<Op
         querySetDao.getQuerySet(experiment.querySetId(), ActionListener.wrap(qsResponse -> {
             try {
                 QuerySet querySet = SystemIndexConverters.toQuerySet(qsResponse);
-                fetchSearchConfigurationsSequentially(experiment, querySet, new ArrayList<>(), 0, listener);
+                fetchSearchConfigurationsInParallel(experiment, querySet, listener);
             } catch (SearchRelevanceException e) {
                 if (e.status() == RestStatus.NOT_FOUND) {
                     listener.onResponse(
@@ -116,53 +116,72 @@ public class ValidateExperimentTransportAction extends HandledTransportAction<Op
         ));
     }
 
-    private void fetchSearchConfigurationsSequentially(
+    private void fetchSearchConfigurationsInParallel(
         Experiment experiment,
         QuerySet querySet,
-        List<SearchConfiguration> loaded,
-        int index,
         ActionListener<ValidateExperimentResponse> listener
     ) {
         List<String> ids = experiment.searchConfigurationList() == null ? List.of() : experiment.searchConfigurationList();
-        if (index >= ids.size()) {
-            Map<String, SearchConfigurationDetails> detailsById = new HashMap<>();
-            for (SearchConfiguration c : loaded) {
-                detailsById.put(
-                    c.id(),
-                    SearchConfigurationDetails.builder().index(c.index()).query(c.query()).pipeline(c.searchPipeline()).build()
-                );
-            }
-            loadJudgmentsThenRespond(experiment, querySet, detailsById, listener);
+        if (ids.isEmpty()) {
+            loadJudgmentsThenRespond(experiment, querySet, Map.of(), listener);
             return;
         }
-        String configId = ids.get(index);
-        searchConfigurationDao.getSearchConfiguration(configId, ActionListener.wrap(sr -> {
-            try {
-                loaded.add(SystemIndexConverters.toSearchConfiguration(sr));
-                fetchSearchConfigurationsSequentially(experiment, querySet, loaded, index + 1, listener);
-            } catch (SearchRelevanceException e) {
-                if (e.status() == RestStatus.NOT_FOUND) {
-                    listener.onResponse(
-                        ValidateExperimentResponse.drifted(
-                            List.of(ExperimentInputSignature.SEARCH_CONFIGURATIONS),
-                            "One or more search configurations have changed or are no longer available."
+        List<SearchConfiguration> buffer = Collections.synchronizedList(new ArrayList<>(Collections.nCopies(ids.size(), null)));
+        AtomicInteger pending = new AtomicInteger(ids.size());
+        AtomicBoolean failed = new AtomicBoolean(false);
+        for (int i = 0; i < ids.size(); i++) {
+            final int idx = i;
+            String configId = ids.get(i);
+            searchConfigurationDao.getSearchConfiguration(configId, ActionListener.wrap(sr -> {
+                if (failed.get()) {
+                    return;
+                }
+                try {
+                    buffer.set(idx, SystemIndexConverters.toSearchConfiguration(sr));
+                } catch (SearchRelevanceException e) {
+                    if (failed.compareAndSet(false, true)) {
+                        if (e.status() == RestStatus.NOT_FOUND) {
+                            listener.onResponse(
+                                ValidateExperimentResponse.drifted(
+                                    List.of(ExperimentInputSignature.SEARCH_CONFIGURATIONS),
+                                    "One or more search configurations have changed or are no longer available."
+                                )
+                            );
+                        } else {
+                            listener.onFailure(e);
+                        }
+                    }
+                    return;
+                } catch (Exception e) {
+                    if (failed.compareAndSet(false, true)) {
+                        listener.onFailure(e);
+                    }
+                    return;
+                }
+                if (pending.decrementAndGet() == 0 && !failed.get()) {
+                    Map<String, SearchConfigurationDetails> detailsById = new HashMap<>();
+                    for (SearchConfiguration c : buffer) {
+                        if (c != null) {
+                            detailsById.put(
+                                c.id(),
+                                SearchConfigurationDetails.builder().index(c.index()).query(c.query()).pipeline(c.searchPipeline()).build()
+                            );
+                        }
+                    }
+                    loadJudgmentsThenRespond(experiment, querySet, detailsById, listener);
+                }
+            }, e -> {
+                if (failed.compareAndSet(false, true)) {
+                    listener.onFailure(
+                        new SearchRelevanceException(
+                            "Failed to load search configuration for drift validation: " + configId,
+                            e,
+                            RestStatus.INTERNAL_SERVER_ERROR
                         )
                     );
-                } else {
-                    listener.onFailure(e);
                 }
-            } catch (Exception e) {
-                listener.onFailure(e);
-            }
-        },
-            e -> listener.onFailure(
-                new SearchRelevanceException(
-                    "Failed to load search configuration for drift validation: " + configId,
-                    e,
-                    RestStatus.INTERNAL_SERVER_ERROR
-                )
-            )
-        ));
+            }));
+        }
     }
 
     private void loadJudgmentsThenRespond(
