@@ -7,6 +7,11 @@
  */
 package org.opensearch.searchrelevance.model;
 
+import static org.opensearch.searchrelevance.experiment.ExperimentOptionsForHybridSearch.EXPERIMENT_OPTION_COMBINATION_TECHNIQUE;
+import static org.opensearch.searchrelevance.experiment.ExperimentOptionsForHybridSearch.EXPERIMENT_OPTION_NORMALIZATION_TECHNIQUE;
+import static org.opensearch.searchrelevance.experiment.ExperimentOptionsForHybridSearch.EXPERIMENT_OPTION_RANK_CONSTANT;
+import static org.opensearch.searchrelevance.experiment.ExperimentOptionsForHybridSearch.EXPERIMENT_OPTION_WEIGHTS_FOR_COMBINATION;
+
 import java.io.IOException;
 import java.text.NumberFormat;
 import java.util.Locale;
@@ -48,12 +53,23 @@ public class ExperimentVariant implements ToXContentObject {
     /**
      * Computes the textual parameters for this experiment variant based on its parameters.
      * The textual parameters are generated on-demand and not stored.
+     * <p>
+     * Output uses a uniform {@code key=value} format separated by commas, so different
+     * variant shapes (e.g. score-based vs rank-based) remain self-describing:
+     * <ul>
+     *   <li>Score-based: {@code combination=arithmetic_mean, normalization=min_max, weights=0.5;0.5}</li>
+     *   <li>RRF: {@code combination=rrf, rank_constant=60}</li>
+     * </ul>
+     * Only fields actually present on the variant are emitted; missing fields are skipped.
      *
      * @return The computed textual parameters string
      */
     public String getTextualParameters() {
-        Object weightsObj = parameters.get("weights");
-        String weightsString = "null";
+        StringBuilder sb = new StringBuilder();
+        appendIfPresent(sb, EXPERIMENT_OPTION_COMBINATION_TECHNIQUE, parameters.get(EXPERIMENT_OPTION_COMBINATION_TECHNIQUE));
+        appendIfPresent(sb, EXPERIMENT_OPTION_NORMALIZATION_TECHNIQUE, parameters.get(EXPERIMENT_OPTION_NORMALIZATION_TECHNIQUE));
+
+        Object weightsObj = parameters.get(EXPERIMENT_OPTION_WEIGHTS_FOR_COMBINATION);
         if (weightsObj instanceof float[] weightsArray && weightsArray.length > 0) {
             StringBuilder weightsBuilder = new StringBuilder();
             NumberFormat formatter = NumberFormat.getNumberInstance(Locale.ROOT);
@@ -65,11 +81,21 @@ public class ExperimentVariant implements ToXContentObject {
                 }
                 weightsBuilder.append(formatter.format(weightsArray[i]));
             }
-            weightsString = weightsBuilder.toString();
+            appendIfPresent(sb, EXPERIMENT_OPTION_WEIGHTS_FOR_COMBINATION, weightsBuilder.toString());
         }
-        String normalizationTechnique = String.valueOf(parameters.getOrDefault("normalization", "unknown"));
-        String combinationTechnique = String.valueOf(parameters.getOrDefault("combination", "unknown"));
-        return combinationTechnique + ", " + normalizationTechnique + ", " + weightsString;
+
+        appendIfPresent(sb, EXPERIMENT_OPTION_RANK_CONSTANT, parameters.get(EXPERIMENT_OPTION_RANK_CONSTANT));
+        return sb.toString();
+    }
+
+    private static void appendIfPresent(StringBuilder sb, String key, Object value) {
+        if (value == null) {
+            return;
+        }
+        if (sb.length() > 0) {
+            sb.append(", ");
+        }
+        sb.append(key).append('=').append(value);
     }
 
     @Override

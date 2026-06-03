@@ -15,8 +15,8 @@ import java.util.Map;
 
 import org.opensearch.test.OpenSearchTestCase;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 public class MLAccessorTests extends OpenSearchTestCase {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -101,7 +101,7 @@ public class MLAccessorTests extends OpenSearchTestCase {
 
         JsonNode messagesNode = jsonNode.get("messages");
         JsonNode userMessage = messagesNode.get(1);
-        String content = userMessage.get("content").asText();
+        String content = userMessage.get("content").asString();
 
         assertTrue("Should contain first hit", content.contains("001"));
         assertTrue("Should contain second hit", content.contains("002"));
@@ -147,7 +147,7 @@ public class MLAccessorTests extends OpenSearchTestCase {
         assertEquals("Should have one rating", 1, jsonNode.get("ratings").size());
 
         JsonNode rating = jsonNode.get("ratings").get(0);
-        assertEquals("ID should be preserved", "1", rating.get("id").asText());
+        assertEquals("ID should be preserved", "1", rating.get("id").asString());
         assertEquals("Rating score should be preserved", 0.9, rating.get("rating_score").asDouble(), 0.001);
     }
 
@@ -171,7 +171,7 @@ public class MLAccessorTests extends OpenSearchTestCase {
         String compositeKeys = "{\"ratings\":[{\"id\":\"test_products::1\",\"rating_score\":1.0}]}";
         JsonNode node3 = OBJECT_MAPPER.readTree(compositeKeys);
         assertNotNull("Composite keys should be valid JSON", node3);
-        assertEquals("Composite key should be preserved", "test_products::1", node3.get("ratings").get(0).get("id").asText());
+        assertEquals("Composite key should be preserved", "test_products::1", node3.get("ratings").get(0).get("id").asString());
     }
 
     /**

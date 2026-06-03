@@ -162,6 +162,7 @@ public class QuerySetDao {
         });
     }
 
+    @SuppressWarnings("unchecked")
     private QuerySet convertToQuerySet(SearchResponse response) {
         SearchHit hit = response.getHits().getHits()[0];
         Map<String, Object> sourceMap = hit.getSourceAsMap();
@@ -171,9 +172,7 @@ public class QuerySetDao {
         Object querySetQueriesObj = sourceMap.get(QuerySet.QUERY_SET_QUERIES);
         if (querySetQueriesObj instanceof List) {
             List<Map<String, Object>> querySetQueriesList = (List<Map<String, Object>>) querySetQueriesObj;
-            querySetEntries = querySetQueriesList.stream()
-                .map(entryMap -> QuerySetEntry.Builder.builder().queryText((String) entryMap.get(QuerySetEntry.QUERY_TEXT)).build())
-                .collect(Collectors.toList());
+            querySetEntries = querySetQueriesList.stream().map(QuerySetEntry::fromStoredMap).collect(Collectors.toList());
         }
 
         return QuerySet.Builder.builder()
