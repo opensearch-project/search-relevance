@@ -72,6 +72,7 @@ import org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager;
 import org.opensearch.searchrelevance.metrics.MetricsHelper;
 import org.opensearch.searchrelevance.ml.MLAccessor;
 import org.opensearch.searchrelevance.model.ScheduledJob;
+import org.opensearch.searchrelevance.model.builder.SearchRequestBuilder;
 import org.opensearch.searchrelevance.rest.RestCreateQuerySetAction;
 import org.opensearch.searchrelevance.rest.RestDeleteExperimentAction;
 import org.opensearch.searchrelevance.rest.RestDeleteJudgmentAction;
@@ -219,6 +220,7 @@ public class SearchRelevancePlugin extends Plugin
         this.scheduledExperimentHistoryDao = new ScheduledExperimentHistoryDao(searchRelevanceIndicesManager);
         MachineLearningNodeClient mlClient = new MachineLearningNodeClient(client);
         this.mlAccessor = new MLAccessor(mlClient);
+        SearchRequestBuilder.initialize(xContentRegistry);
         SearchRelevanceExecutor.initialize(threadPool);
         ExperimentTaskManager experimentTaskManager = new ExperimentTaskManager(
             client,

@@ -14,6 +14,7 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ### Bug Fixes
 - Implement referential integrity validation for search configurations, experiments, and judgments ([#360](https://github.com/opensearch-project/search-relevance/pull/360))
+- Preserve the original query structure when building experiment search requests so search pipeline request processors can resolve field paths instead of failing on a wrapped query ([#490](https://github.com/opensearch-project/search-relevance/pull/490))
 
 ### Infrastructure
 - Update updateVersion task and fix BWC version properties ([#475](https://github.com/opensearch-project/search-relevance/pull/475))

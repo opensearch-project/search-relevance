@@ -87,6 +87,77 @@ public class SearchRequestBuilderTests extends OpenSearchTestCase {
         return null;
     }
 
+    public void testBuildSearchRequest_preservesQueryStructure_forSearchPipeline() throws Exception {
+        String query = "{\"query\":{\"term\":{\"embedding\":{\"value\":\"" + WILDCARD_QUERY_TEXT + "\"}}}}";
+
+        SearchRequest searchRequest = SearchRequestBuilder.buildSearchRequest(TEST_INDEX, query, TEST_QUERY_TEXT, TEST_PIPELINE, TEST_SIZE);
+        assertNotNull(searchRequest);
+        assertEquals(TEST_PIPELINE, searchRequest.pipeline());
+
+        SearchSourceBuilder sourceBuilder = searchRequest.source();
+        assertNotNull(sourceBuilder);
+
+        Map<String, Object> sourceMap = parseJsonToMap(sourceBuilder.toString());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> queryMap = (Map<String, Object>) sourceMap.get("query");
+        assertNotNull(queryMap);
+        assertFalse("Query must not be encoded inside a wrapper query", queryMap.containsKey("wrapper"));
+        assertTrue("Original term query structure must be preserved", queryMap.containsKey("term"));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> termMap = (Map<String, Object>) queryMap.get("term");
+        assertTrue("Field path query.term.embedding must be resolvable", termMap.containsKey("embedding"));
+    }
+
+    public void testBuildSearchRequest_fallsBackToWrapper_forUnregisteredQueryType() throws Exception {
+        String hybridQuery = "{\"query\":{\"hybrid\":{\"queries\":[{\"match\":{\"name\":\""
+            + WILDCARD_QUERY_TEXT
+            + "\"}},{\"match\":{\"name\":\""
+            + WILDCARD_QUERY_TEXT
+            + "\"}}]}}}";
+
+        SearchRequest searchRequest = SearchRequestBuilder.buildSearchRequest(TEST_INDEX, hybridQuery, TEST_QUERY_TEXT, null, TEST_SIZE);
+        assertNotNull(searchRequest);
+
+        SearchSourceBuilder sourceBuilder = searchRequest.source();
+        assertNotNull(sourceBuilder);
+
+        Map<String, Object> sourceMap = parseJsonToMap(sourceBuilder.toString());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> queryMap = (Map<String, Object>) sourceMap.get("query");
+        assertNotNull(queryMap);
+        assertTrue("Unregistered query type should fall back to wrapper query", queryMap.containsKey("wrapper"));
+    }
+
+    public void testBuildSearchRequest_fallsBackToWrapper_whenRegistryNotInitialized() throws Exception {
+        SearchRequestBuilder.initialize(null);
+        String query = "{\"query\":{\"match\":{\"title\":\"" + WILDCARD_QUERY_TEXT + "\"}}}";
+
+        SearchRequest searchRequest = SearchRequestBuilder.buildSearchRequest(TEST_INDEX, query, TEST_QUERY_TEXT, null, TEST_SIZE);
+        assertNotNull(searchRequest);
+
+        SearchSourceBuilder sourceBuilder = searchRequest.source();
+        assertNotNull(sourceBuilder);
+
+        Map<String, Object> sourceMap = parseJsonToMap(sourceBuilder.toString());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> queryMap = (Map<String, Object>) sourceMap.get("query");
+        assertNotNull(queryMap);
+        assertTrue("Query should fall back to wrapper when registry is not initialized", queryMap.containsKey("wrapper"));
+    }
+
+    public void testBuildSearchRequest_whenNoTopLevelQuery_thenNoQuerySet() {
+        String query = "{\"_source\":{\"includes\":[\"title\"]}}";
+
+        SearchRequest searchRequest = SearchRequestBuilder.buildSearchRequest(TEST_INDEX, query, TEST_QUERY_TEXT, null, TEST_SIZE);
+        assertNotNull(searchRequest);
+
+        SearchSourceBuilder sourceBuilder = searchRequest.source();
+        assertNotNull(sourceBuilder);
+        assertNull("No query should be set when the source has no top-level query", sourceBuilder.query());
+        assertEquals(TEST_SIZE, sourceBuilder.size());
+    }
+
     public void testBuildSearchRequestSimpleQuery() {
         String simpleQuery = "{\"query\":{\"match\":{\"title\":\"" + WILDCARD_QUERY_TEXT + "\"}}}";
 
