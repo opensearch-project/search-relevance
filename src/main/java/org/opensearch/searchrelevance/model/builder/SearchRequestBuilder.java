@@ -74,7 +74,7 @@ public class SearchRequestBuilder {
             try (XContentParser parser = newParserWithRegistry(queryBody)) {
                 return AbstractQueryBuilder.parseInnerQueryBuilder(parser);
             } catch (Exception e) {
-                log.debug("Could not parse query with NamedXContentRegistry, falling back to wrapper query: {}", e.getMessage());
+                log.warn("Could not parse query with NamedXContentRegistry, falling back to wrapper query: {}", e.getMessage());
             }
         }
         // Fall back to wrapper query to support custom/unregistered query types
