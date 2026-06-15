@@ -207,7 +207,7 @@ configurations {
 configurations.all {
     resolutionStrategy {
         force("com.google.guava:guava:33.6.0-jre") // CVE for 31.1
-        force("com.google.errorprone:error_prone_annotations:2.49.0") // Fix version conflict
+        force("com.google.errorprone:error_prone_annotations:2.50.0") // Fix version conflict
     }
     exclude group: 'org.slf4j', module: 'slf4j-log4j12'
 }
