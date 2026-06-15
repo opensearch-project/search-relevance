@@ -17,6 +17,7 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ### Infrastructure
 - Update updateVersion task and fix BWC version properties ([#475](https://github.com/opensearch-project/search-relevance/pull/475))
+- Fix BWC tests by creating the referenced index before creating the search configuration ([#497](https://github.com/opensearch-project/search-relevance/pull/497))
 
 ### Documentation
 

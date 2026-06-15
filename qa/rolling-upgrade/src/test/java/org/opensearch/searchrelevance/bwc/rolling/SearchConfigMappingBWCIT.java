@@ -33,6 +33,7 @@ public class SearchConfigMappingBWCIT extends AbstractSearchRelevanceRollingUpgr
 
     private static final String SEARCH_CONFIG_INDEX = "search-relevance-search-config";
     private static final String SEARCH_CONFIG_ENDPOINT = "/_plugins/_search_relevance/search_configurations";
+    private static final String TARGET_INDEX = "test-index";
     private static final String OLD_MAPPING_RESOURCE = "mappings/search_configuration_v0.json";
     private static final String TEST_DOC_RESOURCE = "mappings/search_configuration_test_document.json";
     private static final String TEST_DOC_ID = "test-search-config-bwc";
@@ -50,6 +51,7 @@ public class SearchConfigMappingBWCIT extends AbstractSearchRelevanceRollingUpgr
                     testUpgradedCluster();
                 } finally {
                     wipeOfTestResources(SEARCH_CONFIG_INDEX);
+                    wipeOfTestResources(TARGET_INDEX);
                 }
                 break;
             default:
@@ -115,6 +117,11 @@ public class SearchConfigMappingBWCIT extends AbstractSearchRelevanceRollingUpgr
         Map<String, Object> oldDoc = IndexMappingTestHelper.getDocument(client(), SEARCH_CONFIG_INDEX, TEST_DOC_ID, logger);
         assertNotNull("Old document should survive upgrade", oldDoc);
 
+        // Create the index referenced by the search configuration before the PUT
+        if (!IndexMappingTestHelper.checkIndexExists(client(), TARGET_INDEX, logger)) {
+            IndexMappingTestHelper.createIndexWithMapping(client(), TARGET_INDEX, "{\"properties\": {}}", logger);
+        }
+
         // Create a new search configuration via the plugin API.
         // This triggers the actual auto-migration: updateMappingSync adds description field
         // to the mapping, then the document is written with description.
@@ -123,7 +130,9 @@ public class SearchConfigMappingBWCIT extends AbstractSearchRelevanceRollingUpgr
             "{"
                 + "\"name\": \"bwc-upgraded-config\","
                 + "\"description\": \"Created after upgrade to test auto-migration\","
-                + "\"index\": \"test-index\","
+                + "\"index\": \""
+                + TARGET_INDEX
+                + "\","
                 + "\"query\": \"{\\\"match_all\\\": {}}\""
                 + "}"
         );

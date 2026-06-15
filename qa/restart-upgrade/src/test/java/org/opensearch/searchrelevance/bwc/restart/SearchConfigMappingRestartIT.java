@@ -21,6 +21,7 @@ public class SearchConfigMappingRestartIT extends AbstractSearchRelevanceRestart
 
     private static final String SEARCH_CONFIG_INDEX = "search-relevance-search-config";
     private static final String SEARCH_CONFIG_ENDPOINT = "/_plugins/_search_relevance/search_configurations";
+    private static final String TARGET_INDEX = "test-index";
     private static final String OLD_MAPPING_RESOURCE = "mappings/search_configuration_v0.json";
     private static final String TEST_DOC_RESOURCE = "mappings/search_configuration_test_document.json";
     private static final String TEST_DOC_ID = "test-search-config-bwc";
@@ -35,6 +36,7 @@ public class SearchConfigMappingRestartIT extends AbstractSearchRelevanceRestart
                     testUpgradedCluster();
                 } finally {
                     wipeOfTestResources(SEARCH_CONFIG_INDEX);
+                    wipeOfTestResources(TARGET_INDEX);
                 }
                 break;
             default:
@@ -59,13 +61,20 @@ public class SearchConfigMappingRestartIT extends AbstractSearchRelevanceRestart
         Map<String, Object> oldDoc = IndexMappingTestHelper.getDocument(client(), SEARCH_CONFIG_INDEX, TEST_DOC_ID, logger);
         assertNotNull("Old document should survive restart upgrade", oldDoc);
 
+        // Create the index referenced by the search configuration before the PUT
+        if (!IndexMappingTestHelper.checkIndexExists(client(), TARGET_INDEX, logger)) {
+            IndexMappingTestHelper.createIndexWithMapping(client(), TARGET_INDEX, "{\"properties\": {}}", logger);
+        }
+
         // Create via plugin API — triggers auto-migration
         Request request = new Request("PUT", SEARCH_CONFIG_ENDPOINT);
         request.setJsonEntity(
             "{"
                 + "\"name\": \"bwc-restart-config\","
                 + "\"description\": \"Created after restart to test auto-migration\","
-                + "\"index\": \"test-index\","
+                + "\"index\": \""
+                + TARGET_INDEX
+                + "\","
                 + "\"query\": \"{\\\"match_all\\\": {}}\""
                 + "}"
         );
