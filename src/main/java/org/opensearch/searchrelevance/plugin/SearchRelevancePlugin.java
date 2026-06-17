@@ -7,6 +7,7 @@
  */
 package org.opensearch.searchrelevance.plugin;
 
+import static org.opensearch.searchrelevance.common.PluginConstants.AB_TEST_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_CACHE_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_JOBS_INDEX;
@@ -54,6 +55,7 @@ import org.opensearch.repositories.RepositoriesService;
 import org.opensearch.rest.RestController;
 import org.opensearch.rest.RestHandler;
 import org.opensearch.script.ScriptService;
+import org.opensearch.searchrelevance.dao.ABTestDao;
 import org.opensearch.searchrelevance.dao.EvaluationResultDao;
 import org.opensearch.searchrelevance.dao.ExperimentDao;
 import org.opensearch.searchrelevance.dao.ExperimentVariantDao;
@@ -85,6 +87,7 @@ import org.opensearch.searchrelevance.rest.RestGetScheduledExperimentAction;
 import org.opensearch.searchrelevance.rest.RestGetSearchConfigurationAction;
 import org.opensearch.searchrelevance.rest.RestPatchExperimentAction;
 import org.opensearch.searchrelevance.rest.RestPostScheduledExperimentAction;
+import org.opensearch.searchrelevance.rest.RestPutABTestAction;
 import org.opensearch.searchrelevance.rest.RestPutExperimentAction;
 import org.opensearch.searchrelevance.rest.RestPutJudgmentAction;
 import org.opensearch.searchrelevance.rest.RestPutQuerySetAction;
@@ -101,6 +104,10 @@ import org.opensearch.searchrelevance.scheduler.SearchRelevanceJobRunner;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.searchrelevance.stats.events.EventStatsManager;
 import org.opensearch.searchrelevance.stats.info.InfoStatsManager;
+import org.opensearch.searchrelevance.transport.abTest.PutABTestAction;
+import org.opensearch.searchrelevance.transport.abTest.PutABTestTransportAction;
+import org.opensearch.searchrelevance.transport.abTest.UpdateABTestAction;
+import org.opensearch.searchrelevance.transport.abTest.UpdateABTestTransportAction;
 import org.opensearch.searchrelevance.transport.experiment.DeleteExperimentAction;
 import org.opensearch.searchrelevance.transport.experiment.DeleteExperimentTransportAction;
 import org.opensearch.searchrelevance.transport.experiment.GetExperimentAction;
@@ -176,6 +183,7 @@ public class SearchRelevancePlugin extends Plugin
     private JudgmentCacheDao judgmentCacheDao;
     private ScheduledJobsDao scheduledJobsDao;
     private ScheduledExperimentHistoryDao scheduledExperimentHistoryDao;
+    private ABTestDao abTestDao;
     private MLAccessor mlAccessor;
     private MetricsHelper metricsHelper;
     private SearchRelevanceSettingsAccessor settingsAccessor;
@@ -187,7 +195,8 @@ public class SearchRelevancePlugin extends Plugin
     public Collection<SystemIndexDescriptor> getSystemIndexDescriptors(Settings settings) {
         return List.of(
             new SystemIndexDescriptor(EXPERIMENT_INDEX, "System index used for experiment data"),
-            new SystemIndexDescriptor(JUDGMENT_CACHE_INDEX, "System index used for judgment cache data")
+            new SystemIndexDescriptor(JUDGMENT_CACHE_INDEX, "System index used for judgment cache data"),
+            new SystemIndexDescriptor(AB_TEST_INDEX, "System index used for AB test data")
         );
     }
 
@@ -217,6 +226,7 @@ public class SearchRelevancePlugin extends Plugin
         this.judgmentCacheDao = new JudgmentCacheDao(searchRelevanceIndicesManager);
         this.scheduledJobsDao = new ScheduledJobsDao(searchRelevanceIndicesManager);
         this.scheduledExperimentHistoryDao = new ScheduledExperimentHistoryDao(searchRelevanceIndicesManager);
+        this.abTestDao = new ABTestDao(searchRelevanceIndicesManager);
         MachineLearningNodeClient mlClient = new MachineLearningNodeClient(client);
         this.mlAccessor = new MLAccessor(mlClient);
         SearchRelevanceExecutor.initialize(threadPool);
@@ -268,6 +278,7 @@ public class SearchRelevancePlugin extends Plugin
             judgmentCacheDao,
             scheduledJobsDao,
             scheduledExperimentHistoryDao,
+            abTestDao,
             mlAccessor,
             metricsHelper,
             infoStatsManager,
@@ -310,7 +321,8 @@ public class SearchRelevancePlugin extends Plugin
             new RestSearchRelevanceStatsAction(settingsAccessor, clusterUtil),
             new RestPostScheduledExperimentAction(settingsAccessor, cronUtil),
             new RestDeleteScheduledExperimentAction(settingsAccessor),
-            new RestGetScheduledExperimentAction(settingsAccessor)
+            new RestGetScheduledExperimentAction(settingsAccessor),
+            new RestPutABTestAction(settingsAccessor)
         );
     }
 
@@ -339,7 +351,9 @@ public class SearchRelevancePlugin extends Plugin
             new ActionHandler<>(SearchRelevanceStatsAction.INSTANCE, SearchRelevanceStatsTransportAction.class),
             new ActionHandler<>(PostScheduledExperimentAction.INSTANCE, PostScheduledExperimentTransportAction.class),
             new ActionHandler<>(DeleteScheduledExperimentAction.INSTANCE, DeleteScheduledExperimentTransportAction.class),
-            new ActionHandler<>(GetScheduledExperimentAction.INSTANCE, GetScheduledExperimentTransportAction.class)
+            new ActionHandler<>(GetScheduledExperimentAction.INSTANCE, GetScheduledExperimentTransportAction.class),
+            new ActionHandler<>(PutABTestAction.INSTANCE, PutABTestTransportAction.class),
+            new ActionHandler<>(UpdateABTestAction.INSTANCE, UpdateABTestTransportAction.class)
         );
     }
 

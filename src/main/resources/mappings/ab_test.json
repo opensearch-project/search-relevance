@@ -1,0 +1,19 @@
+{
+  "_meta": {
+    "schema_version": 0
+  },
+  "properties": {
+    "test_id": { "type": "keyword" },
+    "search_configuration_a": { "type": "keyword" },
+    "search_configuration_b": { "type": "keyword" },
+    "config_a_uuid": { "type": "keyword" },
+    "config_b_uuid": { "type": "keyword" },
+    "enabled": { "type": "boolean" },
+    "version": { "type": "integer" },
+    "created_at": { "type": "date", "format": "strict_date_time" },
+    "updated_at": { "type": "date", "format": "strict_date_time" },
+    "doc_id": { "type": "keyword" },
+    "record": { "type": "object", "dynamic": true },
+    "created": { "type": "date", "format": "strict_date_time" }
+  }
+}

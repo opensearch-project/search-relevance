@@ -103,4 +103,24 @@ public class PluginConstants {
     public static final String PROCEED = "proceed";
     public static final String ABORT = "abort";
     public static final int BATCH_SIZE_FOR_DELETE_BY_QUERY = 1000;
+
+    /**
+     * AB Test constants
+     */
+    public static final String AB_TESTS_URL = SEARCH_RELEVANCE_BASE_URI + "/ab_tests";
+    public static final String AB_TEST_INDEX = ".plugins-search-relevance-ab-test";
+    public static final String AB_TEST_INDEX_MAPPING = "mappings/ab_test.json";
+
+    public static final String TEST_ID = "test_id";
+    public static final String SEARCH_CONFIGURATION_A = "search_configuration_a";
+    public static final String SEARCH_CONFIGURATION_B = "search_configuration_b";
+    public static final String CONFIG_A_UUID = "config_a_uuid";
+    public static final String CONFIG_B_UUID = "config_b_uuid";
+    public static final String ENABLED = "enabled";
+    public static final String VERSION = "version";
+    public static final String CREATED_AT = "created_at";
+    public static final String UPDATED_AT = "updated_at";
+    public static final String RECORD = "record";
+    public static final String CREATED = "created";
+    public static final String DOC_ID = "doc_id";
 }
