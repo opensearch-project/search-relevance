@@ -85,12 +85,22 @@ public class UpdateABTestTransportAction extends HandledTransportAction<UpdateAB
         }
     }
 
+    private static final int MAX_RETRIES = 3;
+
     private void performUpdate(UpdateABTestRequest request, ActionListener<IndexResponse> listener) {
+        performUpdateWithRetry(request, listener, 0);
+    }
+
+    private void performUpdateWithRetry(UpdateABTestRequest request, ActionListener<IndexResponse> listener, int attempt) {
         abTestDao.getABTest(request.getTestId(), new ActionListener<SearchResponse>() {
             @Override
             public void onResponse(SearchResponse searchResponse) {
                 try {
-                    Map<String, Object> source = searchResponse.getHits().getHits()[0].getSourceAsMap();
+                    org.opensearch.search.SearchHit hit = searchResponse.getHits().getHits()[0];
+                    long seqNo = hit.getSeqNo();
+                    long primaryTerm = hit.getPrimaryTerm();
+                    Map<String, Object> source = hit.getSourceAsMap();
+
                     ABTest currentTest = new ABTest(
                         (String) source.get(ABTest.TEST_ID),
                         (String) source.get(ABTest.SEARCH_CONFIGURATION_A),
@@ -156,10 +166,33 @@ public class UpdateABTestTransportAction extends HandledTransportAction<UpdateAB
                         now
                     );
 
-                    // Save snapshot then update live doc
+                    // Save snapshot then update live doc with optimistic concurrency
+                    ActionListener<IndexResponse> concurrencyListener = new ActionListener<IndexResponse>() {
+                        @Override
+                        public void onResponse(IndexResponse response) {
+                            listener.onResponse(response);
+                        }
+
+                        @Override
+                        public void onFailure(Exception e) {
+                            if (e instanceof org.opensearch.index.engine.VersionConflictEngineException && attempt < MAX_RETRIES) {
+                                performUpdateWithRetry(request, listener, attempt + 1);
+                            } else {
+                                listener.onFailure(e);
+                            }
+                        }
+                    };
                     abTestDao.putSnapshot(
                         snapshot,
-                        ActionListener.wrap(snapshotResponse -> abTestDao.updateABTest(updatedTest, listener), listener::onFailure)
+                        ActionListener.wrap(
+                            snapshotResponse -> abTestDao.updateABTestWithConcurrencyControl(
+                                updatedTest,
+                                seqNo,
+                                primaryTerm,
+                                concurrencyListener
+                            ),
+                            listener::onFailure
+                        )
                     );
                 } catch (Exception e) {
                     listener.onFailure(new SearchRelevanceException("Failed to update ABTest", e, RestStatus.INTERNAL_SERVER_ERROR));

@@ -61,9 +61,31 @@ public class RestPutABTestAction extends BaseRestHandler {
 
         Map<String, Object> source = request.contentParser().map();
 
-        String searchConfigurationA = (String) source.get("search_configuration_a");
-        String searchConfigurationB = (String) source.get("search_configuration_b");
-        Boolean enabled = source.containsKey("enabled") ? (Boolean) source.get("enabled") : null;
+        if (source == null || source.isEmpty()) {
+            return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.BAD_REQUEST, "Request body must not be empty"));
+        }
+
+        Object configAObj = source.get("search_configuration_a");
+        Object configBObj = source.get("search_configuration_b");
+        Object enabledObj = source.get("enabled");
+
+        if (configAObj != null && !(configAObj instanceof String)) {
+            return channel -> channel.sendResponse(
+                new BytesRestResponse(RestStatus.BAD_REQUEST, "search_configuration_a must be a string")
+            );
+        }
+        if (configBObj != null && !(configBObj instanceof String)) {
+            return channel -> channel.sendResponse(
+                new BytesRestResponse(RestStatus.BAD_REQUEST, "search_configuration_b must be a string")
+            );
+        }
+        if (enabledObj != null && !(enabledObj instanceof Boolean)) {
+            return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.BAD_REQUEST, "enabled must be a boolean"));
+        }
+
+        String searchConfigurationA = (String) configAObj;
+        String searchConfigurationB = (String) configBObj;
+        Boolean enabled = (Boolean) enabledObj;
 
         if (searchConfigurationA == null || searchConfigurationB == null) {
             return channel -> channel.sendResponse(

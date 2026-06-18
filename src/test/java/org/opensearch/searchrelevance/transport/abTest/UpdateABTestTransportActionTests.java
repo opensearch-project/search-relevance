@@ -60,6 +60,8 @@ public class UpdateABTestTransportActionTests extends OpenSearchTestCase {
     private SearchResponse createABTestSearchResponse(Map<String, Object> source) {
         SearchHit hit = new SearchHit(1, "test-id", Collections.emptyMap(), Collections.emptyMap());
         hit.sourceRef(org.opensearch.core.common.bytes.BytesReference.bytes(createXContentFromMap(source)));
+        hit.setSeqNo(1L);
+        hit.setPrimaryTerm(1L);
         SearchHits hits = new SearchHits(new SearchHit[] { hit }, new TotalHits(1, TotalHits.Relation.EQUAL_TO), 1.0f);
         SearchResponse response = mock(SearchResponse.class);
         org.mockito.Mockito.when(response.getHits()).thenReturn(hits);
@@ -115,13 +117,19 @@ public class UpdateABTestTransportActionTests extends OpenSearchTestCase {
         }).when(abTestDao).putSnapshot(any(ABTestSnapshot.class), any(ActionListener.class));
     }
 
-    private void mockUpdateABTest() {
+    private void mockUpdateABTestWithConcurrencyControl() {
         doAnswer(invocation -> {
-            ActionListener listener = invocation.getArgument(1);
+            ActionListener listener = invocation.getArgument(3);
             IndexResponse mockResponse = mock(IndexResponse.class);
             listener.onResponse(mockResponse);
             return null;
-        }).when(abTestDao).updateABTest(any(ABTest.class), any(ActionListener.class));
+        }).when(abTestDao)
+            .updateABTestWithConcurrencyControl(
+                any(ABTest.class),
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyLong(),
+                any(ActionListener.class)
+            );
     }
 
     private void mockConfigExists() {
@@ -139,7 +147,7 @@ public class UpdateABTestTransportActionTests extends OpenSearchTestCase {
     public void testDisableTest() {
         mockGetABTest(createTestDoc(true, 1));
         mockPutSnapshot();
-        mockUpdateABTest();
+        mockUpdateABTestWithConcurrencyControl();
 
         UpdateABTestRequest request = new UpdateABTestRequest("my-test", false, null, null);
         ActionListener<IndexResponse> listener = mock(ActionListener.class);
@@ -155,7 +163,12 @@ public class UpdateABTestTransportActionTests extends OpenSearchTestCase {
 
         // Verify updated test has enabled=false and version=2
         ArgumentCaptor<ABTest> abTestCaptor = ArgumentCaptor.forClass(ABTest.class);
-        verify(abTestDao).updateABTest(abTestCaptor.capture(), any(ActionListener.class));
+        verify(abTestDao).updateABTestWithConcurrencyControl(
+            abTestCaptor.capture(),
+            org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.anyLong(),
+            any(ActionListener.class)
+        );
         assertFalse(abTestCaptor.getValue().isEnabled());
         assertEquals(2, abTestCaptor.getValue().getVersion());
     }
@@ -167,7 +180,7 @@ public class UpdateABTestTransportActionTests extends OpenSearchTestCase {
     public void testChangeConfigB() {
         mockGetABTest(createTestDoc(true, 0));
         mockPutSnapshot();
-        mockUpdateABTest();
+        mockUpdateABTestWithConcurrencyControl();
         mockConfigExists();
 
         UpdateABTestRequest request = new UpdateABTestRequest("my-test", null, "sc-001", "sc-003");
@@ -176,7 +189,12 @@ public class UpdateABTestTransportActionTests extends OpenSearchTestCase {
         transportAction.doExecute(null, request, listener);
 
         ArgumentCaptor<ABTest> abTestCaptor = ArgumentCaptor.forClass(ABTest.class);
-        verify(abTestDao).updateABTest(abTestCaptor.capture(), any(ActionListener.class));
+        verify(abTestDao).updateABTestWithConcurrencyControl(
+            abTestCaptor.capture(),
+            org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.anyLong(),
+            any(ActionListener.class)
+        );
 
         ABTest updated = abTestCaptor.getValue();
         assertEquals("sc-003", updated.getSearchConfigurationB());
@@ -200,7 +218,12 @@ public class UpdateABTestTransportActionTests extends OpenSearchTestCase {
 
         // Verify no snapshot and no update
         verify(abTestDao, never()).putSnapshot(any(ABTestSnapshot.class), any(ActionListener.class));
-        verify(abTestDao, never()).updateABTest(any(), any());
+        verify(abTestDao, never()).updateABTestWithConcurrencyControl(
+            any(),
+            org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.anyLong(),
+            any()
+        );
 
         // Verify listener received null (nothing changed)
         ArgumentCaptor<IndexResponse> responseCaptor = ArgumentCaptor.forClass(IndexResponse.class);
@@ -222,7 +245,7 @@ public class UpdateABTestTransportActionTests extends OpenSearchTestCase {
 
         ArgumentCaptor<Exception> errorCaptor = ArgumentCaptor.forClass(Exception.class);
         verify(listener).onFailure(errorCaptor.capture());
-        assertTrue(errorCaptor.getValue().getMessage().contains("Failed to retrieve ABTest"));
+        assertTrue(errorCaptor.getValue().getMessage().contains("not found"));
     }
 
     /**
@@ -246,7 +269,7 @@ public class UpdateABTestTransportActionTests extends OpenSearchTestCase {
     public void testVersionIncrements() {
         mockGetABTest(createTestDoc(true, 5));
         mockPutSnapshot();
-        mockUpdateABTest();
+        mockUpdateABTestWithConcurrencyControl();
 
         UpdateABTestRequest request = new UpdateABTestRequest("my-test", false, null, null);
         ActionListener<IndexResponse> listener = mock(ActionListener.class);
@@ -268,7 +291,7 @@ public class UpdateABTestTransportActionTests extends OpenSearchTestCase {
     public void testSnapshotContainsOldState() {
         mockGetABTest(createTestDoc(true, 0));
         mockPutSnapshot();
-        mockUpdateABTest();
+        mockUpdateABTestWithConcurrencyControl();
 
         UpdateABTestRequest request = new UpdateABTestRequest("my-test", false, null, null);
         ActionListener<IndexResponse> listener = mock(ActionListener.class);
@@ -307,5 +330,45 @@ public class UpdateABTestTransportActionTests extends OpenSearchTestCase {
         ArgumentCaptor<Exception> errorCaptor = ArgumentCaptor.forClass(Exception.class);
         verify(listener).onFailure(errorCaptor.capture());
         assertTrue(errorCaptor.getValue().getMessage().contains("not found"));
+    }
+
+    /**
+     * Version conflict triggers retry and succeeds on second attempt
+     */
+    @SuppressWarnings("unchecked")
+    public void testVersionConflictRetries() {
+        mockGetABTest(createTestDoc(true, 1));
+        mockPutSnapshot();
+
+        java.util.concurrent.atomic.AtomicInteger callCount = new java.util.concurrent.atomic.AtomicInteger(0);
+        doAnswer(invocation -> {
+            ActionListener listener = invocation.getArgument(3);
+            if (callCount.getAndIncrement() == 0) {
+                listener.onFailure(
+                    new org.opensearch.index.engine.VersionConflictEngineException(
+                        new org.opensearch.core.index.shard.ShardId("test", "test", 0),
+                        "test-id",
+                        "version conflict"
+                    )
+                );
+            } else {
+                listener.onResponse(mock(IndexResponse.class));
+            }
+            return null;
+        }).when(abTestDao)
+            .updateABTestWithConcurrencyControl(
+                any(ABTest.class),
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyLong(),
+                any(ActionListener.class)
+            );
+
+        UpdateABTestRequest request = new UpdateABTestRequest("my-test", false, null, null);
+        ActionListener<IndexResponse> listener = mock(ActionListener.class);
+
+        transportAction.doExecute(null, request, listener);
+
+        verify(listener).onResponse(any(IndexResponse.class));
+        assertEquals(2, callCount.get());
     }
 }
