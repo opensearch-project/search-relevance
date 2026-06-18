@@ -13,6 +13,7 @@ import org.opensearch.action.StepListener;
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.support.ActionFilters;
+import org.opensearch.action.support.GroupedActionListener;
 import org.opensearch.action.support.HandledTransportAction;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.core.action.ActionListener;
@@ -56,47 +57,33 @@ public class PutABTestTransportAction extends HandledTransportAction<PutABTestRe
             return;
         }
 
-        // Validate config A exists
-        searchConfigurationDao.getSearchConfiguration(request.getSearchConfigurationA(), new ActionListener<SearchResponse>() {
-            @Override
-            public void onResponse(SearchResponse responseA) {
-                // Validate config B exists
-                searchConfigurationDao.getSearchConfiguration(request.getSearchConfigurationB(), new ActionListener<SearchResponse>() {
-                    @Override
-                    public void onResponse(SearchResponse responseB) {
-                        // Both configs exist → proceed with creation
-                        createABTest(request, listener);
-                    }
+        // Validate both configs exist in parallel
+        GroupedActionListener<SearchResponse> groupedListener = new GroupedActionListener<>(
+            ActionListener.wrap(responses -> createABTest(request, listener), e -> {
+                if (e instanceof org.opensearch.ResourceNotFoundException) {
+                    listener.onFailure(new SearchRelevanceException("One or more search configurations not found", RestStatus.BAD_REQUEST));
+                } else {
+                    listener.onFailure(e);
+                }
+            }),
+            2
+        );
 
-                    @Override
-                    public void onFailure(Exception e) {
-                        listener.onFailure(
-                            new SearchRelevanceException(
-                                "search_configuration_b '" + request.getSearchConfigurationB() + "' not found",
-                                RestStatus.BAD_REQUEST
-                            )
-                        );
-                    }
-                });
-            }
+        searchConfigurationDao.getSearchConfiguration(request.getSearchConfigurationA(), groupedListener);
+        searchConfigurationDao.getSearchConfiguration(request.getSearchConfigurationB(), groupedListener);
+    }
 
-            @Override
-            public void onFailure(Exception e) {
-                listener.onFailure(
-                    new SearchRelevanceException(
-                        "search_configuration_a '" + request.getSearchConfigurationA() + "' not found",
-                        RestStatus.BAD_REQUEST
-                    )
-                );
-            }
-        });
+    private String generateUuid() {
+        return UUID.randomUUID().toString();
     }
 
     private void createABTest(PutABTestRequest request, ActionListener<IndexResponse> listener) {
         String testId = request.getTestId();
-        String configAUuid = UUID.randomUUID().toString();
-        String configBUuid = UUID.randomUUID().toString();
+        String configAUuid = generateUuid();
+        String configBUuid = generateUuid();
         String timestamp = TimeUtils.getTimestamp();
+
+        boolean enabled = request.getEnabled() != null ? request.getEnabled() : true;
 
         ABTest abTest = new ABTest(
             testId,
@@ -104,7 +91,7 @@ public class PutABTestTransportAction extends HandledTransportAction<PutABTestRe
             request.getSearchConfigurationB(),
             configAUuid,
             configBUuid,
-            true,
+            enabled,
             0,
             timestamp,
             timestamp

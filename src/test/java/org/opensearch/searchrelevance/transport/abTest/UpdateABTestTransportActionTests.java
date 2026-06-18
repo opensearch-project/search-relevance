@@ -34,6 +34,7 @@ import org.opensearch.searchrelevance.dao.ABTestDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.model.ABTest;
+import org.opensearch.searchrelevance.model.ABTestSnapshot;
 import org.opensearch.test.OpenSearchTestCase;
 import org.opensearch.transport.TransportService;
 
@@ -107,11 +108,11 @@ public class UpdateABTestTransportActionTests extends OpenSearchTestCase {
 
     private void mockPutSnapshot() {
         doAnswer(invocation -> {
-            ActionListener listener = invocation.getArgument(4);
+            ActionListener listener = invocation.getArgument(1);
             IndexResponse mockResponse = mock(IndexResponse.class);
             listener.onResponse(mockResponse);
             return null;
-        }).when(abTestDao).putSnapshot(any(String.class), any(String.class), any(Map.class), any(String.class), any(ActionListener.class));
+        }).when(abTestDao).putSnapshot(any(ABTestSnapshot.class), any(ActionListener.class));
     }
 
     private void mockUpdateABTest() {
@@ -146,15 +147,11 @@ public class UpdateABTestTransportActionTests extends OpenSearchTestCase {
         transportAction.doExecute(null, request, listener);
 
         // Verify snapshot was saved
-        ArgumentCaptor<String> snapshotIdCaptor = ArgumentCaptor.forClass(String.class);
-        verify(abTestDao).putSnapshot(
-            snapshotIdCaptor.capture(),
-            any(String.class),
-            any(Map.class),
-            any(String.class),
-            any(ActionListener.class)
-        );
-        assertEquals("my-test_1", snapshotIdCaptor.getValue());
+        // Verify snapshot was saved
+        ArgumentCaptor<ABTestSnapshot> snapshotCaptor = ArgumentCaptor.forClass(ABTestSnapshot.class);
+        verify(abTestDao).putSnapshot(snapshotCaptor.capture(), any(ActionListener.class));
+        assertEquals("my-test_1", snapshotCaptor.getValue().getDocId());
+        assertEquals("my-test", snapshotCaptor.getValue().getTestId());
 
         // Verify updated test has enabled=false and version=2
         ArgumentCaptor<ABTest> abTestCaptor = ArgumentCaptor.forClass(ABTest.class);
@@ -202,7 +199,7 @@ public class UpdateABTestTransportActionTests extends OpenSearchTestCase {
         transportAction.doExecute(null, request, listener);
 
         // Verify no snapshot and no update
-        verify(abTestDao, never()).putSnapshot(any(), any(), any(), any(), any());
+        verify(abTestDao, never()).putSnapshot(any(ABTestSnapshot.class), any(ActionListener.class));
         verify(abTestDao, never()).updateABTest(any(), any());
 
         // Verify listener received null (nothing changed)
@@ -256,14 +253,12 @@ public class UpdateABTestTransportActionTests extends OpenSearchTestCase {
 
         transportAction.doExecute(null, request, listener);
 
-        ArgumentCaptor<ABTest> abTestCaptor = ArgumentCaptor.forClass(ABTest.class);
-        verify(abTestDao).updateABTest(abTestCaptor.capture(), any(ActionListener.class));
-        assertEquals(6, abTestCaptor.getValue().getVersion());
+        ArgumentCaptor<ABTestSnapshot> snapshotCaptor = ArgumentCaptor.forClass(ABTestSnapshot.class);
+        verify(abTestDao).putSnapshot(snapshotCaptor.capture(), any(ActionListener.class));
+        assertEquals("my-test_5", snapshotCaptor.getValue().getDocId());
 
-        // Snapshot ID should use old version
-        ArgumentCaptor<String> snapshotIdCaptor = ArgumentCaptor.forClass(String.class);
-        verify(abTestDao).putSnapshot(snapshotIdCaptor.capture(), any(), any(), any(), any());
-        assertEquals("my-test_5", snapshotIdCaptor.getValue());
+        assertEquals("my-test_5", snapshotCaptor.getValue().getDocId());
+
     }
 
     /**
@@ -280,10 +275,11 @@ public class UpdateABTestTransportActionTests extends OpenSearchTestCase {
 
         transportAction.doExecute(null, request, listener);
 
-        ArgumentCaptor<Map> recordCaptor = ArgumentCaptor.forClass(Map.class);
-        verify(abTestDao).putSnapshot(any(), any(), recordCaptor.capture(), any(), any());
+        ArgumentCaptor<ABTestSnapshot> snapCaptor = ArgumentCaptor.forClass(ABTestSnapshot.class);
+        verify(abTestDao).putSnapshot(snapCaptor.capture(), any(ActionListener.class));
 
-        Map<String, Object> snapshot = recordCaptor.getValue();
+        Map<String, Object> snapshot = snapCaptor.getValue().getRecord();
+
         assertEquals("sc-001", snapshot.get(ABTest.SEARCH_CONFIGURATION_A));
         assertEquals("sc-002", snapshot.get(ABTest.SEARCH_CONFIGURATION_B));
         assertEquals("alias-a", snapshot.get(ABTest.CONFIG_A_UUID));

@@ -10,7 +10,6 @@ package org.opensearch.searchrelevance.dao;
 import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.AB_TEST;
 
 import java.io.IOException;
-import java.util.Map;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -24,6 +23,7 @@ import org.opensearch.core.xcontent.ToXContent;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager;
 import org.opensearch.searchrelevance.model.ABTest;
+import org.opensearch.searchrelevance.model.ABTestSnapshot;
 
 public class ABTestDao {
     private static final Logger LOGGER = LogManager.getLogger(ABTestDao.class);
@@ -73,21 +73,18 @@ public class ABTestDao {
         }
     }
 
-    public void putSnapshot(
-        final String snapshotId,
-        final String testId,
-        final Map<String, Object> record,
-        final String created,
-        final ActionListener listener
-    ) {
+    public void putSnapshot(final ABTestSnapshot snapshot, final ActionListener listener) {
+        if (snapshot == null) {
+            listener.onFailure(new SearchRelevanceException("ABTestSnapshot cannot be null", RestStatus.BAD_REQUEST));
+            return;
+        }
         try {
-            org.opensearch.core.xcontent.XContentBuilder builder = XContentFactory.jsonBuilder().startObject();
-            builder.field("doc_id", snapshotId);
-            builder.field("test_id", testId);
-            builder.field("record", record);
-            builder.field("created", created);
-            builder.endObject();
-            searchRelevanceIndicesManager.updateDoc(snapshotId, builder, AB_TEST, listener);
+            searchRelevanceIndicesManager.updateDoc(
+                snapshot.getDocId(),
+                snapshot.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS),
+                AB_TEST,
+                listener
+            );
         } catch (IOException e) {
             throw new SearchRelevanceException("Failed to store snapshot", e, RestStatus.INTERNAL_SERVER_ERROR);
         }
@@ -101,18 +98,15 @@ public class ABTestDao {
         searchRelevanceIndicesManager.getDocByDocId(testId, AB_TEST, listener);
     }
 
-    private ABTest convertToABTest(SearchResponse response) {
-        Map<String, Object> source = response.getHits().getHits()[0].getSourceAsMap();
-        return new ABTest(
-            (String) source.get(ABTest.TEST_ID),
-            (String) source.get(ABTest.SEARCH_CONFIGURATION_A),
-            (String) source.get(ABTest.SEARCH_CONFIGURATION_B),
-            (String) source.get(ABTest.CONFIG_A_UUID),
-            (String) source.get(ABTest.CONFIG_B_UUID),
-            (Boolean) source.get(ABTest.ENABLED),
-            (Integer) source.get(ABTest.VERSION),
-            (String) source.get(ABTest.CREATED_AT),
-            (String) source.get(ABTest.UPDATED_AT)
-        );
+    public void deleteABTest(String testId, ActionListener<org.opensearch.action.delete.DeleteResponse> listener) {
+        if (testId == null || testId.isEmpty()) {
+            listener.onFailure(new SearchRelevanceException("testId must not be null or empty", RestStatus.BAD_REQUEST));
+            return;
+        }
+        searchRelevanceIndicesManager.deleteDocByDocId(testId, AB_TEST, listener);
+    }
+
+    public void deleteSnapshotsByTestId(String testId, ActionListener<org.opensearch.index.reindex.BulkByScrollResponse> listener) {
+        searchRelevanceIndicesManager.deleteByQuery(testId, "test_id", AB_TEST, listener);
     }
 }

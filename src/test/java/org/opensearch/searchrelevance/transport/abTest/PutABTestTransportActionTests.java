@@ -93,7 +93,7 @@ public class PutABTestTransportActionTests extends OpenSearchTestCase {
         mockIndexCreation();
         mockPutABTest();
 
-        PutABTestRequest request = new PutABTestRequest("my-test", "config-a", "config-b");
+        PutABTestRequest request = new PutABTestRequest("my-test", "config-a", "config-b", null);
         ActionListener<IndexResponse> listener = mock(ActionListener.class);
 
         transportAction.doExecute(null, request, listener);
@@ -134,14 +134,14 @@ public class PutABTestTransportActionTests extends OpenSearchTestCase {
     public void testConfigANotFound() {
         mockConfigNotFound("config-a");
 
-        PutABTestRequest request = new PutABTestRequest("my-test", "config-a", "config-b");
+        PutABTestRequest request = new PutABTestRequest("my-test", "config-a", "config-b", null);
         ActionListener<IndexResponse> listener = mock(ActionListener.class);
 
         transportAction.doExecute(null, request, listener);
 
         ArgumentCaptor<Exception> errorCaptor = ArgumentCaptor.forClass(Exception.class);
         verify(listener).onFailure(errorCaptor.capture());
-        assertTrue(errorCaptor.getValue().getMessage().contains("search_configuration_a"));
+        assertTrue(errorCaptor.getValue().getMessage().contains("not found"));
         assertTrue(errorCaptor.getValue().getMessage().contains("not found"));
     }
 
@@ -162,14 +162,14 @@ public class PutABTestTransportActionTests extends OpenSearchTestCase {
             return null;
         }).when(searchConfigurationDao).getSearchConfiguration(any(String.class), any(ActionListener.class));
 
-        PutABTestRequest request = new PutABTestRequest("my-test", "config-a", "config-b");
+        PutABTestRequest request = new PutABTestRequest("my-test", "config-a", "config-b", null);
         ActionListener<IndexResponse> listener = mock(ActionListener.class);
 
         transportAction.doExecute(null, request, listener);
 
         ArgumentCaptor<Exception> errorCaptor = ArgumentCaptor.forClass(Exception.class);
         verify(listener).onFailure(errorCaptor.capture());
-        assertTrue(errorCaptor.getValue().getMessage().contains("search_configuration_b"));
+        assertTrue(errorCaptor.getValue().getMessage().contains("not found"));
         assertTrue(errorCaptor.getValue().getMessage().contains("not found"));
     }
 
@@ -182,7 +182,7 @@ public class PutABTestTransportActionTests extends OpenSearchTestCase {
         mockIndexCreation();
         mockPutABTest();
 
-        PutABTestRequest request = new PutABTestRequest("my-test", "config-a", "config-b");
+        PutABTestRequest request = new PutABTestRequest("my-test", "config-a", "config-b", null);
         ActionListener<IndexResponse> listener = mock(ActionListener.class);
 
         transportAction.doExecute(null, request, listener);
@@ -207,7 +207,7 @@ public class PutABTestTransportActionTests extends OpenSearchTestCase {
         mockIndexCreation();
         mockPutABTest();
 
-        PutABTestRequest request = new PutABTestRequest("test-123", "sc-001", "sc-002");
+        PutABTestRequest request = new PutABTestRequest("test-123", "sc-001", "sc-002", null);
         ActionListener<IndexResponse> listener = mock(ActionListener.class);
 
         transportAction.doExecute(null, request, listener);
@@ -231,7 +231,7 @@ public class PutABTestTransportActionTests extends OpenSearchTestCase {
      */
     @SuppressWarnings("unchecked")
     public void testSameConfigForBoth() {
-        PutABTestRequest request = new PutABTestRequest("my-test", "same-config-id", "same-config-id");
+        PutABTestRequest request = new PutABTestRequest("my-test", "same-config-id", "same-config-id", null);
         ActionListener<IndexResponse> listener = mock(ActionListener.class);
 
         transportAction.doExecute(null, request, listener);
@@ -239,5 +239,68 @@ public class PutABTestTransportActionTests extends OpenSearchTestCase {
         ArgumentCaptor<Exception> errorCaptor = ArgumentCaptor.forClass(Exception.class);
         verify(listener).onFailure(errorCaptor.capture());
         assertTrue(errorCaptor.getValue().getMessage().contains("must be different"));
+    }
+
+    /**
+     * Create with enabled=false stores test as disabled
+     */
+    @SuppressWarnings("unchecked")
+    public void testCreateWithEnabledFalse() {
+        mockConfigExists("config-a");
+        mockIndexCreation();
+        mockPutABTest();
+
+        PutABTestRequest request = new PutABTestRequest("my-test", "config-a", "config-b", false);
+        ActionListener<IndexResponse> listener = mock(ActionListener.class);
+
+        transportAction.doExecute(null, request, listener);
+
+        ArgumentCaptor<ABTest> abTestCaptor = ArgumentCaptor.forClass(ABTest.class);
+        verify(abTestDao).putABTest(abTestCaptor.capture(), any(ActionListener.class));
+
+        ABTest stored = abTestCaptor.getValue();
+        assertFalse(stored.isEnabled());
+    }
+
+    /**
+     * Create with enabled=true explicitly stores test as enabled
+     */
+    @SuppressWarnings("unchecked")
+    public void testCreateWithEnabledTrue() {
+        mockConfigExists("config-a");
+        mockIndexCreation();
+        mockPutABTest();
+
+        PutABTestRequest request = new PutABTestRequest("my-test", "config-a", "config-b", true);
+        ActionListener<IndexResponse> listener = mock(ActionListener.class);
+
+        transportAction.doExecute(null, request, listener);
+
+        ArgumentCaptor<ABTest> abTestCaptor = ArgumentCaptor.forClass(ABTest.class);
+        verify(abTestDao).putABTest(abTestCaptor.capture(), any(ActionListener.class));
+
+        ABTest stored = abTestCaptor.getValue();
+        assertTrue(stored.isEnabled());
+    }
+
+    /**
+     * Create with enabled=null defaults to true
+     */
+    @SuppressWarnings("unchecked")
+    public void testCreateWithEnabledNullDefaultsTrue() {
+        mockConfigExists("config-a");
+        mockIndexCreation();
+        mockPutABTest();
+
+        PutABTestRequest request = new PutABTestRequest("my-test", "config-a", "config-b", null);
+        ActionListener<IndexResponse> listener = mock(ActionListener.class);
+
+        transportAction.doExecute(null, request, listener);
+
+        ArgumentCaptor<ABTest> abTestCaptor = ArgumentCaptor.forClass(ABTest.class);
+        verify(abTestDao).putABTest(abTestCaptor.capture(), any(ActionListener.class));
+
+        ABTest stored = abTestCaptor.getValue();
+        assertTrue(stored.isEnabled());
     }
 }

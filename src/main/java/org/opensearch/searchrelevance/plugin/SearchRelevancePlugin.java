@@ -75,6 +75,7 @@ import org.opensearch.searchrelevance.metrics.MetricsHelper;
 import org.opensearch.searchrelevance.ml.MLAccessor;
 import org.opensearch.searchrelevance.model.ScheduledJob;
 import org.opensearch.searchrelevance.rest.RestCreateQuerySetAction;
+import org.opensearch.searchrelevance.rest.RestDeleteABTestAction;
 import org.opensearch.searchrelevance.rest.RestDeleteExperimentAction;
 import org.opensearch.searchrelevance.rest.RestDeleteJudgmentAction;
 import org.opensearch.searchrelevance.rest.RestDeleteQuerySetAction;
@@ -97,6 +98,7 @@ import org.opensearch.searchrelevance.rest.RestSearchJudgmentAction;
 import org.opensearch.searchrelevance.rest.RestSearchQuerySetAction;
 import org.opensearch.searchrelevance.rest.RestSearchRelevanceStatsAction;
 import org.opensearch.searchrelevance.rest.RestSearchSearchConfigurationAction;
+import org.opensearch.searchrelevance.rest.RestUpdateABTestAction;
 import org.opensearch.searchrelevance.rest.RestValidateExperimentAction;
 import org.opensearch.searchrelevance.scheduler.ScheduledExperimentRunnerManager;
 import org.opensearch.searchrelevance.scheduler.SearchRelevanceJobParameters;
@@ -104,6 +106,8 @@ import org.opensearch.searchrelevance.scheduler.SearchRelevanceJobRunner;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.searchrelevance.stats.events.EventStatsManager;
 import org.opensearch.searchrelevance.stats.info.InfoStatsManager;
+import org.opensearch.searchrelevance.transport.abTest.DeleteABTestAction;
+import org.opensearch.searchrelevance.transport.abTest.DeleteABTestTransportAction;
 import org.opensearch.searchrelevance.transport.abTest.PutABTestAction;
 import org.opensearch.searchrelevance.transport.abTest.PutABTestTransportAction;
 import org.opensearch.searchrelevance.transport.abTest.UpdateABTestAction;
@@ -322,7 +326,9 @@ public class SearchRelevancePlugin extends Plugin
             new RestPostScheduledExperimentAction(settingsAccessor, cronUtil),
             new RestDeleteScheduledExperimentAction(settingsAccessor),
             new RestGetScheduledExperimentAction(settingsAccessor),
-            new RestPutABTestAction(settingsAccessor)
+            new RestPutABTestAction(settingsAccessor),
+            new RestUpdateABTestAction(settingsAccessor),
+            new RestDeleteABTestAction(settingsAccessor)
         );
     }
 
@@ -353,7 +359,8 @@ public class SearchRelevancePlugin extends Plugin
             new ActionHandler<>(DeleteScheduledExperimentAction.INSTANCE, DeleteScheduledExperimentTransportAction.class),
             new ActionHandler<>(GetScheduledExperimentAction.INSTANCE, GetScheduledExperimentTransportAction.class),
             new ActionHandler<>(PutABTestAction.INSTANCE, PutABTestTransportAction.class),
-            new ActionHandler<>(UpdateABTestAction.INSTANCE, UpdateABTestTransportAction.class)
+            new ActionHandler<>(UpdateABTestAction.INSTANCE, UpdateABTestTransportAction.class),
+            new ActionHandler<>(DeleteABTestAction.INSTANCE, DeleteABTestTransportAction.class)
         );
     }
 

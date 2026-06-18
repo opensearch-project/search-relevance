@@ -9,7 +9,7 @@ package org.opensearch.searchrelevance.rest;
 
 import static java.util.Collections.singletonList;
 import static org.opensearch.rest.RestRequest.Method.PUT;
-import static org.opensearch.searchrelevance.common.PluginConstants.AB_TESTS_URL;
+import static org.opensearch.searchrelevance.common.PluginConstants.AB_TEST_UPDATE_URL;
 
 import java.io.IOException;
 import java.util.List;
@@ -26,26 +26,26 @@ import org.opensearch.rest.BaseRestHandler;
 import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
-import org.opensearch.searchrelevance.transport.abTest.PutABTestAction;
-import org.opensearch.searchrelevance.transport.abTest.PutABTestRequest;
+import org.opensearch.searchrelevance.transport.abTest.UpdateABTestAction;
+import org.opensearch.searchrelevance.transport.abTest.UpdateABTestRequest;
 import org.opensearch.transport.client.node.NodeClient;
 
 import lombok.AllArgsConstructor;
 
 @AllArgsConstructor
-public class RestPutABTestAction extends BaseRestHandler {
-    private static final Logger LOGGER = LogManager.getLogger(RestPutABTestAction.class);
-    private static final String PUT_AB_TEST_ACTION = "put_ab_test_action";
+public class RestUpdateABTestAction extends BaseRestHandler {
+    private static final Logger LOGGER = LogManager.getLogger(RestUpdateABTestAction.class);
+    private static final String UPDATE_AB_TEST_ACTION = "update_ab_test_action";
     private SearchRelevanceSettingsAccessor settingsAccessor;
 
     @Override
     public String getName() {
-        return PUT_AB_TEST_ACTION;
+        return UPDATE_AB_TEST_ACTION;
     }
 
     @Override
     public List<Route> routes() {
-        return singletonList(new Route(PUT, AB_TESTS_URL + "/{id}"));
+        return singletonList(new Route(PUT, AB_TEST_UPDATE_URL));
     }
 
     @Override
@@ -65,21 +65,13 @@ public class RestPutABTestAction extends BaseRestHandler {
         String searchConfigurationB = (String) source.get("search_configuration_b");
         Boolean enabled = source.containsKey("enabled") ? (Boolean) source.get("enabled") : null;
 
-        if (searchConfigurationA == null || searchConfigurationB == null) {
-            return channel -> channel.sendResponse(
-                new BytesRestResponse(RestStatus.BAD_REQUEST, "Both search_configuration_a and search_configuration_b are required")
-            );
+        if (searchConfigurationA == null && searchConfigurationB == null && enabled == null) {
+            return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.BAD_REQUEST, "Request body cannot be empty"));
         }
 
-        if (searchConfigurationA.equals(searchConfigurationB)) {
-            return channel -> channel.sendResponse(
-                new BytesRestResponse(RestStatus.BAD_REQUEST, "search_configuration_a and search_configuration_b must be different")
-            );
-        }
+        UpdateABTestRequest updateRequest = new UpdateABTestRequest(testId, enabled, searchConfigurationA, searchConfigurationB);
 
-        PutABTestRequest putRequest = new PutABTestRequest(testId, searchConfigurationA, searchConfigurationB, enabled);
-
-        return channel -> client.execute(PutABTestAction.INSTANCE, putRequest, new ActionListener<IndexResponse>() {
+        return channel -> client.execute(UpdateABTestAction.INSTANCE, updateRequest, new ActionListener<IndexResponse>() {
             @Override
             public void onResponse(IndexResponse response) {
                 try {

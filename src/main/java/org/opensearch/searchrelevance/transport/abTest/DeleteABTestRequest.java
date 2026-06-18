@@ -17,34 +17,22 @@ import org.opensearch.core.common.io.stream.StreamOutput;
 import lombok.Getter;
 
 @Getter
-public class PutABTestRequest extends ActionRequest {
+public class DeleteABTestRequest extends ActionRequest {
     private final String testId;
-    private final String searchConfigurationA;
-    private final String searchConfigurationB;
-    private final Boolean enabled;
 
-    public PutABTestRequest(String testId, String searchConfigurationA, String searchConfigurationB, Boolean enabled) {
+    public DeleteABTestRequest(String testId) {
         this.testId = testId;
-        this.searchConfigurationA = searchConfigurationA;
-        this.searchConfigurationB = searchConfigurationB;
-        this.enabled = enabled;
     }
 
-    public PutABTestRequest(StreamInput in) throws IOException {
+    public DeleteABTestRequest(StreamInput in) throws IOException {
         super(in);
         this.testId = in.readString();
-        this.searchConfigurationA = in.readString();
-        this.searchConfigurationB = in.readString();
-        this.enabled = in.readOptionalBoolean();
     }
 
     @Override
     public void writeTo(StreamOutput out) throws IOException {
         super.writeTo(out);
         out.writeString(testId);
-        out.writeString(searchConfigurationA);
-        out.writeString(searchConfigurationB);
-        out.writeOptionalBoolean(enabled);
     }
 
     @Override

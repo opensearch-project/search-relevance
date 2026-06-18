@@ -13,6 +13,7 @@ import java.util.Map;
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.support.ActionFilters;
+import org.opensearch.action.support.GroupedActionListener;
 import org.opensearch.action.support.HandledTransportAction;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.core.action.ActionListener;
@@ -21,6 +22,7 @@ import org.opensearch.searchrelevance.dao.ABTestDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.model.ABTest;
+import org.opensearch.searchrelevance.model.ABTestSnapshot;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
@@ -59,78 +61,27 @@ public class UpdateABTestTransportAction extends HandledTransportAction<UpdateAB
     }
 
     private void validateAndUpdate(UpdateABTestRequest request, ActionListener<IndexResponse> listener) {
-        ActionListener<SearchResponse> afterValidation = ActionListener.wrap(
-            response -> performUpdate(request, listener),
-            listener::onFailure
+        java.util.List<String> configsToValidate = new java.util.ArrayList<>();
+        if (request.getSearchConfigurationA() != null) {
+            configsToValidate.add(request.getSearchConfigurationA());
+        }
+        if (request.getSearchConfigurationB() != null) {
+            configsToValidate.add(request.getSearchConfigurationB());
+        }
+
+        GroupedActionListener<SearchResponse> groupedListener = new GroupedActionListener<>(
+            ActionListener.wrap(responses -> performUpdate(request, listener), e -> {
+                if (e instanceof org.opensearch.ResourceNotFoundException) {
+                    listener.onFailure(new SearchRelevanceException("One or more search configurations not found", RestStatus.BAD_REQUEST));
+                } else {
+                    listener.onFailure(e);
+                }
+            }),
+            configsToValidate.size()
         );
 
-        if (request.getSearchConfigurationA() != null && request.getSearchConfigurationB() != null) {
-            // Both configs changing — validate A then B
-            searchConfigurationDao.getSearchConfiguration(request.getSearchConfigurationA(), new ActionListener<SearchResponse>() {
-                @Override
-                public void onResponse(SearchResponse responseA) {
-                    searchConfigurationDao.getSearchConfiguration(request.getSearchConfigurationB(), new ActionListener<SearchResponse>() {
-                        @Override
-                        public void onResponse(SearchResponse responseB) {
-                            performUpdate(request, listener);
-                        }
-
-                        @Override
-                        public void onFailure(Exception e) {
-                            listener.onFailure(
-                                new SearchRelevanceException(
-                                    "search_configuration_b '" + request.getSearchConfigurationB() + "' not found",
-                                    RestStatus.BAD_REQUEST
-                                )
-                            );
-                        }
-                    });
-                }
-
-                @Override
-                public void onFailure(Exception e) {
-                    listener.onFailure(
-                        new SearchRelevanceException(
-                            "search_configuration_a '" + request.getSearchConfigurationA() + "' not found",
-                            RestStatus.BAD_REQUEST
-                        )
-                    );
-                }
-            });
-        } else if (request.getSearchConfigurationA() != null) {
-            searchConfigurationDao.getSearchConfiguration(request.getSearchConfigurationA(), new ActionListener<SearchResponse>() {
-                @Override
-                public void onResponse(SearchResponse response) {
-                    performUpdate(request, listener);
-                }
-
-                @Override
-                public void onFailure(Exception e) {
-                    listener.onFailure(
-                        new SearchRelevanceException(
-                            "search_configuration_a '" + request.getSearchConfigurationA() + "' not found",
-                            RestStatus.BAD_REQUEST
-                        )
-                    );
-                }
-            });
-        } else {
-            searchConfigurationDao.getSearchConfiguration(request.getSearchConfigurationB(), new ActionListener<SearchResponse>() {
-                @Override
-                public void onResponse(SearchResponse response) {
-                    performUpdate(request, listener);
-                }
-
-                @Override
-                public void onFailure(Exception e) {
-                    listener.onFailure(
-                        new SearchRelevanceException(
-                            "search_configuration_b '" + request.getSearchConfigurationB() + "' not found",
-                            RestStatus.BAD_REQUEST
-                        )
-                    );
-                }
-            });
+        for (String configId : configsToValidate) {
+            searchConfigurationDao.getSearchConfiguration(configId, groupedListener);
         }
     }
 
@@ -161,6 +112,17 @@ public class UpdateABTestTransportAction extends HandledTransportAction<UpdateAB
                         ? request.getSearchConfigurationB()
                         : currentTest.getSearchConfigurationB();
 
+                    // Validate: resulting configs must be different
+                    if (newConfigA.equals(newConfigB)) {
+                        listener.onFailure(
+                            new SearchRelevanceException(
+                                "search_configuration_a and search_configuration_b must be different",
+                                RestStatus.BAD_REQUEST
+                            )
+                        );
+                        return;
+                    }
+
                     // Skip if nothing changed
                     if (newEnabled == currentTest.isEnabled()
                         && newConfigA.equals(currentTest.getSearchConfigurationA())
@@ -170,6 +132,9 @@ public class UpdateABTestTransportAction extends HandledTransportAction<UpdateAB
                     }
 
                     // Save snapshot of current state before updating
+                    String snapshotId = currentTest.getTestId() + "_" + currentTest.getVersion();
+                    String now = TimeUtils.getTimestamp();
+
                     Map<String, Object> record = new HashMap<>();
                     record.put(ABTest.SEARCH_CONFIGURATION_A, currentTest.getSearchConfigurationA());
                     record.put(ABTest.SEARCH_CONFIGURATION_B, currentTest.getSearchConfigurationB());
@@ -177,8 +142,7 @@ public class UpdateABTestTransportAction extends HandledTransportAction<UpdateAB
                     record.put(ABTest.CONFIG_B_UUID, currentTest.getConfigBUuid());
                     record.put(ABTest.ENABLED, currentTest.isEnabled());
 
-                    String snapshotId = currentTest.getTestId() + "_" + currentTest.getVersion();
-                    String now = TimeUtils.getTimestamp();
+                    ABTestSnapshot snapshot = new ABTestSnapshot(snapshotId, currentTest.getTestId(), record, now);
 
                     ABTest updatedTest = new ABTest(
                         currentTest.getTestId(),
@@ -194,10 +158,7 @@ public class UpdateABTestTransportAction extends HandledTransportAction<UpdateAB
 
                     // Save snapshot then update live doc
                     abTestDao.putSnapshot(
-                        snapshotId,
-                        currentTest.getTestId(),
-                        record,
-                        now,
+                        snapshot,
                         ActionListener.wrap(snapshotResponse -> abTestDao.updateABTest(updatedTest, listener), listener::onFailure)
                     );
                 } catch (Exception e) {
@@ -207,7 +168,11 @@ public class UpdateABTestTransportAction extends HandledTransportAction<UpdateAB
 
             @Override
             public void onFailure(Exception e) {
-                listener.onFailure(new SearchRelevanceException("Failed to retrieve ABTest", e, RestStatus.INTERNAL_SERVER_ERROR));
+                if (e instanceof org.opensearch.ResourceNotFoundException) {
+                    listener.onFailure(new SearchRelevanceException("AB test not found", RestStatus.NOT_FOUND));
+                } else {
+                    listener.onFailure(new SearchRelevanceException("Failed to retrieve ABTest", e, RestStatus.INTERNAL_SERVER_ERROR));
+                }
             }
         });
     }

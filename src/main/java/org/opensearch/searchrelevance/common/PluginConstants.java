@@ -108,6 +108,7 @@ public class PluginConstants {
      * AB Test constants
      */
     public static final String AB_TESTS_URL = SEARCH_RELEVANCE_BASE_URI + "/ab_tests";
+    public static final String AB_TEST_UPDATE_URL = AB_TESTS_URL + "/{id}/_update";
     public static final String AB_TEST_INDEX = ".plugins-search-relevance-ab-test";
     public static final String AB_TEST_INDEX_MAPPING = "mappings/ab_test.json";
 
