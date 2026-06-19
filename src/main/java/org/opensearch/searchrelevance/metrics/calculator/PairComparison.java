@@ -55,24 +55,35 @@ public class PairComparison {
             throw new SearchRelevanceException("p must be between 0 and 1", RestStatus.INTERNAL_SERVER_ERROR);
         }
 
-        int maxDepth = Math.max(listA.size(), listB.size());
+        int sizeA = listA.size();
+        int sizeB = listB.size();
+        int maxDepth = Math.max(sizeA, sizeB);
         double sum = 0;
         double weight = 1;
-        double sumWeight = 0;
 
-        // Calculate overlap at each depth
+        // Maintain prefix sets incrementally so overlap is updated in O(1) per depth
+        // instead of rebuilding the sets from scratch at each depth.
+        Set<String> setA = new HashSet<>();
+        Set<String> setB = new HashSet<>();
+        int overlapCount = 0;
+
         for (int d = 0; d < maxDepth; d++) {
-            Set<String> setA = new HashSet<>(listA.subList(0, Math.min(d + 1, listA.size())));
-            Set<String> setB = new HashSet<>(listB.subList(0, Math.min(d + 1, listB.size())));
+            if (d < sizeA) {
+                String itemA = listA.get(d);
+                if (setA.add(itemA) && setB.contains(itemA)) {
+                    overlapCount++;
+                }
+            }
 
-            // Calculate overlap at current depth
-            Set<String> intersection = new HashSet<>(setA);
-            intersection.retainAll(setB);
-            double overlap = intersection.size() / (double) Math.max(setA.size(), setB.size());
+            if (d < sizeB) {
+                String itemB = listB.get(d);
+                if (setB.add(itemB) && setA.contains(itemB)) {
+                    overlapCount++;
+                }
+            }
 
-            // Add weighted overlap to sum
+            double overlap = overlapCount / (double) Math.max(setA.size(), setB.size());
             sum += weight * overlap;
-            sumWeight += weight;
             weight *= p;
         }
 
