@@ -85,43 +85,31 @@ public class PairComparison {
      * Frequency Weighted similarity
      */
     public static double calculateFrequencyWeightedSimilarity(List<String> listA, List<String> listB) {
-        Map<String, Double> weights = calculateCombinedWeights(listA, listB);
-
-        // Calculate intersection weight
-        double intersectionWeight = 0.0;
-        for (String item : new HashSet<>(listA)) {
-            if (listB.contains(item)) {
-                intersectionWeight += weights.get(item);
-            }
-        }
-
-        // Calculate union weight
-        double unionWeight = weights.values().stream().mapToDouble(Double::doubleValue).sum();
-
-        double frequencyWeightedSimilarity = unionWeight == 0 ? 0 : intersectionWeight / unionWeight;
-        return Math.round(frequencyWeightedSimilarity * 100.0) / 100.0;
-    }
-
-    private static Map<String, Double> calculateCombinedWeights(List<String> listA, List<String> listB) {
         FrequencyStats statsA = calculateFrequencyWeights(listA);
         FrequencyStats statsB = calculateFrequencyWeights(listB);
 
-        // Combine unique items from both lists
-        Map<String, Double> combinedWeights = new HashMap<>();
-
-        // Process all items from both lists
-        Set<String> allItems = new HashSet<>();
-        allItems.addAll(statsA.weights.keySet());
+        // Combine unique items from both lists and compute intersection / union weights
+        // in a single pass. Using HashSet membership avoids the O(|A| × |B|) scan
+        // caused by calling listB.contains(item) for every unique item in A.
+        Set<String> allItems = new HashSet<>(statsA.weights.keySet());
         allItems.addAll(statsB.weights.keySet());
+
+        Set<String> setB = new HashSet<>(statsB.weights.keySet());
+        double intersectionWeight = 0.0;
+        double unionWeight = 0.0;
 
         for (String item : allItems) {
             double weightA = statsA.weights.getOrDefault(item, 0.0);
             double weightB = statsB.weights.getOrDefault(item, 0.0);
-            // Average of weights from both lists
-            combinedWeights.put(item, (weightA + weightB) / 2.0);
+            double combinedWeight = (weightA + weightB) / 2.0;
+            unionWeight += combinedWeight;
+            if (statsA.weights.containsKey(item) && setB.contains(item)) {
+                intersectionWeight += combinedWeight;
+            }
         }
 
-        return combinedWeights;
+        double frequencyWeightedSimilarity = unionWeight == 0 ? 0 : intersectionWeight / unionWeight;
+        return Math.round(frequencyWeightedSimilarity * 100.0) / 100.0;
     }
 
     private static FrequencyStats calculateFrequencyWeights(List<String> list) {
