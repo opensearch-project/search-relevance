@@ -23,6 +23,8 @@ import lombok.Getter;
 @AllArgsConstructor
 @Getter
 public class ABTestSnapshot implements ToXContentObject {
+    public static final String DOC_TYPE = "doc_type";
+    public static final String DOC_TYPE_VALUE = "snapshot";
     public static final String DOC_ID = "doc_id";
     public static final String TEST_ID = "test_id";
     public static final String RECORD = "record";
@@ -36,6 +38,7 @@ public class ABTestSnapshot implements ToXContentObject {
     @Override
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
         XContentBuilder xContentBuilder = builder.startObject();
+        xContentBuilder.field(DOC_TYPE, DOC_TYPE_VALUE);
         xContentBuilder.field(DOC_ID, this.docId);
         xContentBuilder.field(TEST_ID, this.testId);
         xContentBuilder.field(RECORD, this.record);

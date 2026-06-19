@@ -149,7 +149,7 @@ public class ABTestDao {
         deleteRequest.setQuery(
             org.opensearch.index.query.QueryBuilders.boolQuery()
                 .must(org.opensearch.index.query.QueryBuilders.termQuery("test_id", testId))
-                .must(org.opensearch.index.query.QueryBuilders.existsQuery("doc_id"))
+                .must(org.opensearch.index.query.QueryBuilders.termQuery("doc_type", "snapshot"))
         );
         StashedThreadContext.run(
             client,

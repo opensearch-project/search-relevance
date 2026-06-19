@@ -22,6 +22,8 @@ import lombok.Getter;
 @AllArgsConstructor
 @Getter
 public class ABTest implements ToXContentObject {
+    public static final String DOC_TYPE = "doc_type";
+    public static final String DOC_TYPE_VALUE = "ab_test";
     public static final String TEST_ID = "test_id";
     public static final String SEARCH_CONFIGURATION_A = "search_configuration_a";
     public static final String SEARCH_CONFIGURATION_B = "search_configuration_b";
@@ -45,6 +47,7 @@ public class ABTest implements ToXContentObject {
     @Override
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
         XContentBuilder xContentBuilder = builder.startObject();
+        xContentBuilder.field(DOC_TYPE, DOC_TYPE_VALUE);
         xContentBuilder.field(TEST_ID, this.testId);
         xContentBuilder.field(SEARCH_CONFIGURATION_A, this.searchConfigurationA);
         xContentBuilder.field(SEARCH_CONFIGURATION_B, this.searchConfigurationB);
