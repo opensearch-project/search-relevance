@@ -97,7 +97,7 @@ public class UpdateABTestTransportActionTests extends OpenSearchTestCase {
             ActionListener<SearchResponse> listener = invocation.getArgument(1);
             listener.onResponse(createABTestSearchResponse(source));
             return null;
-        }).when(abTestDao).getABTest(any(String.class), any(ActionListener.class));
+        }).when(abTestDao).getABTestWithSeqNo(any(String.class), any(ActionListener.class));
     }
 
     private void mockGetABTestNotFound() {
@@ -105,7 +105,7 @@ public class UpdateABTestTransportActionTests extends OpenSearchTestCase {
             ActionListener<SearchResponse> listener = invocation.getArgument(1);
             listener.onFailure(new ResourceNotFoundException("Document not found: my-test", RestStatus.NOT_FOUND));
             return null;
-        }).when(abTestDao).getABTest(any(String.class), any(ActionListener.class));
+        }).when(abTestDao).getABTestWithSeqNo(any(String.class), any(ActionListener.class));
     }
 
     private void mockPutSnapshot() {

@@ -60,23 +60,6 @@ public class ABTestDao {
         }
     }
 
-    public void updateABTest(final ABTest abTest, final ActionListener listener) {
-        if (abTest == null) {
-            listener.onFailure(new SearchRelevanceException("ABTest cannot be null", RestStatus.BAD_REQUEST));
-            return;
-        }
-        try {
-            searchRelevanceIndicesManager.updateDoc(
-                abTest.getTestId(),
-                abTest.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS),
-                AB_TEST,
-                listener
-            );
-        } catch (IOException e) {
-            throw new SearchRelevanceException("Failed to update ABTest", e, RestStatus.INTERNAL_SERVER_ERROR);
-        }
-    }
-
     @SuppressWarnings("unchecked")
     public void updateABTestWithConcurrencyControl(
         final ABTest abTest,
@@ -132,6 +115,33 @@ public class ABTestDao {
             return;
         }
         searchRelevanceIndicesManager.getDocByDocId(testId, AB_TEST, listener);
+    }
+
+    public void getABTestWithSeqNo(String testId, ActionListener<SearchResponse> listener) {
+        if (testId == null || testId.isEmpty()) {
+            listener.onFailure(new SearchRelevanceException("testId must not be null or empty", RestStatus.BAD_REQUEST));
+            return;
+        }
+        org.opensearch.action.search.SearchRequest searchRequest = new org.opensearch.action.search.SearchRequest(AB_TEST.getIndexName());
+        org.opensearch.search.builder.SearchSourceBuilder sourceBuilder = new org.opensearch.search.builder.SearchSourceBuilder().query(
+            org.opensearch.index.query.QueryBuilders.termQuery("_id", testId)
+        ).size(1).seqNoAndPrimaryTerm(true);
+        searchRequest.source(sourceBuilder);
+        StashedThreadContext.run(client, () -> client.search(searchRequest, new ActionListener<SearchResponse>() {
+            @Override
+            public void onResponse(SearchResponse response) {
+                if (response.getHits().getTotalHits().value() == 0) {
+                    listener.onFailure(new org.opensearch.ResourceNotFoundException("Document not found: " + testId, RestStatus.NOT_FOUND));
+                } else {
+                    listener.onResponse(response);
+                }
+            }
+
+            @Override
+            public void onFailure(Exception e) {
+                listener.onFailure(e);
+            }
+        }));
     }
 
     public void deleteABTest(String testId, ActionListener<org.opensearch.action.delete.DeleteResponse> listener) {

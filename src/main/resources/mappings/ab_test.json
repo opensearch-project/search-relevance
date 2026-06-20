@@ -3,6 +3,7 @@
     "schema_version": 0
   },
   "properties": {
+    "doc_type": { "type": "keyword" },
     "test_id": { "type": "keyword" },
     "search_configuration_a": { "type": "keyword" },
     "search_configuration_b": { "type": "keyword" },

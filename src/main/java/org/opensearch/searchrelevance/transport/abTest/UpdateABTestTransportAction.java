@@ -92,7 +92,7 @@ public class UpdateABTestTransportAction extends HandledTransportAction<UpdateAB
     }
 
     private void performUpdateWithRetry(UpdateABTestRequest request, ActionListener<IndexResponse> listener, int attempt) {
-        abTestDao.getABTest(request.getTestId(), new ActionListener<SearchResponse>() {
+        abTestDao.getABTestWithSeqNo(request.getTestId(), new ActionListener<SearchResponse>() {
             @Override
             public void onResponse(SearchResponse searchResponse) {
                 try {
