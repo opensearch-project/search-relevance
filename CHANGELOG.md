@@ -4,23 +4,23 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ## [Unreleased]
 
-### Breaking Changes
-
 ### Features
+- Add experiment execution time input signatures (SHA-256 fingerprints of query set, judgments, and search configurations) and `GET /_plugins/_search_relevance/experiments/{id}/validate` for VALID / DRIFTED / UNAVAILABLE drift checks ([#456](https://github.com/opensearch-project/search-relevance/pull/456))
+- Backend support for Mustache templates in search queries [#342](https://github.com/opensearch-project/search-relevance/pull/342)
 - adds version-based index mapping update support to the Search Relevance plugin [#344](https://github.com/opensearch-project/search-relevance/pull/344)
-* LLM Judgement Customized Prompt Template Implementation  [#264](https://github.com/opensearch-project/search-relevance/pull/264)
-* Backend support for Mustache templates in search queries [#342](https://github.com/opensearch-project/search-relevance/pull/342)
+- LLM Judgement Customized Prompt Template Implementation  [#264](https://github.com/opensearch-project/search-relevance/pull/264)
 
 ### Enhancements
-- Add BWC and Integration Tests for Index Mapping Update with Schema Version [#349](https://github.com/opensearch-project/search-relevance/pull/349)
-
-- Added better version of ESCI demo dataset that has images and overlaps with our ESCI judgment data.  More compelling demonstrations.  ([#354](https://github.com/opensearch-project/search-relevance/pull/354))
+- Optimize Rank-Biased Overlap (RBO) calculation from O(n²) to O(n) by maintaining prefix sets incrementally ([#499](https://github.com/opensearch-project/search-relevance/issues/499))
+- Optimize Frequency Weighted similarity calculation by replacing the O(n²) `listB.contains` scan with HashSet membership and single-pass union/intersection accumulation ([#502](https://github.com/opensearch-project/search-relevance/pull/502))
 
 ### Bug Fixes
-* Added `status` filter support to judgment listing API to prevent incomplete judgment groups from appearing in create experiment workflow ([#304](https://github.com/opensearch-project/search-relevance/pull/304))
-* Fix yellow cluster status on single-node clusters ([#329](https://github.com/opensearch-project/search-relevance/issues/329))
+- Implement referential integrity validation for search configurations, experiments, and judgments ([#360](https://github.com/opensearch-project/search-relevance/pull/360))
+- Preserve the original query structure when building experiment search requests so search pipeline request processors can resolve field paths instead of failing on a wrapped query ([#490](https://github.com/opensearch-project/search-relevance/pull/490))
 
 ### Infrastructure
+- Update updateVersion task and fix BWC version properties ([#475](https://github.com/opensearch-project/search-relevance/pull/475))
+- Fix BWC tests by creating the referenced index before creating the search configuration ([#497](https://github.com/opensearch-project/search-relevance/pull/497))
 
 ### Documentation
 

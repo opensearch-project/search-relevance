@@ -1,6 +1,6 @@
 {
   "_meta": {
-    "schema_version": 0
+    "schema_version": 1
   },
   "properties": {
     "id": { "type": "keyword" },
@@ -8,6 +8,7 @@
     "name": { "type": "keyword" },
     "index": { "type": "keyword" },
     "queryBody": { "type": "text" },
-    "searchPipeline": { "type": "keyword" }
+    "searchPipeline": { "type": "keyword" },
+    "description": {"type": "text"}
   }
 }

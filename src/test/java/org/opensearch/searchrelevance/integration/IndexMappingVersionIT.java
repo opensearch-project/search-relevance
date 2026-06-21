@@ -35,6 +35,12 @@ public class IndexMappingVersionIT extends BaseSearchRelevanceIT {
     public void testSystemIndicesHaveSchemaVersion() throws Exception {
         // Create a search configuration to trigger system index creation
         String userIndexName = "test-schema-version-index";
+
+        // Ensure the index exists, required for referential integrity validation
+        String indexConfig = "{ \"settings\": { \"number_of_shards\": 1, \"number_of_replicas\": 0 }, "
+            + "\"mappings\": { \"properties\": { \"text\": { \"type\": \"text\" } } } }";
+        createIndexWithConfiguration(userIndexName, indexConfig);
+
         String template = readTemplate("searchconfig/CreateSearchConfigurationSimpleMatch.json");
         String body = template.replace("{{index_name}}", userIndexName);
 

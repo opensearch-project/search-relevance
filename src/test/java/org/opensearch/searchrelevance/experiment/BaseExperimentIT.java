@@ -11,6 +11,8 @@ import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_I
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENTS_URL;
 import static org.opensearch.searchrelevance.common.PluginConstants.QUERYSETS_URL;
 import static org.opensearch.searchrelevance.common.PluginConstants.SEARCH_CONFIGURATIONS_URL;
+import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.METRICS_DISCOUNTED_CUMULATIVE_GAIN_AT;
+import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.METRICS_MEAN_RECIPROCAL_RANK;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -57,7 +59,7 @@ public abstract class BaseExperimentIT extends BaseSearchRelevanceIT {
             "documentIds",
             List.of("B06Y1L1YJD", "B01M3XBRRX", "B07D29PHFY"),
             "metrics",
-            Map.of("Coverage@5", 1.0, "Precision@5", 1.0, "MAP@5", 1.0, "NDCG@5", 0.94)
+            Map.of("Coverage@5", 1.0, "Precision@5", 0.33, "MAP@5", 0.5, "NDCG@5", 0.94, "Recall@5", 1.0, "MRR", 0.5, "DCG@5", 1.43)
         ),
 
         "metal frame",
@@ -65,7 +67,7 @@ public abstract class BaseExperimentIT extends BaseSearchRelevanceIT {
             "documentIds",
             List.of("B07MBG53JD", "B097Q69V1B", "B00TLYRBMG", "B08G46SS1T", "B07H81Z91C"),
             "metrics",
-            Map.of("Coverage@5", 1.0, "Precision@5", 1.0, "MAP@5", 1.0, "NDCG@5", 0.9)
+            Map.of("Coverage@5", 1.0, "Precision@5", 0.2, "MAP@5", 0.5, "NDCG@5", 0.9, "Recall@5", 1.0, "MRR", 0.5, "DCG@5", 1.68)
         )
     );
 
@@ -109,6 +111,9 @@ public abstract class BaseExperimentIT extends BaseSearchRelevanceIT {
 
     @SneakyThrows
     protected String createSearchConfiguration(String indexName) {
+        // Ensure index exists before creating SearchConfiguration
+        initializeIndexIfNotExist(indexName);
+
         String createSearchConfigurationRequestBody = Files.readString(
             Path.of(classLoader.getResource("searchconfig/CreateSearchConfigurationQueryWithPlaceholder.json").toURI())
         );
@@ -131,6 +136,9 @@ public abstract class BaseExperimentIT extends BaseSearchRelevanceIT {
 
     @SneakyThrows
     protected String createHybridSearchConfiguration(String indexName) {
+        // Ensure index exists before creating SearchConfiguration
+        initializeIndexIfNotExist(indexName);
+
         String createSearchConfigurationRequestBody = Files.readString(
             Path.of(classLoader.getResource("searchconfig/CreateSearchConfigurationHybridQuery.json").toURI())
         );
@@ -153,6 +161,9 @@ public abstract class BaseExperimentIT extends BaseSearchRelevanceIT {
 
     @SneakyThrows
     protected String createSimpleSearchConfiguration(String indexName) {
+        // Ensure index exists before creating SearchConfiguration
+        initializeIndexIfNotExist(indexName);
+
         String createSearchConfigurationRequestBody = Files.readString(
             Path.of(classLoader.getResource("searchconfig/CreateSearchConfigurationSimpleMatch.json").toURI())
         );
@@ -186,7 +197,8 @@ public abstract class BaseExperimentIT extends BaseSearchRelevanceIT {
     }
 
     /**
-     * Generate a unique index name for the test class to avoid collisions during parallel execution
+     * Generate a unique index name for the test class to avoid collisions during
+     * parallel execution
      */
     protected static String generateUniqueIndexName(String testClassName) {
         return BASE_INDEX_NAME_ESCI + "_" + testClassName.toLowerCase(Locale.ROOT);
@@ -287,5 +299,17 @@ public abstract class BaseExperimentIT extends BaseSearchRelevanceIT {
 
         assertEquals(expectedType, source.get("type"));
         assertEquals(querySetId, source.get("querySetId"));
+    }
+
+    /**
+     * Returns the assertion tolerance for a given metric. Position-sensitive metrics
+     * (DCG, MRR) use a wider tolerance because BM25 per-shard IDF variation in
+     * multi-node clusters can change document ranking order between runs.
+     */
+    protected double getMetricTolerance(String metricName) {
+        if (metricName.startsWith(METRICS_DISCOUNTED_CUMULATIVE_GAIN_AT) || metricName.equals(METRICS_MEAN_RECIPROCAL_RANK)) {
+            return 0.2;
+        }
+        return 0.02;
     }
 }

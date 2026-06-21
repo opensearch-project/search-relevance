@@ -27,7 +27,14 @@ public class QuerySourceUtilTests extends OpenSearchTestCase {
         // Given
         ExperimentVariant experimentHybridSearchDao = ExperimentVariant.builder()
             .parameters(
-                Map.of(EXPERIMENT_OPTION_NORMALIZATION_TECHNIQUE, "min_max", EXPERIMENT_OPTION_COMBINATION_TECHNIQUE, "arithmetic_mean")
+                Map.of(
+                    EXPERIMENT_OPTION_NORMALIZATION_TECHNIQUE,
+                    "min_max",
+                    EXPERIMENT_OPTION_COMBINATION_TECHNIQUE,
+                    "arithmetic_mean",
+                    ExperimentOptionsForHybridSearch.EXPERIMENT_OPTION_WEIGHTS_FOR_COMBINATION,
+                    new float[] { 0.5f, 0.5f }
+                )
             )
             .build();
 
@@ -55,6 +62,43 @@ public class QuerySourceUtilTests extends OpenSearchTestCase {
     public void testCreateDefinitionOfTemporarySearchPipeline_NullInput_ThrowsNullPointerException() {
         // When & Then
         assertThrows(NullPointerException.class, () -> QuerySourceUtil.createDefinitionOfTemporarySearchPipeline(null));
+    }
+
+    public void testCreateDefinitionOfTemporarySearchPipeline_RrfInput_ReturnsScoreRankerProcessor() {
+        // Given
+        ExperimentVariant rrfVariant = ExperimentVariant.builder()
+            .parameters(
+                Map.of(
+                    EXPERIMENT_OPTION_NORMALIZATION_TECHNIQUE,
+                    "min_max",
+                    EXPERIMENT_OPTION_COMBINATION_TECHNIQUE,
+                    "rrf",
+                    ExperimentOptionsForHybridSearch.EXPERIMENT_OPTION_RANK_CONSTANT,
+                    60
+                )
+            )
+            .build();
+
+        // When
+        Map<String, Object> result = QuerySourceUtil.createDefinitionOfTemporarySearchPipeline(rrfVariant);
+
+        // Then
+        assertNotNull(result);
+        assertTrue(result.containsKey("phase_results_processors"));
+
+        List<?> processors = (List<?>) result.get("phase_results_processors");
+        assertEquals(1, processors.size());
+
+        Map<?, ?> processorObject = (Map<?, ?>) processors.get(0);
+        assertTrue(processorObject.containsKey("score-ranker-processor"));
+        assertFalse(processorObject.containsKey("normalization-processor"));
+
+        Map<?, ?> scoreRanker = (Map<?, ?>) processorObject.get("score-ranker-processor");
+        Map<?, ?> combination = (Map<?, ?>) scoreRanker.get("combination");
+
+        assertEquals("rrf", combination.get("technique"));
+        // rank_constant is a top-level field of combination, not inside combination.parameters
+        assertEquals(60, combination.get("rank_constant"));
     }
 
     @SneakyThrows

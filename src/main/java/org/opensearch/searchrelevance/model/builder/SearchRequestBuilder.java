@@ -20,6 +20,8 @@ import org.opensearch.core.xcontent.DeprecationHandler;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.core.xcontent.XContentParser;
+import org.opensearch.index.query.AbstractQueryBuilder;
+import org.opensearch.index.query.QueryBuilder;
 import org.opensearch.index.query.QueryBuilders;
 import org.opensearch.script.Script;
 import org.opensearch.script.ScriptService;
@@ -92,6 +94,27 @@ public class SearchRequestBuilder {
     }
 
     /**
+     * Parses the top-level "query" into a QueryBuilder using the cluster's NamedXContentRegistry so
+     * that the original query structure is preserved when the request is serialized. Falls back to a
+     * wrapper query for query types that cannot be parsed (e.g. custom/unregistered query types).
+     */
+    private static QueryBuilder buildQueryBuilder(Object queryObject) throws IOException {
+        XContentBuilder builder = JsonXContent.contentBuilder();
+        builder.value(queryObject);
+        String queryBody = builder.toString();
+
+        if (NAMED_XCONTENT_REGISTRY != null) {
+            try (XContentParser parser = newParserWithRegistry(queryBody)) {
+                return AbstractQueryBuilder.parseInnerQueryBuilder(parser);
+            } catch (Exception e) {
+                log.warn("Could not parse query with NamedXContentRegistry, falling back to wrapper query: {}", e.getMessage());
+            }
+        }
+        // Fall back to wrapper query to support custom/unregistered query types
+        return QueryBuilders.wrapperQuery(queryBody);
+    }
+
+    /**
      * Builds a search request with the given parameters.
      * @param index - target index to be searched against
      * @param query - DSL query that includes queryBody and optional extra fields, like pipeline, aggregation, exclude ...
@@ -122,7 +145,7 @@ public class SearchRequestBuilder {
             );
             Map<String, Object> fullQueryMap = tempParser.map();
 
-            // Handle 'query' separately using WrapperQuery to support custom/unregistered query types
+            // Handle 'query' separately so it can be parsed into a QueryBuilder
             Object queryObject = fullQueryMap.remove(QUERY_FIELD_NAME);
 
             // Parse everything except query using SearchSourceBuilder.fromXContent with real registry
@@ -137,12 +160,9 @@ public class SearchRequestBuilder {
 
             SearchSourceBuilder sourceBuilder = SearchSourceBuilder.fromXContent(parser);
 
-            // Handle query separately using WrapperQuery
+            // Set the query, preserving its original structure so search pipeline processors can resolve field paths
             if (queryObject != null) {
-                builder = JsonXContent.contentBuilder();
-                builder.value(queryObject);
-                String queryBody = builder.toString();
-                sourceBuilder.query(QueryBuilders.wrapperQuery(queryBody));
+                sourceBuilder.query(buildQueryBuilder(queryObject));
             }
 
             // Precheck if query contains a different size value
@@ -203,7 +223,7 @@ public class SearchRequestBuilder {
             // Validate hybrid query
             validateHybridQuery(fullQueryMap);
 
-            // Handle 'query' separately using WrapperQuery to support custom/unregistered query types
+            // Handle 'query' separately so it can be parsed into a QueryBuilder
             Object queryObject = fullQueryMap.remove(QUERY_FIELD_NAME);
 
             // Parse everything except query using SearchSourceBuilder.fromXContent with real registry
@@ -218,12 +238,9 @@ public class SearchRequestBuilder {
 
             SearchSourceBuilder sourceBuilder = SearchSourceBuilder.fromXContent(parser);
 
-            // Handle query separately using WrapperQuery
+            // Set the query, preserving its original structure so search pipeline processors can resolve field paths
             if (queryObject != null) {
-                builder = JsonXContent.contentBuilder();
-                builder.value(queryObject);
-                String queryBody = builder.toString();
-                sourceBuilder.query(QueryBuilders.wrapperQuery(queryBody));
+                sourceBuilder.query(buildQueryBuilder(queryObject));
             }
 
             // validate that query does not have internal temporary pipeline definition

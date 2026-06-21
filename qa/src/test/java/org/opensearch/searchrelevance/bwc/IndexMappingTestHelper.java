@@ -302,6 +302,41 @@ public final class IndexMappingTestHelper {
     }
 
     /**
+     * Polls {@code GET /_cluster/health} until {@code number_of_nodes >= minNodes} and status is not {@code red}.
+     * Used in restart-upgrade BWC after a full version bump, before REST assertions.
+     */
+    public static void waitForClusterNodesReady(RestClient client, int minNodes, int maxWaitSeconds, Logger logger) throws Exception {
+        final long deadline = System.currentTimeMillis() + maxWaitSeconds * 1000L;
+        while (System.currentTimeMillis() < deadline) {
+            try {
+                Request request = new Request("GET", "/_cluster/health");
+                setPermissiveWarningsHandler(request);
+                Response response = client.performRequest(request);
+                if (response.getStatusLine().getStatusCode() != 200) {
+                    logger.debug("Cluster health HTTP {}", response.getStatusLine().getStatusCode());
+                } else {
+                    Map<String, Object> map = parseResponse(response);
+                    String status = map.get("status") != null ? map.get("status").toString() : "";
+                    int nodes = 0;
+                    Object nn = map.get("number_of_nodes");
+                    if (nn instanceof Number) {
+                        nodes = ((Number) nn).intValue();
+                    }
+                    if (!"red".equals(status) && nodes >= minNodes) {
+                        logger.info("Cluster ready for BWC: status={}, number_of_nodes={}", status, nodes);
+                        return;
+                    }
+                    logger.debug("Cluster not ready yet: status={}, number_of_nodes={} (need {})", status, nodes, minNodes);
+                }
+            } catch (Exception e) {
+                logger.debug("Cluster health poll failed: {}", e.getMessage());
+            }
+            Thread.sleep(3000);
+        }
+        throw new AssertionError("Timeout after " + maxWaitSeconds + "s waiting for >= " + minNodes + " nodes and non-red cluster health");
+    }
+
+    /**
      * Waits for mapping to be updated with expected fields.
      */
     public static void waitForMappingUpdate(RestClient client, String indexName, String[] expectedFields, int timeoutSeconds, Logger logger)

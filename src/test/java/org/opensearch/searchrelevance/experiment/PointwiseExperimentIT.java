@@ -164,7 +164,7 @@ public class PointwiseExperimentIT extends BaseExperimentIT {
             assertNotNull(getEvaluationResultJson);
 
             Map<String, Object> evaluationSource = (Map<String, Object>) getEvaluationResultJson.get("_source");
-            // randomly pick 2 items and check them field by field, do sanity check for others
+            // randomly pick 2 items and check them field by field, do sanity check for otherss
             String actualQueryTerm = evaluationSource.get("searchText").toString();
 
             // Verify experiment fields are present for pointwise evaluation experiments
@@ -181,16 +181,17 @@ public class PointwiseExperimentIT extends BaseExperimentIT {
                 assertListsHaveSameElements((List<String>) expectedResult.get("documentIds"), actualDocumentIds);
                 List<Map> actualMetrics = (List<Map>) evaluationSource.get("metrics");
                 Map<String, Double> expectedMetrics = (Map<String, Double>) expectedResult.get("metrics");
-                assertEquals(expectedMetrics.size(), actualMetrics.size());
+                assertEquals("Should have exactly 7 metrics", expectedMetrics.size(), actualMetrics.size());
                 for (Map<String, Object> actualMetric : actualMetrics) {
                     String metricName = actualMetric.get("metric").toString();
                     Double actualValue = Double.parseDouble(actualMetric.get("value").toString());
-                    assertEquals(expectedMetrics.get(metricName), actualValue, 0.02);
+                    assertEquals(expectedMetrics.get(metricName), actualValue, getMetricTolerance(metricName));
                 }
             } else {
                 assertTrue(EXPECTED_QUERY_TERMS.contains(actualQueryTerm));
                 assertEquals(judgmentId, ((List<String>) evaluationSource.get("judgmentIds")).get(0));
-                assertEquals(4, ((List<String>) evaluationSource.get("metrics")).size());
+                int metricsSize = ((List<String>) evaluationSource.get("metrics")).size();
+                assertEquals("Should have exactly 7 metrics", 7, metricsSize);
                 assertEquals(searchConfigurationId, evaluationSource.get("searchConfigurationId"));
                 assertFalse(((List<String>) evaluationSource.get("documentIds")).isEmpty());
             }

@@ -30,7 +30,6 @@ import lombok.SneakyThrows;
 /**
  * Integration tests for search evaluation experiments (POINTWISE_EVALUATION type).
  * This test class verifies the functionality of running pointwise evaluation experiments
- * that evaluate search configurations against query sets and judgments.
  */
 @ThreadLeakScope(ThreadLeakScope.Scope.NONE)
 @OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.SUITE)
@@ -57,6 +56,44 @@ public class SearchEvaluationExperimentIT extends BaseExperimentIT {
 
         Map<String, String> queryTextToEvaluationId = extractQueryTextToEvaluationId(experimentSource);
         assertEvaluationResults(queryTextToEvaluationId, judgmentId, searchConfigurationId);
+
+        deleteIndex(INDEX_NAME_ESCI);
+    }
+
+    @SneakyThrows
+    public void testSearchExperiment_whenExperimentExists_thenSuccessful() {
+        // Arrange
+        initializeIndexIfNotExist(INDEX_NAME_ESCI);
+
+        String searchConfigurationId = createSimpleSearchConfiguration(INDEX_NAME_ESCI);
+        String querySetId = createQuerySet();
+        String judgmentId = createJudgment();
+        String experimentId = createSearchEvaluationExperiment(querySetId, searchConfigurationId, judgmentId);
+
+        // Wait for experiment to complete
+        pollExperimentUntilCompleted(experimentId);
+
+        // Act - Search for the experiment using _search endpoint
+        String searchBody = "{" + "\"query\": {" + "\"term\": {" + "\"id\": \"" + experimentId + "\"" + "}" + "}" + "}";
+        Response searchResponse = makeRequest(
+            client(),
+            RestRequest.Method.POST.name(),
+            EXPERIMENTS_URI + "/_search",
+            null,
+            toHttpEntity(searchBody),
+            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
+        );
+
+        // Assert
+        Map<String, Object> searchResultJson = entityAsMap(searchResponse);
+        Map<String, Object> hits = (Map<String, Object>) searchResultJson.get("hits");
+        List<Map<String, Object>> hitList = (List<Map<String, Object>>) hits.get("hits");
+        assertFalse(hitList.isEmpty());
+        Map<String, Object> firstHit = hitList.get(0);
+        assertEquals(experimentId, firstHit.get("_id"));
+        Map<String, Object> firstHitSource = (Map<String, Object>) firstHit.get("_source");
+        assertEquals("POINTWISE_EVALUATION", firstHitSource.get("type"));
+        assertEquals(querySetId, firstHitSource.get("querySetId"));
 
         deleteIndex(INDEX_NAME_ESCI);
     }
@@ -173,7 +210,7 @@ public class SearchEvaluationExperimentIT extends BaseExperimentIT {
             List<Map> metrics = (List<Map>) evaluationSource.get("metrics");
             assertNotNull("Metrics should exist", metrics);
             assertFalse("Metrics should not be empty", metrics.isEmpty());
-            assertEquals("Should have 4 metrics", 4, metrics.size());
+            assertEquals("Should have exactly 7 metrics", 7, metrics.size());
 
             // Verify we have document IDs
             List<String> documentIds = (List<String>) evaluationSource.get("documentIds");
@@ -195,7 +232,7 @@ public class SearchEvaluationExperimentIT extends BaseExperimentIT {
                             "Metric " + metricName + " should match expected value",
                             expectedMetrics.get(metricName),
                             actualValue,
-                            0.02
+                            getMetricTolerance(metricName)
                         );
                     }
                 }

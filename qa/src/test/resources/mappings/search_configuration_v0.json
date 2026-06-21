@@ -1,0 +1,13 @@
+{
+  "_meta": {
+    "schema_version": 0
+  },
+  "properties": {
+    "id": { "type": "keyword" },
+    "timestamp": { "type": "date", "format": "strict_date_time" },
+    "name": { "type": "keyword" },
+    "index": { "type": "keyword" },
+    "queryBody": { "type": "text" },
+    "searchPipeline": { "type": "keyword" }
+  }
+}

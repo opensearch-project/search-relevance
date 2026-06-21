@@ -9,77 +9,81 @@ package org.opensearch.searchrelevance.experiment;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
 import lombok.Builder;
 import lombok.Data;
 
-@Data
-@Builder
 /**
- * Experiment options for hybrid search
+ * Experiment options for hybrid search.
+ * <p>
+ * Holds the technique-name constants and assembles the list of
+ * {@link HybridSearchConfig} instances representing the curated default sweep.
+ * Valid combinations are spelled out explicitly here so the relationships
+ * between parameters are visible at the definition site.
  */
 public class ExperimentOptionsForHybridSearch implements ExperimentOptions {
-    private Set<String> normalizationTechniques;
-    private Set<String> combinationTechniques;
-    private WeightsRange weightsRange;
 
     public static final String EXPERIMENT_OPTION_NORMALIZATION_TECHNIQUE = "normalization";
     public static final String EXPERIMENT_OPTION_COMBINATION_TECHNIQUE = "combination";
     public static final String EXPERIMENT_OPTION_WEIGHTS_FOR_COMBINATION = "weights";
+    public static final String EXPERIMENT_OPTION_RANK_CONSTANT = "rank_constant";
+
+    public static final String NORMALIZATION_MIN_MAX = "min_max";
+    public static final String NORMALIZATION_L2 = "l2";
+    public static final String NORMALIZATION_Z_SCORE = "z_score";
+
+    public static final String COMBINATION_ARITHMETIC_MEAN = "arithmetic_mean";
+    public static final String COMBINATION_GEOMETRIC_MEAN = "geometric_mean";
+    public static final String COMBINATION_HARMONIC_MEAN = "harmonic_mean";
+    public static final String COMBINATION_RRF = "rrf";
 
     @Data
     @Builder
-    static class WeightsRange {
+    public static class WeightsRange {
         private float rangeMin;
         private float rangeMax;
         private float increment;
     }
 
-    public List<ExperimentVariantHybridSearchDTO> getParameterCombinations(boolean includeWeights) {
-        List<ExperimentVariantHybridSearchDTO> allPossibleParameterCombinations = new ArrayList<>();
-        for (String normalizationTechnique : normalizationTechniques) {
-            for (String combinationTechnique : combinationTechniques) {
-                if (includeWeights) {
-                    // use integer-based approach to avoid floating-point precision issues
-                    float min = weightsRange.getRangeMin();
-                    float max = weightsRange.getRangeMax();
-                    float increment = weightsRange.getIncrement();
+    /**
+     * Expand the curated default sweep into concrete variant DTOs.
+     * <p>
+     * The structure makes the strategy-to-parameter relationships explicit:
+     * RRF contributes one variant per rank_constant (normalization-independent);
+     * the legacy normalization-processor contributes one variant per
+     * (normalization, combination, weight) for {@code min_max} / {@code l2}
+     * paired with the three mean combinations; {@code z_score} is paired only
+     * with arithmetic mean since it produces negative values that break the
+     * geometric and harmonic means.
+     */
+    public List<ExperimentVariantHybridSearchDTO> getParameterCombinations() {
+        WeightsRange weightsRange = WeightsRange.builder().rangeMin(0.0f).rangeMax(1.0f).increment(0.1f).build();
 
-                    // calculate number of steps to ensure we include all values including the max
-                    int steps = Math.round((max - min) / increment) + 1;
-
-                    for (int i = 0; i < steps; i++) {
-                        // calculate weight, ensuring the last step is exactly the max value
-                        float queryWeightForCombination;
-                        if (i == steps - 1) {
-                            queryWeightForCombination = max;
-                        } else {
-                            queryWeightForCombination = min + (i * increment);
-                        }
-
-                        float w1 = Math.round(queryWeightForCombination * 10) / 10.0f;
-                        float w2 = Math.round((1.0f - w1) * 10) / 10.0f;
-
-                        allPossibleParameterCombinations.add(
-                            ExperimentVariantHybridSearchDTO.builder()
-                                .normalizationTechnique(normalizationTechnique)
-                                .combinationTechnique(combinationTechnique)
-                                .queryWeightsForCombination(new float[] { w1, w2 })
-                                .build()
-                        );
-                    }
-                } else {
-                    allPossibleParameterCombinations.add(
-                        ExperimentVariantHybridSearchDTO.builder()
-                            .normalizationTechnique(normalizationTechnique)
-                            .combinationTechnique(combinationTechnique)
-                            .queryWeightsForCombination(new float[] { 0.5f, 0.5f })
-                            .build()
-                    );
-                }
+        List<HybridSearchConfig> configs = new ArrayList<>();
+        configs.add(RRFHybridSearchConfig.builder().rankConstants(List.of(1, 5, 10, 20, 60)).build());
+        for (String normalization : List.of(NORMALIZATION_MIN_MAX, NORMALIZATION_L2)) {
+            for (String combination : List.of(COMBINATION_ARITHMETIC_MEAN, COMBINATION_GEOMETRIC_MEAN, COMBINATION_HARMONIC_MEAN)) {
+                configs.add(
+                    ScoreBasedHybridSearchConfig.builder()
+                        .normalizationTechnique(normalization)
+                        .combinationTechnique(combination)
+                        .weightsRange(weightsRange)
+                        .build()
+                );
             }
         }
-        return allPossibleParameterCombinations;
+        configs.add(
+            ScoreBasedHybridSearchConfig.builder()
+                .normalizationTechnique(NORMALIZATION_Z_SCORE)
+                .combinationTechnique(COMBINATION_ARITHMETIC_MEAN)
+                .weightsRange(weightsRange)
+                .build()
+        );
+
+        List<ExperimentVariantHybridSearchDTO> allVariants = new ArrayList<>();
+        for (HybridSearchConfig config : configs) {
+            allVariants.addAll(config.getAllVariants());
+        }
+        return allVariants;
     }
 }

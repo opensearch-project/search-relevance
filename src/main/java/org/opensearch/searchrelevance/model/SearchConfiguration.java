@@ -12,12 +12,16 @@ import java.io.IOException;
 import org.opensearch.core.xcontent.ToXContentObject;
 import org.opensearch.core.xcontent.XContentBuilder;
 
+import lombok.AllArgsConstructor;
+
 /**
  * SearchConfiguration is a system index object that represents all search related params.
  */
+@AllArgsConstructor
 public class SearchConfiguration implements ToXContentObject {
     public static final String ID = "id";
     public static final String NAME = "name";
+    public static final String DESCRIPTION = "description";
     public static final String TIME_STAMP = "timestamp";
     public static final String INDEX = "index";
 
@@ -33,15 +37,7 @@ public class SearchConfiguration implements ToXContentObject {
     private final String index;
     private final String query;
     private final String searchPipeline;
-
-    public SearchConfiguration(String id, String name, String timestamp, String index, String query, String searchPipeline) {
-        this.id = id;
-        this.name = name;
-        this.timestamp = timestamp;
-        this.index = index;
-        this.query = query;
-        this.searchPipeline = searchPipeline;
-    }
+    private final String description;
 
     @Override
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
@@ -52,6 +48,7 @@ public class SearchConfiguration implements ToXContentObject {
         xContentBuilder.field(INDEX, this.index.trim());
         xContentBuilder.field(QUERY, this.query.trim());
         xContentBuilder.field(SEARCH_PIPELINE, this.searchPipeline == null ? "" : this.searchPipeline.trim());
+        xContentBuilder.field(DESCRIPTION, this.description == null ? "" : this.description.trim());
         return xContentBuilder.endObject();
     }
 

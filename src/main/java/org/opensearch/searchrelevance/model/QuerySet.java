@@ -132,6 +132,10 @@ public class QuerySet implements ToXContentObject {
         return name;
     }
 
+    public String description() {
+        return description;
+    }
+
     public String sampling() {
         return sampling;
     }

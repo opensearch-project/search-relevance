@@ -40,7 +40,7 @@ import lombok.SneakyThrows;
 public class HybridOptimizerExperimentIT extends BaseExperimentIT {
 
     // Expected number of variants per query for HYBRID_OPTIMIZER experiments
-    private static final int EXPECTED_VARIANTS_PER_QUERY = 66;
+    private static final int EXPECTED_VARIANTS_PER_QUERY = 82;
     private static final String INDEX_NAME_ESCI = generateUniqueIndexName("hybridoptimizer");
 
     @SneakyThrows
@@ -190,9 +190,13 @@ public class HybridOptimizerExperimentIT extends BaseExperimentIT {
             // Parameters are nested in a "parameters" object
             Map<String, Object> parameters = (Map<String, Object>) source.get("parameters");
             assertNotNull("Parameters object should exist", parameters);
-            assertNotNull("Normalization should exist", parameters.get("normalization"));
             assertNotNull("Combination should exist", parameters.get("combination"));
-            assertNotNull("Weights should exist", parameters.get("weights"));
+            if ("rrf".equals(parameters.get("combination"))) {
+                assertNotNull("rank_constant should exist for RRF variants", parameters.get("rank_constant"));
+            } else {
+                assertNotNull("Normalization should exist", parameters.get("normalization"));
+                assertNotNull("Weights should exist", parameters.get("weights"));
+            }
 
             // Check results
             Map<String, Object> results = (Map<String, Object>) source.get("results");

@@ -145,7 +145,15 @@ public class LlmJudgmentTemplateIT extends BaseSearchRelevanceIT {
 
     @SneakyThrows
     public void testLlmJudgmentWithDifferentRatingTypes_thenSuccessful() {
-        // Create query set
+        // Step 1: Create test index
+        String indexConfig = Files.readString(Path.of(classLoader.getResource("llmjudgment/CreateTestIndex.json").toURI()));
+        createIndexWithConfiguration(TEST_INDEX, indexConfig);
+
+        // Step 2: Bulk ingest test documents
+        String bulkData = Files.readString(Path.of(classLoader.getResource("llmjudgment/BulkIngestProducts.json").toURI()));
+        bulkIngest(TEST_INDEX, bulkData);
+
+        // Step 3: Create query set
         String querySetBody = Files.readString(Path.of(classLoader.getResource("llmjudgment/CreateQuerySetSimple.json").toURI()));
         Response querySetResponse = makeRequest(
             client(),
@@ -158,7 +166,7 @@ public class LlmJudgmentTemplateIT extends BaseSearchRelevanceIT {
         Map<String, Object> querySetResult = entityAsMap(querySetResponse);
         String querySetId = querySetResult.get("query_set_id").toString();
 
-        // Create search configuration
+        // Step 4: Create search configuration
         String searchConfigBody = Files.readString(Path.of(classLoader.getResource("llmjudgment/CreateSearchConfiguration.json").toURI()));
         searchConfigBody = replacePlaceholders(searchConfigBody, Map.of("index", TEST_INDEX));
         Response searchConfigResponse = makeRequest(
@@ -239,7 +247,15 @@ public class LlmJudgmentTemplateIT extends BaseSearchRelevanceIT {
 
     @SneakyThrows
     public void testLlmJudgmentWithOverwriteCache_thenSuccessful() {
-        // Create query set
+        // Step 1: Create test index
+        String indexConfig = Files.readString(Path.of(classLoader.getResource("llmjudgment/CreateTestIndex.json").toURI()));
+        createIndexWithConfiguration(TEST_INDEX, indexConfig);
+
+        // Step 2: Bulk ingest test documents
+        String bulkData = Files.readString(Path.of(classLoader.getResource("llmjudgment/BulkIngestProducts.json").toURI()));
+        bulkIngest(TEST_INDEX, bulkData);
+
+        // Step 3: Create query set
         String querySetBody = Files.readString(Path.of(classLoader.getResource("llmjudgment/CreateQuerySetSimple.json").toURI()));
         Response querySetResponse = makeRequest(
             client(),
@@ -337,7 +353,15 @@ public class LlmJudgmentTemplateIT extends BaseSearchRelevanceIT {
 
     @SneakyThrows
     public void testLlmJudgmentWithoutOptionalFields_thenSuccessfulWithDefaults() {
-        // Create query set
+        // Step 1: Create test index
+        String indexConfig = Files.readString(Path.of(classLoader.getResource("llmjudgment/CreateTestIndex.json").toURI()));
+        createIndexWithConfiguration(TEST_INDEX, indexConfig);
+
+        // Step 2: Bulk ingest test documents
+        String bulkData = Files.readString(Path.of(classLoader.getResource("llmjudgment/BulkIngestProducts.json").toURI()));
+        bulkIngest(TEST_INDEX, bulkData);
+
+        // Step 3: Create query set
         String querySetBody = Files.readString(Path.of(classLoader.getResource("llmjudgment/CreateQuerySetSimple.json").toURI()));
         Response querySetResponse = makeRequest(
             client(),

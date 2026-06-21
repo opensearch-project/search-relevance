@@ -15,19 +15,12 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.LongAdder;
 
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.cluster.block.ClusterBlockException;
 import org.opensearch.common.inject.Inject;
-import org.opensearch.common.settings.Settings;
-import org.opensearch.common.util.concurrent.AbstractRunnable;
-import org.opensearch.common.util.concurrent.OpenSearchExecutors;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.breaker.CircuitBreakingException;
 import org.opensearch.searchrelevance.dao.EvaluationResultDao;
@@ -40,36 +33,27 @@ import org.opensearch.searchrelevance.scheduler.ExperimentCancellationToken;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.client.Client;
 
-import com.google.common.annotations.VisibleForTesting;
-
 import lombok.extern.log4j.Log4j2;
 
 /**
- * Generic task manager for scheduling experiment tasks with concurrency control and backpressure handling.
- * Supports HYBRID_OPTIMIZER and POINTWISE_EVALUATION experiment types.
+ * Task manager for scheduling experiment variant tasks using {@link BatchedAsyncExecutor}
+ * for concurrency control. Supports HYBRID_OPTIMIZER and POINTWISE_EVALUATION experiment types.
+ *
+ * <p>Delegates to {@link BatchedAsyncExecutor#executeAsync} to process experiment variants
+ * in sequential batches, preventing thread pool starvation when variant processing has
+ * nested dependencies on the same pool (search callbacks, response processing).
  */
 @Log4j2
 public class ExperimentTaskManager {
-    public static final int TASK_RETRY_DELAY_MILLISECONDS = 1000;
-    public static final int ALLOCATED_PROCESSORS = OpenSearchExecutors.allocatedProcessors(Settings.EMPTY);
 
-    private static final int DEFAULT_MIN_CONCURRENT_THREADS = 24;
-    private static final int PROCESSOR_NUMBER_DIVISOR = 2;
-    protected static final String THREAD_POOL_EXECUTOR_NAME = ThreadPool.Names.GENERIC;
-
-    private final int maxConcurrentTasks;
     private final ConcurrentHashMap<String, ExperimentTaskContext> experimentTaskContexts = new ConcurrentHashMap<>();
-    private final Semaphore concurrencyControl;
-
-    // Use LongAdder for better concurrent counting performance
-    private final LongAdder activeTasks = new LongAdder();
 
     // Services
     private final Client client;
-    private final EvaluationResultDao evaluationResultDao;
     private final ExperimentVariantDao experimentVariantDao;
     private final ThreadPool threadPool;
     private final SearchResponseProcessor searchResponseProcessor;
+    private final BatchedAsyncExecutor<ExperimentVariant, Void> batchedExecutor;
 
     @Inject
     public ExperimentTaskManager(
@@ -79,23 +63,26 @@ public class ExperimentTaskManager {
         ThreadPool threadPool
     ) {
         this.client = client;
-        this.evaluationResultDao = evaluationResultDao;
         this.experimentVariantDao = experimentVariantDao;
         this.threadPool = threadPool;
         this.searchResponseProcessor = new SearchResponseProcessor(evaluationResultDao, experimentVariantDao);
-
-        this.maxConcurrentTasks = Math.max(2, Math.min(DEFAULT_MIN_CONCURRENT_THREADS, ALLOCATED_PROCESSORS / PROCESSOR_NUMBER_DIVISOR));
-        this.concurrencyControl = new Semaphore(maxConcurrentTasks, true);
+        this.batchedExecutor = new BatchedAsyncExecutor<>(threadPool, SEARCH_RELEVANCE_EXEC_THREAD_POOL_NAME);
 
         log.info(
-            "ExperimentTaskManager initialized with max {} concurrent tasks (processors: {})",
-            maxConcurrentTasks,
-            ALLOCATED_PROCESSORS
+            "ExperimentTaskManager initialized with batch size {} (processors: {})",
+            batchedExecutor.getBatchSize(),
+            Runtime.getRuntime().availableProcessors()
         );
     }
 
     /**
-     * Schedule experiment tasks using non-blocking mechanisms
+     * Schedule experiment tasks using batched async execution.
+     *
+     * <p>Variants are processed in sequential batches via {@link BatchedAsyncExecutor}.
+     * Each variant's search and response processing is natively async (uses
+     * {@code client.search()} with {@code ActionListener}). Results are aggregated
+     * through {@link ExperimentTaskContext}, which completes the returned future
+     * when all variants finish.
      */
     public CompletableFuture<Map<String, Object>> scheduleTasksAsync(
         ExperimentType experimentType,
@@ -114,10 +101,8 @@ public class ExperimentTaskManager {
         Map<String, List<Future<?>>> runningFutures,
         ExperimentCancellationToken cancellationToken
     ) {
-        // Create a CompletableFuture to track the overall completion
         CompletableFuture<Map<String, Object>> resultFuture = new CompletableFuture<>();
 
-        // Create optimized task context
         ExperimentTaskContext taskContext = new ExperimentTaskContext(
             experimentId,
             searchConfigId,
@@ -130,21 +115,21 @@ public class ExperimentTaskManager {
             experimentType
         );
 
-        // Use putIfAbsent for atomic operation
         experimentTaskContexts.putIfAbsent(experimentId, taskContext);
-
-        // Initialize config map using computeIfAbsent (non-blocking)
         taskContext.getConfigToExperimentVariants().computeIfAbsent(searchConfigId, k -> new ConcurrentHashMap<String, Object>());
 
         log.info(
-            "Scheduling {} {} experiment tasks for experiment {} with non-blocking concurrency",
+            "Scheduling {} {} experiment tasks for experiment {} with batched execution",
             experimentVariants.size(),
             experimentType,
             experimentId
         );
 
-        // Schedule tasks asynchronously
-        List<CompletableFuture<Void>> variantFutures = experimentVariants.stream().map(variant -> {
+        // Cancellation supplier from token
+        java.util.function.Supplier<Boolean> isCancelled = () -> cancellationToken != null && cancellationToken.isCancelled();
+
+        // Use BatchedAsyncExecutor to process variants in controlled batches
+        batchedExecutor.executeAsync(experimentVariants, variant -> {
             VariantTaskParameters params = createTaskParameters(
                 experimentType,
                 experimentId,
@@ -161,21 +146,105 @@ public class ExperimentTaskManager {
                 cancellationToken,
                 runningFutures
             );
-
-            return scheduleVariantTaskAsync(params);
-        }).toList();
-
-        // When all variants complete, clean up
-        CompletableFuture.allOf(variantFutures.toArray(new CompletableFuture[0])).whenComplete((v, ex) -> {
+            return executeVariantAsync(params);
+        }, isCancelled, ActionListener.wrap(results -> {
             experimentTaskContexts.remove(experimentId);
-            activeTasks.decrement();
-        });
+            // resultFuture is completed by ExperimentTaskContext.finishExperiment() when all
+            // variant DAO callbacks fire completeVariantSuccess/Failure. Don't interfere here
+            // for the normal flow — the async DAO writes may still be in-flight.
+            // Only complete exceptionally if cancelled before any variants were processed.
+            if (isCancelled.get() && !resultFuture.isDone()) {
+                resultFuture.completeExceptionally(new TimeoutException("Experiment cancelled before variants could be processed"));
+            }
+            log.debug("Batched variant execution complete for experiment {}", experimentId);
+        }, e -> {
+            experimentTaskContexts.remove(experimentId);
+            if (!resultFuture.isDone()) {
+                resultFuture.completeExceptionally(e);
+            }
+            log.error("Batched variant execution failed for experiment {}", experimentId, e);
+        }));
 
         return resultFuture;
     }
 
     /**
-     * Create task parameters based on experiment type
+     * Execute a single variant asynchronously: build search request, execute search,
+     * process response. Returns a CompletableFuture that completes when the variant
+     * is fully processed (including response handling via ExperimentTaskContext).
+     */
+    private CompletableFuture<Void> executeVariantAsync(VariantTaskParameters params) {
+        CompletableFuture<Void> future = new CompletableFuture<>();
+
+        if (params.getTaskContext().getHasFailure().get()) {
+            // Count the skipped variant so ExperimentTaskContext.remainingVariants reaches 0
+            params.getTaskContext().completeVariantFailure();
+            future.complete(null);
+            return future;
+        }
+        if (params.getCancellationToken() != null && params.getCancellationToken().isCancelled()) {
+            log.info("Cancelled variant task for experiment {}", params.getExperimentId());
+            // Count the skipped variant so ExperimentTaskContext.remainingVariants reaches 0
+            params.getTaskContext().completeVariantFailure();
+            TimeoutException exception = new TimeoutException("Timed out at variant task");
+            params.getTaskContext().getResultFuture().completeExceptionally(exception);
+            future.completeExceptionally(exception);
+            return future;
+        }
+
+        final String evaluationId = UUID.randomUUID().toString();
+        SearchRequest searchRequest = buildSearchRequest(params);
+
+        log.debug(
+            "Experiment search request (experimentId={}, variantId={}, evaluationId={})",
+            params.getExperimentId(),
+            params.getExperimentVariant().getId(),
+            evaluationId
+        );
+
+        client.search(searchRequest, new ActionListener<>() {
+            @Override
+            public void onResponse(org.opensearch.action.search.SearchResponse response) {
+                try {
+                    searchResponseProcessor.processSearchResponse(
+                        response,
+                        params.getExperimentVariant(),
+                        params.getExperimentId(),
+                        params.getSearchConfigId(),
+                        params.getQueryText(),
+                        params.getSize(),
+                        params.getJudgmentIds(),
+                        params.getDocIdToScores(),
+                        evaluationId,
+                        params.getTaskContext(),
+                        params.getScheduledRunId()
+                    );
+                    future.complete(null);
+                } catch (Exception e) {
+                    // Ensure variant is counted even when response processing throws
+                    params.getTaskContext().completeVariantFailure();
+                    future.completeExceptionally(e);
+                }
+            }
+
+            @Override
+            public void onFailure(Exception e) {
+                try {
+                    handleSearchFailure(e, params.getExperimentVariant(), params.getExperimentId(), evaluationId, params.getTaskContext());
+                    future.complete(null);
+                } catch (Exception ex) {
+                    // Ensure variant is counted even when failure handling throws
+                    params.getTaskContext().completeVariantFailure();
+                    future.completeExceptionally(ex);
+                }
+            }
+        });
+
+        return future;
+    }
+
+    /**
+     * Create task parameters based on experiment type.
      */
     private VariantTaskParameters createTaskParameters(
         ExperimentType experimentType,
@@ -211,7 +280,6 @@ public class ExperimentTaskManager {
                 .runningFutures(runningFutures)
                 .build();
         } else {
-            // Default to hybrid optimizer parameters
             return VariantTaskParameters.builder()
                 .experimentId(experimentId)
                 .searchConfigId(searchConfigId)
@@ -230,195 +298,15 @@ public class ExperimentTaskManager {
         }
     }
 
-    /**
-     * Extract search pipeline from variant parameters for pointwise experiments
-     */
     private String getSearchPipelineFromVariant(ExperimentVariant variant) {
         return (String) variant.getParameters().get("searchPipeline");
     }
 
-    private boolean checkIfCancelled(ExperimentCancellationToken cancellationToken) {
-        if (cancellationToken != null && cancellationToken.isCancelled()) {
-            return true;
-        }
-        return false;
-    }
-
     /**
-     * Schedule a single variant task asynchronously
+     * Build search request based on experiment type.
      */
-    private CompletableFuture<Void> scheduleVariantTaskAsync(VariantTaskParameters params) {
-        CompletableFuture<Void> future = new CompletableFuture<>();
-
-        if (params.getTaskContext().getHasFailure().get()) {
-            future.complete(null);
-            return future;
-        }
-        if (checkIfCancelled(params.getCancellationToken())) {
-            log.info("Cancelled when scheduling variant task for experiment id {}", params.getExperimentId());
-            TimeoutException exception = new TimeoutException("Timed out at variant task async");
-            params.getTaskContext().getResultFuture().completeExceptionally(exception);
-            future.completeExceptionally(exception);
-            return future;
-        }
-
-        // Try to acquire permit non-blocking
-        if (concurrencyControl.tryAcquire()) {
-            activeTasks.increment();
-            submitTaskToThreadPool(params, future);
-        } else {
-            // Schedule with backpressure using CompletableFuture
-            CompletableFuture.delayedExecutor(
-                TASK_RETRY_DELAY_MILLISECONDS,
-                TimeUnit.MILLISECONDS,
-                threadPool.executor(THREAD_POOL_EXECUTOR_NAME)
-            ).execute(() -> {
-                scheduleVariantTaskAsync(params).whenComplete((v, ex) -> {
-                    if (ex != null) {
-                        future.completeExceptionally(ex);
-                    } else {
-                        future.complete(v);
-                    }
-                });
-            });
-        }
-
-        return future;
-    }
-
-    private void submitTaskToThreadPool(VariantTaskParameters params, CompletableFuture<Void> future) {
-        try {
-            if (checkIfCancelled(params.getCancellationToken())) {
-                throw new RejectedExecutionException("Task timed out");
-            }
-            Future<?> variantTaskFuture = threadPool.executor(SEARCH_RELEVANCE_EXEC_THREAD_POOL_NAME)
-                .submit(new OptimizedVariantTaskRunnable(params, future));
-            // This should only be used if the experiment is one that is scheduled to run.
-            if (params.getScheduledRunId() != null
-                && params.getRunningFutures() != null
-                && checkIfCancelled(params.getCancellationToken()) == false) {
-                try {
-                    params.getRunningFutures().get(params.getScheduledRunId()).add(variantTaskFuture);
-                } catch (Exception e) {
-                    log.info(
-                        "Submitting variant for scheduled experiment with underlying experiment {} cannot be completed",
-                        params.getExperimentId()
-                    );
-                }
-            }
-        } catch (RejectedExecutionException e) {
-            concurrencyControl.release();
-            activeTasks.decrement();
-            log.warn("Thread pool queue full, retrying for variant: {}", params.getExperimentVariant().getId());
-
-            // Retry with backpressure
-            CompletableFuture.delayedExecutor(
-                TASK_RETRY_DELAY_MILLISECONDS,
-                TimeUnit.MILLISECONDS,
-                threadPool.executor(THREAD_POOL_EXECUTOR_NAME)
-            ).execute(() -> scheduleVariantTaskAsync(params));
-        }
-    }
-
-    /**
-     * Execute variant task using CompletableFuture for better async handling
-     */
-    private void executeVariantTaskAsync(VariantTaskParameters params, CompletableFuture<Void> future) {
-        if (params.getTaskContext().getHasFailure().get()) {
-            concurrencyControl.release();
-            activeTasks.decrement();
-            future.complete(null);
-            return;
-        }
-        if (checkIfCancelled(params.getCancellationToken())) {
-            log.info(
-                "Cancelled scheduled experiment with underlying experiment id {} when executing variant task async",
-                params.getExperimentId()
-            );
-            concurrencyControl.release();
-            activeTasks.decrement();
-            TimeoutException exception = new TimeoutException("Timed out at variant task async");
-            params.getTaskContext().getResultFuture().completeExceptionally(exception);
-            future.completeExceptionally(exception);
-            return;
-        }
-
-        final String evaluationId = UUID.randomUUID().toString();
-        SearchRequest searchRequest = buildSearchRequest(params, evaluationId);
-
-        // Instrumentation: log final serialized search request body for debugging (e.g., LTR rescore_query)
-        try {
-            String source = searchRequest.source() != null ? searchRequest.source().toString() : null;
-            log.debug(
-                "Experiment search request body (experimentId={}, variantId={}, evaluationId={}): {}",
-                params.getExperimentId(),
-                params.getExperimentVariant().getId(),
-                evaluationId,
-                source
-            );
-        } catch (Exception e) {
-            log.warn("Failed to serialize search request body for logging: {}", e.getMessage());
-        }
-
-        // Convert ActionListener to CompletableFuture
-        CompletableFuture<Void> searchFuture = new CompletableFuture<>();
-
-        client.search(searchRequest, new ActionListener<>() {
-            @Override
-            public void onResponse(org.opensearch.action.search.SearchResponse response) {
-                try {
-                    searchResponseProcessor.processSearchResponse(
-                        response,
-                        params.getExperimentVariant(),
-                        params.getExperimentId(),
-                        params.getSearchConfigId(),
-                        params.getQueryText(),
-                        params.getSize(),
-                        params.getJudgmentIds(),
-                        params.getDocIdToScores(),
-                        evaluationId,
-                        params.getTaskContext(),
-                        params.getScheduledRunId()
-                    );
-                    searchFuture.complete(null);
-                } catch (Exception e) {
-                    searchFuture.completeExceptionally(e);
-                } finally {
-                    concurrencyControl.release();
-                    activeTasks.decrement();
-                }
-            }
-
-            @Override
-            public void onFailure(Exception e) {
-                try {
-                    handleSearchFailure(e, params.getExperimentVariant(), params.getExperimentId(), evaluationId, params.getTaskContext());
-                    searchFuture.complete(null);
-                } catch (Exception ex) {
-                    searchFuture.completeExceptionally(ex);
-                } finally {
-                    concurrencyControl.release();
-                    activeTasks.decrement();
-                }
-            }
-        });
-
-        // Chain the futures
-        searchFuture.whenComplete((v, ex) -> {
-            if (ex != null) {
-                future.completeExceptionally(ex);
-            } else {
-                future.complete(null);
-            }
-        });
-    }
-
-    /**
-     * Build search request based on experiment type
-     */
-    private SearchRequest buildSearchRequest(VariantTaskParameters params, String evaluationId) {
-        if (params instanceof PointwiseTaskParameters) {
-            PointwiseTaskParameters pointwiseParams = (PointwiseTaskParameters) params;
+    private SearchRequest buildSearchRequest(VariantTaskParameters params) {
+        if (params instanceof PointwiseTaskParameters pointwiseParams) {
             return SearchRequestBuilder.buildSearchRequest(
                 pointwiseParams.getIndex(),
                 pointwiseParams.getQuery(),
@@ -430,7 +318,6 @@ public class ExperimentTaskManager {
             Map<String, Object> temporarySearchPipeline = QuerySourceUtil.createDefinitionOfTemporarySearchPipeline(
                 params.getExperimentVariant()
             );
-
             return SearchRequestBuilder.buildRequestForHybridSearch(
                 params.getIndex(),
                 params.getQuery(),
@@ -470,76 +357,5 @@ public class ExperimentTaskManager {
             current = current.getCause();
         }
         return false;
-    }
-
-    /**
-     * Get current concurrency metrics
-     */
-    @VisibleForTesting
-    protected Map<String, Object> getConcurrencyMetrics() {
-        return Map.of(
-            "active_experiments",
-            experimentTaskContexts.size(),
-            "active_tasks",
-            activeTasks.sum(),
-            "max_concurrent_tasks",
-            maxConcurrentTasks,
-            "available_permits",
-            concurrencyControl.availablePermits(),
-            "queued_threads",
-            concurrencyControl.getQueueLength(),
-            "thread_pool",
-            SEARCH_RELEVANCE_EXEC_THREAD_POOL_NAME
-        );
-    }
-
-    /**
-     * Optimized runnable using CompletableFuture
-     */
-    private class OptimizedVariantTaskRunnable extends AbstractRunnable {
-        private final VariantTaskParameters params;
-        private final CompletableFuture<Void> future;
-
-        OptimizedVariantTaskRunnable(VariantTaskParameters params, CompletableFuture<Void> future) {
-            this.params = params;
-            this.future = future;
-        }
-
-        @Override
-        public void onFailure(Exception e) {
-            concurrencyControl.release();
-            activeTasks.decrement();
-
-            if (e.getCause() instanceof RejectedExecutionException) {
-                log.warn("Thread pool queue full, retrying task for variant: {}", params.getExperimentVariant().getId());
-                scheduleVariantTaskAsync(params).whenComplete((v, ex) -> {
-                    if (ex != null) {
-                        future.completeExceptionally(ex);
-                    } else {
-                        future.complete(v);
-                    }
-                });
-            } else {
-                handleTaskFailure(params.getExperimentVariant(), e, params.getTaskContext());
-                future.completeExceptionally(e);
-            }
-        }
-
-        @Override
-        protected void doRun() {
-            executeVariantTaskAsync(params, future);
-        }
-    }
-
-    private void handleTaskFailure(ExperimentVariant experimentVariant, Exception e, ExperimentTaskContext taskContext) {
-        if (isCriticalSystemFailure(e)) {
-            if (taskContext.getHasFailure().compareAndSet(false, true)) {
-                log.error("Critical system failure for variant {}: {}", experimentVariant.getId(), e.getMessage());
-                taskContext.getResultFuture().completeExceptionally(e);
-            }
-        } else {
-            log.error("Variant failure for {}: {}", experimentVariant.getId(), e.getMessage());
-            taskContext.completeVariantFailure();
-        }
     }
 }
