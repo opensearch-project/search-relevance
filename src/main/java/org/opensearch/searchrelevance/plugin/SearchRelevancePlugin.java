@@ -222,7 +222,6 @@ public class SearchRelevancePlugin extends Plugin
         this.scheduledExperimentHistoryDao = new ScheduledExperimentHistoryDao(searchRelevanceIndicesManager);
         MachineLearningNodeClient mlClient = new MachineLearningNodeClient(client);
         this.mlAccessor = new MLAccessor(mlClient);
-        SearchRequestBuilder.initialize(xContentRegistry);
         SearchRelevanceExecutor.initialize(threadPool);
         SearchRequestBuilder.initialize(xContentRegistry, scriptService);
         ExperimentTaskManager experimentTaskManager = new ExperimentTaskManager(

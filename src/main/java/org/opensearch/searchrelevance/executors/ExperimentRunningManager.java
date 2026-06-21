@@ -45,6 +45,7 @@ import org.opensearch.searchrelevance.model.ExperimentInputSignature;
 import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.model.Judgment;
 import org.opensearch.searchrelevance.model.QuerySet;
+import org.opensearch.searchrelevance.model.QuerySetEntry;
 import org.opensearch.searchrelevance.model.ScheduledExperimentResult;
 import org.opensearch.searchrelevance.model.SearchConfiguration;
 import org.opensearch.searchrelevance.model.SearchConfigurationDetails;
@@ -170,16 +171,13 @@ public class ExperimentRunningManager {
             try {
                 QuerySet querySet = convertToQuerySet(querySetResponse);
                 ExperimentContext context = new ExperimentContext(experimentId, request, experimentName, experimentDescription, querySet);
-                List<String> queryTextWithReferences = querySet.querySetQueries()
-                    .stream()
-                    .map(e -> e.queryText())
-                    .collect(Collectors.toList());
+                List<QuerySetEntry> queryEntries = querySet.querySetQueries();
 
-                if (queryTextWithReferences.isEmpty()) {
+                if (queryEntries.isEmpty()) {
                     log.info("Experiment {} has 0 query texts; finalizing after input signature capture", experimentId);
                 }
 
-                fetchSearchConfigurationsAsync(context, queryTextWithReferences, cancellationToken, actuallyFinished);
+                fetchSearchConfigurationsAsync(context, queryEntries, cancellationToken, actuallyFinished);
             } catch (Exception e) {
                 ExperimentContext context = new ExperimentContext(experimentId, request, experimentName, experimentDescription, null);
                 handleAsyncFailure(context, "Failed to process QuerySet", e, actuallyFinished);
@@ -193,7 +191,7 @@ public class ExperimentRunningManager {
     @VisibleForTesting
     void fetchSearchConfigurationsAsync(
         ExperimentContext context,
-        List<String> queryTextWithReferences,
+        List<QuerySetEntry> queryEntries,
         ExperimentCancellationToken cancellationToken,
         CountDownLatch actuallyFinished
     ) {
@@ -207,7 +205,7 @@ public class ExperimentRunningManager {
         for (String configId : request.getSearchConfigurationList()) {
             CompletableFuture<Entry<String, Object>> singleSearchConfigurationFuture = fetchSingleSearchConfigurationAsync(
                 context,
-                queryTextWithReferences,
+                queryEntries,
                 hasFailure,
                 configId,
                 cancellationToken,
@@ -244,17 +242,17 @@ public class ExperimentRunningManager {
             searchConfigurations.put(configEntry.getKey(), (SearchConfigurationDetails) configEntry.getValue());
         }
 
-        if (queryTextWithReferences == null || searchConfigurations == null) {
+        if (queryEntries == null || searchConfigurations == null) {
             throw new IllegalStateException("Missing required data for metrics calculation");
         }
 
-        loadJudgmentsThenContinue(context, searchConfigurations, queryTextWithReferences, hasFailure, cancellationToken, actuallyFinished);
+        loadJudgmentsThenContinue(context, searchConfigurations, queryEntries, hasFailure, cancellationToken, actuallyFinished);
     }
 
     private void loadJudgmentsThenContinue(
         ExperimentContext context,
         Map<String, SearchConfigurationDetails> searchConfigurations,
-        List<String> queryTextWithReferences,
+        List<QuerySetEntry> queryEntries,
         AtomicBoolean hasFailure,
         ExperimentCancellationToken cancellationToken,
         CountDownLatch actuallyFinished
@@ -268,7 +266,7 @@ public class ExperimentRunningManager {
             finishAfterSignatureReady(
                 context,
                 searchConfigurations,
-                queryTextWithReferences,
+                queryEntries,
                 List.of(),
                 hasFailure,
                 cancellationToken,
@@ -298,7 +296,7 @@ public class ExperimentRunningManager {
                     finishAfterSignatureReady(
                         context,
                         searchConfigurations,
-                        queryTextWithReferences,
+                        queryEntries,
                         new ArrayList<>(buffer),
                         hasFailure,
                         cancellationToken,
@@ -316,7 +314,7 @@ public class ExperimentRunningManager {
     private void finishAfterSignatureReady(
         ExperimentContext context,
         Map<String, SearchConfigurationDetails> searchConfigurations,
-        List<String> queryTextWithReferences,
+        List<QuerySetEntry> queryEntries,
         List<Judgment> judgments,
         AtomicBoolean hasFailure,
         ExperimentCancellationToken cancellationToken,
@@ -343,17 +341,17 @@ public class ExperimentRunningManager {
             return;
         }
 
-        if (queryTextWithReferences.isEmpty()) {
+        if (queryEntries.isEmpty()) {
             updateFinalExperiment(context, new ArrayList<>(), context.getRequest().getJudgmentList(), actuallyFinished);
             return;
         }
 
         List<Map<String, Object>> finalResults = Collections.synchronizedList(new ArrayList<>());
-        AtomicInteger pendingQueries = new AtomicInteger(queryTextWithReferences.size());
+        AtomicInteger pendingQueries = new AtomicInteger(queryEntries.size());
         executeExperimentEvaluation(
             context,
             searchConfigurations,
-            queryTextWithReferences,
+            queryEntries,
             finalResults,
             pendingQueries,
             hasFailure,
@@ -372,7 +370,7 @@ public class ExperimentRunningManager {
 
     private CompletableFuture<Entry<String, Object>> fetchSingleSearchConfigurationAsync(
         ExperimentContext context,
-        List<String> queryTextWithReferences,
+        List<QuerySetEntry> queryEntries,
         AtomicBoolean hasFailure,
         String configId,
         ExperimentCancellationToken cancellationToken,
@@ -463,7 +461,7 @@ public class ExperimentRunningManager {
     void executeExperimentEvaluation(
         ExperimentContext context,
         Map<String, SearchConfigurationDetails> searchConfigurations,
-        List<String> queryTexts,
+        List<QuerySetEntry> queryEntries,
         List<Map<String, Object>> finalResults,
         AtomicInteger pendingQueries,
         AtomicBoolean hasFailure,
@@ -475,8 +473,9 @@ public class ExperimentRunningManager {
         PutExperimentRequest request = context.getRequest();
 
         int completedQueries = 0;
-        int totalQueries = queryTexts.size();
-        for (String queryText : queryTexts) {
+        int totalQueries = queryEntries.size();
+        for (QuerySetEntry queryEntry : queryEntries) {
+            String queryText = queryEntry.queryText();
             // We need to process metrics for every query text, therefore, we have to keep track of
             // Any previous failures or tiimeout cancellations.
             if (hasFailure.get() || checkIfCancelled(cancellationToken)) {
@@ -493,7 +492,7 @@ public class ExperimentRunningManager {
 
             if (request.getType() == ExperimentType.PAIRWISE_COMPARISON) {
                 metricsHelper.processPairwiseMetrics(
-                    queryText,
+                    queryEntry,
                     searchConfigurations,
                     request.getSize(),
                     ActionListener.wrap(
@@ -515,7 +514,7 @@ public class ExperimentRunningManager {
                 // Use our task manager implementation for hybrid optimizer
                 hybridOptimizerExperimentProcessor.processHybridOptimizerExperiment(
                     experimentId,
-                    queryText,
+                    queryEntry,
                     searchConfigurations,
                     judgmentList,
                     request.getSize(),
@@ -540,7 +539,7 @@ public class ExperimentRunningManager {
             } else if (request.getType() == ExperimentType.POINTWISE_EVALUATION) {
                 pointwiseExperimentProcessor.processPointwiseExperiment(
                     experimentId,
-                    queryText,
+                    queryEntry,
                     searchConfigurations,
                     judgmentList,
                     request.getSize(),

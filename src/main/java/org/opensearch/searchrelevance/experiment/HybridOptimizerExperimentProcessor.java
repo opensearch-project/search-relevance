@@ -28,6 +28,7 @@ import org.opensearch.searchrelevance.executors.ExperimentTaskManager;
 import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.model.ExperimentVariant;
+import org.opensearch.searchrelevance.model.QuerySetEntry;
 import org.opensearch.searchrelevance.model.SearchConfigurationDetails;
 import org.opensearch.searchrelevance.scheduler.ExperimentCancellationToken;
 import org.opensearch.searchrelevance.utils.TimeUtils;
@@ -62,7 +63,7 @@ public class HybridOptimizerExperimentProcessor {
      */
     public void processHybridOptimizerExperiment(
         String experimentId,
-        String queryText,
+        QuerySetEntry queryEntry,
         Map<String, SearchConfigurationDetails> searchConfigurations,
         List<String> judgmentList,
         int size,
@@ -71,6 +72,7 @@ public class HybridOptimizerExperimentProcessor {
         Map<String, List<Future<?>>> runningFutures,
         ActionListener<Map<String, Object>> listener
     ) {
+        String queryText = queryEntry.queryText();
         ExperimentOptionsForHybridSearch experimentOptionForHybridSearch = new ExperimentOptionsForHybridSearch();
 
         List<ExperimentVariantHybridSearchDTO> experimentVariantDTOs = experimentOptionForHybridSearch.getParameterCombinations();
@@ -114,7 +116,7 @@ public class HybridOptimizerExperimentProcessor {
             // Process search configurations with optimized task manager
             processSearchConfigurationsAsync(
                 experimentId,
-                queryText,
+                queryEntry,
                 searchConfigurations,
                 judgmentList,
                 size,
@@ -202,7 +204,7 @@ public class HybridOptimizerExperimentProcessor {
     @VisibleForTesting
     void processSearchConfigurationsAsync(
         String experimentId,
-        String queryText,
+        QuerySetEntry queryEntry,
         Map<String, SearchConfigurationDetails> searchConfigurations,
         List<String> judgmentList,
         int size,
@@ -245,7 +247,7 @@ public class HybridOptimizerExperimentProcessor {
                 searchConfigId,
                 index,
                 query,
-                queryText,
+                queryEntry,
                 size,
                 experimentVariants,
                 judgmentList,

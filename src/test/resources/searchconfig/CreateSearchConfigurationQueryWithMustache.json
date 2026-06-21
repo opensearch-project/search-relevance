@@ -1,0 +1,6 @@
+{
+  "name": "mustache_filter_match",
+  "index": "{{index_name}}",
+  "query": "{\"query\":{\"bool\":{\"must\":[{\"match\":{\"title\":\"{{query_string}}\"}}],\"filter\":[{\"term\":{\"category\":\"{{category_filter}}\"}}]}}}",
+  "searchPipeline": ""
+}

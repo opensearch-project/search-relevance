@@ -1,0 +1,39 @@
+{
+  "name": "query_set_mustache",
+  "description": "Test query set with mustache template custom fields",
+  "sampling": "manual",
+  "querySetQueries": [
+    {
+      "queryText": "phone",
+      "category": "electronics"
+    },
+    {
+      "queryText": "iphone",
+      "category": "electronics"
+    },
+    {
+      "queryText": "steel",
+      "category": "materials"
+    },
+    {
+      "queryText": "keyboard",
+      "category": "electronics"
+    },
+    {
+      "queryText": "diamond wheel",
+      "category": "tools"
+    },
+    {
+      "queryText": "button",
+      "category": "electronics"
+    },
+    {
+      "queryText": "metal frame",
+      "category": "materials"
+    },
+    {
+      "queryText": "giangentic form",
+      "category": "materials"
+    }
+  ]
+}

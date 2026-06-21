@@ -29,6 +29,7 @@ import org.opensearch.action.search.SearchResponse;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.executors.ExperimentTaskManager;
+import org.opensearch.searchrelevance.model.QuerySetEntry;
 import org.opensearch.searchrelevance.model.SearchConfigurationDetails;
 import org.opensearch.searchrelevance.scheduler.ExperimentCancellationToken;
 import org.opensearch.test.OpenSearchTestCase;
@@ -90,7 +91,7 @@ public class HybridOptimizerExperimentProcessorTests extends OpenSearchTestCase 
 
         processor.processHybridOptimizerExperiment(
             experimentId,
-            queryText,
+            new QuerySetEntry(queryText, Map.of()),
             searchConfigs,
             judgmentList,
             10,
@@ -140,7 +141,7 @@ public class HybridOptimizerExperimentProcessorTests extends OpenSearchTestCase 
 
         processor.processHybridOptimizerExperiment(
             experimentId,
-            queryText,
+            new QuerySetEntry(queryText, Map.of()),
             searchConfigs,
             judgmentList,
             10,
@@ -181,7 +182,7 @@ public class HybridOptimizerExperimentProcessorTests extends OpenSearchTestCase 
         cancellationToken.cancel();
         processor.processSearchConfigurationsAsync(
             experimentId,
-            queryText,
+            new QuerySetEntry(queryText, Map.of()),
             searchConfigurations,
             judgmentList,
             size,

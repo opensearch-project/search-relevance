@@ -48,6 +48,7 @@ import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.EvaluationResult;
 import org.opensearch.searchrelevance.model.ExperimentVariant;
+import org.opensearch.searchrelevance.model.QuerySetEntry;
 import org.opensearch.searchrelevance.model.SearchConfigurationDetails;
 import org.opensearch.searchrelevance.model.builder.SearchRequestBuilder;
 import org.opensearch.searchrelevance.utils.TimeUtils;
@@ -86,7 +87,7 @@ public class MetricsHelper {
      * Pairwise comparison will not create evaluation results
      */
     public void processPairwiseMetrics(
-        String queryText,
+        QuerySetEntry queryEntry,
         Map<String, SearchConfigurationDetails> searchConfigurations,
         int size,
         ActionListener<Map<String, Object>> listener
@@ -102,7 +103,7 @@ public class MetricsHelper {
             SearchRequest searchRequest = buildSearchRequest(
                 configDetails.getIndex(),
                 configDetails.getQuery(),
-                queryText,
+                queryEntry,
                 configDetails.getPipeline(),
                 size
             );

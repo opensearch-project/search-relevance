@@ -32,6 +32,7 @@ import org.opensearch.core.action.ActionListener;
 import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.executors.ExperimentTaskManager;
 import org.opensearch.searchrelevance.model.ExperimentType;
+import org.opensearch.searchrelevance.model.QuerySetEntry;
 import org.opensearch.searchrelevance.model.SearchConfigurationDetails;
 import org.opensearch.test.OpenSearchTestCase;
 
@@ -92,7 +93,7 @@ public class PointwiseExperimentProcessorTests extends OpenSearchTestCase {
                 anyString(),
                 anyString(),
                 anyString(),
-                anyString(),
+                any(QuerySetEntry.class),
                 any(Integer.class),
                 any(List.class),
                 any(List.class),
@@ -125,7 +126,7 @@ public class PointwiseExperimentProcessorTests extends OpenSearchTestCase {
         // Execute
         processor.processPointwiseExperiment(
             experimentId,
-            queryText,
+            new QuerySetEntry(queryText, Map.of()),
             searchConfigurations,
             judgmentList,
             size,
@@ -182,7 +183,7 @@ public class PointwiseExperimentProcessorTests extends OpenSearchTestCase {
         // Execute
         processor.processPointwiseExperiment(
             experimentId,
-            queryText,
+            new QuerySetEntry(queryText, Map.of()),
             searchConfigurations,
             judgmentList,
             size,

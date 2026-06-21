@@ -667,13 +667,16 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         if (customFields == null || customFields.isEmpty()) {
             return queryText;
         }
-        try {
-            String jsonFields = OBJECT_MAPPER.writeValueAsString(customFields);
-            return queryText + "#" + jsonFields;
-        } catch (JacksonException e) {
-            log.warn("Failed to serialize custom fields for cache key, using queryText only", e);
-            return queryText;
+        StringBuilder builder = new StringBuilder(queryText);
+        builder.append("#\n");
+        int count = 0;
+        for (Map.Entry<String, String> entry : customFields.entrySet()) {
+            builder.append(entry.getKey()).append(":").append(entry.getValue());
+            if (++count < customFields.size()) {
+                builder.append("\n");
+            }
         }
+        return builder.toString();
     }
 
     private void logFailedChunks(ChunkResult chunkResult) {

@@ -109,6 +109,24 @@ public abstract class BaseExperimentIT extends BaseSearchRelevanceIT {
         return querySetId;
     }
 
+    protected String createQuerySetWithCustomFields() throws IOException, URISyntaxException {
+        String createQuerySetBody = Files.readString(
+            Path.of(classLoader.getResource("queryset/CreateQuerySetWithCustomFields.json").toURI())
+        );
+        Response createQuerySetResponse = makeRequest(
+            client(),
+            RestRequest.Method.PUT.name(),
+            QUERYSETS_URL,
+            null,
+            toHttpEntity(createQuerySetBody),
+            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
+        );
+        Map<String, Object> createQuerySetResultJson = entityAsMap(createQuerySetResponse);
+        String querySetId = createQuerySetResultJson.get("query_set_id").toString();
+        assertNotNull(querySetId);
+        return querySetId;
+    }
+
     @SneakyThrows
     protected String createSearchConfiguration(String indexName) {
         // Ensure index exists before creating SearchConfiguration
@@ -167,6 +185,35 @@ public abstract class BaseExperimentIT extends BaseSearchRelevanceIT {
         String createSearchConfigurationRequestBody = Files.readString(
             Path.of(classLoader.getResource("searchconfig/CreateSearchConfigurationSimpleMatch.json").toURI())
         );
+        // Replace the placeholder with the actual index name
+        createSearchConfigurationRequestBody = createSearchConfigurationRequestBody.replace("{{index_name}}", indexName);
+
+        Response createSearchConfigurationResponse = makeRequest(
+            client(),
+            RestRequest.Method.PUT.name(),
+            SEARCH_CONFIGURATIONS_URL,
+            null,
+            toHttpEntity(createSearchConfigurationRequestBody),
+            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
+        );
+        Map<String, Object> createSearchConfigurationResultJson = entityAsMap(createSearchConfigurationResponse);
+        String searchConfigurationId = createSearchConfigurationResultJson.get("search_configuration_id").toString();
+        assertNotNull(searchConfigurationId);
+        return searchConfigurationId;
+    }
+
+    @SneakyThrows
+    protected String createSearchConfigurationWithMustache(String indexName) {
+        initializeIndexIfNotExist(indexName);
+
+        String createSearchConfigurationRequestBody = null;
+        try {
+            createSearchConfigurationRequestBody = Files.readString(
+                Path.of(classLoader.getResource("searchconfig/CreateSearchConfigurationQueryWithMustache.json").toURI())
+            );
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
         // Replace the placeholder with the actual index name
         createSearchConfigurationRequestBody = createSearchConfigurationRequestBody.replace("{{index_name}}", indexName);
 

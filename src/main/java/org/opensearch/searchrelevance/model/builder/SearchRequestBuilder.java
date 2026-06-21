@@ -11,6 +11,7 @@ import static org.opensearch.searchrelevance.common.PluginConstants.WILDCARD_QUE
 import static org.opensearch.searchrelevance.experiment.QuerySourceUtil.validateHybridQuery;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
@@ -28,6 +29,7 @@ import org.opensearch.script.ScriptService;
 import org.opensearch.script.ScriptType;
 import org.opensearch.script.TemplateScript;
 import org.opensearch.search.builder.SearchSourceBuilder;
+import org.opensearch.searchrelevance.model.QuerySetEntry;
 
 import lombok.extern.log4j.Log4j2;
 
@@ -76,7 +78,7 @@ public class SearchRequestBuilder {
      * @return the compiled template with substituted values
      * @throws IOException if template compilation or execution fails
      */
-    private static String processMustacheTemplate(String template, String queryText) throws IOException {
+    private static String processMustacheTemplate(String template, String queryText, Map<String, String> customFields) throws IOException {
         if (SCRIPT_SERVICE == null) {
             throw new IllegalStateException(
                 "SearchRequestBuilder is not initialized with ScriptService. "
@@ -84,7 +86,13 @@ public class SearchRequestBuilder {
             );
         }
 
-        Map<String, Object> params = Map.of("query_string", queryText);
+        Map<String, Object> params = new HashMap<>();
+        if (queryText != null) {
+            params.put("query_string", queryText);
+        }
+        if (customFields != null) {
+            params.putAll(customFields);
+        }
 
         Script script = new Script(ScriptType.INLINE, "mustache", template, params);
 
@@ -123,7 +131,22 @@ public class SearchRequestBuilder {
      * @param size - number of returned hits from the search
      * @return SearchRequest
      */
+    public static SearchRequest buildSearchRequest(String index, String query, QuerySetEntry queryEntry, String searchPipeline, int size) {
+        return buildSearchRequest(index, query, queryEntry.queryText(), queryEntry.customFields(), searchPipeline, size);
+    }
+
     public static SearchRequest buildSearchRequest(String index, String query, String queryText, String searchPipeline, int size) {
+        return buildSearchRequest(index, query, queryText, null, searchPipeline, size);
+    }
+
+    public static SearchRequest buildSearchRequest(
+        String index,
+        String query,
+        String queryText,
+        Map<String, String> customFields,
+        String searchPipeline,
+        int size
+    ) {
         SearchRequest searchRequest = new SearchRequest(index);
 
         try {
@@ -131,7 +154,7 @@ public class SearchRequestBuilder {
             String processedQuery;
             if (query.contains("{{")) {
                 // Use Mustache templating for queries containing {{
-                processedQuery = processMustacheTemplate(query, queryText);
+                processedQuery = processMustacheTemplate(query, queryText, customFields);
             } else {
                 // Fallback to legacy %SearchText% replacement
                 processedQuery = query.replace(WILDCARD_QUERY_TEXT, queryText);
@@ -196,7 +219,28 @@ public class SearchRequestBuilder {
         String index,
         String query,
         Map<String, Object> temporarySearchPipeline,
+        QuerySetEntry queryEntry,
+        int size
+    ) {
+        return buildRequestForHybridSearch(index, query, temporarySearchPipeline, queryEntry.queryText(), queryEntry.customFields(), size);
+    }
+
+    public static SearchRequest buildRequestForHybridSearch(
+        String index,
+        String query,
+        Map<String, Object> temporarySearchPipeline,
         String queryText,
+        int size
+    ) {
+        return buildRequestForHybridSearch(index, query, temporarySearchPipeline, queryText, null, size);
+    }
+
+    public static SearchRequest buildRequestForHybridSearch(
+        String index,
+        String query,
+        Map<String, Object> temporarySearchPipeline,
+        String queryText,
+        Map<String, String> customFields,
         int size
     ) {
         SearchRequest searchRequest = new SearchRequest(index);
@@ -206,7 +250,7 @@ public class SearchRequestBuilder {
             String processedQuery;
             if (query.contains("{{")) {
                 // Use Mustache templating for queries containing {{
-                processedQuery = processMustacheTemplate(query, queryText);
+                processedQuery = processMustacheTemplate(query, queryText, customFields);
             } else {
                 // Fallback to legacy %SearchText% replacement
                 processedQuery = query.replace(WILDCARD_QUERY_TEXT, queryText);

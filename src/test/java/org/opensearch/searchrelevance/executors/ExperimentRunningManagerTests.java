@@ -128,7 +128,12 @@ public class ExperimentRunningManagerTests extends OpenSearchTestCase {
             request.getDescription(),
             sampleQuerySet()
         );
-        experimentRunningManager.fetchSearchConfigurationsAsync(context, List.of("querySetReference"), cancellationToken, actuallyFinished);
+        experimentRunningManager.fetchSearchConfigurationsAsync(
+            context,
+            List.of(new QuerySetEntry("querySetReference", Map.of())),
+            cancellationToken,
+            actuallyFinished
+        );
 
         assertEquals(0, actuallyFinished.getCount());
     }
@@ -152,7 +157,12 @@ public class ExperimentRunningManagerTests extends OpenSearchTestCase {
             request.getDescription(),
             sampleQuerySet()
         );
-        experimentRunningManager.fetchSearchConfigurationsAsync(context, List.of("querySetReference"), cancellationToken, actuallyFinished);
+        experimentRunningManager.fetchSearchConfigurationsAsync(
+            context,
+            List.of(new QuerySetEntry("querySetReference", Map.of())),
+            cancellationToken,
+            actuallyFinished
+        );
 
         assertEquals(0, actuallyFinished.getCount());
 
@@ -174,7 +184,7 @@ public class ExperimentRunningManagerTests extends OpenSearchTestCase {
         experimentRunningManager.executeExperimentEvaluation(
             context,
             null,
-            List.of("queryText"),
+            List.of(new QuerySetEntry("queryText", Map.of())),
             null,
             null,
             new AtomicBoolean(false),

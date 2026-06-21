@@ -132,7 +132,7 @@ public class SearchRequestBuilderTests extends OpenSearchTestCase {
     }
 
     public void testBuildSearchRequest_fallsBackToWrapper_whenRegistryNotInitialized() throws Exception {
-        SearchRequestBuilder.initialize(null);
+        SearchRequestBuilder.initialize(null, null);
         String query = "{\"query\":{\"match\":{\"title\":\"" + WILDCARD_QUERY_TEXT + "\"}}}";
 
         SearchRequest searchRequest = SearchRequestBuilder.buildSearchRequest(TEST_INDEX, query, TEST_QUERY_TEXT, null, TEST_SIZE);

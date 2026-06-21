@@ -71,6 +71,39 @@ public class PointwiseExperimentIT extends BaseExperimentIT {
     }
 
     @SneakyThrows
+    public void testPointwiseEvaluationExperiment_whenQueryWithMustacheTemplate_thenSuccessful() {
+        // Arrange
+        initializeIndexIfNotExist(INDEX_NAME_ESCI);
+
+        String searchConfigurationId = createSearchConfigurationWithMustache(INDEX_NAME_ESCI);
+        String querySetId = createQuerySetWithCustomFields();
+        String judgmentId = createJudgment();
+
+        // Act
+        String experimentId = createPointwiseExperiment(querySetId, searchConfigurationId, judgmentId);
+
+        // Wait for the experiment to be created and indexed
+        Thread.sleep(DEFAULT_INTERVAL_MS);
+        Map<String, Object> experimentSource = pollExperimentUntilCompleted(experimentId);
+        // Assert experiment exists with correct type
+        assertNotNull("Experiment should exist", experimentSource);
+        assertEquals("POINTWISE_EVALUATION", experimentSource.get("type"));
+        assertEquals(querySetId, experimentSource.get("querySetId"));
+
+        // Assert
+        Map<String, String> queryTextToEvaluationId = assertPointwiseExperimentCreation(
+            experimentId,
+            judgmentId,
+            searchConfigurationId,
+            querySetId
+        );
+        // We won't test exact metrics here since query texts and data differ, but we check execution didn't fail
+        assertFalse(queryTextToEvaluationId.isEmpty());
+
+        deleteIndex(INDEX_NAME_ESCI);
+    }
+
+    @SneakyThrows
     private String createPointwiseExperiment(String querySetId, String searchConfigurationId, String judgmentId) {
         String createExperimentBody = replacePlaceholders(
             Files.readString(Path.of(classLoader.getResource("experiment/CreateExperimentPointwiseEvaluation.json").toURI())),

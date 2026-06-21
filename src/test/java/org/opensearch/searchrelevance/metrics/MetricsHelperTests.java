@@ -37,6 +37,7 @@ import org.opensearch.search.SearchModule;
 import org.opensearch.searchrelevance.dao.EvaluationResultDao;
 import org.opensearch.searchrelevance.dao.ExperimentVariantDao;
 import org.opensearch.searchrelevance.dao.JudgmentDao;
+import org.opensearch.searchrelevance.model.QuerySetEntry;
 import org.opensearch.searchrelevance.model.SearchConfigurationDetails;
 import org.opensearch.searchrelevance.model.builder.SearchRequestBuilder;
 import org.opensearch.test.OpenSearchTestCase;
@@ -122,7 +123,7 @@ public class MetricsHelperTests extends OpenSearchTestCase {
             }
         };
 
-        metricsHelper.processPairwiseMetrics(queryText, searchConfigurations, size, resultListener);
+        metricsHelper.processPairwiseMetrics(new QuerySetEntry(queryText, Map.of()), searchConfigurations, size, resultListener);
 
         // Verify that search was called twice with correct pipelines
         verify(client, times(2)).search(any(SearchRequest.class), any(ActionListener.class));
@@ -174,7 +175,7 @@ public class MetricsHelperTests extends OpenSearchTestCase {
 
         // Execute the method
         ActionListener<Map<String, Object>> resultListener = mock(ActionListener.class);
-        metricsHelper.processPairwiseMetrics(queryText, searchConfigurations, size, resultListener);
+        metricsHelper.processPairwiseMetrics(new QuerySetEntry(queryText, Map.of()), searchConfigurations, size, resultListener);
 
         // Verify that null pipeline is handled correctly
         verify(client, times(1)).search(any(SearchRequest.class), any(ActionListener.class));
@@ -215,7 +216,7 @@ public class MetricsHelperTests extends OpenSearchTestCase {
 
         // Execute the method
         ActionListener<Map<String, Object>> resultListener = mock(ActionListener.class);
-        metricsHelper.processPairwiseMetrics(queryText, searchConfigurations, size, resultListener);
+        metricsHelper.processPairwiseMetrics(new QuerySetEntry(queryText, Map.of()), searchConfigurations, size, resultListener);
 
         // Verify that empty pipeline is handled correctly
         verify(client, times(1)).search(any(SearchRequest.class), any(ActionListener.class));
