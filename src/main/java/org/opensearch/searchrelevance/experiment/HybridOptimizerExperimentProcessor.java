@@ -52,7 +52,7 @@ public class HybridOptimizerExperimentProcessor {
      * Process hybrid optimizer experiment using non-blocking async operations
      *
      * @param experimentId Experiment ID
-     * @param queryText Query text to process
+     * @param queryEntry QuerySetEntry containing query text and custom fields
      * @param searchConfigurations Map of search configuration IDs to SearchConfigurationDetails
      * @param judgmentList List of judgment IDs
      * @param size Result size

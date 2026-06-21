@@ -126,7 +126,7 @@ public class SearchRequestBuilder {
      * Builds a search request with the given parameters.
      * @param index - target index to be searched against
      * @param query - DSL query that includes queryBody and optional extra fields, like pipeline, aggregation, exclude ...
-     * @param queryText - queryText need to be replaced with placeholder
+     * @param queryEntry - query entry containing query text and custom fields
      * @param searchPipeline - searchPipeline if it is provided
      * @param size - number of returned hits from the search
      * @return SearchRequest
