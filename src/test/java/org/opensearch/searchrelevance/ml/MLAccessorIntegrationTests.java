@@ -38,12 +38,7 @@ import org.opensearch.threadpool.ThreadPool;
  * - First attempt success with response_format (GPT-4o scenario)
  * - Response processing with structured outputs
  *
- * Note: Tests for retry logic and fallback behavior (GPT-3.5 compatibility) are documented
- * in TESTING_GPT35_FALLBACK.md as manual tests because they require delayed retries which
- * create thread leaks in the OpenSearch test framework. The retry mechanism uses
- * CompletableFuture.delayedExecutor which creates daemon threads that cannot be properly
- * cleaned up within test execution.
- *
+ * TODO: Tests for retry logic and fallback behavior (GPT-3.5 compatibility) are documented in TESTING_GPT35_FALLBACK.md
  * Covered by unit tests:
  * - MLInputOutputTransformerTests: Verifies response_format parameter is correctly included/excluded
  * - RatingOutputProcessorTests: Verifies both structured and unstructured response parsing
@@ -52,6 +47,7 @@ public class MLAccessorIntegrationTests extends OpenSearchTestCase {
 
     private ThreadPool threadPool;
 
+    @Override
     public void setUp() throws Exception {
         super.setUp();
         threadPool = new TestThreadPool("test-thread-pool");
@@ -133,18 +129,14 @@ public class MLAccessorIntegrationTests extends OpenSearchTestCase {
 
     /**
      * Note: Binary rating (RELEVANT/IRRELEVANT) fallback testing is documented in
-     * TESTING_GPT35_FALLBACK.md as "Scenario 3". This test would trigger scheduleRetry
-     * creating thread leaks. Coverage is provided by:
+     * TESTING_GPT35_FALLBACK.md as "Scenario 3". Coverage is provided by:
      * - Unit tests: MLInputOutputTransformerTests.testCreateMLInput_BinaryRatingWithoutResponseFormat
      * - Unit tests: RatingOutputProcessorTests verifies RELEVANT→1.0, IRRELEVANT→0.0 conversion
      * - Manual tests: Real OpenAI API integration testing
      */
 
     /**
-     * Note: Testing retry exhaustion (all attempts fail) is documented in TESTING_GPT35_FALLBACK.md
-     * as a manual test scenario because it requires delayed retries which create thread leaks in tests.
-     * The retry logic with exponential backoff uses CompletableFuture.delayedExecutor which creates
-     * daemon threads that cannot be properly cleaned up in the OpenSearch test framework.
+     * TODO: Testing retry exhaustion (all attempts fail) is documented in TESTING_GPT35_FALLBACK.md
      */
 
     // ============================================
