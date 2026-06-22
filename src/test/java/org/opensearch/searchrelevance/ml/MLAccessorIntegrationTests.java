@@ -30,6 +30,8 @@ import org.opensearch.ml.common.output.model.ModelTensorOutput;
 import org.opensearch.ml.common.output.model.ModelTensors;
 import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
 import org.opensearch.test.OpenSearchTestCase;
+import org.opensearch.threadpool.TestThreadPool;
+import org.opensearch.threadpool.ThreadPool;
 
 /**
  * Integration tests for MLAccessor focusing on:
@@ -48,9 +50,21 @@ import org.opensearch.test.OpenSearchTestCase;
  */
 public class MLAccessorIntegrationTests extends OpenSearchTestCase {
 
+    private ThreadPool threadPool;
+
+    public void setUp() throws Exception {
+        super.setUp();
+        threadPool = new TestThreadPool("test-thread-pool");
+    }
+
+    @Override
+    public void tearDown() throws Exception {
+        super.tearDown();
+        ThreadPool.terminate(threadPool, 10, TimeUnit.SECONDS);
+    }
+
     /**
      * Note: GPT-3.5 fallback testing is documented in TESTING_GPT35_FALLBACK.md as "Scenario 2"
-     * This scenario requires triggering scheduleRetry which creates CompletableFuture threads that leak.
      * Coverage is provided by:
      * - Unit tests: MLInputOutputTransformerTests verifies response_format parameter handling
      * - Manual tests: Real OpenAI GPT-3.5 API integration testing
@@ -62,7 +76,7 @@ public class MLAccessorIntegrationTests extends OpenSearchTestCase {
      */
     public void testFirstAttemptSuccess_WhenModelSupportsResponseFormat() throws Exception {
         MachineLearningNodeClient mlClient = mock(MachineLearningNodeClient.class);
-        MLAccessor mlAccessor = new MLAccessor(mlClient);
+        MLAccessor mlAccessor = new MLAccessor(mlClient, threadPool);
 
         AtomicInteger attemptCount = new AtomicInteger(0);
         CountDownLatch latch = new CountDownLatch(1);

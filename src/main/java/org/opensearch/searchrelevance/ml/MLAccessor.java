@@ -10,15 +10,15 @@ package org.opensearch.searchrelevance.ml;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 
+import org.opensearch.common.unit.TimeValue;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.ml.client.MachineLearningNodeClient;
 import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
 import org.opensearch.ml.common.input.MLInput;
 import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
 import org.opensearch.searchrelevance.utils.RatingOutputProcessor;
+import org.opensearch.threadpool.ThreadPool;
 
 import lombok.extern.log4j.Log4j2;
 
@@ -29,13 +29,15 @@ import lombok.extern.log4j.Log4j2;
 public class MLAccessor {
     private final MachineLearningNodeClient mlClient;
     private final MLInputOutputTransformer transformer;
+    private final ThreadPool threadPool;
 
     private static final int MAX_RETRY_NUMBER = 3;
     private static final long RETRY_DELAY_MS = 1000;
 
-    public MLAccessor(MachineLearningNodeClient mlClient) {
+    public MLAccessor(MachineLearningNodeClient mlClient, ThreadPool threadPool) {
         this.mlClient = mlClient;
         this.transformer = new MLInputOutputTransformer();
+        this.threadPool = threadPool;
     }
 
     public void predict(
@@ -192,7 +194,7 @@ public class MLAccessor {
     }
 
     private void scheduleRetry(Runnable runnable, long delayMs) {
-        CompletableFuture.delayedExecutor(delayMs, TimeUnit.MILLISECONDS).execute(runnable);
+        threadPool.schedule(runnable, TimeValue.timeValueMillis(delayMs), ThreadPool.Names.GENERIC);
     }
 
     public void predictSingleChunk(String modelId, MLInput mlInput, ActionListener<String> listener) {
