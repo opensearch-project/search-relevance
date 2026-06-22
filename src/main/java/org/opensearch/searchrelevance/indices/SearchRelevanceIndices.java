@@ -7,6 +7,8 @@
  */
 package org.opensearch.searchrelevance.indices;
 
+import static org.opensearch.searchrelevance.common.PluginConstants.AB_TEST_INDEX;
+import static org.opensearch.searchrelevance.common.PluginConstants.AB_TEST_INDEX_MAPPING;
 import static org.opensearch.searchrelevance.common.PluginConstants.EVALUATION_RESULT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.EVALUATION_RESULT_INDEX_MAPPING;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX;
@@ -83,7 +85,12 @@ public enum SearchRelevanceIndices {
     /**
      * Scheduled Experiment History Index
      */
-    SCHEDULED_EXPERIMENT_HISTORY(SCHEDULED_EXPERIMENT_HISTORY_INDEX, SCHEDULED_EXPERIMENT_HISTORY_INDEX_MAPPING, false);
+    SCHEDULED_EXPERIMENT_HISTORY(SCHEDULED_EXPERIMENT_HISTORY_INDEX, SCHEDULED_EXPERIMENT_HISTORY_INDEX_MAPPING, false),
+
+    /**
+     * AB Test Index
+     */
+    AB_TEST(AB_TEST_INDEX, AB_TEST_INDEX_MAPPING, true);
 
     /**
      * Key for schema_version in the _meta section of index mappings
