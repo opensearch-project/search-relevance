@@ -75,6 +75,7 @@ import org.opensearch.searchrelevance.metrics.MetricsHelper;
 import org.opensearch.searchrelevance.ml.MLAccessor;
 import org.opensearch.searchrelevance.model.ScheduledJob;
 import org.opensearch.searchrelevance.model.builder.SearchRequestBuilder;
+import org.opensearch.searchrelevance.rest.RestABTestSearchAction;
 import org.opensearch.searchrelevance.rest.RestCreateQuerySetAction;
 import org.opensearch.searchrelevance.rest.RestDeleteABTestAction;
 import org.opensearch.searchrelevance.rest.RestDeleteExperimentAction;
@@ -107,6 +108,8 @@ import org.opensearch.searchrelevance.scheduler.SearchRelevanceJobRunner;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.searchrelevance.stats.events.EventStatsManager;
 import org.opensearch.searchrelevance.stats.info.InfoStatsManager;
+import org.opensearch.searchrelevance.transport.abTest.ABTestSearchAction;
+import org.opensearch.searchrelevance.transport.abTest.ABTestSearchTransportAction;
 import org.opensearch.searchrelevance.transport.abTest.DeleteABTestAction;
 import org.opensearch.searchrelevance.transport.abTest.DeleteABTestTransportAction;
 import org.opensearch.searchrelevance.transport.abTest.PutABTestAction;
@@ -330,7 +333,8 @@ public class SearchRelevancePlugin extends Plugin
             new RestGetScheduledExperimentAction(settingsAccessor),
             new RestPutABTestAction(settingsAccessor),
             new RestUpdateABTestAction(settingsAccessor),
-            new RestDeleteABTestAction(settingsAccessor)
+            new RestDeleteABTestAction(settingsAccessor),
+            new RestABTestSearchAction(settingsAccessor)
         );
     }
 
@@ -362,7 +366,8 @@ public class SearchRelevancePlugin extends Plugin
             new ActionHandler<>(GetScheduledExperimentAction.INSTANCE, GetScheduledExperimentTransportAction.class),
             new ActionHandler<>(PutABTestAction.INSTANCE, PutABTestTransportAction.class),
             new ActionHandler<>(UpdateABTestAction.INSTANCE, UpdateABTestTransportAction.class),
-            new ActionHandler<>(DeleteABTestAction.INSTANCE, DeleteABTestTransportAction.class)
+            new ActionHandler<>(DeleteABTestAction.INSTANCE, DeleteABTestTransportAction.class),
+            new ActionHandler<>(ABTestSearchAction.INSTANCE, ABTestSearchTransportAction.class)
         );
     }
 
