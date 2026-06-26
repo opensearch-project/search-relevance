@@ -7,11 +7,18 @@
  */
 package org.opensearch.searchrelevance.ml;
 
+import static org.mockito.Mockito.mock;
+
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
 import org.opensearch.ml.common.input.MLInput;
+import org.opensearch.ml.common.output.MLOutput;
+import org.opensearch.ml.common.output.model.ModelTensor;
+import org.opensearch.ml.common.output.model.ModelTensorOutput;
+import org.opensearch.ml.common.output.model.ModelTensors;
 import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
 import org.opensearch.test.OpenSearchTestCase;
 
@@ -239,5 +246,173 @@ public class MLInputOutputTransformerTests extends OpenSearchTestCase {
         assertTrue("response_format should be present", parameters.containsKey("response_format"));
         assertNotNull("messages parameter should not be null", parameters.get("messages"));
         assertFalse("messages parameter should not be empty", parameters.get("messages").isEmpty());
+    }
+
+    // ============================================
+    // Provider-neutral parameter Tests
+    // ============================================
+
+    public void testCreateMLInput_emitsNeutralSystemAndUserPrompt() {
+        Map<String, String> hits = new HashMap<>();
+        hits.put("doc1", "leather running shoes");
+
+        MLInput mlInput = transformer.createMLInput(
+            "red shoes",
+            new HashMap<>(),
+            hits,
+            "{{searchText}} {{hits}}",
+            LLMJudgmentRatingType.SCORE0_1
+        );
+        Map<String, String> parameters = ((RemoteInferenceInputDataSet) mlInput.getInputDataset()).getParameters();
+
+        // Neutral fields a non-OpenAI blueprint references directly.
+        assertTrue("system_prompt should be present", parameters.containsKey("system_prompt"));
+        assertTrue("user_prompt should be present", parameters.containsKey("user_prompt"));
+        assertFalse("system_prompt should not be empty", parameters.get("system_prompt").isEmpty());
+        assertTrue("user_prompt should carry the search text", parameters.get("user_prompt").contains("red shoes"));
+        assertTrue("user_prompt should carry the hit content", parameters.get("user_prompt").contains("leather running shoes"));
+    }
+
+    public void testCreateMLInput_neutralAndLegacyParamsCoexist() {
+        Map<String, String> hits = new HashMap<>();
+        hits.put("doc1", "content");
+
+        MLInput mlInput = transformer.createMLInput("q", new HashMap<>(), hits, "Test prompt", LLMJudgmentRatingType.SCORE0_1);
+        Map<String, String> parameters = ((RemoteInferenceInputDataSet) mlInput.getInputDataset()).getParameters();
+
+        // Both the neutral params and the legacy OpenAI-shaped messages are emitted on every call.
+        assertTrue(parameters.containsKey("system_prompt"));
+        assertTrue(parameters.containsKey("user_prompt"));
+        assertTrue(parameters.containsKey("messages"));
+    }
+
+    public void testCreateMLInput_systemPromptMatchesRatingType() {
+        Map<String, String> hits = new HashMap<>();
+        hits.put("doc1", "content");
+
+        MLInput numeric = transformer.createMLInput("q", new HashMap<>(), hits, "p", LLMJudgmentRatingType.SCORE0_1);
+        MLInput binary = transformer.createMLInput("q", new HashMap<>(), hits, "p", LLMJudgmentRatingType.RELEVANT_IRRELEVANT);
+
+        String numericSystem = ((RemoteInferenceInputDataSet) numeric.getInputDataset()).getParameters().get("system_prompt");
+        String binarySystem = ((RemoteInferenceInputDataSet) binary.getInputDataset()).getParameters().get("system_prompt");
+
+        assertTrue("numeric system prompt should describe the 0-1 scale", numericSystem.contains("Score 1.0"));
+        assertTrue("binary system prompt should describe RELEVANT", binarySystem.contains("RELEVANT"));
+    }
+
+    // ============================================
+    // Response extraction Tests
+    // ============================================
+
+    public void testExtractResponseContent_readsNeutralResponseField() {
+        MLOutput output = outputWithDataMap(Map.of("response", "rated text"));
+        assertEquals("rated text", transformer.extractResponseContent(output));
+    }
+
+    public void testExtractResponseContent_fallsBackToOpenAIChoices() {
+        Map<String, Object> message = Map.of("content", "legacy text");
+        Map<String, Object> choice = Map.of("message", message);
+        MLOutput output = outputWithDataMap(Map.of("choices", List.of(choice)));
+        assertEquals("legacy text", transformer.extractResponseContent(output));
+    }
+
+    public void testExtractResponseContent_prefersResponseFieldOverChoices() {
+        Map<String, Object> message = Map.of("content", "legacy text");
+        Map<String, Object> choice = Map.of("message", message);
+        MLOutput output = outputWithDataMap(Map.of("response", "neutral text", "choices", List.of(choice)));
+        assertEquals("neutral text", transformer.extractResponseContent(output));
+    }
+
+    public void testExtractResponseContent_throwsOnUnrecognisedShape() {
+        MLOutput output = outputWithDataMap(Map.of("unexpected_key", "value"));
+        IllegalStateException ex = expectThrows(IllegalStateException.class, () -> transformer.extractResponseContent(output));
+        assertTrue(ex.getMessage().contains("Unrecognised model response shape"));
+    }
+
+    public void testExtractResponseContent_throwsOnEmptyChoices() {
+        MLOutput output = outputWithDataMap(Map.of("choices", List.of()));
+        expectThrows(IllegalStateException.class, () -> transformer.extractResponseContent(output));
+    }
+
+    public void testExtractResponseContent_throwsOnWrongOutputType() {
+        expectThrows(IllegalArgumentException.class, () -> transformer.extractResponseContent(mock(MLOutput.class)));
+    }
+
+    public void testExtractResponseContent_throwsOnEmptyTensors() {
+        MLOutput output = ModelTensorOutput.builder().mlModelOutputs(List.of()).build();
+        expectThrows(IllegalStateException.class, () -> transformer.extractResponseContent(output));
+    }
+
+    // ============================================
+    // Chunking Tests
+    // ============================================
+
+    public void testCreateMLInputs_splitsIntoMultipleChunksWhenTokenLimitExceeded() {
+        Map<String, String> hits = new HashMap<>();
+        for (int i = 0; i < 5; i++) {
+            hits.put("doc" + i, "content-" + i);
+        }
+        List<MLInput> inputs = transformer.createMLInputs(
+            50,
+            "q",
+            new HashMap<>(),
+            hits,
+            "{{searchText}} {{hits}}",
+            LLMJudgmentRatingType.SCORE0_1
+        );
+        assertTrue("expected multiple chunks, got " + inputs.size(), inputs.size() > 1);
+    }
+
+    public void testCreateMLInputs_singleChunkWhenUnderTokenLimit() {
+        Map<String, String> hits = new HashMap<>();
+        hits.put("doc1", "short");
+        hits.put("doc2", "short");
+        List<MLInput> inputs = transformer.createMLInputs(
+            10000,
+            "q",
+            new HashMap<>(),
+            hits,
+            "{{searchText}} {{hits}}",
+            LLMJudgmentRatingType.SCORE0_1
+        );
+        assertEquals(1, inputs.size());
+    }
+
+    public void testCreateMLInputs_truncatesSingleOversizedHit() {
+        StringBuilder big = new StringBuilder();
+        for (int i = 0; i < 1000; i++) {
+            big.append("very-long-token-text ");
+        }
+        Map<String, String> hits = new HashMap<>();
+        hits.put("doc1", big.toString());
+
+        List<MLInput> inputs = transformer.createMLInputs(
+            30,
+            "q",
+            new HashMap<>(),
+            hits,
+            "{{searchText}} {{hits}}",
+            LLMJudgmentRatingType.SCORE0_1
+        );
+        assertEquals(1, inputs.size());
+        assertNotNull(((RemoteInferenceInputDataSet) inputs.get(0).getInputDataset()).getParameters().get("user_prompt"));
+    }
+
+    public void testCreateMLInputs_emptyHitsReturnsEmptyList() {
+        List<MLInput> inputs = transformer.createMLInputs(
+            1000,
+            "q",
+            new HashMap<>(),
+            new HashMap<>(),
+            "{{searchText}} {{hits}}",
+            LLMJudgmentRatingType.SCORE0_1
+        );
+        assertTrue(inputs.isEmpty());
+    }
+
+    private static MLOutput outputWithDataMap(Map<String, ?> dataMap) {
+        ModelTensor tensor = ModelTensor.builder().dataAsMap(dataMap).build();
+        ModelTensors tensors = ModelTensors.builder().mlModelTensors(List.of(tensor)).build();
+        return ModelTensorOutput.builder().mlModelOutputs(List.of(tensors)).build();
     }
 }
