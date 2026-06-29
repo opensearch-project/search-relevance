@@ -132,6 +132,13 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                 .map(id -> searchConfigurationDao.getSearchConfigurationSync(id))
                 .collect(Collectors.toList());
 
+            // Record per-run success/failure counts and failed queries (with reasons) into the judgment
+            // metadata before handing the ratings back, so the stored judgment reflects partial outcomes.
+            ActionListener<List<Map<String, Object>>> summaryListener = ActionListener.wrap(results -> {
+                metadata.putAll(JudgmentDataTransformer.buildJudgmentSummary(results));
+                listener.onResponse(results);
+            }, listener::onFailure);
+
             generateLLMJudgmentsAsync(
                 modelId,
                 size,
@@ -143,7 +150,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                 promptTemplate,
                 ratingType,
                 overwriteCache,
-                listener
+                summaryListener
             );
         } catch (Exception e) {
             log.error("Failed to generate LLM judgments", e);
@@ -340,8 +347,11 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                 e.getMessage(),
                 e
             );
-            // Always return a result with whatever ratings we managed to collect
-            return JudgmentDataTransformer.createJudgmentResult(queryTextWithCustomInput, docIdToScore);
+            // Always return a result with whatever ratings we managed to collect, tagging the failure
+            // reason so it can be surfaced in the judgment summary.
+            Map<String, Object> result = JudgmentDataTransformer.createJudgmentResult(queryTextWithCustomInput, docIdToScore);
+            result.put("error", e.getMessage());
+            return result;
         }
     }
 

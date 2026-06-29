@@ -32,29 +32,12 @@ import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
 import org.opensearch.test.OpenSearchTestCase;
 
 /**
- * Integration tests for MLAccessor focusing on:
- * - First attempt success with response_format (GPT-4o scenario)
- * - Response processing with structured outputs
- *
- * Note: Tests for retry logic and fallback behavior (GPT-3.5 compatibility) are documented
- * in TESTING_GPT35_FALLBACK.md as manual tests because they require delayed retries which
- * create thread leaks in the OpenSearch test framework. The retry mechanism uses
- * CompletableFuture.delayedExecutor which creates daemon threads that cannot be properly
- * cleaned up within test execution.
- *
- * Covered by unit tests:
- * - MLInputOutputTransformerTests: Verifies response_format parameter is correctly included/excluded
- * - RatingOutputProcessorTests: Verifies both structured and unstructured response parsing
+ * Integration tests for MLAccessor covering:
+ * - First-attempt success with response_format
+ * - One-shot fallback to no response_format on failure (for models without structured-output support)
+ * - No client-side retry loop: transient-error retries are delegated to the ml-commons connector
  */
 public class MLAccessorIntegrationTests extends OpenSearchTestCase {
-
-    /**
-     * Note: GPT-3.5 fallback testing is documented in TESTING_GPT35_FALLBACK.md as "Scenario 2"
-     * This scenario requires triggering scheduleRetry which creates CompletableFuture threads that leak.
-     * Coverage is provided by:
-     * - Unit tests: MLInputOutputTransformerTests verifies response_format parameter handling
-     * - Manual tests: Real OpenAI GPT-3.5 API integration testing
-     */
 
     /**
      * Test that MLAccessor works correctly on first attempt when model supports response_format.
@@ -118,20 +101,99 @@ public class MLAccessorIntegrationTests extends OpenSearchTestCase {
     }
 
     /**
-     * Note: Binary rating (RELEVANT/IRRELEVANT) fallback testing is documented in
-     * TESTING_GPT35_FALLBACK.md as "Scenario 3". This test would trigger scheduleRetry
-     * creating thread leaks. Coverage is provided by:
-     * - Unit tests: MLInputOutputTransformerTests.testCreateMLInput_BinaryRatingWithoutResponseFormat
-     * - Unit tests: RatingOutputProcessorTests verifies RELEVANT→1.0, IRRELEVANT→0.0 conversion
-     * - Manual tests: Real OpenAI API integration testing
+     * On failure with response_format, MLAccessor retries exactly once without response_format
+     * (for models without structured-output support) and succeeds. No additional client-side retries.
      */
+    public void testFallbackToWithoutResponseFormat_OnFailure() throws Exception {
+        MachineLearningNodeClient mlClient = mock(MachineLearningNodeClient.class);
+        MLAccessor mlAccessor = new MLAccessor(mlClient);
+
+        AtomicInteger attemptCount = new AtomicInteger(0);
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicReference<ChunkResult> result = new AtomicReference<>();
+
+        doAnswer(invocation -> {
+            MLInput mlInput = invocation.getArgument(1);
+            ActionListener<MLOutput> listener = invocation.getArgument(2);
+            attemptCount.incrementAndGet();
+
+            RemoteInferenceInputDataSet dataset = (RemoteInferenceInputDataSet) mlInput.getInputDataset();
+            boolean hasResponseFormat = dataset.getParameters().containsKey("response_format");
+
+            if (hasResponseFormat) {
+                // Model rejects structured output
+                listener.onFailure(new RuntimeException("response_format not supported"));
+            } else {
+                listener.onResponse(createMockMLOutput("{\"ratings\":[{\"id\":\"doc1\",\"rating_score\":0.9}]}"));
+            }
+            return null;
+        }).when(mlClient).predict(any(), any(MLInput.class), any());
+
+        mlAccessor.predict(
+            "gpt-3.5-turbo",
+            4000,
+            "test query",
+            new HashMap<>(),
+            Map.of("doc1", "test content"),
+            "Test prompt",
+            LLMJudgmentRatingType.SCORE0_1,
+            ActionListener.wrap(chunkResult -> {
+                result.set(chunkResult);
+                latch.countDown();
+            }, e -> latch.countDown())
+        );
+
+        assertTrue("Should complete", latch.await(10, TimeUnit.SECONDS));
+        assertEquals("One attempt with response_format, one without", 2, attemptCount.get());
+
+        ChunkResult chunkResult = result.get();
+        assertNotNull(chunkResult);
+        assertEquals(1, chunkResult.getSuccessfulChunksCount());
+        assertEquals(0, chunkResult.getFailedChunksCount());
+    }
 
     /**
-     * Note: Testing retry exhaustion (all attempts fail) is documented in TESTING_GPT35_FALLBACK.md
-     * as a manual test scenario because it requires delayed retries which create thread leaks in tests.
-     * The retry logic with exponential backoff uses CompletableFuture.delayedExecutor which creates
-     * daemon threads that cannot be properly cleaned up in the OpenSearch test framework.
+     * When every call fails, MLAccessor makes exactly two attempts (with then without response_format)
+     * and reports the chunk as failed. It does NOT enter a retry loop - transient-error retries are the
+     * ml-commons connector's responsibility.
      */
+    public void testNoClientSideRetryLoop_WhenAllAttemptsFail() throws Exception {
+        MachineLearningNodeClient mlClient = mock(MachineLearningNodeClient.class);
+        MLAccessor mlAccessor = new MLAccessor(mlClient);
+
+        AtomicInteger attemptCount = new AtomicInteger(0);
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicReference<ChunkResult> result = new AtomicReference<>();
+
+        doAnswer(invocation -> {
+            ActionListener<MLOutput> listener = invocation.getArgument(2);
+            attemptCount.incrementAndGet();
+            listener.onFailure(new RuntimeException("boom"));
+            return null;
+        }).when(mlClient).predict(any(), any(MLInput.class), any());
+
+        mlAccessor.predict(
+            "gpt-4o-mini",
+            4000,
+            "test query",
+            new HashMap<>(),
+            Map.of("doc1", "test content"),
+            "Test prompt",
+            LLMJudgmentRatingType.SCORE0_1,
+            ActionListener.wrap(chunkResult -> {
+                result.set(chunkResult);
+                latch.countDown();
+            }, e -> latch.countDown())
+        );
+
+        assertTrue("Should complete", latch.await(10, TimeUnit.SECONDS));
+        assertEquals("Exactly two attempts: with and without response_format, no retry loop", 2, attemptCount.get());
+
+        ChunkResult chunkResult = result.get();
+        assertNotNull(chunkResult);
+        assertEquals(0, chunkResult.getSuccessfulChunksCount());
+        assertEquals(1, chunkResult.getFailedChunksCount());
+    }
 
     // ============================================
     // Helper Methods

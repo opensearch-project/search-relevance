@@ -184,4 +184,58 @@ public class JudgmentDataTransformerTests extends OpenSearchTestCase {
         assertEquals("doc1", ratings.get(0).get("docId"));
         assertEquals("1.0", ratings.get(0).get("rating"));
     }
+
+    public void testBuildJudgmentSummaryAllSuccessful() {
+        List<Map<String, Object>> results = List.of(
+            transformer.createJudgmentResult("q1", Map.of("doc1", "0.9")),
+            transformer.createJudgmentResult("q2", Map.of("doc2", "0.4"))
+        );
+
+        Map<String, Object> summary = JudgmentDataTransformer.buildJudgmentSummary(results);
+
+        assertEquals(2, summary.get("totalQueries"));
+        assertEquals(2, summary.get("successfulQueries"));
+        assertEquals(0, summary.get("failedQueries"));
+        assertTrue(((List<?>) summary.get("failures")).isEmpty());
+    }
+
+    public void testBuildJudgmentSummaryWithTaggedFailure() {
+        Map<String, Object> failed = transformer.createJudgmentResult("bad query", Map.of());
+        failed.put("error", "model timed out");
+
+        List<Map<String, Object>> results = List.of(transformer.createJudgmentResult("good query", Map.of("doc1", "1.0")), failed);
+
+        Map<String, Object> summary = JudgmentDataTransformer.buildJudgmentSummary(results);
+
+        assertEquals(2, summary.get("totalQueries"));
+        assertEquals(1, summary.get("successfulQueries"));
+        assertEquals(1, summary.get("failedQueries"));
+
+        List<Map<String, Object>> failures = (List<Map<String, Object>>) summary.get("failures");
+        assertEquals(1, failures.size());
+        assertEquals("bad query", failures.get(0).get("query"));
+        assertEquals("model timed out", failures.get(0).get("reason"));
+    }
+
+    public void testBuildJudgmentSummaryEmptyRatingsWithoutErrorUsesDefaultReason() {
+        List<Map<String, Object>> results = List.of(transformer.createJudgmentResult("silent query", Map.of()));
+
+        Map<String, Object> summary = JudgmentDataTransformer.buildJudgmentSummary(results);
+
+        assertEquals(0, summary.get("successfulQueries"));
+        assertEquals(1, summary.get("failedQueries"));
+
+        List<Map<String, Object>> failures = (List<Map<String, Object>>) summary.get("failures");
+        assertEquals("silent query", failures.get(0).get("query"));
+        assertEquals("No ratings were generated", failures.get(0).get("reason"));
+    }
+
+    public void testBuildJudgmentSummaryEmptyResults() {
+        Map<String, Object> summary = JudgmentDataTransformer.buildJudgmentSummary(List.of());
+
+        assertEquals(0, summary.get("totalQueries"));
+        assertEquals(0, summary.get("successfulQueries"));
+        assertEquals(0, summary.get("failedQueries"));
+        assertTrue(((List<?>) summary.get("failures")).isEmpty());
+    }
 }
