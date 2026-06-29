@@ -254,8 +254,8 @@ public class MLInputOutputTransformer {
         }
 
         throw new IllegalStateException(
-            "Unrecognised model response shape; expected a top-level \"response\" string (set by the connector "
-                + "blueprint's post_process_function) or an OpenAI \"choices[0].message.content\". Got keys: "
+            "Unrecognised model response shape; expected a top-level \"response\" string set by the connector "
+                + "blueprint's post_process_function, but the response contained these fields instead: "
                 + dataMap.keySet()
         );
     }
