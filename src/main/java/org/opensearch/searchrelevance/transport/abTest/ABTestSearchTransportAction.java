@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -208,7 +209,7 @@ public class ABTestSearchTransportAction extends HandledTransportAction<ABTestSe
         String targetIndexB = (String) configBSource.get("index");
         if (targetIndexB == null || !targetIndexB.equals(targetIndex)) {
             listener.onFailure(new SearchRelevanceException(
-                "Both search configurations must target the same index. Config A targets [" + targetIndex + "], Config B targets [" + targetIndexB + "]",
+                String.format(Locale.ROOT, "Both search configurations must target the same index. Config A targets [%s], Config B targets [%s]", targetIndex, targetIndexB),
                 RestStatus.BAD_REQUEST
             ));
             return;
@@ -216,6 +217,14 @@ public class ABTestSearchTransportAction extends HandledTransportAction<ABTestSe
         String queryB = (String) configBSource.get("query");
         String pipelineB = (String) configBSource.get("searchPipeline");
         int sizeB = configBSource.containsKey("size") ? ((Number) configBSource.get("size")).intValue() : DEFAULT_SEARCH_SIZE;
+
+        if (sizeA != sizeB) {
+            listener.onFailure(new SearchRelevanceException(
+                String.format(Locale.ROOT, "Both search configurations must use the same size for fair comparison. Config A size [%d], Config B size [%d]", sizeA, sizeB),
+                RestStatus.BAD_REQUEST
+            ));
+            return;
+        }
 
         SearchRequest searchRequestA = SearchRequestBuilder.buildSearchRequest(targetIndex, queryA, searchText, pipelineA, sizeA);
         SearchRequest searchRequestB = SearchRequestBuilder.buildSearchRequest(targetIndex, queryB, searchText, pipelineB, sizeB);
@@ -245,7 +254,7 @@ public class ABTestSearchTransportAction extends HandledTransportAction<ABTestSe
                 // Apply Team Draft Interleaving to merge both result sets
                 List<SearchHit> hitsA = Arrays.asList(responseA.get().getHits().getHits());
                 List<SearchHit> hitsB = Arrays.asList(responseB.get().getHits().getHits());
-                TeamDraftInterleaver.Result tdiResult = interleaver.interleave(hitsA, hitsB, Math.max(hitsA.size(), hitsB.size()));
+                TeamDraftInterleaver.Result tdiResult = interleaver.interleave(hitsA, hitsB, Math.min(hitsA.size(), hitsB.size()));
 
                 // Map each hit with its team's config UUID for click attribution
                 List<Map<String, Object>> responseHits = new ArrayList<>();
