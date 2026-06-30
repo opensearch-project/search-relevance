@@ -33,7 +33,6 @@ import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.model.ABTest;
 import org.opensearch.searchrelevance.model.builder.SearchRequestBuilder;
-import org.opensearch.searchrelevance.shared.StashedThreadContext;
 import org.opensearch.tasks.Task;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.TransportService;
@@ -206,6 +205,14 @@ public class ABTestSearchTransportAction extends HandledTransportAction<ABTestSe
             return;
         }
         Map<String, Object> configBSource = configBResponse.getHits().getHits()[0].getSourceAsMap();
+        String targetIndexB = (String) configBSource.get("index");
+        if (targetIndexB == null || !targetIndexB.equals(targetIndex)) {
+            listener.onFailure(new SearchRelevanceException(
+                "Both search configurations must target the same index. Config A targets [" + targetIndex + "], Config B targets [" + targetIndexB + "]",
+                RestStatus.BAD_REQUEST
+            ));
+            return;
+        }
         String queryB = (String) configBSource.get("query");
         String pipelineB = (String) configBSource.get("searchPipeline");
         int sizeB = configBSource.containsKey("size") ? ((Number) configBSource.get("size")).intValue() : DEFAULT_SEARCH_SIZE;
@@ -251,23 +258,24 @@ public class ABTestSearchTransportAction extends HandledTransportAction<ABTestSe
             }
         };
 
-        StashedThreadContext.run(client, () -> client.search(searchRequestA, ActionListener.wrap(r -> {
+        // Execute searches with caller's security context (no stashing) to preserve FGAC
+        client.search(searchRequestA, ActionListener.wrap(r -> {
             responseA.set(r);
             maybeInterleave.run();
         }, e -> {
             if (failed.compareAndSet(false, true)) {
                 listener.onFailure(new SearchRelevanceException("Search execution failed", e, RestStatus.INTERNAL_SERVER_ERROR));
             }
-        })));
+        }));
 
-        StashedThreadContext.run(client, () -> client.search(searchRequestB, ActionListener.wrap(r -> {
+        client.search(searchRequestB, ActionListener.wrap(r -> {
             responseB.set(r);
             maybeInterleave.run();
         }, e -> {
             if (failed.compareAndSet(false, true)) {
                 listener.onFailure(new SearchRelevanceException("Search execution failed", e, RestStatus.INTERNAL_SERVER_ERROR));
             }
-        })));
+        }));
     }
 
     /**
@@ -280,7 +288,8 @@ public class ABTestSearchTransportAction extends HandledTransportAction<ABTestSe
         String configUuid,
         ActionListener<ABTestSearchResponse> listener
     ) {
-        StashedThreadContext.run(client, () -> client.search(searchRequest, ActionListener.wrap(
+        // Execute search with caller's security context (no stashing) to preserve FGAC
+        client.search(searchRequest, ActionListener.wrap(
             searchResponse -> {
                 List<Map<String, Object>> responseHits = new ArrayList<>();
                 for (SearchHit hit : searchResponse.getHits().getHits()) {
@@ -289,7 +298,7 @@ public class ABTestSearchTransportAction extends HandledTransportAction<ABTestSe
                 listener.onResponse(new ABTestSearchResponse(testId, false, responseHits));
             },
             e -> listener.onFailure(new SearchRelevanceException("Search execution failed", e, RestStatus.INTERNAL_SERVER_ERROR))
-        )));
+        ));
     }
 
     /**
