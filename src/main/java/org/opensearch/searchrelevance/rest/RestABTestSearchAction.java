@@ -32,6 +32,13 @@ import org.opensearch.transport.client.node.NodeClient;
 
 import lombok.AllArgsConstructor;
 
+/**
+ * REST handler for AB test search with Team Draft Interleaving.
+ * Executes both search configurations in parallel, interleaves results using TDI,
+ * and returns a merged result list with team attribution per hit.
+ *
+ * Endpoint: POST /_plugins/_search_relevance/ab_tests/{id}/_search
+ */
 @AllArgsConstructor
 public class RestABTestSearchAction extends BaseRestHandler {
     private static final Logger LOGGER = LogManager.getLogger(RestABTestSearchAction.class);
@@ -53,20 +60,24 @@ public class RestABTestSearchAction extends BaseRestHandler {
         if (!settingsAccessor.isWorkbenchEnabled()) {
             return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.FORBIDDEN, "Search Relevance Workbench is disabled"));
         }
+
         String testId = request.param("id");
-        if (testId == null || testId.isEmpty()) {
-            return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.BAD_REQUEST, "test id is required"));
-        }
         Map<String, Object> source = request.contentParser().map();
         @SuppressWarnings("unchecked")
+        // TODO: Currently only SearchText is supported for substitution. Future iterations will
+        // support additional query_params (e.g., filters, boost values, pagination parameters).
         Map<String, Object> rawParams = (Map<String, Object>) source.get("query_params");
-        if (rawParams == null || rawParams.isEmpty()) {
-            return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.BAD_REQUEST, "query_params map is required"));
+
+        String validationError = validateInput(testId, rawParams);
+        if (validationError != null) {
+            return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.BAD_REQUEST, validationError));
         }
+
         Map<String, String> params = new HashMap<>();
         for (Map.Entry<String, Object> entry : rawParams.entrySet()) {
             params.put(entry.getKey(), String.valueOf(entry.getValue()));
         }
+
         ABTestSearchRequest searchRequest = new ABTestSearchRequest(testId, params);
         return channel -> client.execute(ABTestSearchAction.INSTANCE, searchRequest, new ActionListener<ABTestSearchResponse>() {
             @Override
@@ -87,5 +98,28 @@ public class RestABTestSearchAction extends BaseRestHandler {
                 }
             }
         });
+    }
+
+    /**
+     * Validates test id and query_params values.
+     * Returns an error message if validation fails, or null if all inputs are valid.
+     */
+    private String validateInput(String testId, Map<String, Object> rawParams) {
+        if (testId == null || testId.isEmpty()) {
+            return "test id is required";
+        }
+        if (rawParams == null || rawParams.isEmpty()) {
+            return "query_params map is required";
+        }
+        for (Map.Entry<String, Object> entry : rawParams.entrySet()) {
+            String value = String.valueOf(entry.getValue());
+            if (value.length() > 1024) {
+                return "query_params value exceeds maximum length of 1024 characters";
+            }
+            if (value.chars().anyMatch(c -> c < 0x20 && c != '\t' && c != '\n' && c != '\r')) {
+                return "query_params value contains invalid control characters";
+            }
+        }
+        return null;
     }
 }

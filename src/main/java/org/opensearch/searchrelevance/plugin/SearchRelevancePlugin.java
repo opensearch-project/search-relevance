@@ -293,7 +293,8 @@ public class SearchRelevancePlugin extends Plugin
             infoStatsManager,
             experimentTaskManager,
             jobRunner,
-            experimentRunningManager
+            experimentRunningManager,
+            new org.opensearch.searchrelevance.algorithm.TeamDraftInterleaver()
         );
     }
 

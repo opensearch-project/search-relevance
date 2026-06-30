@@ -57,9 +57,8 @@ public class TeamDraftInterleaverTests extends OpenSearchTestCase {
 
         TeamDraftInterleaver.Result result = interleaver.interleave(hitsA, hitsB, 5);
 
-        long doc1Count = result.getInterleavedHits().stream().filter(h -> h.getId().equals("doc1")).count();   // once the interleavig is
-                                                                                                               // performed, we count how
-                                                                                                               // many times "doc 1" appears
+        // Once the interleaving is performed, count how many times "doc1" appears
+        long doc1Count = result.getInterleavedHits().stream().filter(h -> h.getId().equals("doc1")).count();
                                                                                                                // in the result. must be
                                                                                                                // exactly 1 and not greater.
         assertEquals(1, doc1Count);

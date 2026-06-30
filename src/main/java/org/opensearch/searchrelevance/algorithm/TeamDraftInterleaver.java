@@ -15,10 +15,29 @@ import java.util.concurrent.ThreadLocalRandom;
 
 import org.opensearch.search.SearchHit;
 
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+/**
+ * Implements Team Draft Interleaving (TDI) algorithm for A/B testing search configurations.
+ *
+ * TDI merges two ranked result lists into a single interleaved list while tracking which
+ * "team" (search configuration) each document belongs to. A fair coin flip each round
+ * determines which list picks first, ensuring unbiased presentation order.
+ *
+ * Reference: Radlinski & Craswell, "Optimized Interleaving for Online Retrieval Evaluation" (WSDM 2013)
+ */
+@NoArgsConstructor
 public class TeamDraftInterleaver {
 
-    public TeamDraftInterleaver() {}
-
+    /**
+     * Interleaves two ranked hit lists using the Team Draft algorithm.
+     *
+     * @param hitsA ranked results from search configuration A
+     * @param hitsB ranked results from search configuration B
+     * @param size  maximum number of results in the interleaved list
+     * @return Result containing the interleaved list and team membership sets
+     */
     public Result interleave(List<SearchHit> hitsA, List<SearchHit> hitsB, int size) {
         List<SearchHit> interleaved = new ArrayList<>(size);
         Set<String> teamA = new HashSet<>();
@@ -27,7 +46,9 @@ public class TeamDraftInterleaver {
         int ptrA = 0;
         int ptrB = 0;
 
+        // Step 1: Repeat rounds until we have enough results or exhaust both lists
         while (interleaved.size() < size) {
+            // Step 2: Fair coin flip — determines which team picks first this round
             boolean aFirst = ThreadLocalRandom.current().nextBoolean();
             List<SearchHit> firstHits = aFirst ? hitsA : hitsB;
             List<SearchHit> secondHits = aFirst ? hitsB : hitsA;
@@ -36,6 +57,7 @@ public class TeamDraftInterleaver {
             int firstPtr = aFirst ? ptrA : ptrB;
             int secondPtr = aFirst ? ptrB : ptrA;
 
+            // Step 3a: First team picks — skip documents already in the interleaved list
             while (firstPtr < firstHits.size() && seen.contains(firstHits.get(firstPtr).getId())) {
                 firstPtr++;
             }
@@ -57,6 +79,7 @@ public class TeamDraftInterleaver {
                 break;
             }
 
+            // Step 3b: Second team picks — skip documents already in the interleaved list
             while (secondPtr < secondHits.size() && seen.contains(secondHits.get(secondPtr).getId())) {
                 secondPtr++;
             }
@@ -67,6 +90,7 @@ public class TeamDraftInterleaver {
                 seen.add(pick.getId());
                 secondPtr++;
             }
+            // Step 4: Update pointers for next round
             if (aFirst) {
                 ptrA = firstPtr;
                 ptrB = secondPtr;
@@ -81,6 +105,7 @@ public class TeamDraftInterleaver {
         return new Result(interleaved, teamA, teamB);
     }
 
+    @Getter
     public static class Result {
         private final List<SearchHit> interleavedHits;
         private final Set<String> teamA;
@@ -90,18 +115,6 @@ public class TeamDraftInterleaver {
             this.interleavedHits = java.util.Collections.unmodifiableList(interleavedHits);
             this.teamA = java.util.Collections.unmodifiableSet(teamA);
             this.teamB = java.util.Collections.unmodifiableSet(teamB);
-        }
-
-        public List<SearchHit> getInterleavedHits() {
-            return interleavedHits;
-        }
-
-        public Set<String> getTeamA() {
-            return teamA;
-        }
-
-        public Set<String> getTeamB() {
-            return teamB;
         }
     }
 }
