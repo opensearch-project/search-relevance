@@ -13,13 +13,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.support.ActionFilters;
-import org.opensearch.action.support.GroupedActionListener;
 import org.opensearch.action.support.HandledTransportAction;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.core.action.ActionListener;
@@ -49,6 +51,7 @@ import org.opensearch.transport.client.Client;
  */
 public class ABTestSearchTransportAction extends HandledTransportAction<ABTestSearchRequest, ABTestSearchResponse> {
     private static final Logger LOGGER = LogManager.getLogger(ABTestSearchTransportAction.class);
+    private static final int DEFAULT_SEARCH_SIZE = 10;
 
     private final ABTestDao abTestDao;
     private final SearchConfigurationDao searchConfigurationDao;
@@ -107,33 +110,52 @@ public class ABTestSearchTransportAction extends HandledTransportAction<ABTestSe
                 return;
             }
             Map<String, Object> source = abTestResponse.getHits().getHits()[0].getSourceAsMap();
-            boolean enabled = (Boolean) source.get(ABTest.ENABLED);
+            Boolean enabledObj = (Boolean) source.get(ABTest.ENABLED);
             String configAId = (String) source.get(ABTest.SEARCH_CONFIGURATION_A);
             String configBId = (String) source.get(ABTest.SEARCH_CONFIGURATION_B);
             String configAUuid = (String) source.get(ABTest.CONFIG_A_UUID);
             String configBUuid = (String) source.get(ABTest.CONFIG_B_UUID);
             String testId = (String) source.get(ABTest.TEST_ID);
 
-            // Fetch both configurations in parallel using GroupedActionListener
-            int configCount = enabled ? 2 : 1;
-            GroupedActionListener<SearchResponse> groupedListener = new GroupedActionListener<>(
-                ActionListener.wrap(
-                    responses -> {
-                        List<SearchResponse> responseList = new ArrayList<>(responses);
-                        SearchResponse configAResponse = responseList.get(0);
-                        SearchResponse configBResponse = responseList.size() > 1 ? responseList.get(1) : null;
-                        executeSearchWithConfigs(configAResponse, configBResponse, enabled, testId, configAUuid, configBUuid, request, listener);
-                    },
-                    e -> listener.onFailure(
-                        new SearchRelevanceException("Failed to fetch search configuration", e, RestStatus.NOT_FOUND)
-                    )
-                ),
-                configCount
-            );
+            if (enabledObj == null || configAId == null || configAUuid == null || testId == null) {
+                listener.onFailure(new SearchRelevanceException("AB test document is missing required fields", RestStatus.INTERNAL_SERVER_ERROR));
+                return;
+            }
+            boolean enabled = enabledObj;
 
-            searchConfigurationDao.getSearchConfiguration(configAId, groupedListener);
+            // Fetch both configurations in parallel with dedicated slots to preserve ordering
+            AtomicReference<SearchResponse> configARef = new AtomicReference<>();
+            AtomicReference<SearchResponse> configBRef = new AtomicReference<>();
+            AtomicInteger remaining = new AtomicInteger(enabled ? 2 : 1);
+            AtomicBoolean failed = new AtomicBoolean(false);
+
+            Runnable maybeComplete = () -> {
+                if (remaining.decrementAndGet() == 0 && !failed.get()) {
+                    executeSearchWithConfigs(configARef.get(), configBRef.get(), enabled, testId, configAUuid, configBUuid, request, listener);
+                }
+            };
+
+            ActionListener<SearchResponse> configAListener = ActionListener.wrap(r -> {
+                configARef.set(r);
+                maybeComplete.run();
+            }, e -> {
+                if (failed.compareAndSet(false, true)) {
+                    listener.onFailure(new SearchRelevanceException("Failed to fetch search configuration A", e, RestStatus.NOT_FOUND));
+                }
+            });
+
+            searchConfigurationDao.getSearchConfiguration(configAId, configAListener);
+
             if (enabled) {
-                searchConfigurationDao.getSearchConfiguration(configBId, groupedListener);
+                ActionListener<SearchResponse> configBListener = ActionListener.wrap(r -> {
+                    configBRef.set(r);
+                    maybeComplete.run();
+                }, e -> {
+                    if (failed.compareAndSet(false, true)) {
+                        listener.onFailure(new SearchRelevanceException("Failed to fetch search configuration B", e, RestStatus.NOT_FOUND));
+                    }
+                });
+                searchConfigurationDao.getSearchConfiguration(configBId, configBListener);
             }
         } catch (Exception e) {
             listener.onFailure(new SearchRelevanceException("ABTestSearch failed", e, RestStatus.INTERNAL_SERVER_ERROR));
@@ -163,6 +185,7 @@ public class ABTestSearchTransportAction extends HandledTransportAction<ABTestSe
         String queryA = (String) configASource.get("query");
         String pipelineA = (String) configASource.get("searchPipeline");
         String targetIndex = (String) configASource.get("index");
+        int sizeA = configASource.containsKey("size") ? ((Number) configASource.get("size")).intValue() : DEFAULT_SEARCH_SIZE;
 
         String searchText = request.getParams().get("SearchText");
         if (searchText == null || searchText.isEmpty()) {
@@ -172,7 +195,7 @@ public class ABTestSearchTransportAction extends HandledTransportAction<ABTestSe
 
         // If test is disabled, only execute config A
         if (!enabled) {
-            SearchRequest searchRequestA = SearchRequestBuilder.buildSearchRequest(targetIndex, queryA, searchText, pipelineA, 10);
+            SearchRequest searchRequestA = SearchRequestBuilder.buildSearchRequest(targetIndex, queryA, searchText, pipelineA, sizeA);
             executeSingleSearch(searchRequestA, testId, configAUuid, listener);
             return;
         }
@@ -185,16 +208,17 @@ public class ABTestSearchTransportAction extends HandledTransportAction<ABTestSe
         Map<String, Object> configBSource = configBResponse.getHits().getHits()[0].getSourceAsMap();
         String queryB = (String) configBSource.get("query");
         String pipelineB = (String) configBSource.get("searchPipeline");
+        int sizeB = configBSource.containsKey("size") ? ((Number) configBSource.get("size")).intValue() : DEFAULT_SEARCH_SIZE;
 
-        SearchRequest searchRequestA = SearchRequestBuilder.buildSearchRequest(targetIndex, queryA, searchText, pipelineA, 10);
-        SearchRequest searchRequestB = SearchRequestBuilder.buildSearchRequest(targetIndex, queryB, searchText, pipelineB, 10);
+        SearchRequest searchRequestA = SearchRequestBuilder.buildSearchRequest(targetIndex, queryA, searchText, pipelineA, sizeA);
+        SearchRequest searchRequestB = SearchRequestBuilder.buildSearchRequest(targetIndex, queryB, searchText, pipelineB, sizeB);
 
         executeParallelSearchesAndInterleave(searchRequestA, searchRequestB, testId, configAUuid, configBUuid, listener);
     }
 
     /**
-     * Executes both search queries in parallel using GroupedActionListener, then applies
-     * Team Draft Interleaving to merge the two ranked lists into one.
+     * Executes both search queries in parallel with dedicated listeners to preserve ordering,
+     * then applies Team Draft Interleaving to merge the two ranked lists into one.
      */
     private void executeParallelSearchesAndInterleave(
         SearchRequest searchRequestA,
@@ -204,35 +228,46 @@ public class ABTestSearchTransportAction extends HandledTransportAction<ABTestSe
         String configBUuid,
         ActionListener<ABTestSearchResponse> listener
     ) {
-        // Fully async parallel execution using GroupedActionListener
-        GroupedActionListener<SearchResponse> groupedListener = new GroupedActionListener<>(
-            ActionListener.wrap(
-                responses -> {
-                    List<SearchResponse> responseList = new ArrayList<>(responses);
-                    SearchResponse responseA = responseList.get(0);
-                    SearchResponse responseB = responseList.get(1);
+        AtomicReference<SearchResponse> responseA = new AtomicReference<>();
+        AtomicReference<SearchResponse> responseB = new AtomicReference<>();
+        AtomicInteger remaining = new AtomicInteger(2);
+        AtomicBoolean failed = new AtomicBoolean(false);
 
-                    // Apply Team Draft Interleaving to merge both result sets
-                    List<SearchHit> hitsA = Arrays.asList(responseA.getHits().getHits());
-                    List<SearchHit> hitsB = Arrays.asList(responseB.getHits().getHits());
-                    TeamDraftInterleaver.Result tdiResult = interleaver.interleave(hitsA, hitsB, Math.max(hitsA.size(), hitsB.size()));
+        Runnable maybeInterleave = () -> {
+            if (remaining.decrementAndGet() == 0 && !failed.get()) {
+                // Apply Team Draft Interleaving to merge both result sets
+                List<SearchHit> hitsA = Arrays.asList(responseA.get().getHits().getHits());
+                List<SearchHit> hitsB = Arrays.asList(responseB.get().getHits().getHits());
+                TeamDraftInterleaver.Result tdiResult = interleaver.interleave(hitsA, hitsB, Math.max(hitsA.size(), hitsB.size()));
 
-                    // Map each hit with its team's config UUID for click attribution
-                    List<Map<String, Object>> responseHits = new ArrayList<>();
-                    Set<String> teamADocs = tdiResult.getTeamA();
-                    for (SearchHit hit : tdiResult.getInterleavedHits()) {
-                        String uuid = teamADocs.contains(hit.getId()) ? configAUuid : configBUuid;
-                        responseHits.add(mapHit(hit, uuid));
-                    }
-                    listener.onResponse(new ABTestSearchResponse(testId, true, responseHits));
-                },
-                e -> listener.onFailure(new SearchRelevanceException("Search execution failed", e, RestStatus.INTERNAL_SERVER_ERROR))
-            ),
-            2
-        );
+                // Map each hit with its team's config UUID for click attribution
+                List<Map<String, Object>> responseHits = new ArrayList<>();
+                Set<String> teamADocs = tdiResult.getTeamA();
+                for (SearchHit hit : tdiResult.getInterleavedHits()) {
+                    String uuid = teamADocs.contains(hit.getId()) ? configAUuid : configBUuid;
+                    responseHits.add(mapHit(hit, uuid));
+                }
+                listener.onResponse(new ABTestSearchResponse(testId, true, responseHits));
+            }
+        };
 
-        StashedThreadContext.run(client, () -> client.search(searchRequestA, groupedListener));
-        StashedThreadContext.run(client, () -> client.search(searchRequestB, groupedListener));
+        StashedThreadContext.run(client, () -> client.search(searchRequestA, ActionListener.wrap(r -> {
+            responseA.set(r);
+            maybeInterleave.run();
+        }, e -> {
+            if (failed.compareAndSet(false, true)) {
+                listener.onFailure(new SearchRelevanceException("Search execution failed", e, RestStatus.INTERNAL_SERVER_ERROR));
+            }
+        })));
+
+        StashedThreadContext.run(client, () -> client.search(searchRequestB, ActionListener.wrap(r -> {
+            responseB.set(r);
+            maybeInterleave.run();
+        }, e -> {
+            if (failed.compareAndSet(false, true)) {
+                listener.onFailure(new SearchRelevanceException("Search execution failed", e, RestStatus.INTERNAL_SERVER_ERROR));
+            }
+        })));
     }
 
     /**

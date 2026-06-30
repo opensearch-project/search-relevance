@@ -25,7 +25,7 @@ import lombok.NoArgsConstructor;
  * "team" (search configuration) each document belongs to. A fair coin flip each round
  * determines which list picks first, ensuring unbiased presentation order.
  *
- * Reference: Radlinski & Craswell, "Optimized Interleaving for Online Retrieval Evaluation" (WSDM 2013)
+ * Reference: Radlinski &amp; Craswell, "Optimized Interleaving for Online Retrieval Evaluation" (WSDM 2013)
  */
 @NoArgsConstructor
 public class TeamDraftInterleaver {
@@ -61,12 +61,14 @@ public class TeamDraftInterleaver {
             while (firstPtr < firstHits.size() && seen.contains(firstHits.get(firstPtr).getId())) {
                 firstPtr++;
             }
+            boolean pickedFirst = false;
             if (firstPtr < firstHits.size()) {
                 SearchHit pick = firstHits.get(firstPtr);
                 interleaved.add(pick);
                 firstTeam.add(pick.getId());
                 seen.add(pick.getId());
                 firstPtr++;
+                pickedFirst = true;
             }
             if (interleaved.size() >= size) {
                 if (aFirst) {
@@ -83,14 +85,16 @@ public class TeamDraftInterleaver {
             while (secondPtr < secondHits.size() && seen.contains(secondHits.get(secondPtr).getId())) {
                 secondPtr++;
             }
+            boolean pickedSecond = false;
             if (secondPtr < secondHits.size()) {
                 SearchHit pick = secondHits.get(secondPtr);
                 interleaved.add(pick);
                 secondTeam.add(pick.getId());
                 seen.add(pick.getId());
                 secondPtr++;
+                pickedSecond = true;
             }
-            // Step 4: Update pointers for next round
+            // Step 4: Update pointers and check termination
             if (aFirst) {
                 ptrA = firstPtr;
                 ptrB = secondPtr;
@@ -98,7 +102,8 @@ public class TeamDraftInterleaver {
                 ptrB = firstPtr;
                 ptrA = secondPtr;
             }
-            if (ptrA >= hitsA.size() && ptrB >= hitsB.size()) {
+            // No progress guard — break if neither team could pick (all docs exhausted/seen)
+            if (!pickedFirst && !pickedSecond) {
                 break;
             }
         }
