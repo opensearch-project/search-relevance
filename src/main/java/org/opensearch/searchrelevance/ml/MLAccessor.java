@@ -7,7 +7,6 @@
  */
 package org.opensearch.searchrelevance.ml;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -62,64 +61,19 @@ public class MLAccessor {
     }
 
     private void processChunk(String modelId, MLInput mlInput, int chunkIndex, ChunkProcessingContext context) {
-        processChunkWithFallback(modelId, mlInput, chunkIndex, false, context);
-    }
-
-    private void processChunkWithFallback(
-        String modelId,
-        MLInput mlInput,
-        int chunkIndex,
-        boolean triedWithoutResponseFormat,
-        ChunkProcessingContext context
-    ) {
+        // Transient-error retries (throttling, 5xx, timeouts) are handled by the ml-commons connector's client_config.
         predictSingleChunk(modelId, mlInput, ActionListener.wrap(response -> {
             log.info("Chunk {} processed successfully", chunkIndex);
-            String processedResponse = cleanResponse(response);
-
-            // Empty ratings: retry once without response_format for models that do not support structured output.
-            if ("[]".equals(processedResponse) && !triedWithoutResponseFormat) {
-                log.warn("Chunk {} returned empty ratings with response_format. Retrying without response_format...", chunkIndex);
-                MLInput mlInputWithoutFormat = recreateMLInputWithoutResponseFormat(mlInput);
-                processChunkWithFallback(modelId, mlInputWithoutFormat, chunkIndex, true, context);
-            } else {
-                context.handleSuccess(chunkIndex, processedResponse);
-            }
+            context.handleSuccess(chunkIndex, cleanResponse(response));
         }, e -> {
-            // On failure, retry once without response_format for models that do not support structured output.
-            // Transient-error retries (throttling, 5xx, timeouts) are handled by the ml-commons connector's client_config.
-            if (!triedWithoutResponseFormat) {
-                log.warn("Chunk {} failed with response_format. Retrying without response_format...", chunkIndex, e);
-                MLInput mlInputWithoutFormat = recreateMLInputWithoutResponseFormat(mlInput);
-                processChunkWithFallback(modelId, mlInputWithoutFormat, chunkIndex, true, context);
-            } else {
-                log.error("Chunk {} failed", chunkIndex, e);
-                context.handleFailure(chunkIndex, e);
-            }
+            log.error("Chunk {} failed", chunkIndex, e);
+            context.handleFailure(chunkIndex, e);
         }));
     }
 
     private String cleanResponse(String response) {
         // Handle both structured (with response_format) and unstructured responses
         return RatingOutputProcessor.sanitizeLLMResponse(response);
-    }
-
-    /**
-     * Recreates MLInput without the response_format parameter for models that do not support structured output.
-     */
-    private MLInput recreateMLInputWithoutResponseFormat(MLInput originalInput) {
-        // Extract the parameters from the original input and rebuild without response_format
-        RemoteInferenceInputDataSet originalDataSet = (RemoteInferenceInputDataSet) originalInput.getInputDataset();
-        Map<String, String> originalParams = originalDataSet.getParameters();
-
-        // Create new parameters map without response_format
-        Map<String, String> newParams = new HashMap<>();
-        for (Map.Entry<String, String> entry : originalParams.entrySet()) {
-            if (!"response_format".equals(entry.getKey())) {
-                newParams.put(entry.getKey(), entry.getValue());
-            }
-        }
-
-        return MLInput.builder().algorithm(originalInput.getAlgorithm()).inputDataset(new RemoteInferenceInputDataSet(newParams)).build();
     }
 
     public void predictSingleChunk(String modelId, MLInput mlInput, ActionListener<String> listener) {

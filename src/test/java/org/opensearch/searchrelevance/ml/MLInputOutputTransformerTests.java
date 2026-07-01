@@ -47,7 +47,7 @@ public class MLInputOutputTransformerTests extends OpenSearchTestCase {
         String promptTemplate = "Test prompt";
         LLMJudgmentRatingType ratingType = LLMJudgmentRatingType.SCORE0_1;
 
-        MLInput mlInput = transformer.createMLInput(searchText, referenceData, hits, promptTemplate, ratingType, true);
+        MLInput mlInput = transformer.createMLInput(searchText, referenceData, hits, promptTemplate, ratingType);
 
         assertNotNull(mlInput);
         RemoteInferenceInputDataSet dataset = (RemoteInferenceInputDataSet) mlInput.getInputDataset();
@@ -57,26 +57,6 @@ public class MLInputOutputTransformerTests extends OpenSearchTestCase {
         assertTrue("response_format parameter should be present", parameters.containsKey("response_format"));
         assertNotNull("response_format should not be null", parameters.get("response_format"));
         assertTrue("response_format should contain json_schema", parameters.get("response_format").contains("json_schema"));
-    }
-
-    public void testCreateMLInput_WithoutResponseFormat() {
-        String searchText = "test query";
-        Map<String, String> referenceData = new HashMap<>();
-        Map<String, String> hits = new HashMap<>();
-        hits.put("doc1", "test content");
-        String promptTemplate = "Test prompt";
-        LLMJudgmentRatingType ratingType = LLMJudgmentRatingType.SCORE0_1;
-
-        MLInput mlInput = transformer.createMLInput(searchText, referenceData, hits, promptTemplate, ratingType, false);
-
-        assertNotNull(mlInput);
-        RemoteInferenceInputDataSet dataset = (RemoteInferenceInputDataSet) mlInput.getInputDataset();
-        Map<String, String> parameters = dataset.getParameters();
-
-        // Should NOT include response_format parameter
-        assertFalse("response_format parameter should not be present for GPT-3.5 compatibility", parameters.containsKey("response_format"));
-        // Messages parameter should still be present
-        assertTrue("messages parameter should be present", parameters.containsKey("messages"));
     }
 
     public void testCreateMLInput_DefaultIncludesResponseFormat() {
@@ -110,7 +90,7 @@ public class MLInputOutputTransformerTests extends OpenSearchTestCase {
         String promptTemplate = "Test prompt";
         LLMJudgmentRatingType ratingType = LLMJudgmentRatingType.RELEVANT_IRRELEVANT;
 
-        MLInput mlInput = transformer.createMLInput(searchText, referenceData, hits, promptTemplate, ratingType, true);
+        MLInput mlInput = transformer.createMLInput(searchText, referenceData, hits, promptTemplate, ratingType);
 
         assertNotNull(mlInput);
         RemoteInferenceInputDataSet dataset = (RemoteInferenceInputDataSet) mlInput.getInputDataset();
@@ -124,24 +104,6 @@ public class MLInputOutputTransformerTests extends OpenSearchTestCase {
         assertTrue("Binary rating should include IRRELEVANT", responseFormat.contains("IRRELEVANT"));
     }
 
-    public void testCreateMLInput_BinaryRatingWithoutResponseFormat() {
-        String searchText = "test query";
-        Map<String, String> referenceData = new HashMap<>();
-        Map<String, String> hits = new HashMap<>();
-        hits.put("doc1", "test content");
-        String promptTemplate = "Test prompt";
-        LLMJudgmentRatingType ratingType = LLMJudgmentRatingType.RELEVANT_IRRELEVANT;
-
-        MLInput mlInput = transformer.createMLInput(searchText, referenceData, hits, promptTemplate, ratingType, false);
-
-        assertNotNull(mlInput);
-        RemoteInferenceInputDataSet dataset = (RemoteInferenceInputDataSet) mlInput.getInputDataset();
-        Map<String, String> parameters = dataset.getParameters();
-
-        // Should NOT include response_format for GPT-3.5 compatibility
-        assertFalse("response_format should not be present", parameters.containsKey("response_format"));
-    }
-
     public void testCreateMLInput_NumericRatingWithResponseFormat() {
         String searchText = "test query";
         Map<String, String> referenceData = new HashMap<>();
@@ -150,7 +112,7 @@ public class MLInputOutputTransformerTests extends OpenSearchTestCase {
         String promptTemplate = "Test prompt";
         LLMJudgmentRatingType ratingType = LLMJudgmentRatingType.SCORE0_1;
 
-        MLInput mlInput = transformer.createMLInput(searchText, referenceData, hits, promptTemplate, ratingType, true);
+        MLInput mlInput = transformer.createMLInput(searchText, referenceData, hits, promptTemplate, ratingType);
 
         assertNotNull(mlInput);
         RemoteInferenceInputDataSet dataset = (RemoteInferenceInputDataSet) mlInput.getInputDataset();
@@ -176,33 +138,13 @@ public class MLInputOutputTransformerTests extends OpenSearchTestCase {
         String promptTemplate = "Test prompt";
         LLMJudgmentRatingType ratingType = LLMJudgmentRatingType.SCORE0_1;
 
-        MLInput mlInput = transformer.createMLInput(searchText, referenceData, hits, promptTemplate, ratingType, true);
+        MLInput mlInput = transformer.createMLInput(searchText, referenceData, hits, promptTemplate, ratingType);
 
         assertNotNull(mlInput);
         RemoteInferenceInputDataSet dataset = (RemoteInferenceInputDataSet) mlInput.getInputDataset();
         Map<String, String> parameters = dataset.getParameters();
 
         assertTrue("response_format should be present even with multiple hits", parameters.containsKey("response_format"));
-        assertNotNull("messages parameter should not be null", parameters.get("messages"));
-        assertFalse("messages parameter should not be empty", parameters.get("messages").isEmpty());
-    }
-
-    public void testCreateMLInput_MultipleHitsWithoutResponseFormat() {
-        String searchText = "test query";
-        Map<String, String> referenceData = new HashMap<>();
-        Map<String, String> hits = new HashMap<>();
-        hits.put("doc1", "content 1");
-        hits.put("doc2", "content 2");
-        String promptTemplate = "Test prompt";
-        LLMJudgmentRatingType ratingType = LLMJudgmentRatingType.SCORE0_1;
-
-        MLInput mlInput = transformer.createMLInput(searchText, referenceData, hits, promptTemplate, ratingType, false);
-
-        assertNotNull(mlInput);
-        RemoteInferenceInputDataSet dataset = (RemoteInferenceInputDataSet) mlInput.getInputDataset();
-        Map<String, String> parameters = dataset.getParameters();
-
-        assertFalse("response_format should not be present", parameters.containsKey("response_format"));
         assertNotNull("messages parameter should not be null", parameters.get("messages"));
         assertFalse("messages parameter should not be empty", parameters.get("messages").isEmpty());
     }
@@ -218,7 +160,7 @@ public class MLInputOutputTransformerTests extends OpenSearchTestCase {
         String promptTemplate = "Test prompt";
         LLMJudgmentRatingType ratingType = LLMJudgmentRatingType.SCORE0_1;
 
-        MLInput mlInput = transformer.createMLInput(searchText, referenceData, hits, promptTemplate, ratingType, true);
+        MLInput mlInput = transformer.createMLInput(searchText, referenceData, hits, promptTemplate, ratingType);
 
         assertNotNull(mlInput);
         RemoteInferenceInputDataSet dataset = (RemoteInferenceInputDataSet) mlInput.getInputDataset();
@@ -237,7 +179,7 @@ public class MLInputOutputTransformerTests extends OpenSearchTestCase {
         String promptTemplate = "Test prompt";
         LLMJudgmentRatingType ratingType = LLMJudgmentRatingType.SCORE0_1;
 
-        MLInput mlInput = transformer.createMLInput(searchText, referenceData, hits, promptTemplate, ratingType, true);
+        MLInput mlInput = transformer.createMLInput(searchText, referenceData, hits, promptTemplate, ratingType);
 
         assertNotNull(mlInput);
         RemoteInferenceInputDataSet dataset = (RemoteInferenceInputDataSet) mlInput.getInputDataset();

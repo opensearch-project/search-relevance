@@ -116,23 +116,6 @@ public class MLInputOutputTransformer {
         String promptTemplate,
         LLMJudgmentRatingType ratingType
     ) {
-        return createMLInput(searchText, referenceData, hits, promptTemplate, ratingType, true);
-    }
-
-    /**
-     * Creates MLInput with optional response_format parameter.
-     * Some models (like GPT-3.5) don't support response_format, so we can disable it for fallback.
-     *
-     * @param includeResponseFormat If true, includes response_format parameter; if false, excludes it
-     */
-    public MLInput createMLInput(
-        String searchText,
-        Map<String, String> referenceData,
-        Map<String, String> hits,
-        String promptTemplate,
-        LLMJudgmentRatingType ratingType,
-        boolean includeResponseFormat
-    ) {
         Map<String, String> parameters = new HashMap<>();
         String messagesArray = buildMessagesArray(searchText, referenceData, hits, promptTemplate, ratingType);
 
@@ -142,11 +125,8 @@ public class MLInputOutputTransformer {
         parameters.put(PARAM_SYSTEM_PROMPT_FIELD, getSystemPrompt(ratingType));
         parameters.put(PARAM_USER_PROMPT_FIELD, escapeJson(buildUserContent(searchText, referenceData, hits, promptTemplate)));
 
-        // Only add response_format if requested (for models that support it)
-        if (includeResponseFormat) {
-            String responseFormat = getResponseFormat(ratingType);
-            parameters.put("response_format", responseFormat);
-        }
+        // Legacy OpenAI structured-output spec, kept for connectors that reference ${parameters.response_format}
+        parameters.put("response_format", getResponseFormat(ratingType));
 
         return MLInput.builder().algorithm(FunctionName.REMOTE).inputDataset(new RemoteInferenceInputDataSet(parameters)).build();
     }
