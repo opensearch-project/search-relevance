@@ -17,6 +17,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -25,6 +26,7 @@ import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.HandledTransportAction;
 import org.opensearch.common.inject.Inject;
+import org.opensearch.common.util.concurrent.ThreadContext;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.search.SearchHit;
@@ -83,15 +85,22 @@ public class ABTestSearchTransportAction extends HandledTransportAction<ABTestSe
             listener.onFailure(new SearchRelevanceException("Request, testId, and params cannot be null", RestStatus.BAD_REQUEST));
             return;
         }
+        // Capture caller's security context before DAO calls stash it
+        final ThreadContext threadContext = client.threadPool().getThreadContext();
+        final Supplier<ThreadContext.StoredContext> restoreCallerContext = threadContext.newRestorableContext(false);
+
         abTestDao.getABTest(
             request.getTestId(),
-            ActionListener.wrap(abTestResponse -> extractTestMetadataAndFetchConfigs(abTestResponse, request, listener), e -> {
-                if (e instanceof org.opensearch.ResourceNotFoundException) {
-                    listener.onFailure(new SearchRelevanceException("AB test not found", RestStatus.NOT_FOUND));
-                } else {
-                    listener.onFailure(new SearchRelevanceException("Failed to read AB test", e, RestStatus.INTERNAL_SERVER_ERROR));
+            ActionListener.wrap(
+                abTestResponse -> extractTestMetadataAndFetchConfigs(abTestResponse, request, restoreCallerContext, listener),
+                e -> {
+                    if (e instanceof org.opensearch.ResourceNotFoundException) {
+                        listener.onFailure(new SearchRelevanceException("AB test not found", RestStatus.NOT_FOUND));
+                    } else {
+                        listener.onFailure(new SearchRelevanceException("Failed to read AB test", e, RestStatus.INTERNAL_SERVER_ERROR));
+                    }
                 }
-            })
+            )
         );
     }
 
@@ -102,6 +111,7 @@ public class ABTestSearchTransportAction extends HandledTransportAction<ABTestSe
     private void extractTestMetadataAndFetchConfigs(
         SearchResponse abTestResponse,
         ABTestSearchRequest request,
+        Supplier<ThreadContext.StoredContext> restoreCallerContext,
         ActionListener<ABTestSearchResponse> listener
     ) {
         try {
@@ -118,7 +128,9 @@ public class ABTestSearchTransportAction extends HandledTransportAction<ABTestSe
             String testId = (String) source.get(ABTest.TEST_ID);
 
             if (enabledObj == null || configAId == null || configAUuid == null || testId == null) {
-                listener.onFailure(new SearchRelevanceException("AB test document is missing required fields", RestStatus.INTERNAL_SERVER_ERROR));
+                listener.onFailure(
+                    new SearchRelevanceException("AB test document is missing required fields", RestStatus.INTERNAL_SERVER_ERROR)
+                );
                 return;
             }
             boolean enabled = enabledObj;
@@ -131,7 +143,17 @@ public class ABTestSearchTransportAction extends HandledTransportAction<ABTestSe
 
             Runnable maybeComplete = () -> {
                 if (remaining.decrementAndGet() == 0 && !failed.get()) {
-                    executeSearchWithConfigs(configARef.get(), configBRef.get(), enabled, testId, configAUuid, configBUuid, request, listener);
+                    executeSearchWithConfigs(
+                        configARef.get(),
+                        configBRef.get(),
+                        enabled,
+                        testId,
+                        configAUuid,
+                        configBUuid,
+                        request,
+                        restoreCallerContext,
+                        listener
+                    );
                 }
             };
 
@@ -175,6 +197,7 @@ public class ABTestSearchTransportAction extends HandledTransportAction<ABTestSe
         String configAUuid,
         String configBUuid,
         ABTestSearchRequest request,
+        Supplier<ThreadContext.StoredContext> restoreCallerContext,
         ActionListener<ABTestSearchResponse> listener
     ) {
         if (configAResponse.getHits().getHits().length == 0) {
@@ -196,7 +219,7 @@ public class ABTestSearchTransportAction extends HandledTransportAction<ABTestSe
         // If test is disabled, only execute config A
         if (!enabled) {
             SearchRequest searchRequestA = SearchRequestBuilder.buildSearchRequest(targetIndex, queryA, searchText, pipelineA, sizeA);
-            executeSingleSearch(searchRequestA, testId, configAUuid, listener);
+            executeSingleSearch(searchRequestA, testId, configAUuid, restoreCallerContext, listener);
             return;
         }
 
@@ -208,10 +231,17 @@ public class ABTestSearchTransportAction extends HandledTransportAction<ABTestSe
         Map<String, Object> configBSource = configBResponse.getHits().getHits()[0].getSourceAsMap();
         String targetIndexB = (String) configBSource.get("index");
         if (targetIndexB == null || !targetIndexB.equals(targetIndex)) {
-            listener.onFailure(new SearchRelevanceException(
-                String.format(Locale.ROOT, "Both search configurations must target the same index. Config A targets [%s], Config B targets [%s]", targetIndex, targetIndexB),
-                RestStatus.BAD_REQUEST
-            ));
+            listener.onFailure(
+                new SearchRelevanceException(
+                    String.format(
+                        Locale.ROOT,
+                        "Both search configurations must target the same index. Config A targets [%s], Config B targets [%s]",
+                        targetIndex,
+                        targetIndexB
+                    ),
+                    RestStatus.BAD_REQUEST
+                )
+            );
             return;
         }
         String queryB = (String) configBSource.get("query");
@@ -219,17 +249,32 @@ public class ABTestSearchTransportAction extends HandledTransportAction<ABTestSe
         int sizeB = configBSource.containsKey("size") ? ((Number) configBSource.get("size")).intValue() : DEFAULT_SEARCH_SIZE;
 
         if (sizeA != sizeB) {
-            listener.onFailure(new SearchRelevanceException(
-                String.format(Locale.ROOT, "Both search configurations must use the same size for fair comparison. Config A size [%d], Config B size [%d]", sizeA, sizeB),
-                RestStatus.BAD_REQUEST
-            ));
+            listener.onFailure(
+                new SearchRelevanceException(
+                    String.format(
+                        Locale.ROOT,
+                        "Both search configurations must use the same size for fair comparison. Config A size [%d], Config B size [%d]",
+                        sizeA,
+                        sizeB
+                    ),
+                    RestStatus.BAD_REQUEST
+                )
+            );
             return;
         }
 
         SearchRequest searchRequestA = SearchRequestBuilder.buildSearchRequest(targetIndex, queryA, searchText, pipelineA, sizeA);
         SearchRequest searchRequestB = SearchRequestBuilder.buildSearchRequest(targetIndex, queryB, searchText, pipelineB, sizeB);
 
-        executeParallelSearchesAndInterleave(searchRequestA, searchRequestB, testId, configAUuid, configBUuid, listener);
+        executeParallelSearchesAndInterleave(
+            searchRequestA,
+            searchRequestB,
+            testId,
+            configAUuid,
+            configBUuid,
+            restoreCallerContext,
+            listener
+        );
     }
 
     /**
@@ -242,6 +287,7 @@ public class ABTestSearchTransportAction extends HandledTransportAction<ABTestSe
         String testId,
         String configAUuid,
         String configBUuid,
+        Supplier<ThreadContext.StoredContext> restoreCallerContext,
         ActionListener<ABTestSearchResponse> listener
     ) {
         AtomicReference<SearchResponse> responseA = new AtomicReference<>();
@@ -267,24 +313,38 @@ public class ABTestSearchTransportAction extends HandledTransportAction<ABTestSe
             }
         };
 
-        // Execute searches with caller's security context (no stashing) to preserve FGAC
-        client.search(searchRequestA, ActionListener.wrap(r -> {
-            responseA.set(r);
-            maybeInterleave.run();
-        }, e -> {
-            if (failed.compareAndSet(false, true)) {
-                listener.onFailure(new SearchRelevanceException("Search execution failed", e, RestStatus.INTERNAL_SERVER_ERROR));
-            }
-        }));
+        // Restore caller's security context before searching target index
+        try (ThreadContext.StoredContext ctx = restoreCallerContext.get()) {
+            client.search(searchRequestA, ActionListener.wrap(r -> {
+                responseA.set(r);
+                maybeInterleave.run();
+            }, e -> {
+                if (failed.compareAndSet(false, true)) {
+                    listener.onFailure(
+                        new SearchRelevanceException(
+                            "Search execution failed",
+                            e,
+                            isSecurityException(e) ? RestStatus.FORBIDDEN : RestStatus.INTERNAL_SERVER_ERROR
+                        )
+                    );
+                }
+            }));
 
-        client.search(searchRequestB, ActionListener.wrap(r -> {
-            responseB.set(r);
-            maybeInterleave.run();
-        }, e -> {
-            if (failed.compareAndSet(false, true)) {
-                listener.onFailure(new SearchRelevanceException("Search execution failed", e, RestStatus.INTERNAL_SERVER_ERROR));
-            }
-        }));
+            client.search(searchRequestB, ActionListener.wrap(r -> {
+                responseB.set(r);
+                maybeInterleave.run();
+            }, e -> {
+                if (failed.compareAndSet(false, true)) {
+                    listener.onFailure(
+                        new SearchRelevanceException(
+                            "Search execution failed",
+                            e,
+                            isSecurityException(e) ? RestStatus.FORBIDDEN : RestStatus.INTERNAL_SERVER_ERROR
+                        )
+                    );
+                }
+            }));
+        }
     }
 
     /**
@@ -295,19 +355,27 @@ public class ABTestSearchTransportAction extends HandledTransportAction<ABTestSe
         SearchRequest searchRequest,
         String testId,
         String configUuid,
+        Supplier<ThreadContext.StoredContext> restoreCallerContext,
         ActionListener<ABTestSearchResponse> listener
     ) {
-        // Execute search with caller's security context (no stashing) to preserve FGAC
-        client.search(searchRequest, ActionListener.wrap(
-            searchResponse -> {
+        // Restore caller's security context before searching target index
+        try (ThreadContext.StoredContext ctx = restoreCallerContext.get()) {
+            client.search(searchRequest, ActionListener.wrap(searchResponse -> {
                 List<Map<String, Object>> responseHits = new ArrayList<>();
                 for (SearchHit hit : searchResponse.getHits().getHits()) {
                     responseHits.add(mapHit(hit, configUuid));
                 }
                 listener.onResponse(new ABTestSearchResponse(testId, false, responseHits));
             },
-            e -> listener.onFailure(new SearchRelevanceException("Search execution failed", e, RestStatus.INTERNAL_SERVER_ERROR))
-        ));
+                e -> listener.onFailure(
+                    new SearchRelevanceException(
+                        "Search execution failed",
+                        e,
+                        isSecurityException(e) ? RestStatus.FORBIDDEN : RestStatus.INTERNAL_SERVER_ERROR
+                    )
+                )
+            ));
+        }
     }
 
     /**
@@ -321,6 +389,11 @@ public class ABTestSearchTransportAction extends HandledTransportAction<ABTestSe
         hitMap.put("_source", hit.getSourceAsMap());
         hitMap.put("_search_configuration_id", configUuid);
         return hitMap;
+    }
+
+    private boolean isSecurityException(Exception e) {
+        return e.getClass().getSimpleName().contains("Security")
+            || (e.getMessage() != null && e.getMessage().contains("no permissions for"));
     }
 
 }

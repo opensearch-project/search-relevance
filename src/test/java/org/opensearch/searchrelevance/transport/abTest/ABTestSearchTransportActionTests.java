@@ -8,7 +8,6 @@
 package org.opensearch.searchrelevance.transport.abTest;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -17,6 +16,7 @@ import static org.mockito.Mockito.when;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
 
 import org.apache.lucene.search.TotalHits;
 import org.junit.Before;
@@ -37,8 +37,6 @@ import org.opensearch.test.OpenSearchTestCase;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.TransportService;
 import org.opensearch.transport.client.Client;
-
-import java.util.concurrent.ExecutorService;
 
 public class ABTestSearchTransportActionTests extends OpenSearchTestCase {
 
@@ -414,9 +412,7 @@ public class ABTestSearchTransportActionTests extends OpenSearchTestCase {
         // Every hit must have a _search_configuration_id assigned
         for (Map<String, Object> hit : response.getHits()) {
             assertNotNull(hit.get("_search_configuration_id"));
-            assertTrue(
-                hit.get("_search_configuration_id").equals("uuid-a") || hit.get("_search_configuration_id").equals("uuid-b")
-            );
+            assertTrue(hit.get("_search_configuration_id").equals("uuid-a") || hit.get("_search_configuration_id").equals("uuid-b"));
         }
     }
 
