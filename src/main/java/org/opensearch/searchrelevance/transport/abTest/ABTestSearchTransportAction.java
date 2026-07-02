@@ -14,15 +14,13 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.opensearch.action.search.MultiSearchRequest;
+import org.opensearch.action.search.MultiSearchResponse;
 import org.opensearch.action.search.SearchRequest;
-import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.HandledTransportAction;
 import org.opensearch.common.inject.Inject;
@@ -45,11 +43,11 @@ import org.opensearch.transport.client.Client;
  * Transport action for AB test search with Team Draft Interleaving.
  *
  * Flow:
- * 1. Fetch AB test metadata (config IDs, UUIDs, enabled flag)
- * 2. Fetch both search configurations in parallel using GroupedActionListener
- * 3. If test is disabled: execute only config A (single search)
- *    If test is enabled: execute both queries in parallel, interleave with TDI
- * 4. Return results with _search_configuration_id per hit for click attribution
+ * 1. Get AB test metadata (config IDs, UUIDs, enabled flag)
+ * 2. Get config(s) based on test status
+ * 3. Prepare search requests
+ * 4. Call msearch (single round-trip, ordered responses)
+ * 5. Interleave/merge results
  */
 public class ABTestSearchTransportAction extends HandledTransportAction<ABTestSearchRequest, ABTestSearchResponse> {
     private static final Logger LOGGER = LogManager.getLogger(ABTestSearchTransportAction.class);
@@ -86,35 +84,12 @@ public class ABTestSearchTransportAction extends HandledTransportAction<ABTestSe
             return;
         }
         // Capture caller's security context before DAO calls stash it
-        final ThreadContext threadContext = client.threadPool().getThreadContext();
-        final Supplier<ThreadContext.StoredContext> restoreCallerContext = threadContext.newRestorableContext(false);
+        final Supplier<ThreadContext.StoredContext> restoreCallerContext = client.threadPool()
+            .getThreadContext()
+            .newRestorableContext(false);
 
-        abTestDao.getABTest(
-            request.getTestId(),
-            ActionListener.wrap(
-                abTestResponse -> extractTestMetadataAndFetchConfigs(abTestResponse, request, restoreCallerContext, listener),
-                e -> {
-                    if (e instanceof org.opensearch.ResourceNotFoundException) {
-                        listener.onFailure(new SearchRelevanceException("AB test not found", RestStatus.NOT_FOUND));
-                    } else {
-                        listener.onFailure(new SearchRelevanceException("Failed to read AB test", e, RestStatus.INTERNAL_SERVER_ERROR));
-                    }
-                }
-            )
-        );
-    }
-
-    /**
-     * Extracts AB test metadata (config IDs, UUIDs, enabled flag) from the response
-     * and fetches both search configurations in parallel using GroupedActionListener.
-     */
-    private void extractTestMetadataAndFetchConfigs(
-        SearchResponse abTestResponse,
-        ABTestSearchRequest request,
-        Supplier<ThreadContext.StoredContext> restoreCallerContext,
-        ActionListener<ABTestSearchResponse> listener
-    ) {
-        try {
+        // Step 1: Get AB test metadata
+        abTestDao.getABTest(request.getTestId(), ActionListener.wrap(abTestResponse -> {
             if (abTestResponse.getHits().getHits().length == 0) {
                 listener.onFailure(new SearchRelevanceException("AB test not found", RestStatus.NOT_FOUND));
                 return;
@@ -135,252 +110,181 @@ public class ABTestSearchTransportAction extends HandledTransportAction<ABTestSe
             }
             boolean enabled = enabledObj;
 
-            // Fetch both configurations in parallel with dedicated slots to preserve ordering
-            AtomicReference<SearchResponse> configARef = new AtomicReference<>();
-            AtomicReference<SearchResponse> configBRef = new AtomicReference<>();
-            AtomicInteger remaining = new AtomicInteger(enabled ? 2 : 1);
-            AtomicBoolean failed = new AtomicBoolean(false);
-
-            Runnable maybeComplete = () -> {
-                if (remaining.decrementAndGet() == 0 && !failed.get()) {
-                    executeSearchWithConfigs(
-                        configARef.get(),
-                        configBRef.get(),
-                        enabled,
-                        testId,
-                        configAUuid,
-                        configBUuid,
-                        request,
-                        restoreCallerContext,
-                        listener
-                    );
+            // Step 2: Get config A
+            searchConfigurationDao.getSearchConfiguration(configAId, ActionListener.wrap(configAResponse -> {
+                if (configAResponse.getHits().getHits().length == 0) {
+                    listener.onFailure(new SearchRelevanceException("Search configuration A not found", RestStatus.NOT_FOUND));
+                    return;
                 }
-            };
+                Map<String, Object> configASource = configAResponse.getHits().getHits()[0].getSourceAsMap();
+                String queryA = (String) configASource.get("query");
+                String pipelineA = (String) configASource.get("searchPipeline");
+                String targetIndex = (String) configASource.get("index");
+                int sizeA = configASource.containsKey("size") ? ((Number) configASource.get("size")).intValue() : DEFAULT_SEARCH_SIZE;
 
-            ActionListener<SearchResponse> configAListener = ActionListener.wrap(r -> {
-                configARef.set(r);
-                maybeComplete.run();
-            }, e -> {
-                if (failed.compareAndSet(false, true)) {
-                    listener.onFailure(new SearchRelevanceException("Failed to fetch search configuration A", e, RestStatus.NOT_FOUND));
+                String searchText = request.getParams().get("SearchText");
+                if (searchText == null || searchText.isEmpty()) {
+                    listener.onFailure(new SearchRelevanceException("SearchText is required in query_params", RestStatus.BAD_REQUEST));
+                    return;
                 }
-            });
 
-            searchConfigurationDao.getSearchConfiguration(configAId, configAListener);
-
-            if (enabled) {
-                ActionListener<SearchResponse> configBListener = ActionListener.wrap(r -> {
-                    configBRef.set(r);
-                    maybeComplete.run();
-                }, e -> {
-                    if (failed.compareAndSet(false, true)) {
-                        listener.onFailure(new SearchRelevanceException("Failed to fetch search configuration B", e, RestStatus.NOT_FOUND));
-                    }
-                });
-                searchConfigurationDao.getSearchConfiguration(configBId, configBListener);
-            }
-        } catch (Exception e) {
-            listener.onFailure(new SearchRelevanceException("ABTestSearch failed", e, RestStatus.INTERNAL_SERVER_ERROR));
-        }
-    }
-
-    /**
-     * Parses both search configurations, builds search requests using SearchRequestBuilder
-     * (preserving query structure for pipeline processors), and executes search.
-     * If test is disabled, runs only config A. If enabled, runs both in parallel and interleaves.
-     */
-    private void executeSearchWithConfigs(
-        SearchResponse configAResponse,
-        SearchResponse configBResponse,
-        boolean enabled,
-        String testId,
-        String configAUuid,
-        String configBUuid,
-        ABTestSearchRequest request,
-        Supplier<ThreadContext.StoredContext> restoreCallerContext,
-        ActionListener<ABTestSearchResponse> listener
-    ) {
-        if (configAResponse.getHits().getHits().length == 0) {
-            listener.onFailure(new SearchRelevanceException("Search configuration A not found", RestStatus.NOT_FOUND));
-            return;
-        }
-        Map<String, Object> configASource = configAResponse.getHits().getHits()[0].getSourceAsMap();
-        String queryA = (String) configASource.get("query");
-        String pipelineA = (String) configASource.get("searchPipeline");
-        String targetIndex = (String) configASource.get("index");
-        int sizeA = configASource.containsKey("size") ? ((Number) configASource.get("size")).intValue() : DEFAULT_SEARCH_SIZE;
-
-        String searchText = request.getParams().get("SearchText");
-        if (searchText == null || searchText.isEmpty()) {
-            listener.onFailure(new SearchRelevanceException("SearchText is required in query_params", RestStatus.BAD_REQUEST));
-            return;
-        }
-
-        // If test is disabled, only execute config A
-        if (!enabled) {
-            SearchRequest searchRequestA = SearchRequestBuilder.buildSearchRequest(targetIndex, queryA, searchText, pipelineA, sizeA);
-            executeSingleSearch(searchRequestA, testId, configAUuid, restoreCallerContext, listener);
-            return;
-        }
-
-        // Parse config B and execute both searches in parallel with TDI
-        if (configBResponse.getHits().getHits().length == 0) {
-            listener.onFailure(new SearchRelevanceException("Search configuration B not found", RestStatus.NOT_FOUND));
-            return;
-        }
-        Map<String, Object> configBSource = configBResponse.getHits().getHits()[0].getSourceAsMap();
-        String targetIndexB = (String) configBSource.get("index");
-        if (targetIndexB == null || !targetIndexB.equals(targetIndex)) {
-            listener.onFailure(
-                new SearchRelevanceException(
-                    String.format(
-                        Locale.ROOT,
-                        "Both search configurations must target the same index. Config A targets [%s], Config B targets [%s]",
+                // If test is disabled, single search with config A only
+                if (!enabled) {
+                    SearchRequest searchRequestA = SearchRequestBuilder.buildSearchRequest(
                         targetIndex,
-                        targetIndexB
-                    ),
-                    RestStatus.BAD_REQUEST
-                )
-            );
-            return;
-        }
-        String queryB = (String) configBSource.get("query");
-        String pipelineB = (String) configBSource.get("searchPipeline");
-        int sizeB = configBSource.containsKey("size") ? ((Number) configBSource.get("size")).intValue() : DEFAULT_SEARCH_SIZE;
+                        queryA,
+                        searchText,
+                        pipelineA,
+                        sizeA
+                    );
+                    try (ThreadContext.StoredContext ctx = restoreCallerContext.get()) {
+                        client.search(searchRequestA, ActionListener.wrap(searchResponse -> {
+                            List<Map<String, Object>> responseHits = new ArrayList<>();
+                            for (SearchHit hit : searchResponse.getHits().getHits()) {
+                                responseHits.add(mapHit(hit, configAUuid));
+                            }
+                            listener.onResponse(new ABTestSearchResponse(testId, responseHits));
+                        },
+                            e -> listener.onFailure(
+                                new SearchRelevanceException(
+                                    "Search execution failed",
+                                    e,
+                                    isSecurityException(e) ? RestStatus.FORBIDDEN : RestStatus.INTERNAL_SERVER_ERROR
+                                )
+                            )
+                        ));
+                    }
+                    return;
+                }
 
-        if (sizeA != sizeB) {
-            listener.onFailure(
-                new SearchRelevanceException(
-                    String.format(
-                        Locale.ROOT,
-                        "Both search configurations must use the same size for fair comparison. Config A size [%d], Config B size [%d]",
-                        sizeA,
+                // Step 2b: Get config B (only when enabled)
+                searchConfigurationDao.getSearchConfiguration(configBId, ActionListener.wrap(configBResponse -> {
+                    if (configBResponse.getHits().getHits().length == 0) {
+                        listener.onFailure(new SearchRelevanceException("Search configuration B not found", RestStatus.NOT_FOUND));
+                        return;
+                    }
+                    Map<String, Object> configBSource = configBResponse.getHits().getHits()[0].getSourceAsMap();
+                    String targetIndexB = (String) configBSource.get("index");
+                    if (targetIndexB == null || !targetIndexB.equals(targetIndex)) {
+                        listener.onFailure(
+                            new SearchRelevanceException(
+                                String.format(
+                                    Locale.ROOT,
+                                    "Both search configurations must target the same index. Config A targets [%s], Config B targets [%s]",
+                                    targetIndex,
+                                    targetIndexB
+                                ),
+                                RestStatus.BAD_REQUEST
+                            )
+                        );
+                        return;
+                    }
+                    String queryB = (String) configBSource.get("query");
+                    String pipelineB = (String) configBSource.get("searchPipeline");
+                    int sizeB = configBSource.containsKey("size") ? ((Number) configBSource.get("size")).intValue() : DEFAULT_SEARCH_SIZE;
+
+                    if (sizeA != sizeB) {
+                        listener.onFailure(
+                            new SearchRelevanceException(
+                                String.format(
+                                    Locale.ROOT,
+                                    "Both search configurations must use the same size for fair comparison. Config A size [%d], Config B size [%d]",
+                                    sizeA,
+                                    sizeB
+                                ),
+                                RestStatus.BAD_REQUEST
+                            )
+                        );
+                        return;
+                    }
+
+                    // Step 3: Prepare search requests
+                    SearchRequest searchRequestA = SearchRequestBuilder.buildSearchRequest(
+                        targetIndex,
+                        queryA,
+                        searchText,
+                        pipelineA,
+                        sizeA
+                    );
+                    SearchRequest searchRequestB = SearchRequestBuilder.buildSearchRequest(
+                        targetIndex,
+                        queryB,
+                        searchText,
+                        pipelineB,
                         sizeB
-                    ),
-                    RestStatus.BAD_REQUEST
-                )
-            );
-            return;
-        }
+                    );
 
-        SearchRequest searchRequestA = SearchRequestBuilder.buildSearchRequest(targetIndex, queryA, searchText, pipelineA, sizeA);
-        SearchRequest searchRequestB = SearchRequestBuilder.buildSearchRequest(targetIndex, queryB, searchText, pipelineB, sizeB);
+                    // Step 4: Call msearch — single round-trip, ordered responses
+                    MultiSearchRequest msearchRequest = new MultiSearchRequest();
+                    msearchRequest.add(searchRequestA);
+                    msearchRequest.add(searchRequestB);
 
-        executeParallelSearchesAndInterleave(
-            searchRequestA,
-            searchRequestB,
-            testId,
-            configAUuid,
-            configBUuid,
-            restoreCallerContext,
-            listener
-        );
-    }
+                    try (ThreadContext.StoredContext ctx = restoreCallerContext.get()) {
+                        client.multiSearch(msearchRequest, ActionListener.wrap(msearchResponse -> {
+                            MultiSearchResponse.Item[] items = msearchResponse.getResponses();
+                            if (items[0].isFailure()) {
+                                listener.onFailure(
+                                    new SearchRelevanceException(
+                                        "Search A failed",
+                                        items[0].getFailure(),
+                                        isSecurityException(items[0].getFailure()) ? RestStatus.FORBIDDEN : RestStatus.INTERNAL_SERVER_ERROR
+                                    )
+                                );
+                                return;
+                            }
+                            if (items[1].isFailure()) {
+                                listener.onFailure(
+                                    new SearchRelevanceException(
+                                        "Search B failed",
+                                        items[1].getFailure(),
+                                        isSecurityException(items[1].getFailure()) ? RestStatus.FORBIDDEN : RestStatus.INTERNAL_SERVER_ERROR
+                                    )
+                                );
+                                return;
+                            }
 
-    /**
-     * Executes both search queries in parallel with dedicated listeners to preserve ordering,
-     * then applies Team Draft Interleaving to merge the two ranked lists into one.
-     */
-    private void executeParallelSearchesAndInterleave(
-        SearchRequest searchRequestA,
-        SearchRequest searchRequestB,
-        String testId,
-        String configAUuid,
-        String configBUuid,
-        Supplier<ThreadContext.StoredContext> restoreCallerContext,
-        ActionListener<ABTestSearchResponse> listener
-    ) {
-        AtomicReference<SearchResponse> responseA = new AtomicReference<>();
-        AtomicReference<SearchResponse> responseB = new AtomicReference<>();
-        AtomicInteger remaining = new AtomicInteger(2);
-        AtomicBoolean failed = new AtomicBoolean(false);
+                            // Step 5: Interleave results with TDI
+                            List<SearchHit> hitsA = Arrays.asList(items[0].getResponse().getHits().getHits());
+                            List<SearchHit> hitsB = Arrays.asList(items[1].getResponse().getHits().getHits());
+                            TeamDraftInterleaver.Result tdiResult = interleaver.interleave(
+                                hitsA,
+                                hitsB,
+                                Math.min(hitsA.size(), hitsB.size())
+                            );
 
-        Runnable maybeInterleave = () -> {
-            if (remaining.decrementAndGet() == 0 && !failed.get()) {
-                // Apply Team Draft Interleaving to merge both result sets
-                List<SearchHit> hitsA = Arrays.asList(responseA.get().getHits().getHits());
-                List<SearchHit> hitsB = Arrays.asList(responseB.get().getHits().getHits());
-                TeamDraftInterleaver.Result tdiResult = interleaver.interleave(hitsA, hitsB, Math.min(hitsA.size(), hitsB.size()));
+                            List<Map<String, Object>> responseHits = new ArrayList<>();
+                            Set<String> teamADocs = tdiResult.getTeamA();
+                            for (SearchHit hit : tdiResult.getInterleavedHits()) {
+                                String uuid = teamADocs.contains(hit.getId()) ? configAUuid : configBUuid;
+                                responseHits.add(mapHit(hit, uuid));
+                            }
+                            listener.onResponse(new ABTestSearchResponse(testId, responseHits));
 
-                // Map each hit with its team's config UUID for click attribution
-                List<Map<String, Object>> responseHits = new ArrayList<>();
-                Set<String> teamADocs = tdiResult.getTeamA();
-                for (SearchHit hit : tdiResult.getInterleavedHits()) {
-                    String uuid = teamADocs.contains(hit.getId()) ? configAUuid : configBUuid;
-                    responseHits.add(mapHit(hit, uuid));
-                }
-                listener.onResponse(new ABTestSearchResponse(testId, true, responseHits));
+                        },
+                            e -> listener.onFailure(
+                                new SearchRelevanceException(
+                                    "Search execution failed",
+                                    e,
+                                    isSecurityException(e) ? RestStatus.FORBIDDEN : RestStatus.INTERNAL_SERVER_ERROR
+                                )
+                            )
+                        ));
+                    }
+
+                }, e -> listener.onFailure(new SearchRelevanceException("Failed to fetch search configuration B", e, RestStatus.NOT_FOUND)))
+                );
+
+            }, e -> listener.onFailure(new SearchRelevanceException("Failed to fetch search configuration A", e, RestStatus.NOT_FOUND))));
+
+        }, e -> {
+            if (e instanceof org.opensearch.ResourceNotFoundException) {
+                listener.onFailure(new SearchRelevanceException("AB test not found", RestStatus.NOT_FOUND));
+            } else {
+                listener.onFailure(new SearchRelevanceException("Failed to read AB test", e, RestStatus.INTERNAL_SERVER_ERROR));
             }
-        };
-
-        // Restore caller's security context before searching target index
-        try (ThreadContext.StoredContext ctx = restoreCallerContext.get()) {
-            client.search(searchRequestA, ActionListener.wrap(r -> {
-                responseA.set(r);
-                maybeInterleave.run();
-            }, e -> {
-                if (failed.compareAndSet(false, true)) {
-                    listener.onFailure(
-                        new SearchRelevanceException(
-                            "Search execution failed",
-                            e,
-                            isSecurityException(e) ? RestStatus.FORBIDDEN : RestStatus.INTERNAL_SERVER_ERROR
-                        )
-                    );
-                }
-            }));
-
-            client.search(searchRequestB, ActionListener.wrap(r -> {
-                responseB.set(r);
-                maybeInterleave.run();
-            }, e -> {
-                if (failed.compareAndSet(false, true)) {
-                    listener.onFailure(
-                        new SearchRelevanceException(
-                            "Search execution failed",
-                            e,
-                            isSecurityException(e) ? RestStatus.FORBIDDEN : RestStatus.INTERNAL_SERVER_ERROR
-                        )
-                    );
-                }
-            }));
-        }
+        }));
     }
 
-    /**
-     * Executes a single search when the AB test is disabled (only config A).
-     * Fully async — no thread blocking.
-     */
-    private void executeSingleSearch(
-        SearchRequest searchRequest,
-        String testId,
-        String configUuid,
-        Supplier<ThreadContext.StoredContext> restoreCallerContext,
-        ActionListener<ABTestSearchResponse> listener
-    ) {
-        // Restore caller's security context before searching target index
-        try (ThreadContext.StoredContext ctx = restoreCallerContext.get()) {
-            client.search(searchRequest, ActionListener.wrap(searchResponse -> {
-                List<Map<String, Object>> responseHits = new ArrayList<>();
-                for (SearchHit hit : searchResponse.getHits().getHits()) {
-                    responseHits.add(mapHit(hit, configUuid));
-                }
-                listener.onResponse(new ABTestSearchResponse(testId, false, responseHits));
-            },
-                e -> listener.onFailure(
-                    new SearchRelevanceException(
-                        "Search execution failed",
-                        e,
-                        isSecurityException(e) ? RestStatus.FORBIDDEN : RestStatus.INTERNAL_SERVER_ERROR
-                    )
-                )
-            ));
-        }
-    }
-
-    /**
-     * Maps a SearchHit to a response map with config UUID for click attribution.
-     */
     private Map<String, Object> mapHit(SearchHit hit, String configUuid) {
         Map<String, Object> hitMap = new HashMap<>();
         hitMap.put("_index", hit.getIndex());
@@ -395,5 +299,4 @@ public class ABTestSearchTransportAction extends HandledTransportAction<ABTestSe
         return e.getClass().getSimpleName().contains("Security")
             || (e.getMessage() != null && e.getMessage().contains("no permissions for"));
     }
-
 }

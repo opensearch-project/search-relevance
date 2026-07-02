@@ -55,6 +55,7 @@ import org.opensearch.repositories.RepositoriesService;
 import org.opensearch.rest.RestController;
 import org.opensearch.rest.RestHandler;
 import org.opensearch.script.ScriptService;
+import org.opensearch.searchrelevance.algorithm.TeamDraftInterleaver;
 import org.opensearch.searchrelevance.dao.ABTestDao;
 import org.opensearch.searchrelevance.dao.EvaluationResultDao;
 import org.opensearch.searchrelevance.dao.ExperimentDao;
@@ -276,6 +277,8 @@ public class SearchRelevancePlugin extends Plugin
         jobRunner.setSettingsAccessor(settingsAccessor);
         jobRunner.setManager(manager);
 
+        TeamDraftInterleaver teamDraftInterleaver = new TeamDraftInterleaver();
+
         return List.of(
             searchRelevanceIndicesManager,
             querySetDao,
@@ -294,7 +297,7 @@ public class SearchRelevancePlugin extends Plugin
             experimentTaskManager,
             jobRunner,
             experimentRunningManager,
-            new org.opensearch.searchrelevance.algorithm.TeamDraftInterleaver()
+            teamDraftInterleaver
         );
     }
 

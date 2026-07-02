@@ -8,13 +8,9 @@
 package org.opensearch.searchrelevance.action.abTest;
 
 import static org.opensearch.searchrelevance.common.PluginConstants.AB_TESTS_URL;
-import static org.opensearch.searchrelevance.common.PluginConstants.SEARCH_CONFIGURATIONS_URL;
-
-import java.util.Map;
 
 import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.hc.core5.http.message.BasicHeader;
-import org.opensearch.client.Response;
 import org.opensearch.client.ResponseException;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.searchrelevance.BaseSearchRelevanceIT;
@@ -57,17 +53,8 @@ public class ABTestSearchSecurityIT extends BaseSearchRelevanceIT {
             return;
         }
 
-        // Step 1: Create test index as admin
-        makeRequest(
-            client(),
-            RestRequest.Method.PUT.name(),
-            TEST_INDEX,
-            null,
-            toHttpEntity("{\"settings\":{\"number_of_shards\":1,\"number_of_replicas\":0}}"),
-            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
-        );
-
-        // Index a document
+        // Step 1: Create test index and index a document
+        createTestIndex(TEST_INDEX);
         makeRequest(
             client(),
             RestRequest.Method.POST.name(),
@@ -77,37 +64,13 @@ public class ABTestSearchSecurityIT extends BaseSearchRelevanceIT {
             ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
         );
 
-        // Step 2: Create search configuration A
-        String configBodyA = String.format(
-            "{\"name\":\"security-test-config-a\",\"index\":\"%s\",\"query\":\"{\\\"query\\\":{\\\"match\\\":{\\\"title\\\":\\\"%%SearchText%%\\\"}}}\"}",
-            TEST_INDEX
+        // Step 2: Create two different search configurations
+        String configIdA = createSearchConfiguration(
+            "security-test-config-a",
+            TEST_INDEX,
+            "{\"query\":{\"match\":{\"title\":\"%SearchText%\"}}}"
         );
-        Response configResponseA = makeRequest(
-            client(),
-            RestRequest.Method.PUT.name(),
-            SEARCH_CONFIGURATIONS_URL,
-            null,
-            toHttpEntity(configBodyA),
-            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
-        );
-        Map<String, Object> configResultA = entityAsMap(configResponseA);
-        String configIdA = (String) configResultA.get("search_configuration_id");
-
-        // Step 2b: Create search configuration B
-        String configBodyB = String.format(
-            "{\"name\":\"security-test-config-b\",\"index\":\"%s\",\"query\":\"{\\\"query\\\":{\\\"match_all\\\":{}}}\"}",
-            TEST_INDEX
-        );
-        Response configResponseB = makeRequest(
-            client(),
-            RestRequest.Method.PUT.name(),
-            SEARCH_CONFIGURATIONS_URL,
-            null,
-            toHttpEntity(configBodyB),
-            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
-        );
-        Map<String, Object> configResultB = entityAsMap(configResponseB);
-        String configIdB = (String) configResultB.get("search_configuration_id");
+        String configIdB = createSearchConfiguration("security-test-config-b", TEST_INDEX, "{\"query\":{\"match_all\":{}}}");
 
         // Step 3: Create AB test with two different configurations
         String abTestBody = String.format("{\"search_configuration_a\":\"%s\",\"search_configuration_b\":\"%s\"}", configIdA, configIdB);

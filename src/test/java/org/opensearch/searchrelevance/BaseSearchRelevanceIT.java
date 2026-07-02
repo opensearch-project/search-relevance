@@ -335,4 +335,29 @@ public class BaseSearchRelevanceIT extends OpenSearchRestTestCase {
         Response response = client().performRequest(request);
         assertEquals(request.getEndpoint() + ": failed", RestStatus.OK, RestStatus.fromCode(response.getStatusLine().getStatusCode()));
     }
+
+    protected void createTestIndex(String indexName) throws IOException {
+        makeRequest(
+            client(),
+            "PUT",
+            indexName,
+            null,
+            toHttpEntity("{\"settings\":{\"number_of_shards\":1,\"number_of_replicas\":0}}"),
+            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
+        );
+    }
+
+    protected String createSearchConfiguration(String name, String index, String query) throws IOException {
+        String configBody = String.format("{\"name\":\"%s\",\"index\":\"%s\",\"query\":\"%s\"}", name, index, query.replace("\"", "\\\""));
+        Response response = makeRequest(
+            client(),
+            "PUT",
+            "/_plugins/_search_relevance/search_configurations",
+            null,
+            toHttpEntity(configBody),
+            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
+        );
+        Map<String, Object> result = entityAsMap(response);
+        return (String) result.get("search_configuration_id");
+    }
 }

@@ -20,15 +20,17 @@ import org.opensearch.core.xcontent.XContentBuilder;
 
 import lombok.Getter;
 
+/**
+ * Response for AB test search containing test_id and interleaved hits
+ * with _search_configuration_id per hit for click attribution.
+ */
 @Getter
 public class ABTestSearchResponse extends ActionResponse implements ToXContentObject {
     private final String testId;
-    private final boolean interleaved;
     private final List<Map<String, Object>> hits;
 
-    public ABTestSearchResponse(String testId, boolean interleaved, List<Map<String, Object>> hits) {
+    public ABTestSearchResponse(String testId, List<Map<String, Object>> hits) {
         this.testId = testId;
-        this.interleaved = interleaved;
         this.hits = hits;
     }
 
@@ -36,7 +38,6 @@ public class ABTestSearchResponse extends ActionResponse implements ToXContentOb
     public ABTestSearchResponse(StreamInput in) throws IOException {
         super(in);
         this.testId = in.readString();
-        this.interleaved = in.readBoolean();
         int size = in.readVInt();
         this.hits = new ArrayList<>(size);
         for (int i = 0; i < size; i++) {
@@ -47,7 +48,6 @@ public class ABTestSearchResponse extends ActionResponse implements ToXContentOb
     @Override
     public void writeTo(StreamOutput out) throws IOException {
         out.writeString(testId);
-        out.writeBoolean(interleaved);
         out.writeVInt(hits.size());
         for (Map<String, Object> hit : hits) {
             out.writeMap(hit);
@@ -58,7 +58,6 @@ public class ABTestSearchResponse extends ActionResponse implements ToXContentOb
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
         builder.startObject();
         builder.field("test_id", testId);
-        builder.field("interleaved", interleaved);
         builder.startArray("hits");
         for (Map<String, Object> hit : hits) {
             builder.map(hit);

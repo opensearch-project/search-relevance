@@ -252,7 +252,7 @@ public class ABTestSearchTransportActionTests extends OpenSearchTestCase {
         verify(listener).onResponse(responseCaptor.capture());
         ABTestSearchResponse response = responseCaptor.getValue();
         assertEquals("my-test", response.getTestId());
-        assertFalse(response.isInterleaved());
+        // Response no longer contains interleaved field
         assertEquals(3, response.getHits().size());
     }
 
@@ -304,7 +304,7 @@ public class ABTestSearchTransportActionTests extends OpenSearchTestCase {
         verify(listener).onResponse(responseCaptor.capture());
         ABTestSearchResponse response = responseCaptor.getValue();
         assertEquals("my-test", response.getTestId());
-        assertTrue(response.isInterleaved());
+        assertNotNull(response.getHits());
         assertEquals(6, response.getHits().size());
     }
 
@@ -356,7 +356,7 @@ public class ABTestSearchTransportActionTests extends OpenSearchTestCase {
         ArgumentCaptor<ABTestSearchResponse> responseCaptor = ArgumentCaptor.forClass(ABTestSearchResponse.class);
         verify(listener).onResponse(responseCaptor.capture());
         ABTestSearchResponse response = responseCaptor.getValue();
-        assertTrue(response.isInterleaved());
+        assertNotNull(response.getHits());
         // Overlapping docs should appear only once in the interleaved list
         long uniqueDocCount = response.getHits().stream().map(h -> h.get("_id")).distinct().count();
         assertEquals(uniqueDocCount, response.getHits().size());
