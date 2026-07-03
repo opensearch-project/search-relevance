@@ -137,10 +137,9 @@ public class LlmJudgmentTemplateIT extends BaseSearchRelevanceIT {
             Map<String, Object> firstRating = judgmentRatings.get(0);
             String queryText = (String) firstRating.get("query");
             assertNotNull(queryText);
-            // Custom input is stored as "queryText#{json custom fields}"
-            assertTrue(queryText.contains("#"));
-            assertTrue(queryText.contains("category"));
-            assertTrue(queryText.contains("referenceAnswer"));
+            assertTrue(queryText.contains("#\n")); // Custom delimiter
+            assertTrue(queryText.contains("category:"));
+            assertTrue(queryText.contains("referenceAnswer:"));
         }
     }
 
