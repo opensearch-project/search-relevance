@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.Before;
@@ -190,6 +191,53 @@ public class LlmJudgmentsProcessorTests extends OpenSearchTestCase {
 
         assertTrue("Valid values should contain SCORE0_1", validValues.contains("SCORE0_1"));
         assertTrue("Valid values should contain RELEVANT_IRRELEVANT", validValues.contains("RELEVANT_IRRELEVANT"));
+    }
+
+    // ============================================
+    // buildResultWithFailures Tests
+    // ============================================
+
+    @SuppressWarnings("unchecked")
+    public void testBuildResultWithFailures_partialFailure() {
+        Map<String, String> docIdToScore = Map.of("A", "0.9", "B", "0.4");
+
+        Map<String, Object> result = LlmJudgmentsProcessor.buildResultWithFailures("laptop", Set.of("A", "B", "C"), docIdToScore);
+
+        assertEquals("laptop", result.get("query"));
+        List<Map<String, String>> ratings = (List<Map<String, String>>) result.get("ratings");
+        assertEquals(2, ratings.size());
+
+        List<Map<String, String>> failures = (List<Map<String, String>>) result.get("failures");
+        assertNotNull(failures);
+        assertEquals(1, failures.size());
+        assertEquals("C", failures.get(0).get("docId"));
+    }
+
+    @SuppressWarnings("unchecked")
+    public void testBuildResultWithFailures_allRated_noFailuresKey() {
+        Map<String, String> docIdToScore = Map.of("A", "0.9", "B", "0.4");
+
+        Map<String, Object> result = LlmJudgmentsProcessor.buildResultWithFailures("laptop", Set.of("A", "B"), docIdToScore);
+
+        assertEquals(2, ((List<Map<String, String>>) result.get("ratings")).size());
+        assertFalse("no failures key when every doc was rated", result.containsKey("failures"));
+    }
+
+    @SuppressWarnings("unchecked")
+    public void testBuildResultWithFailures_allFailed_emptyRatings() {
+        Map<String, String> docIdToScore = Map.of();
+
+        Map<String, Object> result = LlmJudgmentsProcessor.buildResultWithFailures("laptop", Set.of("A", "B"), docIdToScore);
+
+        assertTrue(((List<Map<String, String>>) result.get("ratings")).isEmpty());
+        assertEquals(2, ((List<Map<String, String>>) result.get("failures")).size());
+    }
+
+    public void testBuildResultWithFailures_noDocsSent_noFailuresKey() {
+        Map<String, Object> result = LlmJudgmentsProcessor.buildResultWithFailures("laptop", Set.of(), Map.of());
+
+        assertTrue(((List<?>) result.get("ratings")).isEmpty());
+        assertFalse("no failures key when nothing was sent", result.containsKey("failures"));
     }
 
     // ============================================

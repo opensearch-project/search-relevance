@@ -9,6 +9,7 @@ package org.opensearch.searchrelevance.executors;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.opensearch.searchrelevance.judgments.JudgmentDataTransformer;
 import org.opensearch.test.OpenSearchTestCase;
@@ -185,6 +186,51 @@ public class JudgmentDataTransformerTests extends OpenSearchTestCase {
         assertEquals("1.0", ratings.get(0).get("rating"));
     }
 
+    public void testBuildFailedDocsListsUnratedDocs() {
+        Set<String> sentDocIds = Set.of("A", "B", "C");
+        Set<String> ratedDocIds = Set.of("A", "B");
+
+        List<Map<String, String>> failures = JudgmentDataTransformer.buildFailedDocs(sentDocIds, ratedDocIds);
+
+        assertEquals(1, failures.size());
+        assertEquals("C", failures.get(0).get("docId"));
+    }
+
+    public void testBuildFailedDocsAllRated() {
+        Set<String> sentDocIds = Set.of("A", "B");
+        Set<String> ratedDocIds = Set.of("A", "B");
+
+        assertTrue(JudgmentDataTransformer.buildFailedDocs(sentDocIds, ratedDocIds).isEmpty());
+    }
+
+    public void testBuildFailedDocsNoDocsSent() {
+        // No search hits for the query: nothing was sent, so there is nothing to report as failed.
+        assertTrue(JudgmentDataTransformer.buildFailedDocs(Set.of(), Set.of()).isEmpty());
+    }
+
+    public void testBuildFailedDocsAllFailed() {
+        Set<String> sentDocIds = Set.of("A", "B");
+        Set<String> ratedDocIds = Set.of();
+
+        List<Map<String, String>> failures = JudgmentDataTransformer.buildFailedDocs(sentDocIds, ratedDocIds);
+
+        assertEquals(2, failures.size());
+        Set<String> failedIds = failures.stream().map(f -> f.get("docId")).collect(java.util.stream.Collectors.toSet());
+        assertEquals(Set.of("A", "B"), failedIds);
+    }
+
+    private Map<String, Object> resultWithFailures(String query, Map<String, String> ratings, String... failedDocIds) {
+        Map<String, Object> result = transformer.createJudgmentResult(query, ratings);
+        if (failedDocIds.length > 0) {
+            List<Map<String, String>> failures = new java.util.ArrayList<>();
+            for (String docId : failedDocIds) {
+                failures.add(Map.of("docId", docId));
+            }
+            result.put("failures", failures);
+        }
+        return result;
+    }
+
     public void testBuildJudgmentSummaryAllSuccessful() {
         List<Map<String, Object>> results = List.of(
             transformer.createJudgmentResult("q1", Map.of("doc1", "0.9")),
@@ -196,38 +242,45 @@ public class JudgmentDataTransformerTests extends OpenSearchTestCase {
         assertEquals(2, summary.get("totalQueries"));
         assertEquals(2, summary.get("successfulQueries"));
         assertEquals(0, summary.get("failedQueries"));
-        assertTrue(((List<?>) summary.get("failures")).isEmpty());
+        assertFalse("no lastFailureReason when nothing failed", summary.containsKey("lastFailureReason"));
     }
 
-    public void testBuildJudgmentSummaryWithTaggedFailure() {
-        Map<String, Object> failed = transformer.createJudgmentResult("bad query", Map.of());
-        failed.put("error", "model timed out");
-
-        List<Map<String, Object>> results = List.of(transformer.createJudgmentResult("good query", Map.of("doc1", "1.0")), failed);
+    public void testBuildJudgmentSummaryCountsQueryWithFailuresAsFailed() {
+        // "good" is fully rated; "bad" has an unrated doc, so it counts as failed.
+        List<Map<String, Object>> results = List.of(
+            resultWithFailures("good", Map.of("doc1", "1.0")),
+            resultWithFailures("bad", Map.of(), "doc2")
+        );
 
         Map<String, Object> summary = JudgmentDataTransformer.buildJudgmentSummary(results);
 
         assertEquals(2, summary.get("totalQueries"));
         assertEquals(1, summary.get("successfulQueries"));
         assertEquals(1, summary.get("failedQueries"));
-
-        List<Map<String, Object>> failures = (List<Map<String, Object>>) summary.get("failures");
-        assertEquals(1, failures.size());
-        assertEquals("bad query", failures.get(0).get("query"));
-        assertEquals("model timed out", failures.get(0).get("reason"));
     }
 
-    public void testBuildJudgmentSummaryEmptyRatingsWithoutErrorUsesDefaultReason() {
-        List<Map<String, Object>> results = List.of(transformer.createJudgmentResult("silent query", Map.of()));
+    public void testBuildJudgmentSummaryPartiallyRatedQueryCountsAsFailed() {
+        // A query with some real ratings AND an unrated doc still counts as failed.
+        List<Map<String, Object>> results = List.of(resultWithFailures("laptop", Map.of("doc1", "1.0"), "doc6"));
 
         Map<String, Object> summary = JudgmentDataTransformer.buildJudgmentSummary(results);
 
+        assertEquals(1, summary.get("totalQueries"));
         assertEquals(0, summary.get("successfulQueries"));
         assertEquals(1, summary.get("failedQueries"));
+    }
 
-        List<Map<String, Object>> failures = (List<Map<String, Object>>) summary.get("failures");
-        assertEquals("silent query", failures.get(0).get("query"));
-        assertEquals("No ratings were generated", failures.get(0).get("reason"));
+    public void testBuildJudgmentSummaryRecordsLastFailureReason() {
+        Map<String, Object> failed = resultWithFailures("bad", Map.of(), "doc1");
+        failed.put(JudgmentDataTransformer.RESULT_FAILURE_REASON, "model timed out");
+
+        List<Map<String, Object>> results = List.of(transformer.createJudgmentResult("good", Map.of("doc1", "1.0")), failed);
+
+        Map<String, Object> summary = JudgmentDataTransformer.buildJudgmentSummary(results);
+
+        assertEquals(1, summary.get("successfulQueries"));
+        assertEquals(1, summary.get("failedQueries"));
+        assertEquals("model timed out", summary.get("lastFailureReason"));
     }
 
     public void testBuildJudgmentSummaryEmptyResults() {
@@ -236,6 +289,6 @@ public class JudgmentDataTransformerTests extends OpenSearchTestCase {
         assertEquals(0, summary.get("totalQueries"));
         assertEquals(0, summary.get("successfulQueries"));
         assertEquals(0, summary.get("failedQueries"));
-        assertTrue(((List<?>) summary.get("failures")).isEmpty());
+        assertFalse(summary.containsKey("lastFailureReason"));
     }
 }

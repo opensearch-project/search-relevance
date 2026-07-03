@@ -12,7 +12,7 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 - Make LLM judgment generation provider-neutral so any LLM provider can be used through an ml-commons connector blueprint ([#515](https://github.com/opensearch-project/search-relevance/pull/515))
 
 ### Enhancements
-- Report LLM judgment outcomes by storing per-run success/failure counts and the list of failed queries with reasons in the judgment metadata ([#521](https://github.com/opensearch-project/search-relevance/pull/521))
+- Report LLM judgment failures by listing the unrated docs on each judgment entry and storing per-run success/failure counts in the judgment metadata ([#521](https://github.com/opensearch-project/search-relevance/pull/521))
 - Optimize Rank-Biased Overlap (RBO) calculation from O(n²) to O(n) by maintaining prefix sets incrementally ([#499](https://github.com/opensearch-project/search-relevance/issues/499))
 - Optimize Frequency Weighted similarity calculation by replacing the O(n²) `listB.contains` scan with HashSet membership and single-pass union/intersection accumulation ([#502](https://github.com/opensearch-project/search-relevance/pull/502))
 

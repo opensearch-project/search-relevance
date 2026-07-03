@@ -62,6 +62,18 @@ public class Judgment implements ToXContentObject {
                 xContentBuilder.endObject();
             }
             xContentBuilder.endArray();
+            Object failures = judgment.get("failures");
+            if (failures instanceof List && !((List<?>) failures).isEmpty()) {
+                xContentBuilder.startArray("failures");
+                for (Map<String, Object> failure : (List<Map<String, Object>>) failures) {
+                    xContentBuilder.startObject();
+                    for (Map.Entry<String, Object> entry : failure.entrySet()) {
+                        xContentBuilder.field(entry.getKey(), entry.getValue());
+                    }
+                    xContentBuilder.endObject();
+                }
+                xContentBuilder.endArray();
+            }
             xContentBuilder.endObject();
         }
         xContentBuilder.endArray();
