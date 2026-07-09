@@ -249,7 +249,7 @@ public class ABTestSearchTransportAction extends HandledTransportAction<ABTestSe
                             TeamDraftInterleaver.Result tdiResult = interleaver.interleave(
                                 hitsA,
                                 hitsB,
-                                Math.min(hitsA.size(), hitsB.size())
+                                Math.max(hitsA.size(), hitsB.size())
                             );
 
                             List<Map<String, Object>> responseHits = new ArrayList<>();

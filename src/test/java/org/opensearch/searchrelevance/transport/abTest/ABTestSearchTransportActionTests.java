@@ -23,6 +23,7 @@ import org.junit.Before;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.opensearch.action.search.MultiSearchResponse;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.core.action.ActionListener;
@@ -58,6 +59,14 @@ public class ABTestSearchTransportActionTests extends OpenSearchTestCase {
     @Before
     public void setup() {
         MockitoAnnotations.openMocks(this);
+        org.opensearch.common.util.concurrent.ThreadContext threadContext = new org.opensearch.common.util.concurrent.ThreadContext(
+            org.opensearch.common.settings.Settings.EMPTY
+        );
+        when(client.threadPool()).thenReturn(threadPool);
+        when(threadPool.getThreadContext()).thenReturn(threadContext);
+        org.opensearch.searchrelevance.model.builder.SearchRequestBuilder.initialize(
+            org.opensearch.core.xcontent.NamedXContentRegistry.EMPTY
+        );
         transportAction = new ABTestSearchTransportAction(
             transportService,
             actionFilters,
@@ -273,25 +282,16 @@ public class ABTestSearchTransportActionTests extends OpenSearchTestCase {
             return null;
         }).when(searchConfigurationDao).getSearchConfiguration(any(String.class), any(ActionListener.class));
 
-        ExecutorService executorService = mock(ExecutorService.class);
-        when(threadPool.generic()).thenReturn(executorService);
-        doAnswer(invocation -> {
-            Runnable task = invocation.getArgument(0);
-            task.run();
-            return null;
-        }).when(executorService).execute(any(Runnable.class));
-
         SearchResponse searchResponseA = createSearchResponseWithHits("doc1", "doc2", "doc3");
         SearchResponse searchResponseB = createSearchResponseWithHits("doc4", "doc5", "doc6");
+        MultiSearchResponse.Item itemA = new MultiSearchResponse.Item(searchResponseA, null);
+        MultiSearchResponse.Item itemB = new MultiSearchResponse.Item(searchResponseB, null);
+        MultiSearchResponse msearchResponse = new MultiSearchResponse(new MultiSearchResponse.Item[] { itemA, itemB }, 0);
         doAnswer(invocation -> {
-            ActionListener<SearchResponse> listener = invocation.getArgument(1);
-            listener.onResponse(searchResponseA);
+            ActionListener<MultiSearchResponse> listener = invocation.getArgument(1);
+            listener.onResponse(msearchResponse);
             return null;
-        }).doAnswer(invocation -> {
-            ActionListener<SearchResponse> listener = invocation.getArgument(1);
-            listener.onResponse(searchResponseB);
-            return null;
-        }).when(client).search(any(), any(ActionListener.class));
+        }).when(client).multiSearch(any(), any(ActionListener.class));
 
         Map<String, String> params = new HashMap<>();
         params.put("SearchText", "laptop");
@@ -305,7 +305,7 @@ public class ABTestSearchTransportActionTests extends OpenSearchTestCase {
         ABTestSearchResponse response = responseCaptor.getValue();
         assertEquals("my-test", response.getTestId());
         assertNotNull(response.getHits());
-        assertEquals(6, response.getHits().size());
+        assertEquals(3, response.getHits().size());
     }
 
     /**
@@ -325,26 +325,17 @@ public class ABTestSearchTransportActionTests extends OpenSearchTestCase {
             return null;
         }).when(searchConfigurationDao).getSearchConfiguration(any(String.class), any(ActionListener.class));
 
-        ExecutorService executorService = mock(ExecutorService.class);
-        when(threadPool.generic()).thenReturn(executorService);
-        doAnswer(invocation -> {
-            Runnable task = invocation.getArgument(0);
-            task.run();
-            return null;
-        }).when(executorService).execute(any(Runnable.class));
-
         // Both configs return overlapping docs (doc1, doc2 appear in both)
         SearchResponse searchResponseA = createSearchResponseWithHits("doc1", "doc2", "doc3");
         SearchResponse searchResponseB = createSearchResponseWithHits("doc1", "doc2", "doc4");
+        MultiSearchResponse.Item itemA = new MultiSearchResponse.Item(searchResponseA, null);
+        MultiSearchResponse.Item itemB = new MultiSearchResponse.Item(searchResponseB, null);
+        MultiSearchResponse msearchResponse = new MultiSearchResponse(new MultiSearchResponse.Item[] { itemA, itemB }, 0);
         doAnswer(invocation -> {
-            ActionListener<SearchResponse> listener = invocation.getArgument(1);
-            listener.onResponse(searchResponseA);
+            ActionListener<MultiSearchResponse> listener = invocation.getArgument(1);
+            listener.onResponse(msearchResponse);
             return null;
-        }).doAnswer(invocation -> {
-            ActionListener<SearchResponse> listener = invocation.getArgument(1);
-            listener.onResponse(searchResponseB);
-            return null;
-        }).when(client).search(any(), any(ActionListener.class));
+        }).when(client).multiSearch(any(), any(ActionListener.class));
 
         Map<String, String> params = new HashMap<>();
         params.put("SearchText", "laptop");
@@ -379,25 +370,16 @@ public class ABTestSearchTransportActionTests extends OpenSearchTestCase {
             return null;
         }).when(searchConfigurationDao).getSearchConfiguration(any(String.class), any(ActionListener.class));
 
-        ExecutorService executorService = mock(ExecutorService.class);
-        when(threadPool.generic()).thenReturn(executorService);
-        doAnswer(invocation -> {
-            Runnable task = invocation.getArgument(0);
-            task.run();
-            return null;
-        }).when(executorService).execute(any(Runnable.class));
-
         SearchResponse searchResponseA = createSearchResponseWithHits("doc1", "doc2");
         SearchResponse searchResponseB = createSearchResponseWithHits("doc3", "doc4");
+        MultiSearchResponse.Item itemA = new MultiSearchResponse.Item(searchResponseA, null);
+        MultiSearchResponse.Item itemB = new MultiSearchResponse.Item(searchResponseB, null);
+        MultiSearchResponse msearchResponse = new MultiSearchResponse(new MultiSearchResponse.Item[] { itemA, itemB }, 0);
         doAnswer(invocation -> {
-            ActionListener<SearchResponse> listener = invocation.getArgument(1);
-            listener.onResponse(searchResponseA);
+            ActionListener<MultiSearchResponse> listener = invocation.getArgument(1);
+            listener.onResponse(msearchResponse);
             return null;
-        }).doAnswer(invocation -> {
-            ActionListener<SearchResponse> listener = invocation.getArgument(1);
-            listener.onResponse(searchResponseB);
-            return null;
-        }).when(client).search(any(), any(ActionListener.class));
+        }).when(client).multiSearch(any(), any(ActionListener.class));
 
         Map<String, String> params = new HashMap<>();
         params.put("SearchText", "laptop");

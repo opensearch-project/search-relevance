@@ -119,6 +119,7 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
         ScheduledJobsDao.class,
         ScheduledExperimentHistoryDao.class,
         org.opensearch.searchrelevance.dao.ABTestDao.class,
+        org.opensearch.searchrelevance.algorithm.TeamDraftInterleaver.class,
         MLAccessor.class,
         MetricsHelper.class,
         InfoStatsManager.class,
