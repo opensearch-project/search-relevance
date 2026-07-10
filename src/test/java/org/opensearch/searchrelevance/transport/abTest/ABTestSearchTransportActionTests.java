@@ -305,7 +305,7 @@ public class ABTestSearchTransportActionTests extends OpenSearchTestCase {
         ABTestSearchResponse response = responseCaptor.getValue();
         assertEquals("my-test", response.getTestId());
         assertNotNull(response.getHits());
-        assertEquals(3, response.getHits().size());
+        assertEquals(6, response.getHits().size());
     }
 
     /**
