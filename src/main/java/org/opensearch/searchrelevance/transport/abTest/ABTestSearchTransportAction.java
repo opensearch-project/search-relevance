@@ -246,11 +246,7 @@ public class ABTestSearchTransportAction extends HandledTransportAction<ABTestSe
                             // Step 5: Interleave results with TDI
                             List<SearchHit> hitsA = Arrays.asList(items[0].getResponse().getHits().getHits());
                             List<SearchHit> hitsB = Arrays.asList(items[1].getResponse().getHits().getHits());
-                            TeamDraftInterleaver.Result tdiResult = interleaver.interleave(
-                                hitsA,
-                                hitsB,
-                                Math.max(hitsA.size(), hitsB.size())
-                            );
+                            TeamDraftInterleaver.Result tdiResult = interleaver.interleave(hitsA, hitsB, hitsA.size() + hitsB.size());
 
                             List<Map<String, Object>> responseHits = new ArrayList<>();
                             Set<String> teamADocs = tdiResult.getTeamA();
