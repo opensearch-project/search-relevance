@@ -119,6 +119,7 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
         ScheduledJobsDao.class,
         ScheduledExperimentHistoryDao.class,
         org.opensearch.searchrelevance.dao.ABTestDao.class,
+        org.opensearch.searchrelevance.algorithm.TeamDraftInterleaver.class,
         MLAccessor.class,
         MetricsHelper.class,
         InfoStatsManager.class,
@@ -204,7 +205,7 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
     }
 
     public void testTotalRestHandlers() {
-        assertEquals(26, plugin.getRestHandlers(Settings.EMPTY, null, null, null, null, null, null).size());
+        assertEquals(27, plugin.getRestHandlers(Settings.EMPTY, null, null, null, null, null, null).size());
     }
 
     public void testQuerySetTransportIsAdded() {
