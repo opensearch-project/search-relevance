@@ -23,6 +23,8 @@ public class MLConstants {
      * ML input field names
      */
     public static final String PARAM_MESSAGES_FIELD = "messages";
+    public static final String PARAM_SYSTEM_PROMPT_FIELD = "system_prompt";
+    public static final String PARAM_USER_PROMPT_FIELD = "user_prompt";
     public static final String PROMPT_TEMPLATE = "promptTemplate";
     public static final String LLM_JUDGMENT_RATING_TYPE = "llmJudgmentRatingType";
     public static final String OVERWRITE_CACHE = "overwriteCache";
@@ -46,6 +48,7 @@ public class MLConstants {
     /**
      * ML response field names
      */
+    public static final String RESPONSE_FIELD = "response";
     public static final String RESPONSE_CHOICES_FIELD = "choices";
     public static final String RESPONSE_MESSAGE_FIELD = "message";
     public static final String RESPONSE_CONTENT_FIELD = "content";

@@ -23,10 +23,12 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import org.opensearch.action.StepListener;
@@ -132,6 +134,13 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                 .map(id -> searchConfigurationDao.getSearchConfigurationSync(id))
                 .collect(Collectors.toList());
 
+            // Record a per-run overview (total/successful/failed counts and the last failure reason)
+            // into the judgment metadata before handing the ratings back.
+            ActionListener<List<Map<String, Object>>> summaryListener = ActionListener.wrap(results -> {
+                metadata.putAll(JudgmentDataTransformer.buildJudgmentSummary(results));
+                listener.onResponse(results);
+            }, listener::onFailure);
+
             generateLLMJudgmentsAsync(
                 modelId,
                 size,
@@ -143,7 +152,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                 promptTemplate,
                 ratingType,
                 overwriteCache,
-                listener
+                summaryListener
             );
         } catch (Exception e) {
             log.error("Failed to generate LLM judgments", e);
@@ -313,8 +322,9 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
             );
 
             // Step 3: Process with LLM if needed
+            String llmFailureReason = null;
             if (!unprocessedDocIds.isEmpty()) {
-                processWithLLM(
+                llmFailureReason = processWithLLM(
                     modelId,
                     queryText,
                     queryTextWithCustomInput,
@@ -330,7 +340,12 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                 );
             }
 
-            Map<String, Object> result = JudgmentDataTransformer.createJudgmentResult(queryTextWithCustomInput, docIdToScore);
+            Map<String, Object> result = buildResultWithFailures(queryTextWithCustomInput, allHits.keySet(), docIdToScore);
+            // A remote error can come back as a failed chunk rather than a thrown exception; carry its
+            // message so the metadata overview can report why the docs went unrated.
+            if (llmFailureReason != null) {
+                result.put(JudgmentDataTransformer.RESULT_FAILURE_REASON, llmFailureReason);
+            }
             return result;
         } catch (Exception e) {
             log.warn(
@@ -340,9 +355,31 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                 e.getMessage(),
                 e
             );
-            // Always return a result with whatever ratings we managed to collect
-            return JudgmentDataTransformer.createJudgmentResult(queryTextWithCustomInput, docIdToScore);
+            // Return whatever ratings we collected; every doc we sent but did not get a score for is
+            // listed under "failures" so it is visible instead of silently dropped. The reason is
+            // tagged for the metadata overview but not persisted on the entry.
+            Map<String, Object> result = buildResultWithFailures(queryTextWithCustomInput, allHits.keySet(), docIdToScore);
+            result.put(JudgmentDataTransformer.RESULT_FAILURE_REASON, e.getMessage());
+            return result;
         }
+    }
+
+    /**
+     * Builds the per-query result and attaches a "failures" list for every sent doc that never got a
+     * rating (real scores stay in "ratings"; failed docs are listed, not given a placeholder rating).
+     * Package-private for testing.
+     */
+    static Map<String, Object> buildResultWithFailures(
+        String queryTextWithCustomInput,
+        Set<String> sentDocIds,
+        Map<String, String> docIdToScore
+    ) {
+        Map<String, Object> result = JudgmentDataTransformer.createJudgmentResult(queryTextWithCustomInput, docIdToScore);
+        List<Map<String, String>> failures = JudgmentDataTransformer.buildFailedDocs(sentDocIds, docIdToScore.keySet());
+        if (!failures.isEmpty()) {
+            result.put("failures", failures);
+        }
+        return result;
     }
 
     private void processSearchConfigurationsAsync(
@@ -426,7 +463,10 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         return unprocessedDocIds;
     }
 
-    private void processWithLLM(
+    /**
+     * @return the reason a chunk failed (when the remote reported an error without throwing), or null when the call succeeded
+     */
+    private String processWithLLM(
         String modelId,
         String queryText,
         String queryTextWithCustomInput,
@@ -460,6 +500,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
 
         // Synchronous LLM call
         PlainActionFuture<Map<String, String>> llmFuture = PlainActionFuture.newFuture();
+        AtomicReference<String> failureReason = new AtomicReference<>();
         generateLLMJudgmentForQueryText(
             modelId,
             queryText,
@@ -472,6 +513,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
             promptTemplate,
             ratingType,
             promptTemplateCode,
+            failureReason,
             llmFuture
         );
 
@@ -479,6 +521,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         docIdToScore.putAll(llmResults);
 
         log.info("LLM processing completed. Generated {} ratings", llmResults.size());
+        return failureReason.get();
     }
 
     private void generateLLMJudgmentForQueryText(
@@ -493,6 +536,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         String promptTemplate,
         LLMJudgmentRatingType ratingType,
         String promptTemplateCode,
+        AtomicReference<String> failureReasonOut,
         ActionListener<Map<String, String>> listener
     ) {
         log.debug("calculating LLM evaluation with modelId: {} and unprocessed unionHits: {}", modelId, unprocessedUnionHits);
@@ -544,6 +588,14 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                         }
 
                         logFailedChunks(chunkResult);
+
+                        // Capture the first chunk error as the query's failure reason. The remote can
+                        // report an error via a failed chunk without throwing, so this is how the
+                        // reason reaches the metadata overview.
+                        Map<Integer, String> failedChunks = chunkResult.getFailedChunks();
+                        if (!failedChunks.isEmpty()) {
+                            failureReasonOut.compareAndSet(null, failedChunks.values().iterator().next());
+                        }
 
                         if (chunkResult.isLastChunk() && !hasFailure.get()) {
                             log.info(
