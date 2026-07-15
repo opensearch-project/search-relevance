@@ -245,6 +245,9 @@ dependencies {
     runtimeOnly group: 'net.minidev', name:'json-smart', version: "${versions.json_smart}"
     runtimeOnly("com.fasterxml.jackson.core:jackson-annotations:${versions.jackson_annotations}")
     runtimeOnly("tools.jackson.core:jackson-databind:${versions.jackson3_databind}")
+    // lang-mustache (core module) is provided by the node at runtime; pull it in for unit tests
+    // so the Mustache template rendering path can be exercised against the real ScriptService engine.
+    testImplementation "org.opensearch.plugin:lang-mustache-client:${opensearch_version}"
     // ZipArchive dependencies used for integration tests
     // Check the order in case of transitive dependencies
     zipArchive group: 'org.opensearch.plugin', name:'opensearch-job-scheduler', version: "${opensearch_build}"
