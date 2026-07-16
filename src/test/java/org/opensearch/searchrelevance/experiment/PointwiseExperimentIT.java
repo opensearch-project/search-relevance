@@ -104,6 +104,29 @@ public class PointwiseExperimentIT extends BaseExperimentIT {
     }
 
     @SneakyThrows
+    public void testPointwiseEvaluationExperiment_whenTemplateFailsToCompile_thenExperimentCompletes() {
+        // A search configuration whose query is an invalid Mustache template (an unsupported partial)
+        // must not strand the experiment in PROCESSING: the request build fails, the variant is
+        // recorded as failed, and the experiment still reaches COMPLETED.
+        initializeIndexIfNotExist(INDEX_NAME_ESCI);
+
+        String searchConfigurationId = createSearchConfigurationWithPartialTemplate(INDEX_NAME_ESCI);
+        String querySetId = createQuerySetWithCustomFields();
+        String judgmentId = createJudgment();
+
+        String experimentId = createPointwiseExperiment(querySetId, searchConfigurationId, judgmentId);
+
+        Thread.sleep(DEFAULT_INTERVAL_MS);
+        // pollExperimentUntilCompleted asserts status becomes COMPLETED — before the fix this hung in
+        // PROCESSING and the poll would exhaust its retries.
+        Map<String, Object> experimentSource = pollExperimentUntilCompleted(experimentId);
+        assertNotNull("Experiment should exist", experimentSource);
+        assertEquals("COMPLETED", experimentSource.get("status"));
+
+        deleteIndex(INDEX_NAME_ESCI);
+    }
+
+    @SneakyThrows
     private String createPointwiseExperiment(String querySetId, String searchConfigurationId, String judgmentId) {
         String createExperimentBody = replacePlaceholders(
             Files.readString(Path.of(classLoader.getResource("experiment/CreateExperimentPointwiseEvaluation.json").toURI())),

@@ -231,6 +231,40 @@ public abstract class BaseExperimentIT extends BaseSearchRelevanceIT {
         return searchConfigurationId;
     }
 
+    /**
+     * Creates a search configuration whose query is an invalid Mustache template (an unsupported
+     * partial, {{>...}}). Used to verify that a template which fails to compile does not strand the
+     * experiment in PROCESSING.
+     */
+    @SneakyThrows
+    protected String createSearchConfigurationWithPartialTemplate(String indexName) {
+        initializeIndexIfNotExist(indexName);
+
+        String createSearchConfigurationRequestBody = null;
+        try {
+            createSearchConfigurationRequestBody = Files.readString(
+                Path.of(classLoader.getResource("searchconfig/CreateSearchConfigurationQueryWithPartial.json").toURI())
+            );
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        // Replace the placeholder with the actual index name
+        createSearchConfigurationRequestBody = createSearchConfigurationRequestBody.replace("{{index_name}}", indexName);
+
+        Response createSearchConfigurationResponse = makeRequest(
+            client(),
+            RestRequest.Method.PUT.name(),
+            SEARCH_CONFIGURATIONS_URL,
+            null,
+            toHttpEntity(createSearchConfigurationRequestBody),
+            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
+        );
+        Map<String, Object> createSearchConfigurationResultJson = entityAsMap(createSearchConfigurationResponse);
+        String searchConfigurationId = createSearchConfigurationResultJson.get("search_configuration_id").toString();
+        assertNotNull(searchConfigurationId);
+        return searchConfigurationId;
+    }
+
     @SneakyThrows
     protected void initializeIndexIfNotExist(String indexName) {
         if (indexName.startsWith(BASE_INDEX_NAME_ESCI) && !indexExists(indexName)) {

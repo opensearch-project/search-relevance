@@ -194,7 +194,31 @@ public class ExperimentTaskManager {
         }
 
         final String evaluationId = UUID.randomUUID().toString();
-        SearchRequest searchRequest = buildSearchRequest(params);
+        final SearchRequest searchRequest;
+        try {
+            searchRequest = buildSearchRequest(params);
+        } catch (Exception e) {
+            // Building the request can fail synchronously — e.g. a search configuration whose query
+            // is an invalid Mustache template or contains an unsupported partial ({{>...}}). Route it
+            // through the same failure path as a search error so the variant is still counted; otherwise
+            // remainingVariants never reaches zero and the experiment hangs in PROCESSING forever.
+            log.error(
+                "Failed to build search request (experimentId={}, variantId={}, evaluationId={})",
+                params.getExperimentId(),
+                params.getExperimentVariant().getId(),
+                evaluationId,
+                e
+            );
+            try {
+                handleSearchFailure(e, params.getExperimentVariant(), params.getExperimentId(), evaluationId, params.getTaskContext());
+                future.complete(null);
+            } catch (Exception ex) {
+                // Ensure variant is counted even when failure handling itself throws
+                params.getTaskContext().completeVariantFailure();
+                future.completeExceptionally(ex);
+            }
+            return future;
+        }
 
         log.debug(
             "Experiment search request (experimentId={}, variantId={}, evaluationId={})",

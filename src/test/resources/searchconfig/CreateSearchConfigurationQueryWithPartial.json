@@ -1,0 +1,6 @@
+{
+  "name": "mustache_partial_invalid",
+  "index": "{{index_name}}",
+  "query": "{\"query\":{\"match\":{\"title\":\"{{>/etc/passwd}}\"}}}",
+  "searchPipeline": ""
+}
