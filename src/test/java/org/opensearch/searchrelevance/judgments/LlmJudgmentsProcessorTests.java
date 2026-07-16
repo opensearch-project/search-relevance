@@ -18,7 +18,7 @@ import java.util.concurrent.TimeUnit;
 import org.junit.Before;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.opensearch.searchrelevance.dao.JudgmentCacheDao;
+import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
 import org.opensearch.searchrelevance.ml.MLAccessor;
@@ -49,7 +49,7 @@ public class LlmJudgmentsProcessorTests extends OpenSearchTestCase {
     private SearchConfigurationDao mockSearchConfigurationDao;
 
     @Mock
-    private JudgmentCacheDao mockJudgmentCacheDao;
+    private JudgmentDao mockJudgmentDao;
 
     @Mock
     private Client mockClient;
@@ -78,7 +78,7 @@ public class LlmJudgmentsProcessorTests extends OpenSearchTestCase {
             mockMLAccessor,
             mockQuerySetDao,
             mockSearchConfigurationDao,
-            mockJudgmentCacheDao,
+            mockJudgmentDao,
             mockClient,
             threadPool
         );
@@ -160,7 +160,6 @@ public class LlmJudgmentsProcessorTests extends OpenSearchTestCase {
         assertTrue("Metadata should contain tokenLimit", metadata.containsKey("tokenLimit"));
         assertTrue("Metadata should contain contextFields", metadata.containsKey("contextFields"));
         assertTrue("Metadata should contain ignoreFailure", metadata.containsKey("ignoreFailure"));
-        assertTrue("Metadata should contain overwriteCache", metadata.containsKey("overwriteCache"));
     }
 
     // ============================================
@@ -255,7 +254,6 @@ public class LlmJudgmentsProcessorTests extends OpenSearchTestCase {
         metadata.put("ignoreFailure", false);
         metadata.put("promptTemplate", "Default prompt template");
         metadata.put("llmJudgmentRatingType", LLMJudgmentRatingType.SCORE0_1);
-        metadata.put("overwriteCache", false);
         return metadata;
     }
 

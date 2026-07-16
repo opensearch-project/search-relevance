@@ -39,7 +39,6 @@ public class SearchRelevanceIndicesTests extends OpenSearchTestCase {
         Set<SearchRelevanceIndices> notProtectedIndices = Set.of(
             SearchRelevanceIndices.SEARCH_CONFIGURATION,
             SearchRelevanceIndices.JUDGMENT,
-            SearchRelevanceIndices.JUDGMENT_CACHE,
             SearchRelevanceIndices.EVALUATION_RESULT,
             SearchRelevanceIndices.EXPERIMENT_VARIANT,
             SearchRelevanceIndices.QUERY_SET,

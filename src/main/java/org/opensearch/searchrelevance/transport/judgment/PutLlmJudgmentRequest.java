@@ -53,9 +53,10 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
     private LLMJudgmentRatingType llmJudgmentRatingType;
 
     /**
-     * Flag to indicate whether to use judgment cache
+     * Optional list of existing judgment IDs whose ratings can be reused
+     * to avoid redundant LLM calls for already-rated (query, doc) pairs.
      */
-    private boolean overwriteCache;
+    private List<String> existingJudgements;
 
     public PutLlmJudgmentRequest(
         @NonNull JudgmentType type,
@@ -70,7 +71,7 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         boolean ignoreFailure,
         String promptTemplate,
         LLMJudgmentRatingType llmJudgmentRatingType,
-        boolean overwriteCache
+        List<String> existingJudgements
     ) {
         super(type, name, description);
         this.modelId = modelId;
@@ -82,7 +83,7 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         this.ignoreFailure = ignoreFailure;
         this.promptTemplate = promptTemplate;
         this.llmJudgmentRatingType = llmJudgmentRatingType;
-        this.overwriteCache = overwriteCache;
+        this.existingJudgements = existingJudgements;
     }
 
     public PutLlmJudgmentRequest(StreamInput in) throws IOException {
@@ -96,7 +97,7 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         this.ignoreFailure = Boolean.TRUE.equals(in.readOptionalBoolean()); // by defaulted as false if not provided
         this.promptTemplate = in.readOptionalString();
         this.llmJudgmentRatingType = in.readOptionalWriteable(LLMJudgmentRatingType::readFromStream);
-        this.overwriteCache = Boolean.TRUE.equals(in.readOptionalBoolean());
+        this.existingJudgements = in.readOptionalStringList();
     }
 
     @Override
@@ -111,7 +112,7 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         out.writeOptionalBoolean(ignoreFailure);
         out.writeOptionalString(promptTemplate);
         out.writeOptionalWriteable(llmJudgmentRatingType);
-        out.writeOptionalBoolean(overwriteCache);
+        out.writeOptionalStringArray(existingJudgements != null ? existingJudgements.toArray(new String[0]) : null);
     }
 
     public String getModelId() {
@@ -150,8 +151,8 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         return llmJudgmentRatingType;
     }
 
-    public boolean isOverwriteCache() {
-        return overwriteCache;
+    public List<String> getExistingJudgements() {
+        return existingJudgements;
     }
 
 }

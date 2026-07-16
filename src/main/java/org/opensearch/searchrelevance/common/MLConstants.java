@@ -27,7 +27,6 @@ public class MLConstants {
     public static final String PARAM_USER_PROMPT_FIELD = "user_prompt";
     public static final String PROMPT_TEMPLATE = "promptTemplate";
     public static final String LLM_JUDGMENT_RATING_TYPE = "llmJudgmentRatingType";
-    public static final String OVERWRITE_CACHE = "overwriteCache";
 
     /**
      * Prompt template placeholder names.

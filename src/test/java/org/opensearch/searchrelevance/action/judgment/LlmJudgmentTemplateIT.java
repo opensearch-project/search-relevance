@@ -32,7 +32,7 @@ import lombok.SneakyThrows;
 
 /**
  * Integration tests for LLM Judgment Template functionality.
- * Tests the new fields: promptTemplate, llmJudgmentRatingType, and overwriteCache.
+ * Tests the new fields: promptTemplate and llmJudgmentRatingType.
  */
 @ThreadLeakScope(ThreadLeakScope.Scope.NONE)
 @OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.SUITE)
@@ -125,8 +125,6 @@ public class LlmJudgmentTemplateIT extends BaseSearchRelevanceIT {
         assertTrue(((String) metadata.get("promptTemplate")).contains("{{queryText}}"));
         assertNotNull(metadata.get("llmJudgmentRatingType"));
         assertEquals("SCORE0_1", metadata.get("llmJudgmentRatingType"));
-        assertNotNull(metadata.get("overwriteCache"));
-
         // Verify judgmentRatings format
         List<Map<String, Object>> judgmentRatings = (List<Map<String, Object>>) source.get("judgmentRatings");
         assertNotNull(judgmentRatings);
@@ -247,112 +245,6 @@ public class LlmJudgmentTemplateIT extends BaseSearchRelevanceIT {
     }
 
     @SneakyThrows
-    public void testLlmJudgmentWithOverwriteCache_thenSuccessful() {
-        // Step 1: Create test index
-        String indexConfig = Files.readString(Path.of(classLoader.getResource("llmjudgment/CreateTestIndex.json").toURI()));
-        createIndexWithConfiguration(TEST_INDEX, indexConfig);
-
-        // Step 2: Bulk ingest test documents
-        String bulkData = Files.readString(Path.of(classLoader.getResource("llmjudgment/BulkIngestProducts.json").toURI()));
-        bulkIngest(TEST_INDEX, bulkData);
-
-        // Step 3: Create query set
-        String querySetBody = Files.readString(Path.of(classLoader.getResource("llmjudgment/CreateQuerySetSimple.json").toURI()));
-        Response querySetResponse = makeRequest(
-            client(),
-            RestRequest.Method.PUT.name(),
-            QUERYSETS_URL,
-            null,
-            toHttpEntity(querySetBody),
-            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
-        );
-        Map<String, Object> querySetResult = entityAsMap(querySetResponse);
-        String querySetId = querySetResult.get("query_set_id").toString();
-
-        // Create search configuration
-        String searchConfigBody = Files.readString(Path.of(classLoader.getResource("llmjudgment/CreateSearchConfiguration.json").toURI()));
-        searchConfigBody = replacePlaceholders(searchConfigBody, Map.of("index", TEST_INDEX));
-        Response searchConfigResponse = makeRequest(
-            client(),
-            RestRequest.Method.PUT.name(),
-            SEARCH_CONFIGURATIONS_URL,
-            null,
-            toHttpEntity(searchConfigBody),
-            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
-        );
-        Map<String, Object> searchConfigResult = entityAsMap(searchConfigResponse);
-        String searchConfigId = searchConfigResult.get("search_configuration_id").toString();
-
-        // Test with overwriteCache = true
-        String overwriteTrueBody = Files.readString(
-            Path.of(classLoader.getResource("llmjudgment/CreateLlmJudgmentOverwriteTrue.json").toURI())
-        );
-        overwriteTrueBody = replacePlaceholders(overwriteTrueBody, Map.of("querySetId", querySetId, "searchConfigId", searchConfigId));
-        Response overwriteTrueResponse = makeRequest(
-            client(),
-            RestRequest.Method.PUT.name(),
-            JUDGMENTS_URL,
-            null,
-            toHttpEntity(overwriteTrueBody),
-            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
-        );
-        Map<String, Object> overwriteTrueResult = entityAsMap(overwriteTrueResponse);
-        String judgmentIdTrue = overwriteTrueResult.get("judgment_id").toString();
-        assertNotNull(judgmentIdTrue);
-
-        Thread.sleep(DEFAULT_INTERVAL_MS);
-
-        // Verify overwriteCache = true
-        String getJudgmentTrueUrl = String.join("/", JUDGMENT_INDEX, "_doc", judgmentIdTrue);
-        Response getJudgmentTrueResponse = makeRequest(
-            adminClient(),
-            RestRequest.Method.GET.name(),
-            getJudgmentTrueUrl,
-            null,
-            null,
-            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
-        );
-        Map<String, Object> judgmentTrueDoc = entityAsMap(getJudgmentTrueResponse);
-        Map<String, Object> sourceTrue = (Map<String, Object>) judgmentTrueDoc.get("_source");
-        Map<String, Object> metadataTrue = (Map<String, Object>) sourceTrue.get("metadata");
-        assertEquals(true, metadataTrue.get("overwriteCache"));
-
-        // Test with overwriteCache = false
-        String overwriteFalseBody = Files.readString(
-            Path.of(classLoader.getResource("llmjudgment/CreateLlmJudgmentOverwriteFalse.json").toURI())
-        );
-        overwriteFalseBody = replacePlaceholders(overwriteFalseBody, Map.of("querySetId", querySetId, "searchConfigId", searchConfigId));
-        Response overwriteFalseResponse = makeRequest(
-            client(),
-            RestRequest.Method.PUT.name(),
-            JUDGMENTS_URL,
-            null,
-            toHttpEntity(overwriteFalseBody),
-            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
-        );
-        Map<String, Object> overwriteFalseResult = entityAsMap(overwriteFalseResponse);
-        String judgmentIdFalse = overwriteFalseResult.get("judgment_id").toString();
-        assertNotNull(judgmentIdFalse);
-
-        Thread.sleep(DEFAULT_INTERVAL_MS);
-
-        // Verify overwriteCache = false
-        String getJudgmentFalseUrl = String.join("/", JUDGMENT_INDEX, "_doc", judgmentIdFalse);
-        Response getJudgmentFalseResponse = makeRequest(
-            adminClient(),
-            RestRequest.Method.GET.name(),
-            getJudgmentFalseUrl,
-            null,
-            null,
-            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
-        );
-        Map<String, Object> judgmentFalseDoc = entityAsMap(getJudgmentFalseResponse);
-        Map<String, Object> sourceFalse = (Map<String, Object>) judgmentFalseDoc.get("_source");
-        Map<String, Object> metadataFalse = (Map<String, Object>) sourceFalse.get("metadata");
-        assertEquals(false, metadataFalse.get("overwriteCache"));
-    }
-
-    @SneakyThrows
     public void testLlmJudgmentWithoutOptionalFields_thenSuccessfulWithDefaults() {
         // Step 1: Create test index
         String indexConfig = Files.readString(Path.of(classLoader.getResource("llmjudgment/CreateTestIndex.json").toURI()));
@@ -389,7 +281,7 @@ public class LlmJudgmentTemplateIT extends BaseSearchRelevanceIT {
         Map<String, Object> searchConfigResult = entityAsMap(searchConfigResponse);
         String searchConfigId = searchConfigResult.get("search_configuration_id").toString();
 
-        // Create LLM judgment WITHOUT promptTemplate, llmJudgmentRatingType, overwriteCache
+        // Create LLM judgment WITHOUT promptTemplate, llmJudgmentRatingType
         String minimalBody = Files.readString(Path.of(classLoader.getResource("llmjudgment/CreateLlmJudgmentMinimal.json").toURI()));
         minimalBody = replacePlaceholders(minimalBody, Map.of("querySetId", querySetId, "searchConfigId", searchConfigId));
         Response minimalResponse = makeRequest(
@@ -428,9 +320,5 @@ public class LlmJudgmentTemplateIT extends BaseSearchRelevanceIT {
         // llmJudgmentRatingType should have a default or be null
         Object ratingType = metadata.get("llmJudgmentRatingType");
         // Either null or has a default value
-
-        // overwriteCache should default to false
-        Object overwriteCache = metadata.get("overwriteCache");
-        assertTrue(overwriteCache == null || overwriteCache.equals(false));
     }
 }

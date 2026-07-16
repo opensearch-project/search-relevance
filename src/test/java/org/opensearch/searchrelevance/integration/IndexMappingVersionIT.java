@@ -112,21 +112,6 @@ public class IndexMappingVersionIT extends BaseSearchRelevanceIT {
     }
 
     /**
-     * Test that judgment_cache index has the new fields (modelId, encodedPromptTemplate).
-     * These fields were added in schema_version 1.
-     */
-    public void testJudgmentCacheMappingHasNewFields() {
-        String mapping = SearchRelevanceIndices.JUDGMENT_CACHE.getMapping();
-
-        // Verify new fields exist in the mapping
-        assertTrue("Mapping should contain modelId field", mapping.contains("\"modelId\""));
-        assertTrue("Mapping should contain encodedPromptTemplate field", mapping.contains("\"encodedPromptTemplate\""));
-
-        // Verify schema_version is 1 (since we added new fields)
-        assertEquals("JUDGMENT_CACHE should have schema_version 1", 1, SearchRelevanceIndices.JUDGMENT_CACHE.getSchemaVersion());
-    }
-
-    /**
      * Helper method to verify an index has the expected schema_version in its mapping.
      */
     private void verifyIndexHasSchemaVersion(String indexName, int expectedVersion) throws Exception {

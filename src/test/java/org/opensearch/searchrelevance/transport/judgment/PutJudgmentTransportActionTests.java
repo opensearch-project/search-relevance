@@ -83,7 +83,7 @@ public class PutJudgmentTransportActionTests extends OpenSearchTestCase {
             false, // ignoreFailure
             null, // promptTemplate
             null, // llmJudgmentRatingType
-            false // overwriteCache
+            null // existingJudgements
         );
 
         // Mock QuerySet DAO to return 0 hits (entity not found)
@@ -121,7 +121,7 @@ public class PutJudgmentTransportActionTests extends OpenSearchTestCase {
             false, // ignoreFailure
             null, // promptTemplate
             null, // llmJudgmentRatingType
-            false // overwriteCache
+            null // existingJudgements
         );
 
         // Mock QuerySet exists

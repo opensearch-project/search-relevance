@@ -8,19 +8,16 @@
 package org.opensearch.searchrelevance.judgments;
 
 import static org.opensearch.searchrelevance.common.MLConstants.LLM_JUDGMENT_RATING_TYPE;
-import static org.opensearch.searchrelevance.common.MLConstants.OVERWRITE_CACHE;
 import static org.opensearch.searchrelevance.common.MLConstants.PROMPT_TEMPLATE;
 import static org.opensearch.searchrelevance.model.builder.SearchRequestBuilder.buildSearchRequest;
 import static org.opensearch.searchrelevance.utils.ParserUtils.combinedIndexAndDocId;
-import static org.opensearch.searchrelevance.utils.ParserUtils.generatePromptTemplateCode;
-import static org.opensearch.searchrelevance.utils.ParserUtils.generateUniqueId;
 import static org.opensearch.searchrelevance.utils.ParserUtils.getDocIdFromCompositeKey;
 import static org.opensearch.searchrelevance.utils.RatingOutputProcessor.convertRatingScore;
 import static org.opensearch.searchrelevance.utils.RatingOutputProcessor.sanitizeLLMResponse;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -31,7 +28,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
-import org.opensearch.action.StepListener;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.support.PlainActionFuture;
@@ -39,14 +35,14 @@ import org.opensearch.common.inject.Inject;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.search.SearchHit;
-import org.opensearch.searchrelevance.dao.JudgmentCacheDao;
+import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.executors.LlmJudgmentTaskManager;
 import org.opensearch.searchrelevance.ml.ChunkResult;
 import org.opensearch.searchrelevance.ml.MLAccessor;
-import org.opensearch.searchrelevance.model.JudgmentCache;
+import org.opensearch.searchrelevance.model.Judgment;
 import org.opensearch.searchrelevance.model.JudgmentType;
 import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
 import org.opensearch.searchrelevance.model.QuerySet;
@@ -54,7 +50,6 @@ import org.opensearch.searchrelevance.model.QuerySetEntry;
 import org.opensearch.searchrelevance.model.SearchConfiguration;
 import org.opensearch.searchrelevance.stats.events.EventStatName;
 import org.opensearch.searchrelevance.stats.events.EventStatsManager;
-import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.client.Client;
 
@@ -75,7 +70,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
     private final MLAccessor mlAccessor;
     private final QuerySetDao querySetDao;
     private final SearchConfigurationDao searchConfigurationDao;
-    private final JudgmentCacheDao judgmentCacheDao;
+    private final JudgmentDao judgmentDao;
     private final Client client;
     private final ThreadPool threadPool;
     private final LlmJudgmentTaskManager taskManager;
@@ -85,14 +80,14 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         MLAccessor mlAccessor,
         QuerySetDao querySetDao,
         SearchConfigurationDao searchConfigurationDao,
-        JudgmentCacheDao judgmentCacheDao,
+        JudgmentDao judgmentDao,
         Client client,
         ThreadPool threadPool
     ) {
         this.mlAccessor = mlAccessor;
         this.querySetDao = querySetDao;
         this.searchConfigurationDao = searchConfigurationDao;
-        this.judgmentCacheDao = judgmentCacheDao;
+        this.judgmentDao = judgmentDao;
         this.client = client;
         this.threadPool = threadPool;
         this.taskManager = new LlmJudgmentTaskManager(threadPool);
@@ -109,6 +104,147 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         threadPool.executor(ThreadPool.Names.GENERIC).execute(() -> { generateJudgmentRatingInternal(metadata, listener); });
     }
 
+    /**
+     * Retries only the failed documents from an existing judgment.
+     * For each query that has failures, fetches the failed docs' content from the index
+     * and re-scores only those docs with the LLM. Returns results per query.
+     *
+     * @param failedQueries map of queryText → list of failed docIds
+     * @param metadata the judgment's stored metadata (modelId, prompt, config, etc.)
+     * @param listener callback with per-query results (ratings + remaining failures)
+     */
+    @SuppressWarnings("unchecked")
+    public void retryFailedDocs(
+        Map<String, List<String>> failedQueries,
+        Map<String, Object> metadata,
+        ActionListener<List<Map<String, Object>>> listener
+    ) {
+        threadPool.executor(ThreadPool.Names.GENERIC).execute(() -> {
+            try {
+                String modelId = (String) metadata.get("modelId");
+                if (modelId == null || modelId.isEmpty()) {
+                    listener.onFailure(new SearchRelevanceException("modelId is missing from judgment metadata", RestStatus.BAD_REQUEST));
+                    return;
+                }
+
+                Number tokenLimitNum = (Number) metadata.get("tokenLimit");
+                int tokenLimit = tokenLimitNum != null ? tokenLimitNum.intValue() : 4000;
+                Number sizeNum = (Number) metadata.get("size");
+                int size = sizeNum != null ? sizeNum.intValue() : 10;
+                List<String> contextFields = (List<String>) metadata.get("contextFields");
+                String promptTemplate = (String) metadata.get(PROMPT_TEMPLATE);
+                List<String> searchConfigurationList = (List<String>) metadata.get("searchConfigurationList");
+
+                if (searchConfigurationList == null || searchConfigurationList.isEmpty()) {
+                    listener.onFailure(
+                        new SearchRelevanceException("searchConfigurationList is missing from judgment metadata", RestStatus.BAD_REQUEST)
+                    );
+                    return;
+                }
+
+                LLMJudgmentRatingType ratingType = null;
+                Object ratingTypeObj = metadata.get(LLM_JUDGMENT_RATING_TYPE);
+                if (ratingTypeObj instanceof LLMJudgmentRatingType) {
+                    ratingType = (LLMJudgmentRatingType) ratingTypeObj;
+                } else if (ratingTypeObj instanceof String) {
+                    ratingType = LLMJudgmentRatingType.valueOf((String) ratingTypeObj);
+                }
+                if (ratingType == null) {
+                    ratingType = LLMJudgmentRatingType.SCORE0_1;
+                }
+
+                List<SearchConfiguration> searchConfigurations = searchConfigurationList.stream()
+                    .map(id -> searchConfigurationDao.getSearchConfigurationSync(id))
+                    .collect(Collectors.toList());
+
+                if (searchConfigurations.isEmpty()) {
+                    listener.onFailure(new SearchRelevanceException("No valid search configurations found", RestStatus.BAD_REQUEST));
+                    return;
+                }
+
+                String index = searchConfigurations.get(0).index();
+                List<Map<String, Object>> results = new ArrayList<>();
+
+                // Process each query that has failures — score only the failed docs
+                for (Map.Entry<String, List<String>> entry : failedQueries.entrySet()) {
+                    String queryTextWithCustomInput = entry.getKey();
+                    List<String> failedDocIds = entry.getValue();
+
+                    // Parse the stored key back into queryText + customFields
+                    // Stored format is "queryText#{"key":"value"}" or just "queryText" if no custom fields
+                    String queryText;
+                    Map<String, String> customFields = Map.of();
+                    if (queryTextWithCustomInput.contains("#")) {
+                        String[] parts = queryTextWithCustomInput.split("#", 2);
+                        queryText = parts[0];
+                        try {
+                            customFields = OBJECT_MAPPER.readValue(parts[1], new TypeReference<Map<String, String>>() {
+                            });
+                        } catch (Exception e) {
+                            log.warn("Failed to parse custom fields from query key: {}, using empty", queryTextWithCustomInput);
+                            customFields = Map.of();
+                        }
+                    } else {
+                        queryText = queryTextWithCustomInput;
+                    }
+
+                    log.info("Retrying {} failed docs for query: {}", failedDocIds.size(), queryText);
+
+                    // Fetch the failed docs' content by running the search with the clean queryText
+                    ConcurrentMap<String, SearchHit> allHits = new ConcurrentHashMap<>();
+                    processSearchConfigurationsAsync(searchConfigurations, queryText, size, allHits, true);
+
+                    // Filter to only the failed docIds
+                    ConcurrentMap<String, String> docIdToScore = new ConcurrentHashMap<>();
+                    List<String> docsToScore = failedDocIds.stream().filter(allHits::containsKey).collect(Collectors.toList());
+
+                    if (docsToScore.isEmpty()) {
+                        log.warn("None of the failed docs found in search results for query: {}", queryText);
+                        Map<String, Object> result = new HashMap<>();
+                        result.put("query", queryTextWithCustomInput);
+                        result.put("ratings", List.of());
+                        result.put("failures", failedDocIds.stream().map(id -> Map.of("docId", id)).collect(Collectors.toList()));
+                        results.add(result);
+                        continue;
+                    }
+
+                    // Score only the failed docs with the LLM using the correct queryText and customFields
+                    String llmFailureReason = processWithLLM(
+                        modelId,
+                        queryText,
+                        queryTextWithCustomInput,
+                        customFields,
+                        tokenLimit,
+                        contextFields,
+                        docsToScore,
+                        allHits,
+                        index,
+                        docIdToScore,
+                        promptTemplate,
+                        ratingType
+                    );
+
+                    // Build result: use queryTextWithCustomInput as the key so it matches the original judgment
+                    Map<String, Object> result = buildResultWithFailures(
+                        queryTextWithCustomInput,
+                        new HashSet<>(failedDocIds),
+                        docIdToScore
+                    );
+                    if (llmFailureReason != null) {
+                        result.put(JudgmentDataTransformer.RESULT_FAILURE_REASON, llmFailureReason);
+                    }
+                    results.add(result);
+                }
+
+                listener.onResponse(results);
+            } catch (Exception e) {
+                log.error("Failed to retry failed docs", e);
+                listener.onFailure(new SearchRelevanceException("Failed to retry failed docs", e, RestStatus.INTERNAL_SERVER_ERROR));
+            }
+        });
+    }
+
+    @SuppressWarnings("unchecked")
     private void generateJudgmentRatingInternal(Map<String, Object> metadata, ActionListener<List<Map<String, Object>>> listener) {
         try {
             EventStatsManager.increment(EventStatName.LLM_JUDGMENT_RATING_GENERATIONS);
@@ -127,7 +263,8 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                 ratingType = LLMJudgmentRatingType.SCORE0_1;
                 log.debug("No ratingType provided, defaulting to SCORE0_1");
             }
-            boolean overwriteCache = (boolean) metadata.get(OVERWRITE_CACHE);
+            // Pass existing judgement IDs for per-query deduplication (queried on demand, not loaded upfront)
+            List<String> existingJudgementIds = (List<String>) metadata.get("existingJudgements");
 
             QuerySet querySet = querySetDao.getQuerySetSync(querySetId);
             List<SearchConfiguration> searchConfigurations = searchConfigurationList.stream()
@@ -151,13 +288,69 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                 ignoreFailure,
                 promptTemplate,
                 ratingType,
-                overwriteCache,
+                existingJudgementIds,
                 summaryListener
             );
         } catch (Exception e) {
             log.error("Failed to generate LLM judgments", e);
             listener.onFailure(new SearchRelevanceException("Failed to generate LLM judgments", e, RestStatus.INTERNAL_SERVER_ERROR));
         }
+    }
+
+    /**
+     * Fetches ratings for a specific queryText from the referenced judgments by querying
+     * the system index. Only returns ratings for the matching query — not the entire judgment.
+     * This keeps memory usage minimal: only one query's worth of ratings at a time.
+     * Package-private for testing.
+     */
+    @SuppressWarnings("unchecked")
+    List<Map<String, String>> fetchRatingsForQuery(List<String> existingJudgementIds, String queryText) {
+        List<Map<String, String>> allRatings = new ArrayList<>();
+
+        for (String judgmentId : existingJudgementIds) {
+            try {
+                SearchResponse response = judgmentDao.getJudgmentSync(judgmentId);
+                if (response.getHits().getTotalHits().value() == 0) {
+                    log.warn("Referenced judgment not found: {}, skipping", judgmentId);
+                    continue;
+                }
+
+                Map<String, Object> source = response.getHits().getHits()[0].getSourceAsMap();
+                List<Map<String, Object>> judgmentRatings = (List<Map<String, Object>>) source.get(Judgment.JUDGMENT_RATINGS);
+                if (judgmentRatings == null) {
+                    continue;
+                }
+
+                // Find only the entry matching the current queryText
+                for (Map<String, Object> queryEntry : judgmentRatings) {
+                    if (queryText.equals(queryEntry.get("query"))) {
+                        List<Map<String, String>> ratings = (List<Map<String, String>>) queryEntry.get("ratings");
+                        if (ratings != null) {
+                            allRatings.addAll(ratings);
+                        }
+                        break;
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Failed to load existing judgment: {}, skipping", judgmentId, e);
+            }
+        }
+
+        return allRatings;
+    }
+
+    /**
+     * Searches a small ratings list for a specific docId.
+     * Returns the rating value if found, null otherwise.
+     * Package-private for testing.
+     */
+    String findRatingForDoc(List<Map<String, String>> ratings, String docId) {
+        for (Map<String, String> rating : ratings) {
+            if (docId.equals(rating.get("docId"))) {
+                return rating.get("rating");
+            }
+        }
+        return null;
     }
 
     private void generateLLMJudgmentsAsync(
@@ -170,7 +363,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         boolean ignoreFailure,
         String promptTemplate,
         LLMJudgmentRatingType ratingType,
-        boolean overwriteCache,
+        List<String> existingJudgementIds,
         ActionListener<List<Map<String, Object>>> listener
     ) {
         List<QuerySetEntry> querySetEntries = querySet.querySetQueries();
@@ -178,104 +371,50 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
 
         log.info("Starting LLM judgment generation for {} total queries", totalQueries);
 
-        // Create judgment cache index upfront to prevent concurrent creation attempts
-        StepListener<Void> cacheIndexListener = new StepListener<>();
-        judgmentCacheDao.createIndexIfAbsent(cacheIndexListener);
-        cacheIndexListener.whenComplete(indexResult -> {
-            log.debug("Judgment cache index creation completed, proceeding with task scheduling");
-
-            taskManager.scheduleTasksAsync(querySetEntries, querySetEntry -> {
-                try {
-                    return processQueryTextAsync(
-                        modelId,
-                        size,
-                        tokenLimit,
-                        contextFields,
-                        searchConfigurations,
-                        querySetEntry,
-                        ignoreFailure,
-                        promptTemplate,
-                        ratingType,
-                        overwriteCache
-                    );
-                } catch (Exception e) {
-                    if (ignoreFailure) {
-                        log.warn("Query processing failed, returning empty result for: {}", querySetEntry.queryText(), e);
-                        return JudgmentDataTransformer.createJudgmentResult(querySetEntry.queryText(), Map.of());
-                    } else {
-                        log.error("Query processing failed for: {}", querySetEntry.queryText(), e);
-                        throw new RuntimeException("Query processing failed: " + querySetEntry.queryText(), e);
-                    }
-                }
-            }, ignoreFailure, ActionListener.wrap(results -> {
-                int processedQueries = results.size();
-                int successQueries = (int) results.stream().mapToLong(result -> {
-                    List<Map<String, String>> ratings = (List<Map<String, String>>) result.get("ratings");
-                    return ratings != null && !ratings.isEmpty() ? 1 : 0;
-                }).sum();
-                int failureQueries = processedQueries - successQueries;
-
-                log.info(
-                    "LLM judgment generation completed - Total: {}, Processed: {}, Success: {}, Failure: {}",
-                    totalQueries,
-                    processedQueries,
-                    successQueries,
-                    failureQueries
+        taskManager.scheduleTasksAsync(querySetEntries, querySetEntry -> {
+            try {
+                return processQueryTextAsync(
+                    modelId,
+                    size,
+                    tokenLimit,
+                    contextFields,
+                    searchConfigurations,
+                    querySetEntry,
+                    ignoreFailure,
+                    promptTemplate,
+                    ratingType,
+                    existingJudgementIds
                 );
-                log.info("Calling final listener.onResponse with {} results", results.size());
-                listener.onResponse(results);
-            }, error -> {
-                log.error("LLM judgment generation failed - Total: {}, All failed", totalQueries, error);
-                listener.onFailure(error);
-            }));
-        }, indexError -> {
-            log.warn("Failed to create judgment cache index, proceeding without cache optimization", indexError);
-
-            taskManager.scheduleTasksAsync(querySetEntries, querySetEntry -> {
-                try {
-                    return processQueryTextAsync(
-                        modelId,
-                        size,
-                        tokenLimit,
-                        contextFields,
-                        searchConfigurations,
-                        querySetEntry,
-                        ignoreFailure,
-                        promptTemplate,
-                        ratingType,
-                        overwriteCache
-                    );
-                } catch (Exception e) {
-                    if (ignoreFailure) {
-                        log.warn("Query processing failed, returning empty result for: {}", querySetEntry.queryText(), e);
-                        return JudgmentDataTransformer.createJudgmentResult(querySetEntry.queryText(), Map.of());
-                    } else {
-                        log.error("Query processing failed for: {}", querySetEntry.queryText(), e);
-                        throw new RuntimeException("Query processing failed: " + querySetEntry.queryText(), e);
-                    }
+            } catch (Exception e) {
+                if (ignoreFailure) {
+                    log.warn("Query processing failed, returning empty result for: {}", querySetEntry.queryText(), e);
+                    return JudgmentDataTransformer.createJudgmentResult(querySetEntry.queryText(), Map.of());
+                } else {
+                    log.error("Query processing failed for: {}", querySetEntry.queryText(), e);
+                    throw new RuntimeException("Query processing failed: " + querySetEntry.queryText(), e);
                 }
-            }, ignoreFailure, ActionListener.wrap(results -> {
-                int processedQueries = results.size();
-                int successQueries = (int) results.stream().mapToLong(result -> {
-                    List<Map<String, String>> ratings = (List<Map<String, String>>) result.get("ratings");
-                    return ratings != null && !ratings.isEmpty() ? 1 : 0;
-                }).sum();
-                int failureQueries = processedQueries - successQueries;
+            }
+        }, ignoreFailure, ActionListener.wrap(results -> {
+            int processedQueries = results.size();
+            int successQueries = (int) results.stream().mapToLong(result -> {
+                List<Map<String, String>> ratings = (List<Map<String, String>>) result.get("ratings");
+                return ratings != null && !ratings.isEmpty() ? 1 : 0;
+            }).sum();
+            int failureQueries = processedQueries - successQueries;
 
-                log.info(
-                    "LLM judgment generation completed - Total: {}, Processed: {}, Success: {}, Failure: {}",
-                    totalQueries,
-                    processedQueries,
-                    successQueries,
-                    failureQueries
-                );
-                log.info("Calling final listener.onResponse with {} results", results.size());
-                listener.onResponse(results);
-            }, error -> {
-                log.error("LLM judgment generation failed - Total: {}, All failed", totalQueries, error);
-                listener.onFailure(error);
-            }));
-        });
+            log.info(
+                "LLM judgment generation completed - Total: {}, Processed: {}, Success: {}, Failure: {}",
+                totalQueries,
+                processedQueries,
+                successQueries,
+                failureQueries
+            );
+            log.info("Calling final listener.onResponse with {} results", results.size());
+            listener.onResponse(results);
+        }, error -> {
+            log.error("LLM judgment generation failed - Total: {}, All failed", totalQueries, error);
+            listener.onFailure(error);
+        }));
     }
 
     private Map<String, Object> processQueryTextAsync(
@@ -288,13 +427,11 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         boolean ignoreFailure,
         String promptTemplate,
         LLMJudgmentRatingType ratingType,
-        boolean overwriteCache
+        List<String> existingJudgementIds
     ) {
         String queryText = querySetEntry.queryText();
         Map<String, String> customFields = querySetEntry.customFields();
-        // Reconstruct the legacy cache key so that existing cache entries written
-        // in the old "queryText#JSON" format can still be found during lookups.
-        String queryTextWithCustomInput = buildCacheKey(queryText, customFields);
+        String queryTextWithCustomInput = buildQueryTextWithCustomInput(queryText, customFields);
 
         log.info("Processing query text judgment: {}", queryText);
 
@@ -305,25 +442,34 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
             // Step 1: Execute searches concurrently within this query text task
             processSearchConfigurationsAsync(searchConfigurations, queryText, size, allHits, ignoreFailure);
 
-            // Step 2: Deduplicate from cache (skip if overwriteCache is true)
+            // Step 1.5: Deduplicate from existing judgements (if provided)
+            // For the current queryText, fetch only that query's ratings from referenced judgments
             List<String> docIds = new ArrayList<>(allHits.keySet());
+            if (existingJudgementIds != null && !existingJudgementIds.isEmpty()) {
+                List<Map<String, String>> existingRatings = fetchRatingsForQuery(existingJudgementIds, queryTextWithCustomInput);
+                List<String> remainingDocIds = new ArrayList<>();
+                for (String docId : docIds) {
+                    String rating = findRatingForDoc(existingRatings, docId);
+                    if (rating != null) {
+                        docIdToScore.put(docId, rating);
+                        log.debug("Reused rating from existing judgment for query: {}, docId: {}", queryText, docId);
+                    } else {
+                        remainingDocIds.add(docId);
+                    }
+                }
+                log.info(
+                    "Reused {} ratings from existing judgments, {} remaining for query: {}",
+                    docIds.size() - remainingDocIds.size(),
+                    remainingDocIds.size(),
+                    queryText
+                );
+                docIds = remainingDocIds;
+            }
 
+            // Step 2: Process with LLM if needed
             String index = searchConfigurations.get(0).index();
-            String promptTemplateCode = generatePromptTemplateCode(promptTemplate, ratingType);
-            List<String> unprocessedDocIds = deduplicateFromCache(
-                index,
-                queryTextWithCustomInput,
-                contextFields,
-                docIds,
-                docIdToScore,
-                ignoreFailure,
-                promptTemplateCode,
-                overwriteCache
-            );
-
-            // Step 3: Process with LLM if needed
             String llmFailureReason = null;
-            if (!unprocessedDocIds.isEmpty()) {
+            if (!docIds.isEmpty()) {
                 llmFailureReason = processWithLLM(
                     modelId,
                     queryText,
@@ -331,7 +477,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                     customFields,
                     tokenLimit,
                     contextFields,
-                    unprocessedDocIds,
+                    docIds,
                     allHits,
                     index,
                     docIdToScore,
@@ -411,58 +557,6 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         log.info("Search phase completed. Total hits collected: {}", allHits.size());
     }
 
-    private List<String> deduplicateFromCache(
-        String index,
-        String queryTextWithCustomInput,
-        List<String> contextFields,
-        List<String> docIds,
-        ConcurrentMap<String, String> docIdToScore,
-        boolean ignoreFailure,
-        String promptTemplateCode,
-        boolean overwriteCache
-    ) throws Exception {
-        // If overwriteCache is true, skip cache lookup and return all docIds as unprocessed
-        if (overwriteCache) {
-            log.info("overwriteCache flag is enabled, skipping cache lookup for all {} docs", docIds.size());
-            return docIds;
-        }
-        List<String> processedDocIds = Collections.synchronizedList(new ArrayList<>());
-        AtomicBoolean hasFailure = new AtomicBoolean(false);
-
-        List<CompletableFuture<Void>> cacheFutures = docIds.stream().map(docId -> {
-            String compositeKey = combinedIndexAndDocId(index, docId);
-            CompletableFuture<SearchResponse> future = new CompletableFuture<>();
-            judgmentCacheDao.getJudgmentCache(
-                queryTextWithCustomInput,
-                compositeKey,
-                contextFields,
-                promptTemplateCode,
-                ActionListener.wrap(future::complete, future::completeExceptionally)
-            );
-
-            return future.thenAccept(response -> {
-                if (response.getHits().getTotalHits().value() > 0) {
-                    SearchHit hit = response.getHits().getHits()[0];
-                    Map<String, Object> source = hit.getSourceAsMap();
-                    String rating = (String) source.get("rating");
-
-                    log.debug("Found cached judgment for docId: {}, rating: {}", docId, rating);
-                    docIdToScore.put(docId, rating);
-                    processedDocIds.add(docId);
-                }
-            }).exceptionally(e -> {
-                log.debug("Cache lookup failed for docId: {} - continuing without cache", docId);
-                return null;
-            });
-        }).toList();
-
-        CompletableFuture.allOf(cacheFutures.toArray(new CompletableFuture[0])).join();
-
-        List<String> unprocessedDocIds = docIds.stream().filter(docId -> !processedDocIds.contains(docId)).collect(Collectors.toList());
-        log.info("Cache deduplication completed. Cached: {}, Unprocessed: {}", processedDocIds.size(), unprocessedDocIds.size());
-        return unprocessedDocIds;
-    }
-
     /**
      * @return the reason a chunk failed (when the remote reported an error without throwing), or null when the call succeeded
      */
@@ -490,13 +584,10 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
             unionHits.put(compositeKey, contextSource);
         }
 
-        log.info("Processing {} uncached docs with LLM", unionHits.size());
+        log.info("Processing {} docs with LLM", unionHits.size());
         log.debug("DEBUG: unionHits keys being sent to LLM: {}", unionHits.keySet());
         log.debug("DEBUG: queryText: {}", queryText);
         log.debug("DEBUG: modelId: {}, tokenLimit: {}, ratingType: {}", modelId, tokenLimit, ratingType);
-
-        // Generate promptTemplateCode for cache updates
-        String promptTemplateCode = generatePromptTemplateCode(promptTemplate, ratingType);
 
         // Synchronous LLM call
         PlainActionFuture<Map<String, String>> llmFuture = PlainActionFuture.newFuture();
@@ -512,7 +603,6 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
             new HashMap<>(),
             promptTemplate,
             ratingType,
-            promptTemplateCode,
             failureReason,
             llmFuture
         );
@@ -535,7 +625,6 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         Map<String, String> docIdToRating,
         String promptTemplate,
         LLMJudgmentRatingType ratingType,
-        String promptTemplateCode,
         AtomicReference<String> failureReasonOut,
         ActionListener<Map<String, String>> listener
     ) {
@@ -543,7 +632,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         log.debug("processed docIdToRating before llm evaluation: {}", docIdToRating);
 
         if (unprocessedUnionHits.isEmpty()) {
-            log.info("All hits found in cache, returning cached results for query: {}", queryText);
+            log.info("No hits to process, returning existing results for query: {}", queryText);
             listener.onResponse(docIdToRating);
             return;
         }
@@ -620,14 +709,6 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                                     String docId = getDocIdFromCompositeKey(compositeKey);
                                     log.debug("DEBUG: Converted rating - docId: {}, ratingScore: {}", docId, ratingScore);
                                     processedRatings.put(docId, ratingScore.toString());
-                                    updateJudgmentCache(
-                                        compositeKey,
-                                        queryTextWithCustomInput,
-                                        contextFields,
-                                        ratingScore.toString(),
-                                        modelId,
-                                        promptTemplateCode
-                                    );
                                 }
                             }
 
@@ -656,66 +737,12 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         );
     }
 
-    private void updateJudgmentCache(
-        String compositeKey,
-        String queryText,
-        List<String> contextFields,
-        String rating,
-        String modelId,
-        String promptTemplateCode
-    ) {
-        try {
-            JudgmentCache judgmentCache = new JudgmentCache(
-                generateUniqueId(queryText, compositeKey, contextFields),
-                TimeUtils.getTimestamp(),
-                queryText,
-                compositeKey,
-                contextFields,
-                rating,
-                modelId,
-                promptTemplateCode
-            );
-            StepListener<Void> createIndexStep = new StepListener<>();
-            judgmentCacheDao.createIndexIfAbsent(createIndexStep);
-
-            createIndexStep.whenComplete(v -> {
-                judgmentCacheDao.upsertJudgmentCache(
-                    judgmentCache,
-                    ActionListener.wrap(
-                        response -> log.debug(
-                            "Successfully processed judgment cache for queryText: {} and compositeKey: {}, contextFields: {}",
-                            queryText,
-                            compositeKey,
-                            contextFields
-                        ),
-                        e -> log.warn(
-                            "Failed to process judgment cache for queryText: {} and compositeKey: {}, contextFields: {} - continuing without cache",
-                            queryText,
-                            compositeKey,
-                            contextFields
-                        )
-                    )
-                );
-            }, e -> {
-                log.warn(
-                    "Failed to create judgment cache index for queryText: {} and compositeKey: {}, contextFields: {} - continuing without cache",
-                    queryText,
-                    compositeKey,
-                    contextFields
-                );
-            });
-        } catch (Exception e) {
-            log.warn("Cache operation failed for queryText: {} - continuing without cache", queryText);
-        }
-    }
-
     /**
-     * Builds a cache key that is compatible with both legacy and new formats.
-     * Legacy cache entries were stored with keys like "queryText#{\"key\":\"value\"}"
-     * so we must reconstruct that format to find existing cached judgments.
-     * New entries (with no custom fields) use just the queryText.
+     * Builds a query text identifier that includes custom fields when present.
+     * This is used for matching against existing judgement ratings.
+     * Format: "queryText" when no custom fields, or "queryText#{\"key\":\"value\"}" with custom fields.
      */
-    private String buildCacheKey(String queryText, Map<String, String> customFields) {
+    private String buildQueryTextWithCustomInput(String queryText, Map<String, String> customFields) {
         if (customFields == null || customFields.isEmpty()) {
             return queryText;
         }
@@ -723,7 +750,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
             String jsonFields = OBJECT_MAPPER.writeValueAsString(customFields);
             return queryText + "#" + jsonFields;
         } catch (JacksonException e) {
-            log.warn("Failed to serialize custom fields for cache key, using queryText only", e);
+            log.warn("Failed to serialize custom fields, using queryText only", e);
             return queryText;
         }
     }

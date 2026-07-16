@@ -10,7 +10,6 @@ package org.opensearch.searchrelevance.plugin;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX;
-import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_CACHE_INDEX;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_ENABLED;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_MINIMUM_INTERVAL;
@@ -48,7 +47,6 @@ import org.opensearch.script.ScriptService;
 import org.opensearch.searchrelevance.dao.EvaluationResultDao;
 import org.opensearch.searchrelevance.dao.ExperimentDao;
 import org.opensearch.searchrelevance.dao.ExperimentVariantDao;
-import org.opensearch.searchrelevance.dao.JudgmentCacheDao;
 import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
 import org.opensearch.searchrelevance.dao.ScheduledExperimentHistoryDao;
@@ -104,7 +102,7 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
     private NodeEnvironment nodeEnvironment;
     private SearchRelevancePlugin plugin;
 
-    public static final Set<String> SUPPORTED_SYSTEM_INDEX_PATTERN = Set.of(EXPERIMENT_INDEX, JUDGMENT_CACHE_INDEX);
+    public static final Set<String> SUPPORTED_SYSTEM_INDEX_PATTERN = Set.of(EXPERIMENT_INDEX);
 
     private final Set<Class> SUPPORTED_COMPONENTS = Set.of(
         SearchRelevanceIndicesManager.class,
@@ -114,7 +112,6 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
         SearchConfigurationDao.class,
         JudgmentDao.class,
         EvaluationResultDao.class,
-        JudgmentCacheDao.class,
         ScheduledJobsDao.class,
         ScheduledExperimentHistoryDao.class,
         MLAccessor.class,
@@ -202,7 +199,7 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
     }
 
     public void testTotalRestHandlers() {
-        assertEquals(23, plugin.getRestHandlers(Settings.EMPTY, null, null, null, null, null, null).size());
+        assertEquals(24, plugin.getRestHandlers(Settings.EMPTY, null, null, null, null, null, null).size());
     }
 
     public void testQuerySetTransportIsAdded() {

@@ -13,18 +13,14 @@ import java.util.concurrent.ConcurrentMap;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.search.SearchHit;
-import org.opensearch.searchrelevance.dao.JudgmentCacheDao;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 
 /**
  * Handles processing of responses for LLM judgment generation
  */
 @Log4j2
-@RequiredArgsConstructor
 public class JudgmentResponseProcessor {
-    private final JudgmentCacheDao judgmentCacheDao;
 
     /**
      * Process search response and collect hits

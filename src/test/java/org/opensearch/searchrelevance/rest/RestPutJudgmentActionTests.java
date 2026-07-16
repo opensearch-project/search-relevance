@@ -55,8 +55,7 @@ public class RestPutJudgmentActionTests extends SearchRelevanceRestTestCase {
         + "\"contextFields\": [\"field1\", \"field2\"],"
         + "\"ignoreFailure\": false,"
         + "\"promptTemplate\": \"Query: {{queryText}}\\\\n\\\\nDocuments: {{hits}}\","
-        + "\"llmJudgmentRatingType\": \"SCORE0_1\","
-        + "\"overwriteCache\": true"
+        + "\"llmJudgmentRatingType\": \"SCORE0_1\""
         + "}";
 
     private static final String UBI_JUDGMENT_CONTENT = "{"
@@ -281,7 +280,6 @@ public class RestPutJudgmentActionTests extends SearchRelevanceRestTestCase {
         PutLlmJudgmentRequest capturedRequest = requestCaptor.getValue();
         assertEquals("Query: {{queryText}}\\n\\nDocuments: {{hits}}", capturedRequest.getPromptTemplate());
         assertEquals("SCORE0_1", capturedRequest.getLlmJudgmentRatingType().name());
-        assertEquals(true, capturedRequest.isOverwriteCache());
     }
 
     public void testPutLlmJudgment_InvalidRatingType() throws Exception {

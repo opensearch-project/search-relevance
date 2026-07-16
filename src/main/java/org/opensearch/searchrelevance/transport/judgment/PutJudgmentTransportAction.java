@@ -8,7 +8,6 @@
 package org.opensearch.searchrelevance.transport.judgment;
 
 import static org.opensearch.searchrelevance.common.MLConstants.LLM_JUDGMENT_RATING_TYPE;
-import static org.opensearch.searchrelevance.common.MLConstants.OVERWRITE_CACHE;
 import static org.opensearch.searchrelevance.common.MLConstants.PROMPT_TEMPLATE;
 import static org.opensearch.searchrelevance.common.MetricsConstants.MODEL_ID;
 import static org.opensearch.searchrelevance.ubi.UbiValidator.checkUbiEventsIndexExists;
@@ -168,7 +167,9 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
                 metadata.put("ignoreFailure", llmRequest.isIgnoreFailure());
                 metadata.put(PROMPT_TEMPLATE, llmRequest.getPromptTemplate());
                 metadata.put(LLM_JUDGMENT_RATING_TYPE, llmRequest.getLlmJudgmentRatingType());
-                metadata.put(OVERWRITE_CACHE, llmRequest.isOverwriteCache());
+                if (llmRequest.getExistingJudgements() != null && !llmRequest.getExistingJudgements().isEmpty()) {
+                    metadata.put("existingJudgements", llmRequest.getExistingJudgements());
+                }
             }
             case UBI_JUDGMENT -> {
                 PutUbiJudgmentRequest ubiRequest = (PutUbiJudgmentRequest) request;

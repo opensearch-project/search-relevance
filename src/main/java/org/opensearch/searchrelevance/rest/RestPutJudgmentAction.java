@@ -11,7 +11,6 @@ import static java.util.Collections.singletonList;
 import static org.opensearch.rest.RestRequest.Method.PUT;
 import static org.opensearch.searchrelevance.common.MLConstants.DEFAULT_PROMPT_TEMPLATE;
 import static org.opensearch.searchrelevance.common.MLConstants.LLM_JUDGMENT_RATING_TYPE;
-import static org.opensearch.searchrelevance.common.MLConstants.OVERWRITE_CACHE;
 import static org.opensearch.searchrelevance.common.MLConstants.PROMPT_TEMPLATE;
 import static org.opensearch.searchrelevance.common.MLConstants.validateTokenLimit;
 import static org.opensearch.searchrelevance.common.MetricsConstants.MODEL_ID;
@@ -165,7 +164,7 @@ public class RestPutJudgmentAction extends BaseRestHandler {
                         );
                     }
                 }
-                boolean overwriteCache = Optional.ofNullable((Boolean) source.get(OVERWRITE_CACHE)).orElse(Boolean.FALSE);
+                List<String> existingJudgements = ParserUtils.convertObjToList(source, "existingJudgements");
 
                 createRequest = new PutLlmJudgmentRequest(
                     type,
@@ -180,7 +179,7 @@ public class RestPutJudgmentAction extends BaseRestHandler {
                     ignoreFailure,
                     promptTemplate,
                     llmJudgmentRatingType,
-                    overwriteCache
+                    existingJudgements
                 );
             }
             case UBI_JUDGMENT -> {
@@ -227,6 +226,7 @@ public class RestPutJudgmentAction extends BaseRestHandler {
                     builder.field("judgment_id", response.getId());
                     builder.endObject();
                     channel.sendResponse(new BytesRestResponse(RestStatus.OK, builder));
+
                 } catch (IOException e) {
                     onFailure(e);
                 }
