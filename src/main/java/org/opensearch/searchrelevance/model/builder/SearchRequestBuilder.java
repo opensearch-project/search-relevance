@@ -69,13 +69,12 @@ public class SearchRequestBuilder {
     }
 
     /**
-     * Process a Mustache template by compiling and executing it with the given
-     * query text.
+     * Renders a Mustache template by compiling and executing it with the current query's values.
      *
-     * @param template  - the Mustache template string containing {{query_string}}
-     *                  placeholder
-     * @param queryText - the actual query text to substitute into the template
-     * @return the compiled template with substituted values
+     * @param template     - the Mustache template string, referencing variables such as {{queryText}}
+     * @param queryText    - the query text, exposed to the template as the {{queryText}} variable
+     * @param customFields - query set custom fields, each exposed as a variable by its field name (for example, {{category}})
+     * @return the rendered template with substituted values
      * @throws IOException if template compilation or execution fails
      */
     private static String processMustacheTemplate(String template, String queryText, Map<String, String> customFields) throws IOException {
@@ -88,7 +87,7 @@ public class SearchRequestBuilder {
 
         Map<String, Object> params = new HashMap<>();
         if (queryText != null) {
-            params.put("query_string", queryText);
+            params.put("queryText", queryText);
         }
         if (customFields != null) {
             params.putAll(customFields);

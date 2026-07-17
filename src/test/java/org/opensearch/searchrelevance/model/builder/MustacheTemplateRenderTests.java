@@ -53,13 +53,13 @@ public class MustacheTemplateRenderTests extends OpenSearchTestCase {
     }
 
     public void testSingleVariableSubstitution() throws Exception {
-        String query = "{\"query\":{\"match\":{\"title\":\"{{query_string}}\"}}}";
+        String query = "{\"query\":{\"match\":{\"title\":\"{{queryText}}\"}}}";
         SearchRequest sr = SearchRequestBuilder.buildSearchRequest(TEST_INDEX, query, "laptop", null, null, TEST_SIZE);
         assertEquals("laptop", matchTitleValue(sr));
     }
 
     public void testMultipleCustomFieldSubstitution() throws Exception {
-        String query = "{\"query\":{\"bool\":{\"must\":[{\"match\":{\"title\":\"{{query_string}}\"}}],"
+        String query = "{\"query\":{\"bool\":{\"must\":[{\"match\":{\"title\":\"{{queryText}}\"}}],"
             + "\"filter\":[{\"term\":{\"category_filter\":\"{{category}}\"}}]}}}";
         SearchRequest sr = SearchRequestBuilder.buildSearchRequest(
             TEST_INDEX,
@@ -70,7 +70,7 @@ public class MustacheTemplateRenderTests extends OpenSearchTestCase {
             TEST_SIZE
         );
         String rendered = sr.source().toString();
-        // query_string hydrates the must clause, the custom field hydrates the filter clause
+        // queryText hydrates the must clause, the custom field hydrates the filter clause
         assertEquals("phone", boolMustMatchTitleValue(sr));
         assertEquals("electronics", boolFilterTermValue(sr, "category_filter"));
         assertFalse("no unresolved template markers should remain", rendered.contains("{{"));
@@ -80,7 +80,7 @@ public class MustacheTemplateRenderTests extends OpenSearchTestCase {
         // A value with quotes would corrupt the DSL under naive string replacement; the managed
         // Mustache engine JSON-escapes it, so the query stays valid and the value round-trips intact.
         String tricky = "sony \"official\" 50% #1";
-        String query = "{\"query\":{\"match\":{\"title\":\"{{query_string}}\"}}}";
+        String query = "{\"query\":{\"match\":{\"title\":\"{{queryText}}\"}}}";
         SearchRequest sr = SearchRequestBuilder.buildSearchRequest(TEST_INDEX, query, tricky, null, null, TEST_SIZE);
         assertEquals(tricky, matchTitleValue(sr));
     }
@@ -88,7 +88,7 @@ public class MustacheTemplateRenderTests extends OpenSearchTestCase {
     public void testMissingVariableRendersEmpty() throws Exception {
         // {{brand}} is referenced but not supplied — Mustache renders it as an empty string
         // rather than failing. This documents (and pins) the current missing-variable behavior.
-        String query = "{\"query\":{\"bool\":{\"must\":[{\"match\":{\"title\":\"{{query_string}}\"}}],"
+        String query = "{\"query\":{\"bool\":{\"must\":[{\"match\":{\"title\":\"{{queryText}}\"}}],"
             + "\"filter\":[{\"term\":{\"brand\":\"{{brand}}\"}}]}}}";
         SearchRequest sr = SearchRequestBuilder.buildSearchRequest(
             TEST_INDEX,

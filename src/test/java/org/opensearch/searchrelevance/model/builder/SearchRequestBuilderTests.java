@@ -390,7 +390,7 @@ public class SearchRequestBuilderTests extends OpenSearchTestCase {
         );
         SearchRequestBuilder.initialize(reg, null);
 
-        String mustacheQuery = "{\"query\":{\"match\":{\"title\":\"{{query_string}}\"}}}";
+        String mustacheQuery = "{\"query\":{\"match\":{\"title\":\"{{queryText}}\"}}}";
 
         try {
             SearchRequestBuilder.buildSearchRequest(TEST_INDEX, mustacheQuery, TEST_QUERY_TEXT, null, TEST_SIZE);
@@ -437,7 +437,7 @@ public class SearchRequestBuilderTests extends OpenSearchTestCase {
         assertNotNull("Legacy query should work without ScriptService", sr);
 
         // Query WITH {{ should fail with null ScriptService
-        String mustacheQuery = "{\"query\":{\"match\":{\"title\":\"{{query_string}}\"}}}";
+        String mustacheQuery = "{\"query\":{\"match\":{\"title\":\"{{queryText}}\"}}}";
         try {
             SearchRequestBuilder.buildSearchRequest(TEST_INDEX, mustacheQuery, "test", null, TEST_SIZE);
             fail("Mustache query should fail without ScriptService");
@@ -481,8 +481,8 @@ public class SearchRequestBuilderTests extends OpenSearchTestCase {
 
         // Mustache query should fail without ScriptService
         String mustacheQuery = "{\"query\":{\"hybrid\":{\"queries\":["
-            + "{\"match\":{\"title\":\"{{query_string}}\"}},"
-            + "{\"match\":{\"description\":\"{{query_string}}\"}}"
+            + "{\"match\":{\"title\":\"{{queryText}}\"}},"
+            + "{\"match\":{\"description\":\"{{queryText}}\"}}"
             + "]}}}";
         try {
             SearchRequestBuilder.buildRequestForHybridSearch(TEST_INDEX, mustacheQuery, temporarySearchPipeline, "test", TEST_SIZE);
