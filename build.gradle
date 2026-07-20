@@ -234,7 +234,7 @@ dependencies {
     runtimeOnly group: 'org.opensearch', name: 'common-utils', version: "${opensearch_build}"
     runtimeOnly group: 'org.apache.commons', name: 'commons-text', version: '1.15.0'
     runtimeOnly group: 'com.google.code.gson', name: 'gson', version: '2.14.0'
-    runtimeOnly group: 'org.json', name: 'json', version: '20260522'
+    runtimeOnly group: 'org.json', name: 'json', version: '20260719'
     // json-path 2.9.0 depends on slf4j 2.0.11, which conflicts with the version used by OpenSearch core.
     // Excluding slf4j here since json-path is only used for testing, and logging failures in this context are acceptable.
     runtimeOnly('com.jayway.jsonpath:json-path:3.0.0') {
