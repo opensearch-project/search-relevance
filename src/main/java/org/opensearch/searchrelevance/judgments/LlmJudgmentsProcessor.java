@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -28,6 +29,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
+import org.opensearch.action.get.GetResponse;
+import org.opensearch.action.get.MultiGetItemResponse;
+import org.opensearch.action.get.MultiGetRequest;
+import org.opensearch.action.get.MultiGetResponse;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.support.PlainActionFuture;
@@ -98,6 +103,75 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         return JudgmentType.LLM_JUDGMENT;
     }
 
+    /**
+     * Parses the scoring configuration shared by the initial-generation and retry paths from a
+     * judgment's metadata map, and resolves the referenced search configurations.
+     *
+     * <p>Both {@link #generateJudgmentRatingInternal} and {@link #retryFailedDocs} read the same
+     * fields from the same metadata shape, so this keeps that parsing (and its defaults) in one
+     * place. Required fields (modelId, querySetId, searchConfigurationList) throw a
+     * {@link SearchRelevanceException} with {@link RestStatus#BAD_REQUEST} when missing, since a
+     * judgment cannot be scored without them.
+     */
+    static final class ScoringConfig {
+        final String modelId;
+        final String querySetId;
+        final List<SearchConfiguration> searchConfigurations;
+        final String index;
+        final int size;
+        final int tokenLimit;
+        final List<String> contextFields;
+        final boolean ignoreFailure;
+        final String promptTemplate;
+        final LLMJudgmentRatingType ratingType;
+        final List<String> existingJudgmentIds;
+
+        @SuppressWarnings("unchecked")
+        ScoringConfig(Map<String, Object> metadata, SearchConfigurationDao searchConfigurationDao) {
+            this.modelId = (String) metadata.get("modelId");
+            if (modelId == null || modelId.isEmpty()) {
+                throw new SearchRelevanceException("modelId is missing from judgment metadata", RestStatus.BAD_REQUEST);
+            }
+
+            this.querySetId = (String) metadata.get("querySetId");
+            if (querySetId == null || querySetId.isEmpty()) {
+                throw new SearchRelevanceException("querySetId is missing from judgment metadata", RestStatus.BAD_REQUEST);
+            }
+
+            List<String> searchConfigurationList = (List<String>) metadata.get("searchConfigurationList");
+            if (searchConfigurationList == null || searchConfigurationList.isEmpty()) {
+                throw new SearchRelevanceException("searchConfigurationList is missing from judgment metadata", RestStatus.BAD_REQUEST);
+            }
+            this.searchConfigurations = searchConfigurationList.stream()
+                .map(searchConfigurationDao::getSearchConfigurationSync)
+                .collect(Collectors.toList());
+            if (searchConfigurations.isEmpty()) {
+                throw new SearchRelevanceException("No valid search configurations found", RestStatus.BAD_REQUEST);
+            }
+            this.index = searchConfigurations.get(0).index();
+
+            Number sizeNum = (Number) metadata.get("size");
+            this.size = sizeNum != null ? sizeNum.intValue() : 0;
+            Number tokenLimitNum = (Number) metadata.get("tokenLimit");
+            this.tokenLimit = tokenLimitNum != null ? tokenLimitNum.intValue() : 4000;
+            this.contextFields = (List<String>) metadata.get("contextFields");
+            this.ignoreFailure = Boolean.TRUE.equals(metadata.get("ignoreFailure"));
+            this.promptTemplate = (String) metadata.get(PROMPT_TEMPLATE);
+            this.existingJudgmentIds = (List<String>) metadata.get("existingJudgments");
+
+            // ratingType may be stored as an enum (in-memory generation) or a String (loaded back
+            // from the index during retry); accept either and fall back to the shared default.
+            Object ratingTypeObj = metadata.get(LLM_JUDGMENT_RATING_TYPE);
+            LLMJudgmentRatingType parsed = null;
+            if (ratingTypeObj instanceof LLMJudgmentRatingType) {
+                parsed = (LLMJudgmentRatingType) ratingTypeObj;
+            } else if (ratingTypeObj instanceof String) {
+                parsed = LLMJudgmentRatingType.valueOf((String) ratingTypeObj);
+            }
+            this.ratingType = parsed != null ? parsed : LLMJudgmentRatingType.DEFAULT;
+        }
+    }
+
     @Override
     public void generateJudgmentRating(Map<String, Object> metadata, ActionListener<List<Map<String, Object>>> listener) {
         // Execute entire method on generic thread pool to avoid transport thread blocking
@@ -111,165 +185,121 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
      *
      * @param failedQueries map of queryText → list of failed docIds
      * @param metadata the judgment's stored metadata (modelId, prompt, config, etc.)
+     * @param onProgress invoked after each query is processed, so the caller can refresh the
+     *        judgment's heartbeat timestamp; signals that the retry is still alive. May be null.
      * @param listener callback with per-query results (ratings + remaining failures)
+     *
+     * <p>This method makes blocking calls (multiGet, sync LLM), so it must be invoked off the
+     * transport thread. The caller (RetryFailedJudgmentTransportAction) already dispatches to the
+     * GENERIC thread pool before calling this.
      */
-    @SuppressWarnings("unchecked")
     public void retryFailedDocs(
         Map<String, List<String>> failedQueries,
         Map<String, Object> metadata,
+        Runnable onProgress,
         ActionListener<List<Map<String, Object>>> listener
     ) {
-        threadPool.executor(ThreadPool.Names.GENERIC).execute(() -> {
-            try {
-                String modelId = (String) metadata.get("modelId");
-                if (modelId == null || modelId.isEmpty()) {
-                    listener.onFailure(new SearchRelevanceException("modelId is missing from judgment metadata", RestStatus.BAD_REQUEST));
-                    return;
-                }
+        try {
+            // Parse the shared scoring configuration (modelId, prompt, search configs, etc.)
+            // from the judgment's own metadata — same parsing used by the initial generation.
+            ScoringConfig config = new ScoringConfig(metadata, searchConfigurationDao);
+            String index = config.index;
+            List<Map<String, Object>> results = new ArrayList<>();
 
-                Number tokenLimitNum = (Number) metadata.get("tokenLimit");
-                int tokenLimit = tokenLimitNum != null ? tokenLimitNum.intValue() : 4000;
-                Number sizeNum = (Number) metadata.get("size");
-                int size = sizeNum != null ? sizeNum.intValue() : 10;
-                List<String> contextFields = (List<String>) metadata.get("contextFields");
-                String promptTemplate = (String) metadata.get(PROMPT_TEMPLATE);
-                List<String> searchConfigurationList = (List<String>) metadata.get("searchConfigurationList");
+            // Process each query that has failures — score only the failed docs
+            for (Map.Entry<String, List<String>> entry : failedQueries.entrySet()) {
+                // Heartbeat first: refresh the judgment's timestamp before the slow LLM call, so
+                // it stays fresh through the scoring. If the heartbeat write fails it throws,
+                // aborting the retry (surfaced below as a failure -> judgment flipped to ERROR).
+                notifyProgress(onProgress);
 
-                if (searchConfigurationList == null || searchConfigurationList.isEmpty()) {
-                    listener.onFailure(
-                        new SearchRelevanceException("searchConfigurationList is missing from judgment metadata", RestStatus.BAD_REQUEST)
-                    );
-                    return;
-                }
+                String queryTextWithCustomInput = entry.getKey();
+                List<String> failedDocIds = entry.getValue();
 
-                LLMJudgmentRatingType ratingType = null;
-                Object ratingTypeObj = metadata.get(LLM_JUDGMENT_RATING_TYPE);
-                if (ratingTypeObj instanceof LLMJudgmentRatingType) {
-                    ratingType = (LLMJudgmentRatingType) ratingTypeObj;
-                } else if (ratingTypeObj instanceof String) {
-                    ratingType = LLMJudgmentRatingType.valueOf((String) ratingTypeObj);
-                }
-                if (ratingType == null) {
-                    ratingType = LLMJudgmentRatingType.SCORE0_1;
-                }
+                // Reconstruct the queryText and customFields from the stored key. This is
+                // self-contained (no QuerySet lookup) and safe: the '#' is only treated as a
+                // delimiter when the suffix is valid JSON, so a query like "What is C#?" stays
+                // intact.
+                QuerySetEntry parsedEntry = QuerySetEntry.fromCombinedKey(queryTextWithCustomInput);
+                String queryText = parsedEntry.queryText();
+                Map<String, String> customFields = parsedEntry.customFields();
 
-                List<SearchConfiguration> searchConfigurations = searchConfigurationList.stream()
-                    .map(id -> searchConfigurationDao.getSearchConfigurationSync(id))
-                    .collect(Collectors.toList());
+                log.info("Retrying {} failed docs for query: {}", failedDocIds.size(), queryText);
 
-                if (searchConfigurations.isEmpty()) {
-                    listener.onFailure(new SearchRelevanceException("No valid search configurations found", RestStatus.BAD_REQUEST));
-                    return;
-                }
+                // Fetch the failed docs directly by their IDs (no search — we already know the docIds).
+                // Docs that no longer exist are skipped by fetchDocsByIds, so they won't be in allHits.
+                ConcurrentMap<String, SearchHit> allHits = fetchDocsByIds(index, failedDocIds);
+                ConcurrentMap<String, String> docIdToScore = new ConcurrentHashMap<>();
 
-                String index = searchConfigurations.get(0).index();
-                List<Map<String, Object>> results = new ArrayList<>();
+                // Docs that no longer exist can't be re-scored — they stay in failures. Record a
+                // reason naming them so the user knows why (the reason field holds the latest such
+                // message, consistent with how failure reasons are reported elsewhere).
+                List<String> missingDocIds = failedDocIds.stream().filter(id -> !allHits.containsKey(id)).collect(Collectors.toList());
+                List<String> docsToScore = failedDocIds.stream().filter(allHits::containsKey).collect(Collectors.toList());
 
-                // Process each query that has failures — score only the failed docs
-                for (Map.Entry<String, List<String>> entry : failedQueries.entrySet()) {
-                    String queryTextWithCustomInput = entry.getKey();
-                    List<String> failedDocIds = entry.getValue();
-
-                    // Parse the stored key back into queryText + customFields
-                    // Stored format is "queryText#{"key":"value"}" or just "queryText" if no custom fields
-                    String queryText;
-                    Map<String, String> customFields = Map.of();
-                    if (queryTextWithCustomInput.contains("#")) {
-                        String[] parts = queryTextWithCustomInput.split("#", 2);
-                        queryText = parts[0];
-                        try {
-                            customFields = OBJECT_MAPPER.readValue(parts[1], new TypeReference<Map<String, String>>() {
-                            });
-                        } catch (Exception e) {
-                            log.warn("Failed to parse custom fields from query key: {}, using empty", queryTextWithCustomInput);
-                            customFields = Map.of();
-                        }
-                    } else {
-                        queryText = queryTextWithCustomInput;
-                    }
-
-                    log.info("Retrying {} failed docs for query: {}", failedDocIds.size(), queryText);
-
-                    // Fetch the failed docs' content by running the search with the clean queryText
-                    ConcurrentMap<String, SearchHit> allHits = new ConcurrentHashMap<>();
-                    processSearchConfigurationsAsync(searchConfigurations, queryText, size, allHits, true);
-
-                    // Filter to only the failed docIds
-                    ConcurrentMap<String, String> docIdToScore = new ConcurrentHashMap<>();
-                    List<String> docsToScore = failedDocIds.stream().filter(allHits::containsKey).collect(Collectors.toList());
-
-                    if (docsToScore.isEmpty()) {
-                        log.warn("None of the failed docs found in search results for query: {}", queryText);
-                        Map<String, Object> result = new HashMap<>();
-                        result.put("query", queryTextWithCustomInput);
-                        result.put("ratings", List.of());
-                        result.put("failures", failedDocIds.stream().map(id -> Map.of("docId", id)).collect(Collectors.toList()));
-                        results.add(result);
-                        continue;
-                    }
-
-                    // Score only the failed docs with the LLM using the correct queryText and customFields
-                    String llmFailureReason = processWithLLM(
-                        modelId,
+                // Score the docs that still exist with the LLM
+                String llmFailureReason = null;
+                if (!docsToScore.isEmpty()) {
+                    llmFailureReason = processWithLLM(
+                        config.modelId,
                         queryText,
                         queryTextWithCustomInput,
                         customFields,
-                        tokenLimit,
-                        contextFields,
+                        config.tokenLimit,
+                        config.contextFields,
                         docsToScore,
                         allHits,
                         index,
                         docIdToScore,
-                        promptTemplate,
-                        ratingType
+                        config.promptTemplate,
+                        config.ratingType
                     );
-
-                    // Build result: use queryTextWithCustomInput as the key so it matches the original judgment
-                    Map<String, Object> result = buildResultWithFailures(
-                        queryTextWithCustomInput,
-                        new HashSet<>(failedDocIds),
-                        docIdToScore
-                    );
-                    if (llmFailureReason != null) {
-                        result.put(JudgmentDataTransformer.RESULT_FAILURE_REASON, llmFailureReason);
-                    }
-                    results.add(result);
                 }
 
-                listener.onResponse(results);
-            } catch (Exception e) {
-                log.error("Failed to retry failed docs", e);
-                listener.onFailure(new SearchRelevanceException("Failed to retry failed docs", e, RestStatus.INTERNAL_SERVER_ERROR));
+                // Build result: use queryTextWithCustomInput as the key so it matches the original judgment
+                Map<String, Object> result = buildResultWithFailures(queryTextWithCustomInput, new HashSet<>(failedDocIds), docIdToScore);
+                if (!missingDocIds.isEmpty()) {
+                    result.put(
+                        JudgmentDataTransformer.RESULT_FAILURE_REASON,
+                        "Document(s) no longer exist in index [" + index + "]: " + missingDocIds
+                    );
+                } else if (llmFailureReason != null) {
+                    result.put(JudgmentDataTransformer.RESULT_FAILURE_REASON, llmFailureReason);
+                }
+                results.add(result);
             }
-        });
+
+            listener.onResponse(results);
+        } catch (Exception e) {
+            log.error("Failed to retry failed docs", e);
+            listener.onFailure(new SearchRelevanceException("Failed to retry failed docs", e, RestStatus.INTERNAL_SERVER_ERROR));
+        }
     }
 
-    @SuppressWarnings("unchecked")
+    /**
+     * Runs the progress callback if one was provided. The callback (a heartbeat write) is expected
+     * to throw if it fails; we let that propagate so the caller can abort the retry. If we can no
+     * longer write progress, continuing is unsafe — the final result write would likely fail too,
+     * and a stale heartbeat could let a concurrent retry take over.
+     */
+    private void notifyProgress(Runnable onProgress) {
+        if (onProgress != null) {
+            onProgress.run();
+        }
+    }
+
     private void generateJudgmentRatingInternal(Map<String, Object> metadata, ActionListener<List<Map<String, Object>>> listener) {
         try {
             EventStatsManager.increment(EventStatName.LLM_JUDGMENT_RATING_GENERATIONS);
-            String querySetId = (String) metadata.get("querySetId");
-            List<String> searchConfigurationList = (List<String>) metadata.get("searchConfigurationList");
-            int size = (int) metadata.get("size");
 
-            String modelId = (String) metadata.get("modelId");
-            int tokenLimit = (int) metadata.get("tokenLimit");
-            List<String> contextFields = (List<String>) metadata.get("contextFields");
-            boolean ignoreFailure = (boolean) metadata.get("ignoreFailure");
-            String promptTemplate = (String) metadata.get(PROMPT_TEMPLATE);
-            LLMJudgmentRatingType ratingType = (LLMJudgmentRatingType) metadata.get(LLM_JUDGMENT_RATING_TYPE);
-            // Default to SCORE0_1 if ratingType is not provided
-            if (ratingType == null) {
-                ratingType = LLMJudgmentRatingType.SCORE0_1;
-                log.debug("No ratingType provided, defaulting to SCORE0_1");
-            }
-            // Pass existing judgement IDs for per-query deduplication (queried on demand, not loaded upfront)
-            List<String> existingJudgementIds = (List<String>) metadata.get("existingJudgements");
+            // Parse the shared scoring configuration (modelId, prompt, search configs, etc.) — same
+            // parsing used by the retry path.
+            ScoringConfig config = new ScoringConfig(metadata, searchConfigurationDao);
+            QuerySet querySet = querySetDao.getQuerySetSync(config.querySetId);
 
-            QuerySet querySet = querySetDao.getQuerySetSync(querySetId);
-            List<SearchConfiguration> searchConfigurations = searchConfigurationList.stream()
-                .map(id -> searchConfigurationDao.getSearchConfigurationSync(id))
-                .collect(Collectors.toList());
+            // Fetch all reusable ratings from the referenced judgments once, up front, so each is
+            // read a single time and reused across all queries (rather than re-fetched per query).
+            Map<String, Map<String, String>> existingRatingsByQuery = fetchAllRatings(config.existingJudgmentIds);
 
             // Record a per-run overview (total/successful/failed counts and the last failure reason)
             // into the judgment metadata before handing the ratings back.
@@ -279,16 +309,16 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
             }, listener::onFailure);
 
             generateLLMJudgmentsAsync(
-                modelId,
-                size,
-                tokenLimit,
-                contextFields,
+                config.modelId,
+                config.size,
+                config.tokenLimit,
+                config.contextFields,
                 querySet,
-                searchConfigurations,
-                ignoreFailure,
-                promptTemplate,
-                ratingType,
-                existingJudgementIds,
+                config.searchConfigurations,
+                config.ignoreFailure,
+                config.promptTemplate,
+                config.ratingType,
+                existingRatingsByQuery,
                 summaryListener
             );
         } catch (Exception e) {
@@ -298,16 +328,21 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
     }
 
     /**
-     * Fetches ratings for a specific queryText from the referenced judgments by querying
-     * the system index. Only returns ratings for the matching query — not the entire judgment.
-     * This keeps memory usage minimal: only one query's worth of ratings at a time.
-     * Package-private for testing.
+     * Fetches all reusable ratings from the referenced judgments up front, so each referenced
+     * judgment is read once (not re-fetched per query). Returns a nested map of
+     * queryText → (docId → rating) for O(1) lookup during deduplication.
+     *
+     * <p>When multiple referenced judgments rate the same (queryText, docId), the first judgment in
+     * the list wins. Package-private for testing.
      */
     @SuppressWarnings("unchecked")
-    List<Map<String, String>> fetchRatingsForQuery(List<String> existingJudgementIds, String queryText) {
-        List<Map<String, String>> allRatings = new ArrayList<>();
+    Map<String, Map<String, String>> fetchAllRatings(List<String> existingJudgmentIds) {
+        Map<String, Map<String, String>> ratingsByQuery = new HashMap<>();
+        if (existingJudgmentIds == null || existingJudgmentIds.isEmpty()) {
+            return ratingsByQuery;
+        }
 
-        for (String judgmentId : existingJudgementIds) {
+        for (String judgmentId : existingJudgmentIds) {
             try {
                 SearchResponse response = judgmentDao.getJudgmentSync(judgmentId);
                 if (response.getHits().getTotalHits().value() == 0) {
@@ -321,14 +356,22 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                     continue;
                 }
 
-                // Find only the entry matching the current queryText
                 for (Map<String, Object> queryEntry : judgmentRatings) {
-                    if (queryText.equals(queryEntry.get("query"))) {
-                        List<Map<String, String>> ratings = (List<Map<String, String>>) queryEntry.get("ratings");
-                        if (ratings != null) {
-                            allRatings.addAll(ratings);
+                    String query = (String) queryEntry.get("query");
+                    if (query == null) {
+                        continue;
+                    }
+                    List<Map<String, String>> ratings = (List<Map<String, String>>) queryEntry.get("ratings");
+                    if (ratings == null) {
+                        continue;
+                    }
+                    Map<String, String> ratingsByDocId = ratingsByQuery.computeIfAbsent(query, k -> new HashMap<>());
+                    for (Map<String, String> rating : ratings) {
+                        String docId = rating.get("docId");
+                        String ratingValue = rating.get("rating");
+                        if (docId != null && ratingValue != null) {
+                            ratingsByDocId.putIfAbsent(docId, ratingValue); // first judgment wins
                         }
-                        break;
                     }
                 }
             } catch (Exception e) {
@@ -336,21 +379,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
             }
         }
 
-        return allRatings;
-    }
-
-    /**
-     * Searches a small ratings list for a specific docId.
-     * Returns the rating value if found, null otherwise.
-     * Package-private for testing.
-     */
-    String findRatingForDoc(List<Map<String, String>> ratings, String docId) {
-        for (Map<String, String> rating : ratings) {
-            if (docId.equals(rating.get("docId"))) {
-                return rating.get("rating");
-            }
-        }
-        return null;
+        return ratingsByQuery;
     }
 
     private void generateLLMJudgmentsAsync(
@@ -363,7 +392,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         boolean ignoreFailure,
         String promptTemplate,
         LLMJudgmentRatingType ratingType,
-        List<String> existingJudgementIds,
+        Map<String, Map<String, String>> existingRatingsByQuery,
         ActionListener<List<Map<String, Object>>> listener
     ) {
         List<QuerySetEntry> querySetEntries = querySet.querySetQueries();
@@ -383,7 +412,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                     ignoreFailure,
                     promptTemplate,
                     ratingType,
-                    existingJudgementIds
+                    existingRatingsByQuery
                 );
             } catch (Exception e) {
                 if (ignoreFailure) {
@@ -396,6 +425,26 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
             }
         }, ignoreFailure, ActionListener.wrap(results -> {
             int processedQueries = results.size();
+
+            // When ignoreFailure is false, every query must produce a result. The executor drops a
+            // query that threw (it collects non-null results only), so fewer results than queries
+            // means at least one query failed — fail the whole run instead of silently completing
+            // with a partial judgment.
+            if (!ignoreFailure && processedQueries < totalQueries) {
+                listener.onFailure(
+                    new SearchRelevanceException(
+                        String.format(
+                            Locale.ROOT,
+                            "LLM judgment generation failed: %d of %d queries could not be processed",
+                            totalQueries - processedQueries,
+                            totalQueries
+                        ),
+                        RestStatus.INTERNAL_SERVER_ERROR
+                    )
+                );
+                return;
+            }
+
             int successQueries = (int) results.stream().mapToLong(result -> {
                 List<Map<String, String>> ratings = (List<Map<String, String>>) result.get("ratings");
                 return ratings != null && !ratings.isEmpty() ? 1 : 0;
@@ -427,7 +476,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         boolean ignoreFailure,
         String promptTemplate,
         LLMJudgmentRatingType ratingType,
-        List<String> existingJudgementIds
+        Map<String, Map<String, String>> existingRatingsByQuery
     ) {
         String queryText = querySetEntry.queryText();
         Map<String, String> customFields = querySetEntry.customFields();
@@ -442,27 +491,20 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
             // Step 1: Execute searches concurrently within this query text task
             processSearchConfigurationsAsync(searchConfigurations, queryText, size, allHits, ignoreFailure);
 
-            // Step 1.5: Deduplicate from existing judgements (if provided)
-            // For the current queryText, fetch only that query's ratings from referenced judgments
+            // Step 1.5: Deduplicate from existing judgements (if provided). Ratings for all
+            // referenced judgments were fetched once up front, so this is just a map lookup.
             List<String> docIds = new ArrayList<>(allHits.keySet());
-            if (existingJudgementIds != null && !existingJudgementIds.isEmpty()) {
-                List<Map<String, String>> existingRatings = fetchRatingsForQuery(existingJudgementIds, queryTextWithCustomInput);
+            Map<String, String> existingRatings = existingRatingsByQuery.get(queryTextWithCustomInput);
+            if (existingRatings != null && !existingRatings.isEmpty()) {
                 List<String> remainingDocIds = new ArrayList<>();
                 for (String docId : docIds) {
-                    String rating = findRatingForDoc(existingRatings, docId);
+                    String rating = existingRatings.get(docId);
                     if (rating != null) {
                         docIdToScore.put(docId, rating);
-                        log.debug("Reused rating from existing judgment for query: {}, docId: {}", queryText, docId);
                     } else {
                         remainingDocIds.add(docId);
                     }
                 }
-                log.info(
-                    "Reused {} ratings from existing judgments, {} remaining for query: {}",
-                    docIds.size() - remainingDocIds.size(),
-                    remainingDocIds.size(),
-                    queryText
-                );
                 docIds = remainingDocIds;
             }
 
@@ -526,6 +568,46 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
             result.put("failures", failures);
         }
         return result;
+    }
+
+    /**
+     * Fetches documents directly by their IDs using a multi-get request.
+     * Used by the retry flow where the exact failed docIds are already known —
+     * avoids running a search (which re-ranks and may not return the failed docs).
+     *
+     * @param index the index to fetch from
+     * @param docIds the document IDs to fetch
+     * @return a map of docId to its SearchHit (only docs that exist are included)
+     */
+    private ConcurrentMap<String, SearchHit> fetchDocsByIds(String index, List<String> docIds) {
+        ConcurrentMap<String, SearchHit> hits = new ConcurrentHashMap<>();
+        if (docIds.isEmpty()) {
+            return hits;
+        }
+
+        MultiGetRequest multiGetRequest = new MultiGetRequest();
+        for (String docId : docIds) {
+            multiGetRequest.add(new MultiGetRequest.Item(index, docId));
+        }
+
+        MultiGetResponse response = client.multiGet(multiGetRequest).actionGet();
+        for (MultiGetItemResponse itemResponse : response.getResponses()) {
+            if (itemResponse.isFailed() || !itemResponse.getResponse().isExists()) {
+                // A failed doc no longer exists in the index — it can't be re-scored. Skip it so the
+                // rest of the failed docs are still retried; it stays in the query's "failures" list,
+                // and the caller records a reason naming this specific doc.
+                log.warn("Failed doc [{}] not found in index [{}] during retry, skipping", itemResponse.getId(), index);
+                continue;
+            }
+            GetResponse getResponse = itemResponse.getResponse();
+            // Build a SearchHit from the get result so it can flow through the existing scoring pipeline
+            SearchHit hit = new SearchHit(-1, getResponse.getId(), Map.of(), Map.of());
+            hit.sourceRef(getResponse.getSourceAsBytesRef());
+            hits.put(getResponse.getId(), hit);
+        }
+
+        log.info("Fetched {} docs by ID for retry (requested {})", hits.size(), docIds.size());
+        return hits;
     }
 
     private void processSearchConfigurationsAsync(

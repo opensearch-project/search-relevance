@@ -8,6 +8,7 @@
 package org.opensearch.searchrelevance.plugin;
 
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX;
+import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_CACHE_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_JOBS_INDEX;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_ENABLED;
@@ -187,7 +188,13 @@ public class SearchRelevancePlugin extends Plugin
 
     @Override
     public Collection<SystemIndexDescriptor> getSystemIndexDescriptors(Settings settings) {
-        return List.of(new SystemIndexDescriptor(EXPERIMENT_INDEX, "System index used for experiment data"));
+        return List.of(
+            new SystemIndexDescriptor(EXPERIMENT_INDEX, "System index used for experiment data"),
+            // Deprecated: the global judgment cache was removed and this index is no longer created
+            // or written to. It stays registered so that leftover cache data on clusters upgraded
+            // from an older version remains protected (hidden and guarded) until manually deleted.
+            new SystemIndexDescriptor(JUDGMENT_CACHE_INDEX, "Deprecated system index previously used for judgment cache data")
+        );
     }
 
     @Override

@@ -19,6 +19,9 @@ public enum LLMJudgmentRatingType implements Writeable {
     SCORE0_1,
     RELEVANT_IRRELEVANT;
 
+    /** The default rating type used when none is provided by the caller. */
+    public static final LLMJudgmentRatingType DEFAULT = SCORE0_1;
+
     @Override
     public void writeTo(StreamOutput out) throws IOException {
         out.writeEnum(this);

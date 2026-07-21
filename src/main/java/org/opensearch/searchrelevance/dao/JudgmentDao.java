@@ -74,7 +74,41 @@ public class JudgmentDao {
                 listener
             );
         } catch (IOException e) {
-            throw new SearchRelevanceException("Failed to store judgment", e, RestStatus.INTERNAL_SERVER_ERROR);
+            // Route the failure to the listener rather than throwing, so async callers are always
+            // notified (a thrown exception here would be lost and could leave the caller hanging).
+            listener.onFailure(new SearchRelevanceException("Failed to store judgment", e, RestStatus.INTERNAL_SERVER_ERROR));
+        }
+    }
+
+    /**
+     * Update a judgment with optimistic concurrency control. The write succeeds only if the
+     * document's sequence number and primary term still match the supplied values; otherwise it
+     * fails with a version conflict. Used to guard a status transition (e.g. COMPLETED -> RETRYING)
+     * against concurrent retry requests.
+     *
+     * @param judgment - judgment to write
+     * @param seqNo - sequence number last read for this judgment
+     * @param primaryTerm - primary term last read for this judgment
+     * @param listener - action listener; receives a version-conflict failure if the doc changed
+     */
+    public void updateJudgment(final Judgment judgment, final long seqNo, final long primaryTerm, final ActionListener listener) {
+        if (judgment == null) {
+            listener.onFailure(new SearchRelevanceException("Judgment cannot be null", RestStatus.BAD_REQUEST));
+            return;
+        }
+        try {
+            searchRelevanceIndicesManager.updateDocWithSeqNoAndPrimaryTerm(
+                judgment.getId(),
+                judgment.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS),
+                JUDGMENT,
+                seqNo,
+                primaryTerm,
+                listener
+            );
+        } catch (IOException e) {
+            // Route the failure to the listener rather than throwing, so async callers are always
+            // notified (a thrown exception here would be lost and could leave the caller hanging).
+            listener.onFailure(new SearchRelevanceException("Failed to store judgment", e, RestStatus.INTERNAL_SERVER_ERROR));
         }
     }
 

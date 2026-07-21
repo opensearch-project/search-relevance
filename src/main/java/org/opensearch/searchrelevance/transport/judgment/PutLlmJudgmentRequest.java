@@ -56,7 +56,7 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
      * Optional list of existing judgment IDs whose ratings can be reused
      * to avoid redundant LLM calls for already-rated (query, doc) pairs.
      */
-    private List<String> existingJudgements;
+    private List<String> existingJudgments;
 
     public PutLlmJudgmentRequest(
         @NonNull JudgmentType type,
@@ -71,7 +71,7 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         boolean ignoreFailure,
         String promptTemplate,
         LLMJudgmentRatingType llmJudgmentRatingType,
-        List<String> existingJudgements
+        List<String> existingJudgments
     ) {
         super(type, name, description);
         this.modelId = modelId;
@@ -83,7 +83,7 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         this.ignoreFailure = ignoreFailure;
         this.promptTemplate = promptTemplate;
         this.llmJudgmentRatingType = llmJudgmentRatingType;
-        this.existingJudgements = existingJudgements;
+        this.existingJudgments = existingJudgments;
     }
 
     public PutLlmJudgmentRequest(StreamInput in) throws IOException {
@@ -97,7 +97,7 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         this.ignoreFailure = Boolean.TRUE.equals(in.readOptionalBoolean()); // by defaulted as false if not provided
         this.promptTemplate = in.readOptionalString();
         this.llmJudgmentRatingType = in.readOptionalWriteable(LLMJudgmentRatingType::readFromStream);
-        this.existingJudgements = in.readOptionalStringList();
+        this.existingJudgments = in.readOptionalStringList();
     }
 
     @Override
@@ -112,7 +112,7 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         out.writeOptionalBoolean(ignoreFailure);
         out.writeOptionalString(promptTemplate);
         out.writeOptionalWriteable(llmJudgmentRatingType);
-        out.writeOptionalStringArray(existingJudgements != null ? existingJudgements.toArray(new String[0]) : null);
+        out.writeOptionalStringCollection(existingJudgments);
     }
 
     public String getModelId() {
@@ -151,8 +151,8 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         return llmJudgmentRatingType;
     }
 
-    public List<String> getExistingJudgements() {
-        return existingJudgements;
+    public List<String> getExistingJudgments() {
+        return existingJudgments;
     }
 
 }

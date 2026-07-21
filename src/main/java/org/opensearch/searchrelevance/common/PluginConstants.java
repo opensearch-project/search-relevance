@@ -49,6 +49,14 @@ public class PluginConstants {
     public static final String EXPERIMENT_INDEX_MAPPING = "mappings/experiment.json";
     public static final String JUDGMENT_INDEX = "search-relevance-judgment";
     public static final String JUDGMENT_INDEX_MAPPING = "mappings/judgment.json";
+    /**
+     * Deprecated: the global judgment cache was removed. This index is no longer created or written
+     * to, but is still registered as a system index so that any data left over on clusters upgraded
+     * from an older version stays protected (hidden from users, guarded from accidental changes)
+     * until it is manually deleted.
+     */
+    @Deprecated
+    public static final String JUDGMENT_CACHE_INDEX = ".plugins-search-relevance-judgment-cache";
     public static final String EVALUATION_RESULT_INDEX = "search-relevance-evaluation-result";
     public static final String EVALUATION_RESULT_INDEX_MAPPING = "mappings/evaluation_result.json";
     public static final String EXPERIMENT_VARIANT_INDEX = "search-relevance-experiment-variant";
@@ -95,6 +103,8 @@ public class PluginConstants {
     public static final String JUDGMENT_RATINGS = "judgmentRatings";
     public static final String CONTEXT_FIELDS = "contextFields";
     public static final String IGNORE_FAILURE = "ignoreFailure";
+    // Deprecated: the judgment cache was removed. Accepted but ignored for backward compatibility.
+    public static final String OVERWRITE_CACHE = "overwriteCache";
 
     public static final int DEFAULTED_QUERY_SET_SIZE = 10;
     public static final String MANUAL = "manual";

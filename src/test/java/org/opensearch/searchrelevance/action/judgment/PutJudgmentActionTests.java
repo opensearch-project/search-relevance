@@ -113,7 +113,7 @@ public class PutJudgmentActionTests extends OpenSearchTestCase {
         assertEquals(false, serialized.isIgnoreFailure());
         assertEquals("test_prompt_template", serialized.getPromptTemplate());
         assertEquals(LLMJudgmentRatingType.SCORE0_1, serialized.getLlmJudgmentRatingType());
-        assertEquals(List.of("existing-judgment-1"), serialized.getExistingJudgements());
+        assertEquals(List.of("existing-judgment-1"), serialized.getExistingJudgments());
     }
 
     public void testLlmJudgmentRequestStreamsWithNullOptionalFields() throws IOException {
@@ -143,7 +143,7 @@ public class PutJudgmentActionTests extends OpenSearchTestCase {
         assertEquals("test_description", serialized.getDescription());
         assertNull(serialized.getPromptTemplate());
         assertNull(serialized.getLlmJudgmentRatingType());
-        assertNull(serialized.getExistingJudgements());
+        assertNull(serialized.getExistingJudgments());
     }
 
     public void testUbiJudgmentWithCustomIndexes() throws IOException {

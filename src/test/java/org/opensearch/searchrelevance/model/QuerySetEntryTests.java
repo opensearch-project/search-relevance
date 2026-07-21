@@ -294,4 +294,29 @@ public class QuerySetEntryTests extends OpenSearchTestCase {
         assertEquals(original.queryText(), copy.queryText());
         assertEquals(original.customFields(), copy.customFields());
     }
+
+    public void testFromCombinedKey_PlainQueryText() {
+        QuerySetEntry entry = QuerySetEntry.fromCombinedKey("superhero");
+        assertEquals("superhero", entry.queryText());
+        assertTrue(entry.customFields().isEmpty());
+    }
+
+    public void testFromCombinedKey_WithCustomFields() {
+        QuerySetEntry entry = QuerySetEntry.fromCombinedKey("superhero#{\"color\":\"red\"}");
+        assertEquals("superhero", entry.queryText());
+        assertEquals("red", entry.customFields().get("color"));
+    }
+
+    public void testFromCombinedKey_HashInQueryTextNotSplit() {
+        // "What is C#?" has no valid JSON after '#', so the whole string stays the query text.
+        QuerySetEntry entry = QuerySetEntry.fromCombinedKey("What is C#?");
+        assertEquals("What is C#?", entry.queryText());
+        assertTrue(entry.customFields().isEmpty());
+    }
+
+    public void testFromCombinedKey_Null() {
+        QuerySetEntry entry = QuerySetEntry.fromCombinedKey(null);
+        assertNull(entry.queryText());
+        assertTrue(entry.customFields().isEmpty());
+    }
 }

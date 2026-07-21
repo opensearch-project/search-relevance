@@ -17,7 +17,7 @@ import org.opensearch.action.index.IndexResponse;
  */
 public class RetryFailedJudgmentAction extends ActionType<IndexResponse> {
     /** The name of this action */
-    public static final String NAME = TRANSPORT_ACTION_NAME_PREFIX + "judgment/retry_failed";
+    public static final String NAME = TRANSPORT_ACTION_NAME_PREFIX + "judgment/retry";
 
     /** An instance of this action */
     public static final RetryFailedJudgmentAction INSTANCE = new RetryFailedJudgmentAction();

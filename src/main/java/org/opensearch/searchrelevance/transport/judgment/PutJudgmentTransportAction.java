@@ -51,6 +51,13 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
 
     private static final Logger LOGGER = LogManager.getLogger(PutJudgmentTransportAction.class);
 
+    /**
+     * Maximum number of existing judgments a single request may reference for rating reuse.
+     * Each referenced judgment triggers an index lookup per query, so this bounds the work
+     * a single request can generate.
+     */
+    private static final int MAX_EXISTING_JUDGMENTS = 5;
+
     @Inject
     public PutJudgmentTransportAction(
         ClusterService clusterService,
@@ -122,6 +129,22 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
     }
 
     private void validateLlmJudgmentReferences(PutLlmJudgmentRequest request, ActionListener<Void> listener) {
+        // Reject requests that reference too many existing judgments, to bound the number of
+        // index lookups a single judgment generation can trigger.
+        List<String> existingJudgments = request.getExistingJudgments();
+        if (existingJudgments != null && existingJudgments.size() > MAX_EXISTING_JUDGMENTS) {
+            listener.onFailure(
+                new SearchRelevanceException(
+                    "Too many existing judgments referenced: "
+                        + existingJudgments.size()
+                        + ". Maximum allowed is "
+                        + MAX_EXISTING_JUDGMENTS,
+                    RestStatus.BAD_REQUEST
+                )
+            );
+            return;
+        }
+
         int totalValidations = 1; // QuerySet
         if (request.getSearchConfigurationList() != null && !request.getSearchConfigurationList().isEmpty()) {
             totalValidations += request.getSearchConfigurationList().size();
@@ -167,8 +190,8 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
                 metadata.put("ignoreFailure", llmRequest.isIgnoreFailure());
                 metadata.put(PROMPT_TEMPLATE, llmRequest.getPromptTemplate());
                 metadata.put(LLM_JUDGMENT_RATING_TYPE, llmRequest.getLlmJudgmentRatingType());
-                if (llmRequest.getExistingJudgements() != null && !llmRequest.getExistingJudgements().isEmpty()) {
-                    metadata.put("existingJudgements", llmRequest.getExistingJudgements());
+                if (llmRequest.getExistingJudgments() != null && !llmRequest.getExistingJudgments().isEmpty()) {
+                    metadata.put("existingJudgments", llmRequest.getExistingJudgments());
                 }
             }
             case UBI_JUDGMENT -> {

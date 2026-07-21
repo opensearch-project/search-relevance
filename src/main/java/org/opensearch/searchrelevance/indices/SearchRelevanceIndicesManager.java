@@ -322,7 +322,11 @@ public class SearchRelevanceIndicesManager {
 
     public SearchResponse getDocByDocIdSync(final String docId, final SearchRelevanceIndices index) {
         SearchRequest searchRequest = new SearchRequest(index.getIndexName());
-        SearchSourceBuilder sourceBuilder = new SearchSourceBuilder().query(QueryBuilders.termQuery("_id", docId)).size(1);
+        // Request _seq_no and _primary_term so callers can use optimistic concurrency control on a
+        // subsequent update. This is harmless for callers that don't need them.
+        SearchSourceBuilder sourceBuilder = new SearchSourceBuilder().query(QueryBuilders.termQuery("_id", docId))
+            .size(1)
+            .seqNoAndPrimaryTerm(true);
         searchRequest.source(sourceBuilder);
 
         return client.search(searchRequest).actionGet();
@@ -460,6 +464,52 @@ public class SearchRelevanceIndicesManager {
                         .execute((ActionListener) actionListener);
                 } catch (Exception e) {
                     throw new SearchRelevanceException("Failed to store doc", e, RestStatus.INTERNAL_SERVER_ERROR);
+                }
+            });
+        executeAction(listener, searchOperationContext, action);
+    }
+
+    /**
+     * Update a doc using optimistic concurrency control. The write only succeeds if the document's
+     * current sequence number and primary term still match the supplied values; otherwise the write
+     * fails with a version conflict. This lets callers guard a read-then-write transition (e.g. a
+     * status change) against concurrent updates.
+     *
+     * @param docId - document id to update
+     * @param xContentBuilder - content to write
+     * @param index - system index
+     * @param seqNo - the sequence number the caller last read for this doc
+     * @param primaryTerm - the primary term the caller last read for this doc
+     * @param listener - action listener; receives a version-conflict failure if the doc changed
+     */
+    public void updateDocWithSeqNoAndPrimaryTerm(
+        final String docId,
+        final XContentBuilder xContentBuilder,
+        final SearchRelevanceIndices index,
+        final long seqNo,
+        final long primaryTerm,
+        final ActionListener listener
+    ) {
+        SearchOperationContext searchOperationContext = SearchOperationContext.builder()
+            .index(index)
+            .xContentBuilder(xContentBuilder)
+            .documentId(docId)
+            .build();
+        BiConsumer<SearchOperationContext, ActionListener<?>> action = (searchOperationContext1, actionListener) -> StashedThreadContext
+            .run(client, () -> {
+                try {
+                    client.prepareIndex(searchOperationContext1.getIndex().getIndexName())
+                        .setId(searchOperationContext1.getDocumentId())
+                        .setOpType(OpType.INDEX)
+                        .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
+                        .setIfSeqNo(seqNo)
+                        .setIfPrimaryTerm(primaryTerm)
+                        .setSource(searchOperationContext1.getXContentBuilder())
+                        .execute((ActionListener) actionListener);
+                } catch (Exception e) {
+                    // Notify the listener rather than throwing, so the caller is always informed
+                    // (a thrown exception here would be lost on the executing thread).
+                    actionListener.onFailure(new SearchRelevanceException("Failed to store doc", e, RestStatus.INTERNAL_SERVER_ERROR));
                 }
             });
         executeAction(listener, searchOperationContext, action);

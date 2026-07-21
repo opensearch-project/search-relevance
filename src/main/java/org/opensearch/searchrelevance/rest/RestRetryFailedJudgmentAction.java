@@ -25,6 +25,7 @@ import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.rest.BaseRestHandler;
 import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestRequest;
+import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.searchrelevance.transport.judgment.RetryFailedJudgmentAction;
 import org.opensearch.searchrelevance.transport.judgment.RetryFailedJudgmentRequest;
@@ -38,17 +39,17 @@ import lombok.AllArgsConstructor;
 @AllArgsConstructor
 public class RestRetryFailedJudgmentAction extends BaseRestHandler {
     private static final Logger LOGGER = LogManager.getLogger(RestRetryFailedJudgmentAction.class);
-    private static final String RETRY_FAILED_JUDGMENT_ACTION = "retry_failed_judgment_action";
+    private static final String RETRY_JUDGMENT_ACTION = "retry_judgment_action";
     private SearchRelevanceSettingsAccessor settingsAccessor;
 
     @Override
     public String getName() {
-        return RETRY_FAILED_JUDGMENT_ACTION;
+        return RETRY_JUDGMENT_ACTION;
     }
 
     @Override
     public List<Route> routes() {
-        return singletonList(new Route(POST, String.format(Locale.ROOT, "%s/{%s}/_retry_failed", JUDGMENTS_URL, DOCUMENT_ID)));
+        return singletonList(new Route(POST, String.format(Locale.ROOT, "%s/{%s}/_retry", JUDGMENTS_URL, DOCUMENT_ID)));
     }
 
     @Override
@@ -71,7 +72,7 @@ public class RestRetryFailedJudgmentAction extends BaseRestHandler {
                     XContentBuilder builder = channel.newBuilder();
                     builder.startObject();
                     builder.field("judgment_id", judgmentId);
-                    builder.field("status", "PROCESSING");
+                    builder.field("status", AsyncStatus.RETRYING.name());
                     builder.field("message", "Retrying failed documents");
                     builder.endObject();
                     channel.sendResponse(new BytesRestResponse(RestStatus.OK, builder));

@@ -125,6 +125,33 @@ public class QuerySetEntry implements ToXContentObject {
     }
 
     /**
+     * Reconstructs a QuerySetEntry from a combined key of the form {@code "queryText#{json}"} (or
+     * just {@code "queryText"} when there are no custom fields). The {@code '#'} is only treated as
+     * a delimiter when the content after it is a valid JSON object, so queries that legitimately
+     * contain a {@code '#'} (e.g. "What is C#?") are preserved intact.
+     *
+     * @param combinedKey the stored key
+     * @return a QuerySetEntry with the recovered queryText and customFields
+     */
+    public static QuerySetEntry fromCombinedKey(String combinedKey) {
+        if (combinedKey == null) {
+            return new QuerySetEntry(null, Collections.emptyMap());
+        }
+        int hashIndex = combinedKey.indexOf('#');
+        if (hashIndex >= 0 && hashIndex < combinedKey.length() - 1) {
+            String afterHash = combinedKey.substring(hashIndex + 1).trim();
+            if (afterHash.startsWith("{") && afterHash.endsWith("}")) {
+                Map<String, String> customFields = tryParseJsonToStringMap(afterHash);
+                if (customFields != null) {
+                    return new QuerySetEntry(combinedKey.substring(0, hashIndex), customFields);
+                }
+            }
+        }
+        // No valid JSON suffix — the whole string is the query text (handles "What is C#?").
+        return new QuerySetEntry(combinedKey, Collections.emptyMap());
+    }
+
+    /**
      * Attempts to parse a JSON string into a Map of String to String.
      * Uses OpenSearch's XContentHelper instead of external Jackson dependency.
      *

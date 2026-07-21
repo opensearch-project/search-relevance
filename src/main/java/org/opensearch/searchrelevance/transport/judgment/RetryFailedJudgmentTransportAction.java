@@ -9,9 +9,11 @@ package org.opensearch.searchrelevance.transport.judgment;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.apache.logging.log4j.LogManager;
@@ -20,9 +22,11 @@ import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.HandledTransportAction;
+import org.opensearch.action.support.PlainActionFuture;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
+import org.opensearch.index.engine.VersionConflictEngineException;
 import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.judgments.JudgmentDataTransformer;
@@ -45,6 +49,13 @@ import org.opensearch.transport.TransportService;
  */
 public class RetryFailedJudgmentTransportAction extends HandledTransportAction<RetryFailedJudgmentRequest, IndexResponse> {
     private static final Logger LOGGER = LogManager.getLogger(RetryFailedJudgmentTransportAction.class);
+
+    /**
+     * How long a judgment may stay in PROCESSING without its timestamp advancing before we treat
+     * it as stale (i.e. the previous retry process likely died) and allow a new retry to take over.
+     */
+    private static final long STALE_PROCESSING_THRESHOLD_MS = 5 * 60 * 1000L; // 5 minutes
+
     private final JudgmentDao judgmentDao;
     private final LlmJudgmentsProcessor llmJudgmentsProcessor;
     private final ThreadPool threadPool;
@@ -75,9 +86,9 @@ public class RetryFailedJudgmentTransportAction extends HandledTransportAction<R
     /**
      * Main retry logic:
      * 1. Load the judgment from the system index
-     * 2. Validate it (must be LLM_JUDGMENT, not currently PROCESSING, has failures)
+     * 2. Validate it (must be LLM_JUDGMENT, not currently PROCESSING/RETRYING, has failures)
      * 3. Extract the scoring configuration from its metadata
-     * 4. Set status to PROCESSING to prevent concurrent retries
+     * 4. Set status to RETRYING to prevent concurrent retries
      * 5. Re-run the scoring pipeline for the failed docs
      * 6. Merge new ratings back and update the judgment
      */
@@ -93,7 +104,12 @@ public class RetryFailedJudgmentTransportAction extends HandledTransportAction<R
                 return;
             }
 
-            Map<String, Object> source = searchResponse.getHits().getHits()[0].getSourceAsMap();
+            org.opensearch.search.SearchHit hit = searchResponse.getHits().getHits()[0];
+            Map<String, Object> source = hit.getSourceAsMap();
+            // Capture the version info so we can guard the status transition against concurrent
+            // retries via optimistic concurrency control on the update below.
+            long seqNo = hit.getSeqNo();
+            long primaryTerm = hit.getPrimaryTerm();
 
             // Step 2a: Validate judgment type — retry only works for LLM judgments
             String type = (String) source.get(Judgment.TYPE);
@@ -102,11 +118,38 @@ public class RetryFailedJudgmentTransportAction extends HandledTransportAction<R
                 return;
             }
 
-            // Step 2b: Validate status — can't retry if still processing
+            // Step 2b: Validate status.
+            // - PROCESSING means the initial generation is still running. We must NOT retry it: a
+            // generation that has not COMPLETED may not have discovered the full set of documents
+            // to rate yet, so its "failures" list is not trustworthy.
+            // - RETRYING means another retry is already running. A retry refreshes the judgment's
+            // timestamp after each query (a heartbeat); if that timestamp has not advanced for
+            // longer than STALE_PROCESSING_THRESHOLD_MS, we assume that run died and allow this
+            // one to take over. If the heartbeat is still fresh, reject with 409.
+            // - COMPLETED / ERROR / TIMEOUT are all retryable.
             String status = (String) source.get(Judgment.STATUS);
             if (AsyncStatus.PROCESSING.name().equals(status)) {
-                listener.onFailure(new SearchRelevanceException("Cannot retry a judgment that is still PROCESSING", RestStatus.CONFLICT));
+                listener.onFailure(
+                    new SearchRelevanceException(
+                        "Cannot retry a judgment whose initial generation is still PROCESSING",
+                        RestStatus.CONFLICT
+                    )
+                );
                 return;
+            }
+            if (AsyncStatus.RETRYING.name().equals(status)) {
+                String lastUpdated = (String) source.get(Judgment.TIME_STAMP);
+                if (!isProcessingStale(lastUpdated)) {
+                    listener.onFailure(
+                        new SearchRelevanceException("A retry is already in progress for this judgment", RestStatus.CONFLICT)
+                    );
+                    return;
+                }
+                LOGGER.warn(
+                    "Judgment {} has been RETRYING with no progress since {}; assuming stale and retrying",
+                    judgmentId,
+                    lastUpdated
+                );
             }
 
             // Step 2c: Check that there are actually failures to retry
@@ -145,23 +188,36 @@ public class RetryFailedJudgmentTransportAction extends HandledTransportAction<R
                 failedQueriesMap.put(query, failedDocIds);
             }
 
-            // Step 4: Set status to PROCESSING to prevent concurrent retries
+            // Step 4: Set status to RETRYING to prevent concurrent retries. RETRYING (not PROCESSING)
+            // marks this as a retry of an already-completed judgment, so it is distinguishable from
+            // an initial generation.
             String name = (String) source.get(Judgment.NAME);
-            Judgment processingJudgment = new Judgment(
+            Judgment retryingJudgment = new Judgment(
                 judgmentId,
                 TimeUtils.getTimestamp(),
                 name,
-                AsyncStatus.PROCESSING,
+                AsyncStatus.RETRYING,
                 JudgmentType.LLM_JUDGMENT,
                 metadata,
                 judgmentRatings
             );
 
-            // Save PROCESSING status, return 200 to caller, then start retry in background
-            judgmentDao.updateJudgment(processingJudgment, ActionListener.wrap(updateResponse -> {
+            // Save RETRYING status guarded by optimistic concurrency: the write only succeeds if the
+            // judgment's seqNo/primaryTerm are unchanged since we read it. If a concurrent retry won
+            // the race and already flipped the status, this write fails with a version conflict, which
+            // we surface as 409 so only one retry proceeds. On success, return 200 and start the retry.
+            judgmentDao.updateJudgment(retryingJudgment, seqNo, primaryTerm, ActionListener.wrap(updateResponse -> {
                 listener.onResponse((IndexResponse) updateResponse);
                 retryFailedDocsAsync(judgmentId, name, metadata, judgmentRatings, failedQueriesMap);
-            }, listener::onFailure));
+            }, error -> {
+                if (error instanceof VersionConflictEngineException) {
+                    listener.onFailure(
+                        new SearchRelevanceException("A concurrent retry is already in progress for this judgment", RestStatus.CONFLICT)
+                    );
+                } else {
+                    listener.onFailure(error);
+                }
+            }));
 
         } catch (Exception e) {
             LOGGER.error("Failed to retry judgment: {}", judgmentId, e);
@@ -181,56 +237,122 @@ public class RetryFailedJudgmentTransportAction extends HandledTransportAction<R
         List<Map<String, Object>> judgmentRatings,
         Map<String, List<String>> failedQueriesMap
     ) {
-        llmJudgmentsProcessor.retryFailedDocs(failedQueriesMap, metadata, ActionListener.wrap(newResults -> {
-            // Merge new ratings into the original judgment
-            List<Map<String, Object>> mergedRatings = mergeRetryResults(judgmentRatings, newResults);
-
-            // Recompute metadata counts (totalQueries, successfulQueries, failedQueries)
-            Map<String, Object> updatedMetadata = new HashMap<>(metadata);
-            Map<String, Object> summary = JudgmentDataTransformer.buildJudgmentSummary(mergedRatings);
-            updatedMetadata.putAll(summary);
-
-            // Save the updated judgment back to the index
-            Judgment completedJudgment = new Judgment(
+        // Heartbeat: before each query is processed, rewrite the judgment (still RETRYING) with a
+        // fresh timestamp. This tells any concurrent retry that this run is alive; if the timestamp
+        // stops advancing, isProcessingStale() lets another retry take over.
+        //
+        // The write is synchronous (we block on it) and any failure is thrown: if we can no longer
+        // update the judgment, continuing is unsafe — the final write would likely fail too, and a
+        // stale heartbeat could let a concurrent retry start. Throwing aborts the retry, which the
+        // processor surfaces as a failure so the judgment is flipped to ERROR.
+        Runnable heartbeat = () -> {
+            Judgment stillRetrying = new Judgment(
                 judgmentId,
                 TimeUtils.getTimestamp(),
                 name,
-                AsyncStatus.COMPLETED,
+                AsyncStatus.RETRYING,
                 JudgmentType.LLM_JUDGMENT,
-                updatedMetadata,
-                mergedRatings
-            );
-
-            judgmentDao.updateJudgment(
-                completedJudgment,
-                ActionListener.wrap(
-                    response -> LOGGER.info("Successfully retried judgment: {}", judgmentId),
-                    error -> LOGGER.error("Failed to update judgment after retry: {}", judgmentId, error)
-                )
-            );
-        }, error -> {
-            // If the entire retry fails, mark the judgment as ERROR but preserve metadata
-            LOGGER.error("Retry processing failed for judgment: {}", judgmentId, error);
-            Map<String, Object> errorMetadata = new HashMap<>(metadata);
-            errorMetadata.put("error", Objects.toString(error.getMessage(), "Unknown error"));
-
-            Judgment errorJudgment = new Judgment(
-                judgmentId,
-                TimeUtils.getTimestamp(),
-                name,
-                AsyncStatus.ERROR,
-                JudgmentType.LLM_JUDGMENT,
-                errorMetadata,
+                metadata,
                 judgmentRatings
             );
-            judgmentDao.updateJudgment(
-                errorJudgment,
-                ActionListener.wrap(
-                    response -> LOGGER.info("Updated judgment {} status to ERROR", judgmentId),
-                    e -> LOGGER.error("Failed to update error status for judgment: {}", judgmentId, e)
-                )
-            );
-        }));
+            PlainActionFuture<Object> future = PlainActionFuture.newFuture();
+            judgmentDao.updateJudgment(stillRetrying, future);
+            future.actionGet(); // blocks; throws if the heartbeat write fails
+            LOGGER.debug("Refreshed heartbeat for judgment: {}", judgmentId);
+        };
+
+        llmJudgmentsProcessor.retryFailedDocs(failedQueriesMap, metadata, heartbeat, ActionListener.wrap(newResults -> {
+            try {
+                // Merge new ratings into the original judgment
+                List<Map<String, Object>> mergedRatings = mergeRetryResults(judgmentRatings, newResults);
+
+                // Recompute metadata counts (totalQueries, successfulQueries, failedQueries)
+                Map<String, Object> updatedMetadata = new HashMap<>(metadata);
+                Map<String, Object> summary = JudgmentDataTransformer.buildJudgmentSummary(mergedRatings);
+                updatedMetadata.putAll(summary);
+
+                // Save the updated judgment back to the index
+                Judgment completedJudgment = new Judgment(
+                    judgmentId,
+                    TimeUtils.getTimestamp(),
+                    name,
+                    AsyncStatus.COMPLETED,
+                    JudgmentType.LLM_JUDGMENT,
+                    updatedMetadata,
+                    mergedRatings
+                );
+
+                judgmentDao.updateJudgment(
+                    completedJudgment,
+                    ActionListener.wrap(
+                        response -> LOGGER.info("Successfully retried judgment: {}", judgmentId),
+                        // If the final write fails, flip to ERROR so it doesn't stay stuck in PROCESSING
+                        error -> markJudgmentAsError(judgmentId, name, metadata, judgmentRatings, error)
+                    )
+                );
+            } catch (Exception e) {
+                // Any failure while merging/building results must flip the judgment to ERROR,
+                // otherwise it would stay stuck in PROCESSING forever
+                markJudgmentAsError(judgmentId, name, metadata, judgmentRatings, e);
+            }
+        }, error -> markJudgmentAsError(judgmentId, name, metadata, judgmentRatings, error)));
+    }
+
+    /**
+     * Marks a judgment as ERROR (preserving its metadata) so it never stays stuck in PROCESSING
+     * after a retry failure.
+     */
+    private void markJudgmentAsError(
+        String judgmentId,
+        String name,
+        Map<String, Object> metadata,
+        List<Map<String, Object>> judgmentRatings,
+        Exception error
+    ) {
+        LOGGER.error("Retry processing failed for judgment: {}", judgmentId, error);
+        Map<String, Object> errorMetadata = new HashMap<>(metadata);
+        errorMetadata.put("error", Objects.toString(error.getMessage(), "Unknown error"));
+
+        Judgment errorJudgment = new Judgment(
+            judgmentId,
+            TimeUtils.getTimestamp(),
+            name,
+            AsyncStatus.ERROR,
+            JudgmentType.LLM_JUDGMENT,
+            errorMetadata,
+            judgmentRatings
+        );
+        judgmentDao.updateJudgment(
+            errorJudgment,
+            ActionListener.wrap(
+                response -> LOGGER.info("Updated judgment {} status to ERROR", judgmentId),
+                e -> LOGGER.error("Failed to update error status for judgment: {}", judgmentId, e)
+            )
+        );
+    }
+
+    /**
+     * Decides whether a RETRYING judgment is stale — i.e. its timestamp (refreshed as a heartbeat
+     * on each rating update) has not advanced within STALE_PROCESSING_THRESHOLD_MS. A stale judgment
+     * is assumed to belong to a died retry process, so a new retry is allowed to take over.
+     *
+     * <p>If the timestamp is missing or unparseable, we treat it as stale rather than blocking the
+     * user forever on a judgment we cannot reason about.
+     *
+     * @param lastUpdated the judgment's timestamp in {@link TimeUtils} format
+     * @return true if the judgment should be considered stale and safe to retry
+     */
+    private boolean isProcessingStale(String lastUpdated) {
+        if (lastUpdated == null || lastUpdated.isBlank()) {
+            return true;
+        }
+        try {
+            long lastUpdatedMs = TimeUtils.parseTimestamp(lastUpdated);
+            return (TimeUtils.currentTimeMillis() - lastUpdatedMs) > STALE_PROCESSING_THRESHOLD_MS;
+        } catch (Exception e) {
+            LOGGER.warn("Could not parse judgment timestamp '{}', treating as stale", lastUpdated, e);
+            return true;
+        }
     }
 
     /**
@@ -261,11 +383,16 @@ public class RetryFailedJudgmentTransportAction extends HandledTransportAction<R
                 );
                 List<Map<String, String>> newRatings = (List<Map<String, String>>) newResult.getOrDefault("ratings", List.of());
 
+                // Track existing docIds in a set for O(1) membership checks (avoids an O(n^2) scan
+                // when merging many newly-scored docs into a query with many existing ratings).
+                Set<String> existingDocIds = new HashSet<>();
+                for (Map<String, String> rating : existingRatings) {
+                    existingDocIds.add(rating.get("docId"));
+                }
+
                 // Add newly scored docs that weren't already in ratings
                 for (Map<String, String> newRating : newRatings) {
-                    String docId = newRating.get("docId");
-                    boolean alreadyExists = existingRatings.stream().anyMatch(r -> docId.equals(r.get("docId")));
-                    if (!alreadyExists) {
+                    if (existingDocIds.add(newRating.get("docId"))) {
                         existingRatings.add(newRating);
                     }
                 }

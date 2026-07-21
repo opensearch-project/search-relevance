@@ -8,6 +8,8 @@
 package org.opensearch.searchrelevance.transport.judgment;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -33,6 +35,7 @@ import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.judgments.LlmJudgmentsProcessor;
 import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.JudgmentType;
+import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.test.OpenSearchTestCase;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.TransportService;
@@ -99,7 +102,9 @@ public class RetryFailedJudgmentTransportActionTests extends OpenSearchTestCase 
         assertTrue(exceptionCaptor.getValue().getMessage().contains("Retry is only supported for LLM_JUDGMENT type"));
     }
 
-    public void testRetry_StillProcessing() {
+    public void testRetry_InitialGenerationProcessing_Rejected() {
+        // PROCESSING = initial generation still running. Never retryable, regardless of timestamp,
+        // because a generation that hasn't COMPLETED may not have the full list of docs to rate.
         Map<String, Object> source = buildJudgmentSource(JudgmentType.LLM_JUDGMENT.name(), AsyncStatus.PROCESSING.name(), List.of());
         SearchResponse mockResponse = buildMockSearchResponse(source);
         when(judgmentDao.getJudgmentSync("processing-id")).thenReturn(mockResponse);
@@ -110,7 +115,86 @@ public class RetryFailedJudgmentTransportActionTests extends OpenSearchTestCase 
 
         ArgumentCaptor<Exception> exceptionCaptor = ArgumentCaptor.forClass(Exception.class);
         verify(listener).onFailure(exceptionCaptor.capture());
-        assertTrue(exceptionCaptor.getValue().getMessage().contains("Cannot retry a judgment that is still PROCESSING"));
+        assertTrue(exceptionCaptor.getValue().getMessage().contains("initial generation is still PROCESSING"));
+    }
+
+    public void testRetry_RetryingFreshHeartbeat_Rejected() {
+        // RETRYING with a fresh timestamp means another retry is actively running — reject.
+        Map<String, Object> source = buildJudgmentSource(JudgmentType.LLM_JUDGMENT.name(), AsyncStatus.RETRYING.name(), List.of());
+        source.put("timestamp", TimeUtils.getTimestamp()); // fresh heartbeat = now
+        SearchResponse mockResponse = buildMockSearchResponse(source);
+        when(judgmentDao.getJudgmentSync("retrying-id")).thenReturn(mockResponse);
+
+        RetryFailedJudgmentRequest request = new RetryFailedJudgmentRequest("retrying-id");
+        ActionListener<IndexResponse> listener = mock(ActionListener.class);
+        action.doExecute(null, request, listener);
+
+        ArgumentCaptor<Exception> exceptionCaptor = ArgumentCaptor.forClass(Exception.class);
+        verify(listener).onFailure(exceptionCaptor.capture());
+        assertTrue(exceptionCaptor.getValue().getMessage().contains("A retry is already in progress"));
+    }
+
+    public void testRetry_StaleRetrying_AllowedToProceed() {
+        // RETRYING but the heartbeat timestamp is old (previous retry died) — a new retry may take over.
+        // The judgment has failures, so it reaches the RETRYING-status write (proving the stale guard
+        // did NOT reject it with a 409).
+        List<Map<String, Object>> judgmentRatings = new ArrayList<>();
+        Map<String, Object> queryEntry = new HashMap<>();
+        queryEntry.put("query", "superhero");
+        queryEntry.put("ratings", new ArrayList<>());
+        queryEntry.put("failures", List.of(Map.of("docId", "5")));
+        judgmentRatings.add(queryEntry);
+
+        Map<String, Object> source = buildJudgmentSource(JudgmentType.LLM_JUDGMENT.name(), AsyncStatus.RETRYING.name(), judgmentRatings);
+        source.put("timestamp", "2000-01-01T00:00:00.000Z"); // far in the past = stale
+        SearchResponse mockResponse = buildMockSearchResponse(source);
+        when(judgmentDao.getJudgmentSync("stale-id")).thenReturn(mockResponse);
+
+        // Let the RETRYING-status write succeed so we can observe that we got past the stale guard.
+        // The status write uses optimistic concurrency, i.e. the 4-arg (judgment, seqNo, primaryTerm,
+        // listener) overload; the listener is the last argument.
+        doAnswer(invocation -> {
+            ActionListener<IndexResponse> l = invocation.getArgument(3);
+            l.onResponse(mock(IndexResponse.class));
+            return null;
+        }).when(judgmentDao).updateJudgment(any(), anyLong(), anyLong(), any());
+
+        RetryFailedJudgmentRequest request = new RetryFailedJudgmentRequest("stale-id");
+        ActionListener<IndexResponse> listener = mock(ActionListener.class);
+        action.doExecute(null, request, listener);
+
+        // Not rejected with CONFLICT — instead it proceeded and the caller got a success response.
+        verify(listener).onResponse(any(IndexResponse.class));
+    }
+
+    public void testRetry_VersionConflict_ReturnsConflict() {
+        // A concurrent retry won the race: the optimistic-concurrency status write fails with a
+        // version conflict, which must surface to the caller as 409.
+        List<Map<String, Object>> judgmentRatings = new ArrayList<>();
+        Map<String, Object> queryEntry = new HashMap<>();
+        queryEntry.put("query", "superhero");
+        queryEntry.put("ratings", new ArrayList<>());
+        queryEntry.put("failures", List.of(Map.of("docId", "5")));
+        judgmentRatings.add(queryEntry);
+
+        Map<String, Object> source = buildJudgmentSource(JudgmentType.LLM_JUDGMENT.name(), AsyncStatus.COMPLETED.name(), judgmentRatings);
+        SearchResponse mockResponse = buildMockSearchResponse(source);
+        when(judgmentDao.getJudgmentSync("conflict-id")).thenReturn(mockResponse);
+
+        // The guarded status write loses the race → version conflict.
+        doAnswer(invocation -> {
+            ActionListener<IndexResponse> l = invocation.getArgument(3);
+            l.onFailure(new org.opensearch.index.engine.VersionConflictEngineException(null, "conflict-id", "version conflict"));
+            return null;
+        }).when(judgmentDao).updateJudgment(any(), anyLong(), anyLong(), any());
+
+        RetryFailedJudgmentRequest request = new RetryFailedJudgmentRequest("conflict-id");
+        ActionListener<IndexResponse> listener = mock(ActionListener.class);
+        action.doExecute(null, request, listener);
+
+        ArgumentCaptor<Exception> exceptionCaptor = ArgumentCaptor.forClass(Exception.class);
+        verify(listener).onFailure(exceptionCaptor.capture());
+        assertTrue(exceptionCaptor.getValue().getMessage().contains("concurrent retry is already in progress"));
     }
 
     public void testRetry_NoFailures() {

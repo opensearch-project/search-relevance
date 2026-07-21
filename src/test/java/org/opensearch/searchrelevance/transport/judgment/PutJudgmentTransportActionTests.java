@@ -83,7 +83,7 @@ public class PutJudgmentTransportActionTests extends OpenSearchTestCase {
             false, // ignoreFailure
             null, // promptTemplate
             null, // llmJudgmentRatingType
-            null // existingJudgements
+            null // existingJudgments
         );
 
         // Mock QuerySet DAO to return 0 hits (entity not found)
@@ -107,6 +107,34 @@ public class PutJudgmentTransportActionTests extends OpenSearchTestCase {
         assertTrue(exception.getMessage().contains("QuerySet [missing-queryset-id] does not exist"));
     }
 
+    public void testValidation_LlmJudgment_TooManyExistingJudgments() {
+        // Reference 6 existing judgments — one more than the allowed maximum of 5.
+        PutLlmJudgmentRequest request = new PutLlmJudgmentRequest(
+            JudgmentType.LLM_JUDGMENT,
+            "test-judgment",
+            "test description",
+            "test-model-id",
+            "valid-queryset-id",
+            List.of(),
+            10,
+            1000,
+            null, // contextFields
+            false, // ignoreFailure
+            null, // promptTemplate
+            null, // llmJudgmentRatingType
+            List.of("j1", "j2", "j3", "j4", "j5", "j6") // existingJudgments — over the limit
+        );
+
+        ActionListener<IndexResponse> responseListener = mock(ActionListener.class);
+        action.doExecute(null, request, responseListener);
+
+        ArgumentCaptor<Exception> exceptionCaptor = ArgumentCaptor.forClass(Exception.class);
+        verify(responseListener).onFailure(exceptionCaptor.capture());
+
+        Exception exception = exceptionCaptor.getValue();
+        assertTrue(exception.getMessage().contains("Too many existing judgments referenced"));
+    }
+
     public void testValidation_LlmJudgment_SearchConfigNotFound() {
         PutLlmJudgmentRequest request = new PutLlmJudgmentRequest(
             JudgmentType.LLM_JUDGMENT,
@@ -121,7 +149,7 @@ public class PutJudgmentTransportActionTests extends OpenSearchTestCase {
             false, // ignoreFailure
             null, // promptTemplate
             null, // llmJudgmentRatingType
-            null // existingJudgements
+            null // existingJudgments
         );
 
         // Mock QuerySet exists
