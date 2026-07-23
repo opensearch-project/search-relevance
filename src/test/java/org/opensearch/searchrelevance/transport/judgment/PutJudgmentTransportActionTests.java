@@ -21,9 +21,12 @@ import org.junit.Before;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.opensearch.Version;
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.support.ActionFilters;
+import org.opensearch.cluster.ClusterState;
+import org.opensearch.cluster.node.DiscoveryNodes;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.search.SearchHit;
@@ -58,6 +61,16 @@ public class PutJudgmentTransportActionTests extends OpenSearchTestCase {
     @Before
     public void setup() {
         MockitoAnnotations.openMocks(this);
+
+        // The transport action checks the cluster's minimum node version before allowing the
+        // existingJudgments field (a rolling-upgrade guard). Stub the chain to report a fully
+        // upgraded cluster so the guard passes and the rest of the validation is exercised.
+        ClusterState clusterState = mock(ClusterState.class);
+        DiscoveryNodes discoveryNodes = mock(DiscoveryNodes.class);
+        when(clusterService.state()).thenReturn(clusterState);
+        when(clusterState.getNodes()).thenReturn(discoveryNodes);
+        when(discoveryNodes.getMinNodeVersion()).thenReturn(Version.CURRENT);
+
         action = new PutJudgmentTransportAction(
             clusterService,
             transportService,
@@ -182,5 +195,45 @@ public class PutJudgmentTransportActionTests extends OpenSearchTestCase {
 
         Exception exception = exceptionCaptor.getValue();
         assertTrue(exception.getMessage().contains("SearchConfiguration [missing-config-id] does not exist"));
+    }
+
+    public void testValidation_LlmJudgment_ExistingJudgmentsIgnoredOnMixedVersionCluster() {
+        // Simulate a rolling upgrade: at least one node is still on an older version. The
+        // existingJudgments field cannot be serialized to such a node, so it is ignored (cleared)
+        // and the request falls back to the previous behavior rather than being rejected.
+        when(clusterService.state().getNodes().getMinNodeVersion()).thenReturn(Version.V_3_7_0);
+
+        PutLlmJudgmentRequest request = new PutLlmJudgmentRequest(
+            JudgmentType.LLM_JUDGMENT,
+            "test-judgment",
+            "test description",
+            "test-model-id",
+            "valid-queryset-id",
+            List.of(),
+            10,
+            1000,
+            null, // contextFields
+            false, // ignoreFailure
+            null, // promptTemplate
+            null, // llmJudgmentRatingType
+            List.of("j1") // existingJudgments — present, but cluster is not fully upgraded
+        );
+
+        // QuerySet exists so validation proceeds past the version check.
+        SearchResponse mockQuerySetResponse = mock(SearchResponse.class);
+        SearchHits querySetHits = new SearchHits(new SearchHit[0], new TotalHits(1, TotalHits.Relation.EQUAL_TO), 0.0f);
+        when(mockQuerySetResponse.getHits()).thenReturn(querySetHits);
+        doAnswer(invocation -> {
+            ActionListener<SearchResponse> listener = invocation.getArgument(1);
+            listener.onResponse(mockQuerySetResponse);
+            return null;
+        }).when(querySetDao).checkQuerySetExists(eq("valid-queryset-id"), any(ActionListener.class));
+
+        ActionListener<IndexResponse> responseListener = mock(ActionListener.class);
+        action.doExecute(null, request, responseListener);
+
+        // The field is ignored (cleared), not rejected: no version-related failure is raised and
+        // the request no longer carries existingJudgments.
+        assertNull("existingJudgments should be cleared on a mixed-version cluster", request.getExistingJudgments());
     }
 }

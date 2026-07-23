@@ -238,7 +238,6 @@ public class RestPutJudgmentAction extends BaseRestHandler {
                     builder.field("judgment_id", response.getId());
                     builder.endObject();
                     channel.sendResponse(new BytesRestResponse(RestStatus.OK, builder));
-
                 } catch (IOException e) {
                     onFailure(e);
                 }

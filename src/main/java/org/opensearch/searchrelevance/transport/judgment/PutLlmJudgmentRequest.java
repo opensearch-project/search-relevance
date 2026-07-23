@@ -10,6 +10,7 @@ package org.opensearch.searchrelevance.transport.judgment;
 import java.io.IOException;
 import java.util.List;
 
+import org.opensearch.Version;
 import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.core.common.io.stream.StreamOutput;
 import org.opensearch.searchrelevance.model.JudgmentType;
@@ -97,7 +98,15 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         this.ignoreFailure = Boolean.TRUE.equals(in.readOptionalBoolean()); // by defaulted as false if not provided
         this.promptTemplate = in.readOptionalString();
         this.llmJudgmentRatingType = in.readOptionalWriteable(LLMJudgmentRatingType::readFromStream);
-        this.existingJudgments = in.readOptionalStringList();
+        // BWC: this trailing field changed shape in 3.8. Older nodes wrote an optional boolean
+        // here (the removed "overwriteCache"); 3.8+ writes the "existingJudgments" list. Read the
+        // format the peer actually wrote, based on the stream's negotiated version.
+        if (in.getVersion().onOrAfter(Version.V_3_8_0)) {
+            this.existingJudgments = in.readOptionalStringList();
+        } else {
+            in.readOptionalBoolean(); // discard the old overwriteCache flag
+            this.existingJudgments = null;
+        }
     }
 
     @Override
@@ -112,7 +121,14 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         out.writeOptionalBoolean(ignoreFailure);
         out.writeOptionalString(promptTemplate);
         out.writeOptionalWriteable(llmJudgmentRatingType);
-        out.writeOptionalStringCollection(existingJudgments);
+        // BWC: match the format the peer expects at this trailing position. A pre-3.8 node reads an
+        // optional boolean here (the removed "overwriteCache"), so write a null boolean for it;
+        // 3.8+ nodes read the "existingJudgments" list.
+        if (out.getVersion().onOrAfter(Version.V_3_8_0)) {
+            out.writeOptionalStringCollection(existingJudgments);
+        } else {
+            out.writeOptionalBoolean(null);
+        }
     }
 
     public String getModelId() {
@@ -153,6 +169,10 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
 
     public List<String> getExistingJudgments() {
         return existingJudgments;
+    }
+
+    public void setExistingJudgments(List<String> existingJudgments) {
+        this.existingJudgments = existingJudgments;
     }
 
 }
