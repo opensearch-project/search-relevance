@@ -18,6 +18,7 @@ import static org.opensearch.searchrelevance.utils.RatingOutputProcessor.sanitiz
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -206,11 +207,40 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
             String index = config.index;
             List<Map<String, Object>> results = new ArrayList<>();
 
-            // Process each query that has failures — score only the failed docs
+            // Pass 1: fetch every failed doc up front and detect any that no longer exist. If a
+            // failed doc has been deleted from the index since the judgment was created, it can
+            // never be re-scored, so we fail the entire retry rather than silently returning a
+            // partial result. The reason names the missing docs and is stored on the judgment's
+            // failure reason (the caller flips the status to ERROR). Fetching first also avoids
+            // burning LLM calls on a retry that is going to fail anyway.
+            Map<String, ConcurrentMap<String, SearchHit>> hitsByQuery = new LinkedHashMap<>();
+            List<String> missingDocIds = new ArrayList<>();
             for (Map.Entry<String, List<String>> entry : failedQueries.entrySet()) {
-                // Heartbeat first: refresh the judgment's timestamp before the slow LLM call, so
-                // it stays fresh through the scoring. If the heartbeat write fails it throws,
-                // aborting the retry (surfaced below as a failure -> judgment flipped to ERROR).
+                // Heartbeat: refresh the judgment's timestamp so it stays fresh. If the heartbeat
+                // write fails it throws, aborting the retry (surfaced below as a failure).
+                notifyProgress(onProgress);
+
+                String queryTextWithCustomInput = entry.getKey();
+                List<String> failedDocIds = entry.getValue();
+
+                // Fetch the failed docs directly by their IDs (no search — we already know the docIds).
+                // Docs that no longer exist are skipped by fetchDocsByIds, so they won't be in allHits.
+                ConcurrentMap<String, SearchHit> allHits = fetchDocsByIds(index, failedDocIds);
+                hitsByQuery.put(queryTextWithCustomInput, allHits);
+                failedDocIds.stream().filter(id -> !allHits.containsKey(id)).forEach(missingDocIds::add);
+            }
+            if (!missingDocIds.isEmpty()) {
+                listener.onFailure(
+                    new SearchRelevanceException(
+                        "Cannot retry: document(s) no longer exist in index [" + index + "]: " + missingDocIds,
+                        RestStatus.NOT_FOUND
+                    )
+                );
+                return;
+            }
+
+            // Pass 2: all failed docs still exist — re-score each query's failed docs with the LLM.
+            for (Map.Entry<String, List<String>> entry : failedQueries.entrySet()) {
                 notifyProgress(onProgress);
 
                 String queryTextWithCustomInput = entry.getKey();
@@ -226,44 +256,28 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
 
                 log.info("Retrying {} failed docs for query: {}", failedDocIds.size(), queryText);
 
-                // Fetch the failed docs directly by their IDs (no search — we already know the docIds).
-                // Docs that no longer exist are skipped by fetchDocsByIds, so they won't be in allHits.
-                ConcurrentMap<String, SearchHit> allHits = fetchDocsByIds(index, failedDocIds);
+                ConcurrentMap<String, SearchHit> allHits = hitsByQuery.get(queryTextWithCustomInput);
                 ConcurrentMap<String, String> docIdToScore = new ConcurrentHashMap<>();
 
-                // Docs that no longer exist can't be re-scored — they stay in failures. Record a
-                // reason naming them so the user knows why (the reason field holds the latest such
-                // message, consistent with how failure reasons are reported elsewhere).
-                List<String> missingDocIds = failedDocIds.stream().filter(id -> !allHits.containsKey(id)).collect(Collectors.toList());
-                List<String> docsToScore = failedDocIds.stream().filter(allHits::containsKey).collect(Collectors.toList());
-
-                // Score the docs that still exist with the LLM
-                String llmFailureReason = null;
-                if (!docsToScore.isEmpty()) {
-                    llmFailureReason = processWithLLM(
-                        config.modelId,
-                        queryText,
-                        queryTextWithCustomInput,
-                        customFields,
-                        config.tokenLimit,
-                        config.contextFields,
-                        docsToScore,
-                        allHits,
-                        index,
-                        docIdToScore,
-                        config.promptTemplate,
-                        config.ratingType
-                    );
-                }
+                // Score the failed docs with the LLM (all are known to exist after pass 1).
+                String llmFailureReason = processWithLLM(
+                    config.modelId,
+                    queryText,
+                    queryTextWithCustomInput,
+                    customFields,
+                    config.tokenLimit,
+                    config.contextFields,
+                    failedDocIds,
+                    allHits,
+                    index,
+                    docIdToScore,
+                    config.promptTemplate,
+                    config.ratingType
+                );
 
                 // Build result: use queryTextWithCustomInput as the key so it matches the original judgment
                 Map<String, Object> result = buildResultWithFailures(queryTextWithCustomInput, new HashSet<>(failedDocIds), docIdToScore);
-                if (!missingDocIds.isEmpty()) {
-                    result.put(
-                        JudgmentDataTransformer.RESULT_FAILURE_REASON,
-                        "Document(s) no longer exist in index [" + index + "]: " + missingDocIds
-                    );
-                } else if (llmFailureReason != null) {
+                if (llmFailureReason != null) {
                     result.put(JudgmentDataTransformer.RESULT_FAILURE_REASON, llmFailureReason);
                 }
                 results.add(result);
@@ -593,10 +607,10 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         MultiGetResponse response = client.multiGet(multiGetRequest).actionGet();
         for (MultiGetItemResponse itemResponse : response.getResponses()) {
             if (itemResponse.isFailed() || !itemResponse.getResponse().isExists()) {
-                // A failed doc no longer exists in the index — it can't be re-scored. Skip it so the
-                // rest of the failed docs are still retried; it stays in the query's "failures" list,
-                // and the caller records a reason naming this specific doc.
-                log.warn("Failed doc [{}] not found in index [{}] during retry, skipping", itemResponse.getId(), index);
+                // A failed doc no longer exists in the index, so it won't appear in the returned
+                // hits. The retry caller detects these missing docs up front and fails the whole
+                // retry with a reason naming them (a deleted doc can never be re-scored).
+                log.warn("Failed doc [{}] not found in index [{}] during retry", itemResponse.getId(), index);
                 continue;
             }
             GetResponse getResponse = itemResponse.getResponse();
