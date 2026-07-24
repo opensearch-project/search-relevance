@@ -6,6 +6,7 @@ Compatible with OpenSearch and OpenSearch Dashboards version 3.8.0
 
 * Implement Mustache template support for search queries, enabling native OpenSearch ScriptService-based templating alongside legacy `%SearchText%` placeholders ([#342](https://github.com/opensearch-project/search-relevance/pull/342))
 * Implement referential integrity validation for Search Relevance entities, ensuring referenced resources exist before creation or update operations proceed ([#360](https://github.com/opensearch-project/search-relevance/pull/360))
+* Add experiment execution time input signatures (SHA-256 fingerprints of query set, judgments, and search configurations) and `GET /_plugins/_search_relevance/experiments/{id}/validate` for VALID / DRIFTED / UNAVAILABLE drift checks ([#456](https://github.com/opensearch-project/search-relevance/pull/456))
 * Make LLM judgment generation provider-neutral, supporting any LLM provider through ml-commons connectors while maintaining backward compatibility with OpenAI-compatible connectors ([#515](https://github.com/opensearch-project/search-relevance/pull/515))
 * Report LLM judgment success/failure counts and failed queries in judgment metadata, making unrated documents visible instead of silently dropping them ([#521](https://github.com/opensearch-project/search-relevance/pull/521))
 
@@ -22,7 +23,7 @@ Compatible with OpenSearch and OpenSearch Dashboards version 3.8.0
 * Fix BWC SearchConfigMapping tests by creating referenced index before search config creation to satisfy referential integrity validation ([#497](https://github.com/opensearch-project/search-relevance/pull/497))
 
 ### Maintenance
-
+* Update updateVersion task and fix BWC version properties ([#475](https://github.com/opensearch-project/search-relevance/pull/475))
 * Bump 1password/load-secrets-action from 4.0.0 to 4.0.1 ([#493](https://github.com/opensearch-project/search-relevance/pull/493))
 * Bump actions/checkout from 6.0.3 to 7.0.0 ([#504](https://github.com/opensearch-project/search-relevance/pull/504))
 * Bump actions/setup-java from 5.2.0 to 5.3.0 ([#505](https://github.com/opensearch-project/search-relevance/pull/505))
