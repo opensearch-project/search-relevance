@@ -35,14 +35,14 @@ public class PutJudgmentActionTests extends OpenSearchTestCase {
     @Before
     public void setup() {
         // PutLlmJudgmentRequest serialization gates the existingJudgments field on the cluster's
-        // minimum node version via the ClusterUtil singleton. Initialize it to report a fully
-        // upgraded cluster so the round-trip uses the current (list) format.
+        // minimum node version via the ClusterUtil singleton. Report a cluster on the gate version
+        // so the round-trip uses the current (list) format.
         ClusterService clusterService = mock(ClusterService.class);
         ClusterState clusterState = mock(ClusterState.class);
         DiscoveryNodes discoveryNodes = mock(DiscoveryNodes.class);
         when(clusterService.state()).thenReturn(clusterState);
         when(clusterState.getNodes()).thenReturn(discoveryNodes);
-        when(discoveryNodes.getMinNodeVersion()).thenReturn(Version.CURRENT);
+        when(discoveryNodes.getMinNodeVersion()).thenReturn(Version.fromString("3.9.0"));
         ClusterUtil.instance().initialize(clusterService);
     }
 
