@@ -7,10 +7,18 @@
  */
 package org.opensearch.searchrelevance.action.judgment;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
+import org.junit.Before;
+import org.opensearch.Version;
+import org.opensearch.cluster.ClusterState;
+import org.opensearch.cluster.node.DiscoveryNodes;
+import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.io.stream.BytesStreamOutput;
 import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.searchrelevance.model.JudgmentType;
@@ -19,9 +27,24 @@ import org.opensearch.searchrelevance.transport.judgment.PutImportJudgmentReques
 import org.opensearch.searchrelevance.transport.judgment.PutJudgmentRequest;
 import org.opensearch.searchrelevance.transport.judgment.PutLlmJudgmentRequest;
 import org.opensearch.searchrelevance.transport.judgment.PutUbiJudgmentRequest;
+import org.opensearch.searchrelevance.utils.ClusterUtil;
 import org.opensearch.test.OpenSearchTestCase;
 
 public class PutJudgmentActionTests extends OpenSearchTestCase {
+
+    @Before
+    public void setup() {
+        // PutLlmJudgmentRequest serialization gates the existingJudgments field on the cluster's
+        // minimum node version via the ClusterUtil singleton. Initialize it to report a fully
+        // upgraded cluster so the round-trip uses the current (list) format.
+        ClusterService clusterService = mock(ClusterService.class);
+        ClusterState clusterState = mock(ClusterState.class);
+        DiscoveryNodes discoveryNodes = mock(DiscoveryNodes.class);
+        when(clusterService.state()).thenReturn(clusterState);
+        when(clusterState.getNodes()).thenReturn(discoveryNodes);
+        when(discoveryNodes.getMinNodeVersion()).thenReturn(Version.CURRENT);
+        ClusterUtil.instance().initialize(clusterService);
+    }
 
     public void testStreams() throws IOException {
         PutJudgmentRequest request = new PutUbiJudgmentRequest(JudgmentType.UBI_JUDGMENT, "name", "description", "coec", 20, "", "", null);

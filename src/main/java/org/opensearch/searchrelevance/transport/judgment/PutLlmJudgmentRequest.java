@@ -15,10 +15,18 @@ import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.core.common.io.stream.StreamOutput;
 import org.opensearch.searchrelevance.model.JudgmentType;
 import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
+import org.opensearch.searchrelevance.utils.ClusterUtil;
 
 import reactor.util.annotation.NonNull;
 
 public class PutLlmJudgmentRequest extends PutJudgmentRequest {
+
+    /**
+     * The first version that serializes {@code existingJudgments} (a string list) at the trailing
+     * position. Older versions wrote an optional boolean there (the removed "overwriteCache"), so
+     * the wire format is gated on the cluster's minimum node version being at least this.
+     */
+    private static final Version MINIMAL_SUPPORTED_VERSION_EXISTING_JUDGMENTS = Version.V_3_8_0;
 
     private final String modelId;
     private final String querySetId;
@@ -99,13 +107,12 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         this.promptTemplate = in.readOptionalString();
         this.llmJudgmentRatingType = in.readOptionalWriteable(LLMJudgmentRatingType::readFromStream);
         // BWC: this trailing field changed shape in 3.8. Older nodes wrote an optional boolean
-        // here (the removed "overwriteCache"); 3.8+ writes the "existingJudgments" list. Read the
-        // format the peer actually wrote, based on the stream's negotiated version.
-        if (in.getVersion().onOrAfter(Version.V_3_8_0)) {
+        // here (the removed "overwriteCache"); 3.8+ writes the "existingJudgments" list. Gate on the
+        // cluster's minimum node version so both directions agree during a rolling upgrade.
+        if (isClusterOnOrAfterMinReqVersionForExistingJudgments()) {
             this.existingJudgments = in.readOptionalStringList();
         } else {
-            in.readOptionalBoolean(); // discard the old overwriteCache flag
-            this.existingJudgments = null;
+            in.readOptionalBoolean(); // discard the old overwriteCache flag; existingJudgments stays null
         }
     }
 
@@ -123,12 +130,16 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         out.writeOptionalWriteable(llmJudgmentRatingType);
         // BWC: match the format the peer expects at this trailing position. A pre-3.8 node reads an
         // optional boolean here (the removed "overwriteCache"), so write a null boolean for it;
-        // 3.8+ nodes read the "existingJudgments" list.
-        if (out.getVersion().onOrAfter(Version.V_3_8_0)) {
+        // 3.8+ nodes read the "existingJudgments" list. Gate on the cluster's minimum node version.
+        if (isClusterOnOrAfterMinReqVersionForExistingJudgments()) {
             out.writeOptionalStringCollection(existingJudgments);
         } else {
             out.writeOptionalBoolean(null);
         }
+    }
+
+    private static boolean isClusterOnOrAfterMinReqVersionForExistingJudgments() {
+        return ClusterUtil.instance().getClusterMinVersion().onOrAfter(MINIMAL_SUPPORTED_VERSION_EXISTING_JUDGMENTS);
     }
 
     public String getModelId() {
@@ -169,10 +180,6 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
 
     public List<String> getExistingJudgments() {
         return existingJudgments;
-    }
-
-    public void setExistingJudgments(List<String> existingJudgments) {
-        this.existingJudgments = existingJudgments;
     }
 
 }

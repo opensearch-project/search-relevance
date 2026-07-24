@@ -235,7 +235,8 @@ public class SearchRelevancePlugin extends Plugin
         );
         this.metricsHelper = new MetricsHelper(clusterService, client, judgmentDao, evaluationResultDao, experimentVariantDao);
         this.settingsAccessor = new SearchRelevanceSettingsAccessor(clusterService, environment.settings());
-        this.clusterUtil = new ClusterUtil(clusterService);
+        ClusterUtil.instance().initialize(clusterService);
+        this.clusterUtil = ClusterUtil.instance();
         this.cronUtil = new CronUtil(settingsAccessor);
         this.infoStatsManager = new InfoStatsManager(settingsAccessor);
         EventStatsManager.instance().initialize(settingsAccessor);

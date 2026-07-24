@@ -20,7 +20,6 @@ import java.util.UUID;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.opensearch.Version;
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.GroupedActionListener;
@@ -130,23 +129,6 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
     }
 
     private void validateLlmJudgmentReferences(PutLlmJudgmentRequest request, ActionListener<Void> listener) {
-        // Backward-compatibility handling for rolling upgrades. "existingJudgments" is a new field
-        // on PutLlmJudgmentRequest (it replaced the old "overwriteCache" boolean on the wire). A
-        // node on an older version cannot deserialize it, so until every node in the cluster is on
-        // 3.8+ we ignore the field and fall back to the previous behavior (no reuse) rather than
-        // failing the request. Behavior may be inconsistent during the upgrade since the coordinator
-        // node handling the request is chosen effectively at random, which is acceptable; once the
-        // whole cluster is upgraded the feature applies on every request.
-        if (request.getExistingJudgments() != null
-            && !request.getExistingJudgments().isEmpty()
-            && getMinNodeVersion().before(Version.V_3_8_0)) {
-            LOGGER.warn(
-                "Ignoring 'existingJudgments' because not all cluster nodes are upgraded to 3.8.0 yet; "
-                    + "falling back to generating ratings without reuse."
-            );
-            request.setExistingJudgments(null);
-        }
-
         List<String> existingJudgments = request.getExistingJudgments();
 
         // Reject requests that reference too many existing judgments, to bound the number of
@@ -193,14 +175,6 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
                 );
             }
         }
-    }
-
-    /**
-     * @return the minimum OpenSearch version across all nodes currently in the cluster. Used to
-     *         gate features that are not backward-compatible during a rolling upgrade.
-     */
-    private Version getMinNodeVersion() {
-        return clusterService.state().getNodes().getMinNodeVersion();
     }
 
     private Map<String, Object> buildMetadata(PutJudgmentRequest request) {
