@@ -1,0 +1,237 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The OpenSearch Contributors require contributions made to
+ * this file be licensed under the Apache-2.0 license or a
+ * compatible open source license.
+ */
+package org.opensearch.searchrelevance.transport.judgment;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.opensearch.action.index.IndexResponse;
+import org.opensearch.action.search.SearchResponse;
+import org.opensearch.action.support.ActionFilters;
+import org.opensearch.action.support.HandledTransportAction;
+import org.opensearch.common.inject.Inject;
+import org.opensearch.core.action.ActionListener;
+import org.opensearch.core.rest.RestStatus;
+import org.opensearch.search.SearchHit;
+import org.opensearch.searchrelevance.dao.JudgmentDao;
+import org.opensearch.searchrelevance.exception.SearchRelevanceException;
+import org.opensearch.searchrelevance.judgments.JudgmentDataTransformer;
+import org.opensearch.searchrelevance.model.AsyncStatus;
+import org.opensearch.searchrelevance.model.Judgment;
+import org.opensearch.searchrelevance.model.JudgmentType;
+import org.opensearch.searchrelevance.utils.TimeUtils;
+import org.opensearch.tasks.Task;
+import org.opensearch.threadpool.ThreadPool;
+import org.opensearch.transport.TransportService;
+
+/**
+ * Transport action that updates the judgmentRatings of an existing LLM judgment in place.
+ *
+ * <p>Used for manual edits: the client fetches the judgment, adjusts a rating (e.g. moves a doc from
+ * failures to ratings, or overwrites a value), and submits the new judgmentRatings. This action
+ * replaces only the ratings on the stored judgment, recomputes the metadata summary counts, and
+ * saves it back to the same document id. No model call is made.
+ */
+public class UpdateJudgmentRatingsTransportAction extends HandledTransportAction<UpdateJudgmentRatingsRequest, IndexResponse> {
+    private static final Logger LOGGER = LogManager.getLogger(UpdateJudgmentRatingsTransportAction.class);
+
+    private final JudgmentDao judgmentDao;
+    private final ThreadPool threadPool;
+
+    /**
+     * @param transportService - transport service for action registration
+     * @param actionFilters - action filters applied to this action
+     * @param judgmentDao - DAO used to load and persist the judgment
+     * @param threadPool - thread pool; the blocking load is dispatched to the GENERIC pool
+     */
+    @Inject
+    public UpdateJudgmentRatingsTransportAction(
+        TransportService transportService,
+        ActionFilters actionFilters,
+        JudgmentDao judgmentDao,
+        ThreadPool threadPool
+    ) {
+        super(UpdateJudgmentRatingsAction.NAME, transportService, actionFilters, UpdateJudgmentRatingsRequest::new);
+        this.judgmentDao = judgmentDao;
+        this.threadPool = threadPool;
+    }
+
+    /**
+     * Dispatch to a GENERIC thread because the load is a synchronous index read.
+     */
+    @Override
+    protected void doExecute(Task task, UpdateJudgmentRatingsRequest request, ActionListener<IndexResponse> listener) {
+        threadPool.executor(ThreadPool.Names.GENERIC).execute(() -> doExecuteInternal(request, listener));
+    }
+
+    /**
+     * Load the judgment, validate it, replace its ratings, recompute the summary counts, and save
+     * it back under optimistic concurrency control. Fails the request with:
+     * <ul>
+     *   <li>404 if the judgment does not exist,</li>
+     *   <li>400 if it is not an LLM_JUDGMENT,</li>
+     *   <li>409 if it is currently PROCESSING/RETRYING, or if the doc changed since it was read
+     *       (version conflict),</li>
+     *   <li>500 on any other error.</li>
+     * </ul>
+     *
+     * @param request - carries the judgment id and the replacement ratings
+     * @param listener - receives the IndexResponse on success, or the failure above
+     */
+    @SuppressWarnings("unchecked")
+    private void doExecuteInternal(UpdateJudgmentRatingsRequest request, ActionListener<IndexResponse> listener) {
+        String judgmentId = request.getJudgmentId();
+        try {
+            // Load the existing judgment.
+            SearchResponse searchResponse = judgmentDao.getJudgmentSync(judgmentId);
+            if (searchResponse.getHits().getTotalHits().value() == 0) {
+                listener.onFailure(new SearchRelevanceException("Judgment not found: " + judgmentId, RestStatus.NOT_FOUND));
+                return;
+            }
+
+            SearchHit hit = searchResponse.getHits().getHits()[0];
+            Map<String, Object> source = hit.getSourceAsMap();
+            // Capture the version info so the write can be guarded against a concurrent edit or an
+            // in-flight retry via optimistic concurrency control (see updateJudgment below).
+            long seqNo = hit.getSeqNo();
+            long primaryTerm = hit.getPrimaryTerm();
+
+            // Only LLM judgments carry the ratings/failures structure we edit here.
+            String type = (String) source.get(Judgment.TYPE);
+            if (!JudgmentType.LLM_JUDGMENT.name().equals(type)) {
+                listener.onFailure(
+                    new SearchRelevanceException("Rating update is only supported for LLM_JUDGMENT type", RestStatus.BAD_REQUEST)
+                );
+                return;
+            }
+
+            // Reject edits while the judgment is mid-flight (generating or retrying). Editing now
+            // would race the in-flight write and could clobber scored results.
+            String status = (String) source.get(Judgment.STATUS);
+            if (AsyncStatus.PROCESSING.name().equals(status) || AsyncStatus.RETRYING.name().equals(status)) {
+                listener.onFailure(
+                    new SearchRelevanceException(
+                        "Judgment is currently " + status + "; cannot edit ratings until it completes",
+                        RestStatus.CONFLICT
+                    )
+                );
+                return;
+            }
+
+            String name = (String) source.get(Judgment.NAME);
+            Map<String, Object> metadata = (Map<String, Object>) source.get(Judgment.METADATA);
+            if (metadata == null) {
+                metadata = new HashMap<>();
+            }
+
+            List<Map<String, Object>> currentRatings = (List<Map<String, Object>>) source.get(Judgment.JUDGMENT_RATINGS);
+            if (currentRatings == null) {
+                listener.onFailure(new SearchRelevanceException("Judgment has no ratings to update", RestStatus.BAD_REQUEST));
+                return;
+            }
+
+            // Apply the single (query, docId) rating adjustment in place. Fails with 404 if the
+            // query or doc is not part of this judgment.
+            List<Map<String, Object>> updatedRatings = applyRatingAdjustment(
+                currentRatings,
+                request.getQuery(),
+                request.getDocId(),
+                request.getRating(),
+                listener
+            );
+            if (updatedRatings == null) {
+                return; // listener already notified of the failure
+            }
+
+            // Recompute the summary counts so metadata stays consistent with the edited ratings.
+            Map<String, Object> updatedMetadata = new HashMap<>(metadata);
+            updatedMetadata.putAll(JudgmentDataTransformer.buildJudgmentSummary(updatedRatings));
+
+            Judgment updatedJudgment = new Judgment(
+                judgmentId,
+                TimeUtils.getTimestamp(),
+                name,
+                AsyncStatus.COMPLETED,
+                JudgmentType.LLM_JUDGMENT,
+                updatedMetadata,
+                updatedRatings
+            );
+
+            // Guard the write with optimistic concurrency: it succeeds only if the doc hasn't
+            // changed since we read it. A concurrent edit or retry -> VersionConflictEngineException,
+            // surfaced to the client as 409 rather than silently overwriting their change.
+            judgmentDao.updateJudgment(updatedJudgment, seqNo, primaryTerm, ActionListener.wrap(response -> {
+                LOGGER.info("Updated ratings for judgment: {}", judgmentId);
+                listener.onResponse((IndexResponse) response);
+            }, listener::onFailure));
+
+        } catch (Exception e) {
+            LOGGER.error("Failed to update ratings for judgment: {}", judgmentId, e);
+            listener.onFailure(new SearchRelevanceException("Failed to update judgment ratings", e, RestStatus.INTERNAL_SERVER_ERROR));
+        }
+    }
+
+    /**
+     * Apply a single (query, docId) rating adjustment to the judgment's ratings. Locates the query
+     * entry, sets docId's rating (adding it to "ratings" if absent), and removes docId from that
+     * query's "failures" list if present. Notifies the listener with a 404 and returns {@code null}
+     * if the query is not part of the judgment.
+     *
+     * @return the updated ratings list, or {@code null} if the query was not found (listener already failed)
+     */
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> applyRatingAdjustment(
+        List<Map<String, Object>> currentRatings,
+        String query,
+        String docId,
+        String rating,
+        ActionListener<IndexResponse> listener
+    ) {
+        for (Map<String, Object> queryEntry : currentRatings) {
+            if (!query.equals(queryEntry.get("query"))) {
+                continue;
+            }
+
+            // Update (or add) the rating for this docId under the matched query.
+            List<Map<String, Object>> ratings = (List<Map<String, Object>>) queryEntry.get("ratings");
+            if (ratings == null) {
+                ratings = new ArrayList<>();
+                queryEntry.put("ratings", ratings);
+            }
+            boolean found = false;
+            for (Map<String, Object> ratingEntry : ratings) {
+                if (docId.equals(ratingEntry.get("docId"))) {
+                    ratingEntry.put("rating", rating);
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                Map<String, Object> newRating = new HashMap<>();
+                newRating.put("docId", docId);
+                newRating.put("rating", rating);
+                ratings.add(newRating);
+            }
+
+            // The doc is now rated, so drop it from this query's failures list if present.
+            List<Map<String, Object>> failures = (List<Map<String, Object>>) queryEntry.get("failures");
+            if (failures != null) {
+                failures.removeIf(f -> docId.equals(f.get("docId")));
+            }
+
+            return currentRatings;
+        }
+
+        listener.onFailure(new SearchRelevanceException("Query not found in judgment: " + query, RestStatus.NOT_FOUND));
+        return null;
+    }
+}
