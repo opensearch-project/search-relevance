@@ -139,18 +139,14 @@ public class UpdateJudgmentRatingsTransportAction extends HandledTransportAction
                 return;
             }
 
-            // Apply the single (query, docId) rating adjustment in place. Fails with 404 if the
-            // query or doc is not part of this judgment.
+            // Apply the single (query, docId) rating adjustment in place. Throws a 404
+            // SearchRelevanceException if the query is not part of this judgment.
             List<Map<String, Object>> updatedRatings = applyRatingAdjustment(
                 currentRatings,
                 request.getQuery(),
                 request.getDocId(),
-                request.getRating(),
-                listener
+                request.getRating()
             );
-            if (updatedRatings == null) {
-                return; // listener already notified of the failure
-            }
 
             // Recompute the summary counts so metadata stays consistent with the edited ratings.
             Map<String, Object> updatedMetadata = new HashMap<>(metadata);
@@ -174,6 +170,9 @@ public class UpdateJudgmentRatingsTransportAction extends HandledTransportAction
                 listener.onResponse((IndexResponse) response);
             }, listener::onFailure));
 
+        } catch (SearchRelevanceException e) {
+            // Already carries the intended status (e.g. 404 query-not-found); surface it as-is.
+            listener.onFailure(e);
         } catch (Exception e) {
             LOGGER.error("Failed to update ratings for judgment: {}", judgmentId, e);
             listener.onFailure(new SearchRelevanceException("Failed to update judgment ratings", e, RestStatus.INTERNAL_SERVER_ERROR));
@@ -183,18 +182,17 @@ public class UpdateJudgmentRatingsTransportAction extends HandledTransportAction
     /**
      * Apply a single (query, docId) rating adjustment to the judgment's ratings. Locates the query
      * entry, sets docId's rating (adding it to "ratings" if absent), and removes docId from that
-     * query's "failures" list if present. Notifies the listener with a 404 and returns {@code null}
-     * if the query is not part of the judgment.
+     * query's "failures" list if present.
      *
-     * @return the updated ratings list, or {@code null} if the query was not found (listener already failed)
+     * @return the updated ratings list
+     * @throws SearchRelevanceException with 404 if the query is not part of the judgment
      */
     @SuppressWarnings("unchecked")
     private List<Map<String, Object>> applyRatingAdjustment(
         List<Map<String, Object>> currentRatings,
         String query,
         String docId,
-        String rating,
-        ActionListener<IndexResponse> listener
+        String rating
     ) {
         for (Map<String, Object> queryEntry : currentRatings) {
             if (!query.equals(queryEntry.get("query"))) {
@@ -231,7 +229,6 @@ public class UpdateJudgmentRatingsTransportAction extends HandledTransportAction
             return currentRatings;
         }
 
-        listener.onFailure(new SearchRelevanceException("Query not found in judgment: " + query, RestStatus.NOT_FOUND));
-        return null;
+        throw new SearchRelevanceException("Query not found in judgment: " + query, RestStatus.NOT_FOUND);
     }
 }
