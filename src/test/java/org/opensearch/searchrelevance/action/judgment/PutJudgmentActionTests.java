@@ -42,7 +42,7 @@ public class PutJudgmentActionTests extends OpenSearchTestCase {
         DiscoveryNodes discoveryNodes = mock(DiscoveryNodes.class);
         when(clusterService.state()).thenReturn(clusterState);
         when(clusterState.getNodes()).thenReturn(discoveryNodes);
-        when(discoveryNodes.getMinNodeVersion()).thenReturn(Version.fromString("3.9.0"));
+        when(discoveryNodes.getMinNodeVersion()).thenReturn(Version.CURRENT);
         ClusterUtil.instance().initialize(clusterService);
     }
 
