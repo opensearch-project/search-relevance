@@ -22,6 +22,12 @@ public class JudgmentDataTransformer {
     /** Transient key on a per-query result carrying its failure reason. Used to build the metadata summary; not persisted. */
     public static final String RESULT_FAILURE_REASON = "failureReason";
 
+    /** Metadata key holding the most recent failure reason across all queries in the judgment. */
+    public static final String LAST_FAILURE_REASON = "lastFailureReason";
+
+    /** Metadata key holding the number of queries with at least one unrated doc. */
+    public static final String FAILED_QUERIES = "failedQueries";
+
     public static Map<String, Object> createJudgmentResult(String queryTextWithCustomInput, Map<String, String> docIdToScore) {
         Map<String, Object> judgmentForQuery = new HashMap<>();
         judgmentForQuery.put("query", queryTextWithCustomInput);
@@ -83,11 +89,38 @@ public class JudgmentDataTransformer {
         Map<String, Object> summary = new HashMap<>();
         summary.put("totalQueries", judgmentResults.size());
         summary.put("successfulQueries", judgmentResults.size() - failedQueries);
-        summary.put("failedQueries", failedQueries);
+        summary.put(FAILED_QUERIES, failedQueries);
         if (lastFailureReason != null) {
-            summary.put("lastFailureReason", lastFailureReason);
+            summary.put(LAST_FAILURE_REASON, lastFailureReason);
         }
         return summary;
+    }
+
+    /**
+     * Writes the summary of {@code judgmentResults} into {@code metadata}, replacing the previous
+     * counts and clearing a stale failure reason.
+     *
+     * <p>Prefer this over calling {@link #buildJudgmentSummary} and merging the result by hand.
+     * {@code metadata.putAll(summary)} alone cannot clear a key, so a {@code lastFailureReason} left
+     * over from an earlier run would survive even after every failed doc had been rated — leaving a
+     * healthy judgment reporting a failure that no longer applies. This method drops the key once the
+     * recomputed {@code failedQueries} reaches 0, keeping the two consistent: a reason is reported
+     * only while something is actually failing.
+     *
+     * <p>The removal keys off the recomputed count rather than the absence of a reason in the summary,
+     * because {@link #RESULT_FAILURE_REASON} is transient. A judgment reloaded from the index carries
+     * no per-query reason, so the summary omits {@code lastFailureReason} even when queries are still
+     * failing; keying off the count preserves the stored reason in that case.
+     *
+     * @param metadata the judgment metadata to update in place
+     * @param judgmentResults per-query results to summarise, in the form described on {@link #buildJudgmentSummary}
+     */
+    public static void applyJudgmentSummary(Map<String, Object> metadata, List<Map<String, Object>> judgmentResults) {
+        Map<String, Object> summary = buildJudgmentSummary(judgmentResults);
+        metadata.putAll(summary);
+        if (Integer.valueOf(0).equals(summary.get(FAILED_QUERIES))) {
+            metadata.remove(LAST_FAILURE_REASON);
+        }
     }
 
     public static String extractQueryText(String queryTextWithCustomInput, String delimiter) {

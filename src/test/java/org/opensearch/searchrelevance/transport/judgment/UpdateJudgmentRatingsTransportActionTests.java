@@ -279,6 +279,72 @@ public class UpdateJudgmentRatingsTransportActionTests extends OpenSearchTestCas
         assertTrue(((List<?>) comedy.get("failures")).isEmpty());
     }
 
+    public void testUpdate_RescuingAllFailures_ClearsStaleFailureReason() {
+        // The judgment carries a failure reason from the run that produced its failures. Rating the
+        // last failed doc must clear it, so a healthy judgment does not keep reporting a failure.
+        Map<String, Object> source = buildJudgmentSource(JudgmentType.LLM_JUDGMENT.name(), AsyncStatus.COMPLETED.name());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> metadata = (Map<String, Object>) source.get("metadata");
+        metadata.put("failedQueries", 1);
+        metadata.put("lastFailureReason", "ThrottlingException: Rate exceeded");
+        SearchResponse loaded = buildMockSearchResponse(source);
+        when(judgmentDao.getJudgmentSync("rescue-id")).thenReturn(loaded);
+
+        doAnswer(invocation -> {
+            ActionListener<IndexResponse> l = invocation.getArgument(3);
+            l.onResponse(mock(IndexResponse.class));
+            return null;
+        }).when(judgmentDao).updateJudgment(any(), anyLong(), anyLong(), any());
+
+        // Doc "5" is the judgment's only failure; rating it leaves nothing failing.
+        UpdateJudgmentRatingsRequest request = new UpdateJudgmentRatingsRequest(
+            "rescue-id",
+            List.of(new RatingAdjustment("superhero", "5", "0.8"))
+        );
+        ActionListener<IndexResponse> listener = mock(ActionListener.class);
+        action.doExecute(null, request, listener);
+
+        verify(listener).onResponse(any(IndexResponse.class));
+
+        ArgumentCaptor<Judgment> judgmentCaptor = ArgumentCaptor.forClass(Judgment.class);
+        verify(judgmentDao).updateJudgment(judgmentCaptor.capture(), anyLong(), anyLong(), any());
+        Map<String, Object> writtenMetadata = judgmentCaptor.getValue().getMetadata();
+        assertEquals(0, writtenMetadata.get("failedQueries"));
+        assertFalse("stale lastFailureReason must be cleared", writtenMetadata.containsKey("lastFailureReason"));
+        assertEquals("unrelated metadata must be preserved", "test-model", writtenMetadata.get("modelId"));
+    }
+
+    public void testUpdate_FailuresRemaining_KeepsFailureReason() {
+        // Only one of the two failed docs is rated, so the judgment is still failing and the recorded
+        // reason must survive.
+        Map<String, Object> source = buildTwoQueryJudgmentSource();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> metadata = (Map<String, Object>) source.get("metadata");
+        metadata.put("lastFailureReason", "ThrottlingException: Rate exceeded");
+        SearchResponse loaded = buildMockSearchResponse(source);
+        when(judgmentDao.getJudgmentSync("partial-id")).thenReturn(loaded);
+
+        doAnswer(invocation -> {
+            ActionListener<IndexResponse> l = invocation.getArgument(3);
+            l.onResponse(mock(IndexResponse.class));
+            return null;
+        }).when(judgmentDao).updateJudgment(any(), anyLong(), anyLong(), any());
+
+        // "superhero" doc 5 is rescued, but "comedy" doc 7 is left failing.
+        UpdateJudgmentRatingsRequest request = new UpdateJudgmentRatingsRequest(
+            "partial-id",
+            List.of(new RatingAdjustment("superhero", "5", "0.8"))
+        );
+        ActionListener<IndexResponse> listener = mock(ActionListener.class);
+        action.doExecute(null, request, listener);
+
+        ArgumentCaptor<Judgment> judgmentCaptor = ArgumentCaptor.forClass(Judgment.class);
+        verify(judgmentDao).updateJudgment(judgmentCaptor.capture(), anyLong(), anyLong(), any());
+        Map<String, Object> writtenMetadata = judgmentCaptor.getValue().getMetadata();
+        assertEquals(1, writtenMetadata.get("failedQueries"));
+        assertEquals("ThrottlingException: Rate exceeded", writtenMetadata.get("lastFailureReason"));
+    }
+
     public void testUpdate_MultipleAdjustments_UnknownQueryFailsWholeRequest() {
         // The first adjustment is valid, the second names a query not in the judgment: the whole
         // request must fail with 404 and nothing is written.

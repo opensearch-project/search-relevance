@@ -266,10 +266,10 @@ public class RetryFailedJudgmentTransportAction extends HandledTransportAction<R
                 // Merge new ratings into the original judgment
                 List<Map<String, Object>> mergedRatings = mergeRetryResults(judgmentRatings, newResults);
 
-                // Recompute metadata counts (totalQueries, successfulQueries, failedQueries)
+                // Recompute metadata counts (totalQueries, successfulQueries, failedQueries) and clear
+                // the recorded failure reason once the retry has rated every previously failed doc.
                 Map<String, Object> updatedMetadata = new HashMap<>(metadata);
-                Map<String, Object> summary = JudgmentDataTransformer.buildJudgmentSummary(mergedRatings);
-                updatedMetadata.putAll(summary);
+                JudgmentDataTransformer.applyJudgmentSummary(updatedMetadata, mergedRatings);
 
                 // Save the updated judgment back to the index
                 Judgment completedJudgment = new Judgment(

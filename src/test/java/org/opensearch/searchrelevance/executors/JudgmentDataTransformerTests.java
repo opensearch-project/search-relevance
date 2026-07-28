@@ -7,6 +7,7 @@
  */
 package org.opensearch.searchrelevance.executors;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -290,5 +291,69 @@ public class JudgmentDataTransformerTests extends OpenSearchTestCase {
         assertEquals(0, summary.get("successfulQueries"));
         assertEquals(0, summary.get("failedQueries"));
         assertFalse(summary.containsKey("lastFailureReason"));
+    }
+
+    public void testApplyJudgmentSummaryClearsStaleFailureReason() {
+        // Metadata from an earlier partially-failed run: every doc has since been rated, so the
+        // recorded reason no longer applies and must not survive the recompute.
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("modelId", "test-model");
+        metadata.put("failedQueries", 2);
+        metadata.put("lastFailureReason", "ThrottlingException: Rate exceeded");
+
+        List<Map<String, Object>> results = List.of(
+            transformer.createJudgmentResult("q1", Map.of("doc1", "0.9")),
+            transformer.createJudgmentResult("q2", Map.of("doc2", "0.4"))
+        );
+
+        JudgmentDataTransformer.applyJudgmentSummary(metadata, results);
+
+        assertEquals(0, metadata.get("failedQueries"));
+        assertEquals(2, metadata.get("successfulQueries"));
+        assertFalse("stale lastFailureReason must be cleared", metadata.containsKey("lastFailureReason"));
+        assertEquals("unrelated metadata must be preserved", "test-model", metadata.get("modelId"));
+    }
+
+    public void testApplyJudgmentSummaryKeepsFailureReasonWhileStillFailing() {
+        // Some docs are still unrated, so the reason from this run is recorded and kept.
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("lastFailureReason", "an older reason");
+
+        Map<String, Object> failed = resultWithFailures("bad", Map.of(), "doc1");
+        failed.put(JudgmentDataTransformer.RESULT_FAILURE_REASON, "model timed out");
+        List<Map<String, Object>> results = List.of(transformer.createJudgmentResult("good", Map.of("doc1", "1.0")), failed);
+
+        JudgmentDataTransformer.applyJudgmentSummary(metadata, results);
+
+        assertEquals(1, metadata.get("failedQueries"));
+        assertEquals("model timed out", metadata.get("lastFailureReason"));
+    }
+
+    public void testApplyJudgmentSummaryKeepsStoredReasonForReloadedJudgment() {
+        // A judgment reloaded from the index has no transient RESULT_FAILURE_REASON on its per-query
+        // entries, so the recomputed summary carries no reason. Queries are still failing, so the
+        // reason already stored in metadata must be left alone.
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("lastFailureReason", "ThrottlingException: Rate exceeded");
+
+        List<Map<String, Object>> results = List.of(
+            resultWithFailures("good", Map.of("doc1", "1.0")),
+            resultWithFailures("bad", Map.of(), "doc2")
+        );
+
+        JudgmentDataTransformer.applyJudgmentSummary(metadata, results);
+
+        assertEquals(1, metadata.get("failedQueries"));
+        assertEquals("ThrottlingException: Rate exceeded", metadata.get("lastFailureReason"));
+    }
+
+    public void testApplyJudgmentSummaryNoFailureReasonToClear() {
+        // Nothing failed before or now: the key was never there and must not be added.
+        Map<String, Object> metadata = new HashMap<>();
+
+        JudgmentDataTransformer.applyJudgmentSummary(metadata, List.of(transformer.createJudgmentResult("q1", Map.of("doc1", "0.9"))));
+
+        assertEquals(0, metadata.get("failedQueries"));
+        assertFalse(metadata.containsKey("lastFailureReason"));
     }
 }

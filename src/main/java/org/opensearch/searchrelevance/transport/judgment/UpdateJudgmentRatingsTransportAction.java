@@ -153,9 +153,10 @@ public class UpdateJudgmentRatingsTransportAction extends HandledTransportAction
                 );
             }
 
-            // Recompute the summary counts so metadata stays consistent with the edited ratings.
+            // Recompute the summary counts so metadata stays consistent with the edited ratings. Also
+            // clears a stale failure reason once the edit has rated every previously failed doc.
             Map<String, Object> updatedMetadata = new HashMap<>(metadata);
-            updatedMetadata.putAll(JudgmentDataTransformer.buildJudgmentSummary(updatedRatings));
+            JudgmentDataTransformer.applyJudgmentSummary(updatedMetadata, updatedRatings);
 
             Judgment updatedJudgment = new Judgment(
                 judgmentId,

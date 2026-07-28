@@ -318,7 +318,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
             // Record a per-run overview (total/successful/failed counts and the last failure reason)
             // into the judgment metadata before handing the ratings back.
             ActionListener<List<Map<String, Object>>> summaryListener = ActionListener.wrap(results -> {
-                metadata.putAll(JudgmentDataTransformer.buildJudgmentSummary(results));
+                JudgmentDataTransformer.applyJudgmentSummary(metadata, results);
                 listener.onResponse(results);
             }, listener::onFailure);
 
