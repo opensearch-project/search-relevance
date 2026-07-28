@@ -11,6 +11,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -33,16 +34,17 @@ import org.opensearch.search.SearchHit;
 import org.opensearch.search.SearchHits;
 import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.model.AsyncStatus;
+import org.opensearch.searchrelevance.model.Judgment;
 import org.opensearch.searchrelevance.model.JudgmentType;
 import org.opensearch.test.OpenSearchTestCase;
 import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.TransportService;
 
 /**
- * Tests for UpdateJudgmentRatingsTransportAction (single-rating manual edit).
+ * Tests for UpdateJudgmentRatingsTransportAction (manual rating edits).
  * Verifies: judgment not found (404), wrong type (400), in-flight status (409),
- * query not found (404), optimistic-concurrency version conflict (409), the happy path,
- * and request validation.
+ * query not found (404), optimistic-concurrency version conflict (409), the single- and
+ * multi-adjustment happy paths, and request validation.
  */
 public class UpdateJudgmentRatingsTransportActionTests extends OpenSearchTestCase {
 
@@ -76,7 +78,10 @@ public class UpdateJudgmentRatingsTransportActionTests extends OpenSearchTestCas
         when(mockResponse.getHits()).thenReturn(searchHits);
         when(judgmentDao.getJudgmentSync("missing-id")).thenReturn(mockResponse);
 
-        UpdateJudgmentRatingsRequest request = new UpdateJudgmentRatingsRequest("missing-id", "superhero", "1", "0.9");
+        UpdateJudgmentRatingsRequest request = new UpdateJudgmentRatingsRequest(
+            "missing-id",
+            List.of(new RatingAdjustment("superhero", "1", "0.9"))
+        );
         ActionListener<IndexResponse> listener = mock(ActionListener.class);
         action.doExecute(null, request, listener);
 
@@ -90,7 +95,10 @@ public class UpdateJudgmentRatingsTransportActionTests extends OpenSearchTestCas
         SearchResponse loaded = buildMockSearchResponse(source);
         when(judgmentDao.getJudgmentSync("ubi-id")).thenReturn(loaded);
 
-        UpdateJudgmentRatingsRequest request = new UpdateJudgmentRatingsRequest("ubi-id", "superhero", "1", "0.9");
+        UpdateJudgmentRatingsRequest request = new UpdateJudgmentRatingsRequest(
+            "ubi-id",
+            List.of(new RatingAdjustment("superhero", "1", "0.9"))
+        );
         ActionListener<IndexResponse> listener = mock(ActionListener.class);
         action.doExecute(null, request, listener);
 
@@ -104,7 +112,10 @@ public class UpdateJudgmentRatingsTransportActionTests extends OpenSearchTestCas
         SearchResponse loaded = buildMockSearchResponse(source);
         when(judgmentDao.getJudgmentSync("processing-id")).thenReturn(loaded);
 
-        UpdateJudgmentRatingsRequest request = new UpdateJudgmentRatingsRequest("processing-id", "superhero", "1", "0.9");
+        UpdateJudgmentRatingsRequest request = new UpdateJudgmentRatingsRequest(
+            "processing-id",
+            List.of(new RatingAdjustment("superhero", "1", "0.9"))
+        );
         ActionListener<IndexResponse> listener = mock(ActionListener.class);
         action.doExecute(null, request, listener);
 
@@ -118,7 +129,10 @@ public class UpdateJudgmentRatingsTransportActionTests extends OpenSearchTestCas
         SearchResponse loaded = buildMockSearchResponse(source);
         when(judgmentDao.getJudgmentSync("retrying-id")).thenReturn(loaded);
 
-        UpdateJudgmentRatingsRequest request = new UpdateJudgmentRatingsRequest("retrying-id", "superhero", "1", "0.9");
+        UpdateJudgmentRatingsRequest request = new UpdateJudgmentRatingsRequest(
+            "retrying-id",
+            List.of(new RatingAdjustment("superhero", "1", "0.9"))
+        );
         ActionListener<IndexResponse> listener = mock(ActionListener.class);
         action.doExecute(null, request, listener);
 
@@ -133,7 +147,10 @@ public class UpdateJudgmentRatingsTransportActionTests extends OpenSearchTestCas
         when(judgmentDao.getJudgmentSync("ok-id")).thenReturn(loaded);
 
         // "comedy" is not a query in the judgment (only "superhero" is).
-        UpdateJudgmentRatingsRequest request = new UpdateJudgmentRatingsRequest("ok-id", "comedy", "1", "0.9");
+        UpdateJudgmentRatingsRequest request = new UpdateJudgmentRatingsRequest(
+            "ok-id",
+            List.of(new RatingAdjustment("comedy", "1", "0.9"))
+        );
         ActionListener<IndexResponse> listener = mock(ActionListener.class);
         action.doExecute(null, request, listener);
 
@@ -155,7 +172,10 @@ public class UpdateJudgmentRatingsTransportActionTests extends OpenSearchTestCas
             return null;
         }).when(judgmentDao).updateJudgment(any(), anyLong(), anyLong(), any());
 
-        UpdateJudgmentRatingsRequest request = new UpdateJudgmentRatingsRequest("conflict-id", "superhero", "1", "0.9");
+        UpdateJudgmentRatingsRequest request = new UpdateJudgmentRatingsRequest(
+            "conflict-id",
+            List.of(new RatingAdjustment("superhero", "1", "0.9"))
+        );
         ActionListener<IndexResponse> listener = mock(ActionListener.class);
         action.doExecute(null, request, listener);
 
@@ -176,25 +196,135 @@ public class UpdateJudgmentRatingsTransportActionTests extends OpenSearchTestCas
             return null;
         }).when(judgmentDao).updateJudgment(any(), anyLong(), anyLong(), any());
 
-        UpdateJudgmentRatingsRequest request = new UpdateJudgmentRatingsRequest("ok-id", "superhero", "1", "0.5");
+        UpdateJudgmentRatingsRequest request = new UpdateJudgmentRatingsRequest(
+            "ok-id",
+            List.of(new RatingAdjustment("superhero", "1", "0.5"))
+        );
         ActionListener<IndexResponse> listener = mock(ActionListener.class);
         action.doExecute(null, request, listener);
 
         verify(listener).onResponse(any(IndexResponse.class));
     }
 
+    public void testUpdate_MultipleAdjustments_AppliedInOneWrite() {
+        // The judgment has one query "superhero" with docId "1" rated and docId "5" in failures.
+        // Adjust both in a single request: overwrite the rated doc and rescue the failed doc.
+        Map<String, Object> source = buildJudgmentSource(JudgmentType.LLM_JUDGMENT.name(), AsyncStatus.COMPLETED.name());
+        SearchResponse loaded = buildMockSearchResponse(source);
+        when(judgmentDao.getJudgmentSync("ok-id")).thenReturn(loaded);
+
+        doAnswer(invocation -> {
+            ActionListener<IndexResponse> l = invocation.getArgument(3);
+            l.onResponse(mock(IndexResponse.class));
+            return null;
+        }).when(judgmentDao).updateJudgment(any(), anyLong(), anyLong(), any());
+
+        UpdateJudgmentRatingsRequest request = new UpdateJudgmentRatingsRequest(
+            "ok-id",
+            List.of(new RatingAdjustment("superhero", "1", "0.3"), new RatingAdjustment("superhero", "5", "0.7"))
+        );
+        ActionListener<IndexResponse> listener = mock(ActionListener.class);
+        action.doExecute(null, request, listener);
+
+        // A single guarded write carries all adjustments; the request succeeds.
+        verify(judgmentDao).updateJudgment(any(), anyLong(), anyLong(), any());
+        verify(listener).onResponse(any(IndexResponse.class));
+    }
+
+    public void testUpdate_MultipleQueries_FailedAndSuccessfulDocs() {
+        // Two queries, each with one rated doc and one failed doc. In a single request:
+        // "superhero": overwrite rated doc "1", rescue failed doc "5"
+        // "comedy": overwrite rated doc "2", rescue failed doc "7"
+        // Assert the persisted judgment has all four docs rated and both failures lists emptied.
+        Map<String, Object> source = buildTwoQueryJudgmentSource();
+        SearchResponse loaded = buildMockSearchResponse(source);
+        when(judgmentDao.getJudgmentSync("multi-id")).thenReturn(loaded);
+
+        doAnswer(invocation -> {
+            ActionListener<IndexResponse> l = invocation.getArgument(3);
+            l.onResponse(mock(IndexResponse.class));
+            return null;
+        }).when(judgmentDao).updateJudgment(any(), anyLong(), anyLong(), any());
+
+        UpdateJudgmentRatingsRequest request = new UpdateJudgmentRatingsRequest(
+            "multi-id",
+            List.of(
+                new RatingAdjustment("superhero", "1", "0.3"),
+                new RatingAdjustment("superhero", "5", "0.7"),
+                new RatingAdjustment("comedy", "2", "0.4"),
+                new RatingAdjustment("comedy", "7", "0.6")
+            )
+        );
+        ActionListener<IndexResponse> listener = mock(ActionListener.class);
+        action.doExecute(null, request, listener);
+
+        verify(listener).onResponse(any(IndexResponse.class));
+
+        // Capture what was actually persisted by the single guarded write.
+        ArgumentCaptor<Judgment> judgmentCaptor = ArgumentCaptor.forClass(Judgment.class);
+        verify(judgmentDao).updateJudgment(judgmentCaptor.capture(), anyLong(), anyLong(), any());
+        List<Map<String, Object>> written = judgmentCaptor.getValue().getJudgmentRatings();
+        assertEquals(2, written.size());
+
+        // "superhero": doc 1 overwritten to 0.3, doc 5 rescued at 0.7, failures now empty.
+        Map<String, Object> superhero = findQueryEntry(written, "superhero");
+        assertEquals("0.3", ratingOf(superhero, "1"));
+        assertEquals("0.7", ratingOf(superhero, "5"));
+        assertTrue(((List<?>) superhero.get("failures")).isEmpty());
+
+        // "comedy": doc 2 overwritten to 0.4, doc 7 rescued at 0.6, failures now empty.
+        Map<String, Object> comedy = findQueryEntry(written, "comedy");
+        assertEquals("0.4", ratingOf(comedy, "2"));
+        assertEquals("0.6", ratingOf(comedy, "7"));
+        assertTrue(((List<?>) comedy.get("failures")).isEmpty());
+    }
+
+    public void testUpdate_MultipleAdjustments_UnknownQueryFailsWholeRequest() {
+        // The first adjustment is valid, the second names a query not in the judgment: the whole
+        // request must fail with 404 and nothing is written.
+        Map<String, Object> source = buildJudgmentSource(JudgmentType.LLM_JUDGMENT.name(), AsyncStatus.COMPLETED.name());
+        SearchResponse loaded = buildMockSearchResponse(source);
+        when(judgmentDao.getJudgmentSync("ok-id")).thenReturn(loaded);
+
+        UpdateJudgmentRatingsRequest request = new UpdateJudgmentRatingsRequest(
+            "ok-id",
+            List.of(new RatingAdjustment("superhero", "1", "0.3"), new RatingAdjustment("comedy", "9", "0.7"))
+        );
+        ActionListener<IndexResponse> listener = mock(ActionListener.class);
+        action.doExecute(null, request, listener);
+
+        ArgumentCaptor<Exception> exceptionCaptor = ArgumentCaptor.forClass(Exception.class);
+        verify(listener).onFailure(exceptionCaptor.capture());
+        assertTrue(exceptionCaptor.getValue().getMessage().contains("Query not found in judgment"));
+        verify(judgmentDao, never()).updateJudgment(any(), anyLong(), anyLong(), any());
+    }
+
     public void testRequestValidation_NullId() {
-        UpdateJudgmentRatingsRequest request = new UpdateJudgmentRatingsRequest(null, "superhero", "1", "0.9");
+        UpdateJudgmentRatingsRequest request = new UpdateJudgmentRatingsRequest(
+            null,
+            List.of(new RatingAdjustment("superhero", "1", "0.9"))
+        );
+        assertNotNull(request.validate());
+    }
+
+    public void testRequestValidation_EmptyAdjustments() {
+        UpdateJudgmentRatingsRequest request = new UpdateJudgmentRatingsRequest("id-1", List.of());
         assertNotNull(request.validate());
     }
 
     public void testRequestValidation_MissingFields() {
-        UpdateJudgmentRatingsRequest request = new UpdateJudgmentRatingsRequest("id-1", "superhero", "1", "");
+        UpdateJudgmentRatingsRequest request = new UpdateJudgmentRatingsRequest(
+            "id-1",
+            List.of(new RatingAdjustment("superhero", "1", ""))
+        );
         assertNotNull(request.validate());
     }
 
     public void testRequestValidation_Valid() {
-        UpdateJudgmentRatingsRequest request = new UpdateJudgmentRatingsRequest("id-1", "superhero", "1", "0.9");
+        UpdateJudgmentRatingsRequest request = new UpdateJudgmentRatingsRequest(
+            "id-1",
+            List.of(new RatingAdjustment("superhero", "1", "0.9"))
+        );
         assertNull(request.validate());
     }
 
@@ -228,6 +358,71 @@ public class UpdateJudgmentRatingsTransportActionTests extends OpenSearchTestCas
         source.put("metadata", metadata);
 
         return source;
+    }
+
+    /**
+     * A judgment with two queries, each holding one rated doc and one failed doc:
+     * "superhero" -> rated 1, failed 5; "comedy" -> rated 2, failed 7.
+     */
+    private Map<String, Object> buildTwoQueryJudgmentSource() {
+        Map<String, Object> source = new HashMap<>();
+        source.put("type", JudgmentType.LLM_JUDGMENT.name());
+        source.put("status", AsyncStatus.COMPLETED.name());
+        source.put("name", "two query judgment");
+
+        List<Map<String, Object>> judgmentRatings = new ArrayList<>();
+        judgmentRatings.add(buildQueryEntry("superhero", "1", "0.9", "5"));
+        judgmentRatings.add(buildQueryEntry("comedy", "2", "0.8", "7"));
+        source.put("judgmentRatings", judgmentRatings);
+
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("modelId", "test-model");
+        metadata.put("querySetId", "qs-1");
+        source.put("metadata", metadata);
+
+        return source;
+    }
+
+    /** One query entry with a single rated doc and a single failed doc. */
+    private Map<String, Object> buildQueryEntry(String query, String ratedDocId, String rating, String failedDocId) {
+        Map<String, Object> queryEntry = new HashMap<>();
+        queryEntry.put("query", query);
+
+        List<Map<String, Object>> ratings = new ArrayList<>();
+        Map<String, Object> rated = new HashMap<>();
+        rated.put("docId", ratedDocId);
+        rated.put("rating", rating);
+        ratings.add(rated);
+        queryEntry.put("ratings", ratings);
+
+        List<Map<String, Object>> failures = new ArrayList<>();
+        Map<String, Object> failed = new HashMap<>();
+        failed.put("docId", failedDocId);
+        failures.add(failed);
+        queryEntry.put("failures", failures);
+
+        return queryEntry;
+    }
+
+    /** Locate the entry for a query in a judgmentRatings list. */
+    private Map<String, Object> findQueryEntry(List<Map<String, Object>> judgmentRatings, String query) {
+        for (Map<String, Object> entry : judgmentRatings) {
+            if (query.equals(entry.get("query"))) {
+                return entry;
+            }
+        }
+        throw new AssertionError("query not present in written judgment: " + query);
+    }
+
+    /** Read the rating value stored for a docId under a query entry. */
+    @SuppressWarnings("unchecked")
+    private String ratingOf(Map<String, Object> queryEntry, String docId) {
+        for (Map<String, Object> rating : (List<Map<String, Object>>) queryEntry.get("ratings")) {
+            if (docId.equals(rating.get("docId"))) {
+                return String.valueOf(rating.get("rating"));
+            }
+        }
+        throw new AssertionError("docId not rated: " + docId);
     }
 
     private SearchResponse buildMockSearchResponse(Map<String, Object> source) {

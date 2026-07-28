@@ -11,9 +11,11 @@ import static java.util.Collections.singletonList;
 import static org.opensearch.rest.RestRequest.Method.PUT;
 import static org.opensearch.searchrelevance.common.PluginConstants.DOCUMENT_ID;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENTS_URL;
+import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_RATINGS;
 import static org.opensearch.searchrelevance.common.PluginConstants.QUERY;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -29,6 +31,7 @@ import org.opensearch.rest.BaseRestHandler;
 import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
+import org.opensearch.searchrelevance.transport.judgment.RatingAdjustment;
 import org.opensearch.searchrelevance.transport.judgment.UpdateJudgmentRatingsAction;
 import org.opensearch.searchrelevance.transport.judgment.UpdateJudgmentRatingsRequest;
 import org.opensearch.transport.client.node.NodeClient;
@@ -36,11 +39,16 @@ import org.opensearch.transport.client.node.NodeClient;
 import lombok.AllArgsConstructor;
 
 /**
- * Rest Action to adjust a single rating on an existing LLM judgment in place (manual edit).
+ * Rest Action to adjust one or more ratings on an existing LLM judgment in place (manual edit).
  *
- * <p>Route: {@code PUT /_plugins/_search_relevance/judgments/{id}}. The body carries just the one
- * rating being changed — {@code {"query": ..., "docId": ..., "rating": ...}}. The server updates
- * that entry, recomputes the summary counts, and saves back to the same id. No model call is made.
+ * <p>Route: {@code PUT /_plugins/_search_relevance/judgments/{id}}. The body carries only the
+ * ratings being changed, under {@code judgmentRatings} — the same field name and shape the judgment
+ * is stored in — so a client can send back the structure it read from a GET:
+ * {@code {"judgmentRatings": [{"query": ..., "ratings": [{"docId": ..., "rating": ...}, ...]}, ...]}}.
+ * Several queries and several docs per query may be sent at once. This is a partial merge: only the
+ * listed (query, docId) pairs are touched and every other rating is left as is. The server updates
+ * those entries, recomputes the summary counts, and saves back to the same id under one guarded
+ * write. No model call is made.
  */
 @AllArgsConstructor
 public class RestUpdateJudgmentRatingsAction extends BaseRestHandler {
@@ -81,10 +89,16 @@ public class RestUpdateJudgmentRatingsAction extends BaseRestHandler {
             return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.BAD_REQUEST, "Judgment ID is required"));
         }
 
-        final Map<String, Object> source;
+        // The body carries the ratings to change under "judgmentRatings", the same field name and
+        // shape the judgment is stored and returned in.
+        final List<?> queryEntries;
         try {
             XContentParser parser = request.contentParser();
-            source = parser.map();
+            Object ratingsToUpdate = parser.map().get(JUDGMENT_RATINGS);
+            if (ratingsToUpdate == null) {
+                return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.BAD_REQUEST, JUDGMENT_RATINGS + " is required"));
+            }
+            queryEntries = (List<?>) ratingsToUpdate;
         } catch (Exception e) {
             LOGGER.warn("Failed to parse update-ratings request body", e);
             return channel -> channel.sendResponse(
@@ -92,17 +106,44 @@ public class RestUpdateJudgmentRatingsAction extends BaseRestHandler {
             );
         }
 
-        // A single rating adjustment: query, docId and the new rating value are all required.
-        final String query = source.get(QUERY) == null ? null : source.get(QUERY).toString();
-        final String docId = source.get("docId") == null ? null : source.get("docId").toString();
-        final String rating = source.get("rating") == null ? null : source.get("rating").toString();
-        if (query == null || query.isEmpty() || docId == null || docId.isEmpty() || rating == null || rating.isEmpty()) {
+        // Flatten into one adjustment per (query, docId) pair.
+        final List<RatingAdjustment> adjustments = new ArrayList<>();
+        try {
+            for (Object entry : queryEntries) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> queryEntry = (Map<String, Object>) entry;
+                String query = queryEntry.get(QUERY) == null ? null : queryEntry.get(QUERY).toString();
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> ratings = (List<Map<String, Object>>) queryEntry.get("ratings");
+                if (ratings == null) {
+                    return channel -> channel.sendResponse(
+                        new BytesRestResponse(RestStatus.BAD_REQUEST, "each entry must have a ratings list")
+                    );
+                }
+                for (Map<String, Object> rating : ratings) {
+                    String docId = rating.get("docId") == null ? null : rating.get("docId").toString();
+                    String ratingValue = rating.get("rating") == null ? null : rating.get("rating").toString();
+                    adjustments.add(new RatingAdjustment(query, docId, ratingValue));
+                }
+            }
+        } catch (ClassCastException e) {
             return channel -> channel.sendResponse(
-                new BytesRestResponse(RestStatus.BAD_REQUEST, "query, docId and rating are all required")
+                new BytesRestResponse(RestStatus.BAD_REQUEST, "expected a list of {query, ratings:[{docId, rating}]} objects")
             );
         }
 
-        UpdateJudgmentRatingsRequest updateRequest = new UpdateJudgmentRatingsRequest(judgmentId, query, docId, rating);
+        if (adjustments.isEmpty()) {
+            return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.BAD_REQUEST, "at least one rating is required"));
+        }
+        for (RatingAdjustment adjustment : adjustments) {
+            if (adjustment.isIncomplete()) {
+                return channel -> channel.sendResponse(
+                    new BytesRestResponse(RestStatus.BAD_REQUEST, "each rating must have a query, docId and rating")
+                );
+            }
+        }
+
+        UpdateJudgmentRatingsRequest updateRequest = new UpdateJudgmentRatingsRequest(judgmentId, adjustments);
 
         return channel -> client.execute(UpdateJudgmentRatingsAction.INSTANCE, updateRequest, new ActionListener<IndexResponse>() {
             @Override
@@ -129,4 +170,5 @@ public class RestUpdateJudgmentRatingsAction extends BaseRestHandler {
             }
         });
     }
+
 }

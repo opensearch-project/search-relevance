@@ -36,10 +36,11 @@ import org.opensearch.transport.TransportService;
 /**
  * Transport action that updates the judgmentRatings of an existing LLM judgment in place.
  *
- * <p>Used for manual edits: the client fetches the judgment, adjusts a rating (e.g. moves a doc from
- * failures to ratings, or overwrites a value), and submits the new judgmentRatings. This action
- * replaces only the ratings on the stored judgment, recomputes the metadata summary counts, and
- * saves it back to the same document id. No model call is made.
+ * <p>Used for manual edits: the client fetches the judgment, then submits one or more rating
+ * adjustments (e.g. moving docs from failures to ratings, or overwriting already-rated values).
+ * This action applies every adjustment to the stored judgment, recomputes the metadata summary
+ * counts once, and saves it back to the same document id under a single optimistic-concurrency
+ * write. No model call is made.
  */
 public class UpdateJudgmentRatingsTransportAction extends HandledTransportAction<UpdateJudgmentRatingsRequest, IndexResponse> {
     private static final Logger LOGGER = LogManager.getLogger(UpdateJudgmentRatingsTransportAction.class);
@@ -84,7 +85,7 @@ public class UpdateJudgmentRatingsTransportAction extends HandledTransportAction
      *   <li>500 on any other error.</li>
      * </ul>
      *
-     * @param request - carries the judgment id and the replacement ratings
+     * @param request - carries the judgment id and the list of rating adjustments
      * @param listener - receives the IndexResponse on success, or the failure above
      */
     @SuppressWarnings("unchecked")
@@ -139,14 +140,18 @@ public class UpdateJudgmentRatingsTransportAction extends HandledTransportAction
                 return;
             }
 
-            // Apply the single (query, docId) rating adjustment in place. Throws a 404
-            // SearchRelevanceException if the query is not part of this judgment.
-            List<Map<String, Object>> updatedRatings = applyRatingAdjustment(
-                currentRatings,
-                request.getQuery(),
-                request.getDocId(),
-                request.getRating()
-            );
+            // Apply every (query, docId) rating adjustment in place. Throws a 404
+            // SearchRelevanceException if any adjustment names a query not part of this judgment,
+            // in which case nothing is written (the whole request fails).
+            List<Map<String, Object>> updatedRatings = currentRatings;
+            for (RatingAdjustment adjustment : request.getAdjustments()) {
+                updatedRatings = applyRatingAdjustment(
+                    updatedRatings,
+                    adjustment.getQuery(),
+                    adjustment.getDocId(),
+                    adjustment.getRating()
+                );
+            }
 
             // Recompute the summary counts so metadata stays consistent with the edited ratings.
             Map<String, Object> updatedMetadata = new HashMap<>(metadata);
