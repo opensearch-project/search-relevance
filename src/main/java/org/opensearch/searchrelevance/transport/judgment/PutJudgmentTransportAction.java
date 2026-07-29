@@ -13,9 +13,12 @@ import static org.opensearch.searchrelevance.common.MetricsConstants.MODEL_ID;
 import static org.opensearch.searchrelevance.ubi.UbiValidator.checkUbiEventsIndexExists;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import org.apache.logging.log4j.LogManager;
@@ -37,9 +40,11 @@ import org.opensearch.searchrelevance.judgments.JudgmentsProcessorFactory;
 import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.Judgment;
 import org.opensearch.searchrelevance.model.JudgmentType;
+import org.opensearch.searchrelevance.model.SearchConfiguration;
 import org.opensearch.searchrelevance.utils.ReferenceValidationUtil;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.tasks.Task;
+import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.TransportService;
 
 public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgmentRequest, IndexResponse> {
@@ -48,6 +53,7 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
     private final QuerySetDao querySetDao;
     private final SearchConfigurationDao searchConfigurationDao;
     private final JudgmentsProcessorFactory judgmentsProcessorFactory;
+    private final ThreadPool threadPool;
 
     private static final Logger LOGGER = LogManager.getLogger(PutJudgmentTransportAction.class);
 
@@ -58,6 +64,12 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
      */
     private static final int MAX_EXISTING_JUDGMENTS = 5;
 
+    /**
+     * Metadata key under which a judgment records the search configurations it was generated
+     * against. Used to recover a referenced judgment's target index for reuse validation.
+     */
+    private static final String METADATA_SEARCH_CONFIGURATION_LIST = "searchConfigurationList";
+
     @Inject
     public PutJudgmentTransportAction(
         ClusterService clusterService,
@@ -66,7 +78,8 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
         JudgmentDao judgmentDao,
         QuerySetDao querySetDao,
         SearchConfigurationDao searchConfigurationDao,
-        JudgmentsProcessorFactory judgmentsProcessorFactory
+        JudgmentsProcessorFactory judgmentsProcessorFactory,
+        ThreadPool threadPool
     ) {
         super(PutJudgmentAction.NAME, transportService, actionFilters, PutUbiJudgmentRequest::new);
         this.clusterService = clusterService;
@@ -74,6 +87,7 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
         this.querySetDao = querySetDao;
         this.searchConfigurationDao = searchConfigurationDao;
         this.judgmentsProcessorFactory = judgmentsProcessorFactory;
+        this.threadPool = threadPool;
     }
 
     @Override
@@ -151,8 +165,12 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
             totalValidations += request.getSearchConfigurationList().size();
         }
 
+        // Once every referenced entity is confirmed to exist, validate that any reused existing
+        // judgments were generated against the same target index as this request. Reuse merges
+        // ratings by (query, docId), and a matched docId skips the LLM call, so reusing a judgment
+        // built on a different index would silently suppress correct ratings for this index.
         GroupedActionListener<Void> groupedListener = new GroupedActionListener<>(
-            ActionListener.wrap(results -> listener.onResponse(null), listener::onFailure),
+            ActionListener.wrap(results -> validateExistingJudgmentIndexes(request, listener), listener::onFailure),
             totalValidations
         );
 
@@ -175,6 +193,133 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
                 );
             }
         }
+    }
+
+    /**
+     * Validate that every reused existing judgment targets the same index as this request.
+     *
+     * <p>Rating reuse merges an existing judgment's ratings into this judgment by (query, docId),
+     * and a docId matched from a reused judgment skips the LLM call entirely. If a reused judgment
+     * was generated against a different index, its ratings do not describe this index's documents,
+     * so reusing it would silently substitute wrong ratings rather than merely adding junk. We
+     * therefore require the reused judgment's target index set to be a superset of this request's.
+     *
+     * <p>Per product decision, an index that cannot be resolved (a referenced judgment with no
+     * {@code searchConfigurationList} metadata, or whose search configuration has since been
+     * deleted) is rejected with 400 rather than skipped — we cannot prove the reuse is safe.
+     *
+     * <p>The resolution reads the judgment and its search configuration docs synchronously, so it
+     * is dispatched to the GENERIC thread pool to avoid blocking a transport thread.
+     */
+    private void validateExistingJudgmentIndexes(PutLlmJudgmentRequest request, ActionListener<Void> listener) {
+        List<String> existingJudgments = request.getExistingJudgments();
+        if (existingJudgments == null || existingJudgments.isEmpty()) {
+            listener.onResponse(null);
+            return;
+        }
+
+        threadPool.executor(ThreadPool.Names.GENERIC).execute(() -> {
+            try {
+                Set<String> requestIndexes = resolveIndexes(request.getSearchConfigurationList());
+                if (requestIndexes.isEmpty()) {
+                    listener.onFailure(
+                        new SearchRelevanceException(
+                            "Cannot determine the target index for this judgment; existing judgments cannot be reused",
+                            RestStatus.BAD_REQUEST
+                        )
+                    );
+                    return;
+                }
+
+                for (String judgmentId : existingJudgments) {
+                    Set<String> referencedIndexes = resolveExistingJudgmentIndexes(judgmentId);
+                    if (!referencedIndexes.containsAll(requestIndexes)) {
+                        listener.onFailure(
+                            new SearchRelevanceException(
+                                "Existing judgment ["
+                                    + judgmentId
+                                    + "] was generated for a different target index and cannot be reused. "
+                                    + "Requested index(es): "
+                                    + requestIndexes
+                                    + ", existing judgment index(es): "
+                                    + referencedIndexes,
+                                RestStatus.BAD_REQUEST
+                            )
+                        );
+                        return;
+                    }
+                }
+
+                listener.onResponse(null);
+            } catch (SearchRelevanceException e) {
+                // Already carries the intended status (e.g. 400 unresolvable index); surface it as-is.
+                listener.onFailure(e);
+            } catch (Exception e) {
+                LOGGER.error("Failed to validate existing judgment target indexes", e);
+                listener.onFailure(
+                    new SearchRelevanceException("Failed to validate existing judgment target indexes", e, RestStatus.INTERNAL_SERVER_ERROR)
+                );
+            }
+        });
+    }
+
+    /**
+     * Resolve the target index set that a referenced existing judgment was generated against, from
+     * its {@code searchConfigurationList} metadata. Throws a 400 SearchRelevanceException if the
+     * judgment does not exist, records no search configurations, or references a search
+     * configuration that can no longer be resolved — in every such case reuse cannot be proven safe.
+     */
+    @SuppressWarnings("unchecked")
+    private Set<String> resolveExistingJudgmentIndexes(String judgmentId) {
+        var response = judgmentDao.getJudgmentSync(judgmentId);
+        if (response.getHits().getTotalHits().value() == 0) {
+            throw new SearchRelevanceException("Existing judgment [" + judgmentId + "] does not exist", RestStatus.BAD_REQUEST);
+        }
+
+        Map<String, Object> source = response.getHits().getHits()[0].getSourceAsMap();
+        Map<String, Object> metadata = (Map<String, Object>) source.get(Judgment.METADATA);
+        List<String> searchConfigurationList = metadata == null ? null : (List<String>) metadata.get(METADATA_SEARCH_CONFIGURATION_LIST);
+
+        if (searchConfigurationList == null || searchConfigurationList.isEmpty()) {
+            throw new SearchRelevanceException(
+                "Existing judgment [" + judgmentId + "] does not record its target index (no search configurations) and cannot be reused",
+                RestStatus.BAD_REQUEST
+            );
+        }
+
+        return resolveIndexes(searchConfigurationList);
+    }
+
+    /**
+     * Resolve the set of target indexes backing the given search configuration ids. A search
+     * configuration that can no longer be resolved (e.g. it was deleted) is rejected with 400,
+     * since we cannot confirm the index it targeted.
+     */
+    private Set<String> resolveIndexes(List<String> searchConfigurationList) {
+        if (searchConfigurationList == null || searchConfigurationList.isEmpty()) {
+            return Collections.emptySet();
+        }
+        Set<String> indexes = new HashSet<>();
+        for (String configId : searchConfigurationList) {
+            SearchConfiguration searchConfiguration;
+            try {
+                searchConfiguration = searchConfigurationDao.getSearchConfigurationSync(configId);
+            } catch (Exception e) {
+                throw new SearchRelevanceException(
+                    "Search configuration [" + configId + "] could not be resolved to a target index",
+                    e,
+                    RestStatus.BAD_REQUEST
+                );
+            }
+            if (searchConfiguration == null || searchConfiguration.index() == null) {
+                throw new SearchRelevanceException(
+                    "Search configuration [" + configId + "] could not be resolved to a target index",
+                    RestStatus.BAD_REQUEST
+                );
+            }
+            indexes.add(searchConfiguration.index());
+        }
+        return indexes;
     }
 
     private Map<String, Object> buildMetadata(PutJudgmentRequest request) {
