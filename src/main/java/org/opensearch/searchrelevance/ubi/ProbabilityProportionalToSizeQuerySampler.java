@@ -110,7 +110,11 @@ public class ProbabilityProportionalToSizeQuerySampler extends QuerySampler {
 
         final UniformRealDistribution uniform = new UniformRealDistribution(0, 1);
 
-        for (int i = 1; i <= getSize(); i++) {
+        final int targetSize = Math.min(getSize(), cumulativeWeights.size());
+        final int maxIterations = Math.max(targetSize * 100, 1000);
+        int iterations = 0;
+
+        while (querySet.size() < targetSize && iterations++ < maxIterations) {
 
             final double r = uniform.sample();
 
