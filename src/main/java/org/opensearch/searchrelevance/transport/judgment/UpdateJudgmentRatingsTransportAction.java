@@ -190,7 +190,13 @@ public class UpdateJudgmentRatingsTransportAction extends HandledTransportAction
      * entry, sets docId's rating (adding it to "ratings" if absent), and removes docId from that
      * query's "failures" list if present.
      *
-     * @return the updated ratings list
+     * <p>Mutates {@code currentRatings} in place — the nested rating and failure collections are
+     * modified directly, and the returned list is the same instance that was passed in, not a copy.
+     * Callers applying several adjustments can therefore chain calls on the same list; the return
+     * value exists for readability, not to signal a new object.
+     *
+     * @param currentRatings the judgment's ratings list, modified in place
+     * @return the same {@code currentRatings} instance, now including this adjustment
      * @throws SearchRelevanceException with 404 if the query is not part of the judgment
      */
     @SuppressWarnings("unchecked")

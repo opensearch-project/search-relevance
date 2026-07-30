@@ -35,6 +35,7 @@ import org.opensearch.searchrelevance.dao.QuerySetDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
 import org.opensearch.searchrelevance.judgments.JudgmentsProcessorFactory;
 import org.opensearch.searchrelevance.model.JudgmentType;
+import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
 import org.opensearch.searchrelevance.model.SearchConfiguration;
 import org.opensearch.test.OpenSearchTestCase;
 import org.opensearch.threadpool.ThreadPool;
@@ -117,13 +118,24 @@ public class PutJudgmentTransportActionTests extends OpenSearchTestCase {
 
     /** Stub a stored judgment whose metadata records the given search configuration ids. */
     private void stubExistingJudgment(String judgmentId, List<String> searchConfigurationList) {
+        stubExistingJudgment(judgmentId, searchConfigurationList, null);
+    }
+
+    /**
+     * Stub a stored judgment recording the given search configuration ids and rating type. The
+     * rating type is stored as a String, matching how it is read back from the index.
+     */
+    private void stubExistingJudgment(String judgmentId, List<String> searchConfigurationList, String ratingType) {
         SearchHit hit = new SearchHit(1);
         Map<String, Object> source = new java.util.HashMap<>();
+        Map<String, Object> metadata = new java.util.HashMap<>();
         if (searchConfigurationList != null) {
-            source.put("metadata", Map.of("searchConfigurationList", searchConfigurationList));
-        } else {
-            source.put("metadata", Map.of());
+            metadata.put("searchConfigurationList", searchConfigurationList);
         }
+        if (ratingType != null) {
+            metadata.put("llmJudgmentRatingType", ratingType);
+        }
+        source.put("metadata", metadata);
         hit.sourceRef(org.opensearch.core.common.bytes.BytesReference.bytes(mapToXContent(source)));
         SearchResponse response = mock(SearchResponse.class);
         SearchHits hits = new SearchHits(new SearchHit[] { hit }, new TotalHits(1, TotalHits.Relation.EQUAL_TO), 1.0f);
@@ -146,6 +158,15 @@ public class PutJudgmentTransportActionTests extends OpenSearchTestCase {
         List<String> searchConfigurationList,
         List<String> existingJudgments
     ) {
+        return llmRequestWithReuse(querySetId, searchConfigurationList, existingJudgments, null);
+    }
+
+    private PutLlmJudgmentRequest llmRequestWithReuse(
+        String querySetId,
+        List<String> searchConfigurationList,
+        List<String> existingJudgments,
+        LLMJudgmentRatingType ratingType
+    ) {
         return new PutLlmJudgmentRequest(
             JudgmentType.LLM_JUDGMENT,
             "test-judgment",
@@ -158,7 +179,7 @@ public class PutJudgmentTransportActionTests extends OpenSearchTestCase {
             null, // contextFields
             false, // ignoreFailure
             null, // promptTemplate
-            null, // llmJudgmentRatingType
+            ratingType,
             existingJudgments
         );
     }
@@ -347,6 +368,107 @@ public class PutJudgmentTransportActionTests extends OpenSearchTestCase {
 
         verify(judgmentDao).putJudgement(any(), any(ActionListener.class));
         verify(responseListener).onResponse(indexResponse);
+    }
+
+    public void testValidation_ReuseExistingJudgment_ContinuousIntoBinary_Returns400() {
+        stubQuerySetExists("valid-queryset-id");
+        stubSearchConfigExists("cfg-1");
+        stubSearchConfigIndex("cfg-1", "products");
+        // Same index, but the existing judgment holds continuous ratings that cannot be expressed
+        // on this request's binary scale.
+        stubExistingJudgment("judg-1", List.of("cfg-existing"), LLMJudgmentRatingType.SCORE0_1.name());
+        stubSearchConfigIndex("cfg-existing", "products");
+
+        PutLlmJudgmentRequest request = llmRequestWithReuse(
+            "valid-queryset-id",
+            List.of("cfg-1"),
+            List.of("judg-1"),
+            LLMJudgmentRatingType.RELEVANT_IRRELEVANT
+        );
+
+        ActionListener<IndexResponse> responseListener = mock(ActionListener.class);
+        action.doExecute(null, request, responseListener);
+
+        ArgumentCaptor<Exception> exceptionCaptor = ArgumentCaptor.forClass(Exception.class);
+        verify(responseListener).onFailure(exceptionCaptor.capture());
+        assertTrue(exceptionCaptor.getValue().getMessage().contains("the rating scales are not comparable"));
+        verify(judgmentDao, org.mockito.Mockito.never()).putJudgement(any(), any(ActionListener.class));
+    }
+
+    public void testValidation_ReuseExistingJudgment_BinaryIntoContinuous_Returns400() {
+        stubQuerySetExists("valid-queryset-id");
+        stubSearchConfigExists("cfg-1");
+        stubSearchConfigIndex("cfg-1", "products");
+        // Any rating scale mismatch is rejected, in either direction.
+        stubExistingJudgment("judg-1", List.of("cfg-existing"), LLMJudgmentRatingType.RELEVANT_IRRELEVANT.name());
+        stubSearchConfigIndex("cfg-existing", "products");
+
+        PutLlmJudgmentRequest request = llmRequestWithReuse(
+            "valid-queryset-id",
+            List.of("cfg-1"),
+            List.of("judg-1"),
+            LLMJudgmentRatingType.SCORE0_1
+        );
+
+        ActionListener<IndexResponse> responseListener = mock(ActionListener.class);
+        action.doExecute(null, request, responseListener);
+
+        ArgumentCaptor<Exception> exceptionCaptor = ArgumentCaptor.forClass(Exception.class);
+        verify(responseListener).onFailure(exceptionCaptor.capture());
+        assertTrue(exceptionCaptor.getValue().getMessage().contains("the rating scales are not comparable"));
+        verify(judgmentDao, org.mockito.Mockito.never()).putJudgement(any(), any(ActionListener.class));
+    }
+
+    public void testValidation_ReuseExistingJudgment_SameRatingType_Passes() {
+        stubQuerySetExists("valid-queryset-id");
+        stubSearchConfigExists("cfg-1");
+        stubSearchConfigIndex("cfg-1", "products");
+        stubExistingJudgment("judg-1", List.of("cfg-existing"), LLMJudgmentRatingType.RELEVANT_IRRELEVANT.name());
+        stubSearchConfigIndex("cfg-existing", "products");
+
+        PutLlmJudgmentRequest request = llmRequestWithReuse(
+            "valid-queryset-id",
+            List.of("cfg-1"),
+            List.of("judg-1"),
+            LLMJudgmentRatingType.RELEVANT_IRRELEVANT
+        );
+
+        IndexResponse indexResponse = mock(IndexResponse.class);
+        doAnswer(invocation -> {
+            ActionListener<IndexResponse> listener = invocation.getArgument(1);
+            listener.onResponse(indexResponse);
+            return null;
+        }).when(judgmentDao).putJudgement(any(), any(ActionListener.class));
+
+        ActionListener<IndexResponse> responseListener = mock(ActionListener.class);
+        action.doExecute(null, request, responseListener);
+
+        verify(judgmentDao).putJudgement(any(), any(ActionListener.class));
+        verify(responseListener).onResponse(indexResponse);
+    }
+
+    public void testValidation_ReuseExistingJudgment_MissingRatingType_TreatedAsDefault_Returns400() {
+        stubQuerySetExists("valid-queryset-id");
+        stubSearchConfigExists("cfg-1");
+        stubSearchConfigIndex("cfg-1", "products");
+        // Pre-dates the rating type field, so it is treated as the default (SCORE0_1) — which cannot
+        // be reused in a binary run.
+        stubExistingJudgment("judg-1", List.of("cfg-existing"), null);
+        stubSearchConfigIndex("cfg-existing", "products");
+
+        PutLlmJudgmentRequest request = llmRequestWithReuse(
+            "valid-queryset-id",
+            List.of("cfg-1"),
+            List.of("judg-1"),
+            LLMJudgmentRatingType.RELEVANT_IRRELEVANT
+        );
+
+        ActionListener<IndexResponse> responseListener = mock(ActionListener.class);
+        action.doExecute(null, request, responseListener);
+
+        ArgumentCaptor<Exception> exceptionCaptor = ArgumentCaptor.forClass(Exception.class);
+        verify(responseListener).onFailure(exceptionCaptor.capture());
+        assertTrue(exceptionCaptor.getValue().getMessage().contains("the rating scales are not comparable"));
     }
 
     public void testValidation_ReuseExistingJudgment_NoMetadata_Returns400() {

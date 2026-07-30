@@ -40,6 +40,7 @@ import org.opensearch.searchrelevance.judgments.JudgmentsProcessorFactory;
 import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.Judgment;
 import org.opensearch.searchrelevance.model.JudgmentType;
+import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
 import org.opensearch.searchrelevance.model.SearchConfiguration;
 import org.opensearch.searchrelevance.utils.ReferenceValidationUtil;
 import org.opensearch.searchrelevance.utils.TimeUtils;
@@ -231,8 +232,12 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
                     return;
                 }
 
+                LLMJudgmentRatingType requestRatingType = request.getLlmJudgmentRatingType() != null
+                    ? request.getLlmJudgmentRatingType()
+                    : LLMJudgmentRatingType.DEFAULT;
+
                 for (String judgmentId : existingJudgments) {
-                    Set<String> referencedIndexes = resolveExistingJudgmentIndexes(judgmentId);
+                    Set<String> referencedIndexes = resolveExistingJudgmentIndexes(judgmentId, requestRatingType);
                     if (!referencedIndexes.containsAll(requestIndexes)) {
                         listener.onFailure(
                             new SearchRelevanceException(
@@ -265,12 +270,13 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
 
     /**
      * Resolve the target index set that a referenced existing judgment was generated against, from
-     * its {@code searchConfigurationList} metadata. Throws a 400 SearchRelevanceException if the
-     * judgment does not exist, records no search configurations, or references a search
-     * configuration that can no longer be resolved — in every such case reuse cannot be proven safe.
+     * its {@code searchConfigurationList} metadata, and check that its rating scale is compatible
+     * with this request's. Throws a 400 SearchRelevanceException if the judgment does not exist,
+     * records no search configurations, or references a search configuration that can no longer be
+     * resolved — in every such case reuse cannot be proven safe.
      */
     @SuppressWarnings("unchecked")
-    private Set<String> resolveExistingJudgmentIndexes(String judgmentId) {
+    private Set<String> resolveExistingJudgmentIndexes(String judgmentId, LLMJudgmentRatingType requestRatingType) {
         var response = judgmentDao.getJudgmentSync(judgmentId);
         if (response.getHits().getTotalHits().value() == 0) {
             throw new SearchRelevanceException("Existing judgment [" + judgmentId + "] does not exist", RestStatus.BAD_REQUEST);
@@ -287,7 +293,60 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
             );
         }
 
+        validateRatingScaleCompatible(judgmentId, metadata, requestRatingType);
+
         return resolveIndexes(searchConfigurationList);
+    }
+
+    /**
+     * Reject reusing a referenced judgment generated on a different rating scale.
+     *
+     * <p>Reuse merges the referenced judgment's stored ratings in as-is, and a merged docId skips the
+     * LLM call, so the two judgments must share a rating scale for the resulting ratings to be
+     * comparable. SCORE0_1 is continuous and RELEVANT_IRRELEVANT is binary; mixing them produces a
+     * single ratings list on two incompatible scales, so any mismatch is rejected with 400.
+     *
+     * <p>A referenced judgment that records no rating type predates the field and is treated as the
+     * default (SCORE0_1), matching how {@code LlmJudgmentsProcessor} reads it back.
+     */
+    private void validateRatingScaleCompatible(String judgmentId, Map<String, Object> metadata, LLMJudgmentRatingType requestRatingType) {
+        // Stored as an enum when the judgment is still in memory, or as a String once it has been
+        // read back from the index; accept either, mirroring LlmJudgmentsProcessor.
+        Object ratingTypeObj = metadata.get(LLM_JUDGMENT_RATING_TYPE);
+        LLMJudgmentRatingType referencedRatingType = null;
+        if (ratingTypeObj instanceof LLMJudgmentRatingType) {
+            referencedRatingType = (LLMJudgmentRatingType) ratingTypeObj;
+        } else if (ratingTypeObj instanceof String) {
+            try {
+                referencedRatingType = LLMJudgmentRatingType.valueOf((String) ratingTypeObj);
+            } catch (IllegalArgumentException e) {
+                throw new SearchRelevanceException(
+                    "Existing judgment ["
+                        + judgmentId
+                        + "] records an unrecognized rating type ["
+                        + ratingTypeObj
+                        + "] and cannot be reused",
+                    e,
+                    RestStatus.BAD_REQUEST
+                );
+            }
+        }
+        if (referencedRatingType == null) {
+            referencedRatingType = LLMJudgmentRatingType.DEFAULT;
+        }
+
+        if (referencedRatingType != requestRatingType) {
+            throw new SearchRelevanceException(
+                "Existing judgment ["
+                    + judgmentId
+                    + "] uses rating type "
+                    + referencedRatingType
+                    + " and cannot be reused in a "
+                    + requestRatingType
+                    + " judgment; the rating scales are not comparable",
+                RestStatus.BAD_REQUEST
+            );
+        }
     }
 
     /**
