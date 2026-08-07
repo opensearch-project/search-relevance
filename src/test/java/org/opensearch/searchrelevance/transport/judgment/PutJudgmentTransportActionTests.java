@@ -11,7 +11,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
@@ -23,16 +25,29 @@ import org.junit.Before;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.opensearch.Version;
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.support.ActionFilters;
+import org.opensearch.cluster.ClusterName;
+import org.opensearch.cluster.ClusterState;
+import org.opensearch.cluster.metadata.AliasMetadata;
+import org.opensearch.cluster.metadata.IndexMetadata;
+import org.opensearch.cluster.metadata.IndexNameExpressionResolver;
+import org.opensearch.cluster.metadata.MappingMetadata;
+import org.opensearch.cluster.metadata.Metadata;
 import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.common.settings.Settings;
+import org.opensearch.common.util.concurrent.ThreadContext;
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.core.rest.RestStatus;
+import org.opensearch.index.mapper.MapperService;
 import org.opensearch.search.SearchHit;
 import org.opensearch.search.SearchHits;
 import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
+import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.judgments.JudgmentsProcessorFactory;
 import org.opensearch.searchrelevance.model.JudgmentType;
 import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
@@ -74,6 +89,7 @@ public class PutJudgmentTransportActionTests extends OpenSearchTestCase {
         }).when(directExecutor).execute(any(Runnable.class));
         action = new PutJudgmentTransportAction(
             clusterService,
+            new IndexNameExpressionResolver(new ThreadContext(Settings.EMPTY)),
             transportService,
             actionFilters,
             judgmentDao,
@@ -506,5 +522,68 @@ public class PutJudgmentTransportActionTests extends OpenSearchTestCase {
         verify(responseListener).onFailure(exceptionCaptor.capture());
         assertTrue(exceptionCaptor.getValue().getMessage().contains("could not be resolved to a target index"));
         verify(judgmentDao, org.mockito.Mockito.never()).putJudgement(any(), any(ActionListener.class));
+    }
+
+    public void testValidation_UbiJudgment_EventsIndexNotFound() {
+        when(clusterService.state()).thenReturn(emptyClusterState());
+
+        ActionListener<IndexResponse> responseListener = mock(ActionListener.class);
+        action.doExecute(null, ubiJudgmentRequest(), responseListener);
+
+        ArgumentCaptor<Exception> exceptionCaptor = ArgumentCaptor.forClass(Exception.class);
+        verify(responseListener).onFailure(exceptionCaptor.capture());
+        verifyNoInteractions(judgmentDao);
+
+        Exception exception = exceptionCaptor.getValue();
+        assertTrue(exception instanceof SearchRelevanceException);
+        assertEquals(RestStatus.BAD_REQUEST, ((SearchRelevanceException) exception).status());
+        assertTrue(exception.getMessage().contains("UBI events index [ubi_events] does not exist"));
+        assertTrue(exception.getMessage().contains("ubiEventsIndex"));
+    }
+
+    public void testValidation_UbiJudgment_EventsIndexResolvedFromAlias() {
+        when(clusterService.state()).thenReturn(clusterStateWithSampleEventsAliasedAsUbiEvents());
+
+        ActionListener<IndexResponse> responseListener = mock(ActionListener.class);
+        action.doExecute(null, ubiJudgmentRequest(), responseListener);
+
+        verify(responseListener, never()).onFailure(any(Exception.class));
+        verify(judgmentDao).putJudgement(any(), any(ActionListener.class));
+    }
+
+    private static PutUbiJudgmentRequest ubiJudgmentRequest() {
+        return new PutUbiJudgmentRequest(JudgmentType.UBI_JUDGMENT, "my-implicit-judgments", "test description", "coec", 20, "", "", null);
+    }
+
+    private static ClusterState emptyClusterState() {
+        return ClusterState.builder(new ClusterName("test")).metadata(Metadata.builder().build()).build();
+    }
+
+    private static ClusterState clusterStateWithSampleEventsAliasedAsUbiEvents() {
+        MappingMetadata mapping = new MappingMetadata(
+            MapperService.SINGLE_MAPPING_NAME,
+            Map.of(
+                "properties",
+                Map.of(
+                    "query_id",
+                    Map.of("type", "keyword"),
+                    "action_name",
+                    Map.of("type", "keyword"),
+                    "event_attributes",
+                    Map.of("properties", Map.of("object", Map.of("properties", Map.of("object_id", Map.of("type", "keyword")))))
+                )
+            )
+        );
+        IndexMetadata sampleEventsIndex = IndexMetadata.builder("opensearch_dashboards_sample_ubi_events")
+            .settings(
+                Settings.builder()
+                    .put(IndexMetadata.SETTING_VERSION_CREATED, Version.CURRENT)
+                    .put(IndexMetadata.SETTING_NUMBER_OF_SHARDS, 1)
+                    .put(IndexMetadata.SETTING_NUMBER_OF_REPLICAS, 0)
+            )
+            .putMapping(mapping)
+            .putAlias(AliasMetadata.builder("ubi_events"))
+            .build();
+        return ClusterState.builder(new ClusterName("test")).metadata(Metadata.builder().put(sampleEventsIndex, false).build()).build();
     }
 }

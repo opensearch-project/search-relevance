@@ -10,7 +10,7 @@ package org.opensearch.searchrelevance.transport.judgment;
 import static org.opensearch.searchrelevance.common.MLConstants.LLM_JUDGMENT_RATING_TYPE;
 import static org.opensearch.searchrelevance.common.MLConstants.PROMPT_TEMPLATE;
 import static org.opensearch.searchrelevance.common.MetricsConstants.MODEL_ID;
-import static org.opensearch.searchrelevance.ubi.UbiValidator.checkUbiEventsIndexExists;
+import static org.opensearch.searchrelevance.ubi.UbiValidator.validateUbiEventsIndex;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -27,6 +27,7 @@ import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.GroupedActionListener;
 import org.opensearch.action.support.HandledTransportAction;
+import org.opensearch.cluster.metadata.IndexNameExpressionResolver;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.core.action.ActionListener;
@@ -42,6 +43,7 @@ import org.opensearch.searchrelevance.model.Judgment;
 import org.opensearch.searchrelevance.model.JudgmentType;
 import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
 import org.opensearch.searchrelevance.model.SearchConfiguration;
+import org.opensearch.searchrelevance.ubi.UbiValidator;
 import org.opensearch.searchrelevance.utils.ReferenceValidationUtil;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.tasks.Task;
@@ -50,6 +52,7 @@ import org.opensearch.transport.TransportService;
 
 public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgmentRequest, IndexResponse> {
     private final ClusterService clusterService;
+    private final IndexNameExpressionResolver indexNameExpressionResolver;
     private final JudgmentDao judgmentDao;
     private final QuerySetDao querySetDao;
     private final SearchConfigurationDao searchConfigurationDao;
@@ -74,6 +77,7 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
     @Inject
     public PutJudgmentTransportAction(
         ClusterService clusterService,
+        IndexNameExpressionResolver indexNameExpressionResolver,
         TransportService transportService,
         ActionFilters actionFilters,
         JudgmentDao judgmentDao,
@@ -84,6 +88,7 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
     ) {
         super(PutJudgmentAction.NAME, transportService, actionFilters, PutUbiJudgmentRequest::new);
         this.clusterService = clusterService;
+        this.indexNameExpressionResolver = indexNameExpressionResolver;
         this.judgmentDao = judgmentDao;
         this.querySetDao = querySetDao;
         this.searchConfigurationDao = searchConfigurationDao;
@@ -105,6 +110,18 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
                     llmRequest,
                     ActionListener.wrap(v -> { createJudgment(request, listener); }, listener::onFailure)
                 );
+            } else if (request.getType() == JudgmentType.UBI_JUDGMENT) {
+                PutUbiJudgmentRequest ubiRequest = (PutUbiJudgmentRequest) request;
+                UbiValidator.ValidationResult ubiEventsIndexValidation = validateUbiEventsIndex(
+                    clusterService.state(),
+                    indexNameExpressionResolver,
+                    ubiRequest.getUbiEventsIndex()
+                );
+                if (!ubiEventsIndexValidation.isValid()) {
+                    listener.onFailure(new SearchRelevanceException(ubiEventsIndexValidation.getErrorMessage(), RestStatus.BAD_REQUEST));
+                    return;
+                }
+                createJudgment(request, listener);
             } else {
                 createJudgment(request, listener);
             }
@@ -401,9 +418,6 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
             }
             case UBI_JUDGMENT -> {
                 PutUbiJudgmentRequest ubiRequest = (PutUbiJudgmentRequest) request;
-                if (!checkUbiEventsIndexExists(clusterService, ubiRequest.getUbiEventsIndex())) {
-                    throw new SearchRelevanceException("UBI events index does not exist", RestStatus.CONFLICT);
-                }
                 metadata.put("clickModel", ubiRequest.getClickModel());
                 metadata.put("maxRank", ubiRequest.getMaxRank());
                 metadata.put("startDate", ubiRequest.getStartDate());
