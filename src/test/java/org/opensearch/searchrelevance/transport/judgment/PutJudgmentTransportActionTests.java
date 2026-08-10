@@ -26,13 +26,17 @@ import org.mockito.MockitoAnnotations;
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.support.ActionFilters;
+import org.opensearch.cluster.ClusterState;
+import org.opensearch.cluster.metadata.Metadata;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.core.rest.RestStatus;
 import org.opensearch.search.SearchHit;
 import org.opensearch.search.SearchHits;
 import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
+import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.judgments.JudgmentsProcessorFactory;
 import org.opensearch.searchrelevance.model.JudgmentType;
 import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
@@ -506,5 +510,37 @@ public class PutJudgmentTransportActionTests extends OpenSearchTestCase {
         verify(responseListener).onFailure(exceptionCaptor.capture());
         assertTrue(exceptionCaptor.getValue().getMessage().contains("could not be resolved to a target index"));
         verify(judgmentDao, org.mockito.Mockito.never()).putJudgement(any(), any(ActionListener.class));
+    }
+
+    public void testValidation_UbiJudgment_EventsIndexNotFound_Returns400() {
+        ClusterState clusterState = mock(ClusterState.class);
+        Metadata metadata = mock(Metadata.class);
+        when(clusterService.state()).thenReturn(clusterState);
+        when(clusterState.metadata()).thenReturn(metadata);
+        when(metadata.hasIndex("ubi_events")).thenReturn(false);
+
+        PutUbiJudgmentRequest request = new PutUbiJudgmentRequest(
+            JudgmentType.UBI_JUDGMENT,
+            "my-implicit-judgments",
+            "test description",
+            "coec",
+            20,
+            "",
+            "",
+            null
+        );
+
+        ActionListener<IndexResponse> responseListener = mock(ActionListener.class);
+        action.doExecute(null, request, responseListener);
+
+        ArgumentCaptor<Exception> exceptionCaptor = ArgumentCaptor.forClass(Exception.class);
+        verify(responseListener).onFailure(exceptionCaptor.capture());
+        verify(judgmentDao, org.mockito.Mockito.never()).putJudgement(any(), any(ActionListener.class));
+
+        Exception exception = exceptionCaptor.getValue();
+        assertTrue(exception instanceof SearchRelevanceException);
+        assertEquals(RestStatus.BAD_REQUEST, ((SearchRelevanceException) exception).status());
+        assertTrue(exception.getMessage(), exception.getMessage().contains("UBI events index [ubi_events]"));
+        assertTrue(exception.getMessage(), exception.getMessage().contains("ubiEventsIndex"));
     }
 }

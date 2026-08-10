@@ -10,6 +10,7 @@ package org.opensearch.searchrelevance.transport.judgment;
 import static org.opensearch.searchrelevance.common.MLConstants.LLM_JUDGMENT_RATING_TYPE;
 import static org.opensearch.searchrelevance.common.MLConstants.PROMPT_TEMPLATE;
 import static org.opensearch.searchrelevance.common.MetricsConstants.MODEL_ID;
+import static org.opensearch.searchrelevance.common.PluginConstants.UBI_EVENTS_INDEX_PARAM;
 import static org.opensearch.searchrelevance.ubi.UbiValidator.checkUbiEventsIndexExists;
 
 import java.util.ArrayList;
@@ -17,6 +18,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -105,6 +107,25 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
                     llmRequest,
                     ActionListener.wrap(v -> { createJudgment(request, listener); }, listener::onFailure)
                 );
+            } else if (request.getType() == JudgmentType.UBI_JUDGMENT) {
+                PutUbiJudgmentRequest ubiRequest = (PutUbiJudgmentRequest) request;
+                String ubiEventsIndex = ubiRequest.getUbiEventsIndex();
+                if (!checkUbiEventsIndexExists(clusterService, ubiEventsIndex)) {
+                    listener.onFailure(
+                        new SearchRelevanceException(
+                            String.format(
+                                Locale.ROOT,
+                                "UBI events index [%s] does not exist or does not have the required UBI event fields. "
+                                    + "Ingest UBI events data into it, or set the '%s' parameter to an existing UBI events index.",
+                                ubiEventsIndex,
+                                UBI_EVENTS_INDEX_PARAM
+                            ),
+                            RestStatus.BAD_REQUEST
+                        )
+                    );
+                    return;
+                }
+                createJudgment(request, listener);
             } else {
                 createJudgment(request, listener);
             }
@@ -401,9 +422,6 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
             }
             case UBI_JUDGMENT -> {
                 PutUbiJudgmentRequest ubiRequest = (PutUbiJudgmentRequest) request;
-                if (!checkUbiEventsIndexExists(clusterService, ubiRequest.getUbiEventsIndex())) {
-                    throw new SearchRelevanceException("UBI events index does not exist", RestStatus.CONFLICT);
-                }
                 metadata.put("clickModel", ubiRequest.getClickModel());
                 metadata.put("maxRank", ubiRequest.getMaxRank());
                 metadata.put("startDate", ubiRequest.getStartDate());
