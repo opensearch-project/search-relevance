@@ -217,6 +217,41 @@ public class ExperimentRunningManagerTests extends OpenSearchTestCase {
 
     }
 
+    public void testFetchSearchConfigurationsAsyncDoesNotBlockCallingThread() throws Exception {
+        PutExperimentRequest request = createExperimentRequest();
+        CountDownLatch actuallyFinished = new CountDownLatch(1);
+
+        doAnswer(invocation -> null).when(searchConfigurationDao).getSearchConfiguration(any(String.class), any(ActionListener.class));
+
+        ExperimentRunningManager.ExperimentContext context = new ExperimentRunningManager.ExperimentContext(
+            "experimentId",
+            request,
+            request.getName(),
+            request.getDescription(),
+            sampleQuerySet()
+        );
+
+        CountDownLatch returned = new CountDownLatch(1);
+        Thread caller = new Thread(() -> {
+            experimentRunningManager.fetchSearchConfigurationsAsync(
+                context,
+                List.of(new QuerySetEntry("querySetReference", Map.of())),
+                new ExperimentCancellationToken("scheduled-experiment-result-id"),
+                actuallyFinished
+            );
+            returned.countDown();
+        }, "srw-fetch-config-caller");
+        caller.start();
+
+        boolean returnedPromptly = returned.await(5, java.util.concurrent.TimeUnit.SECONDS);
+        if (!returnedPromptly) {
+            caller.interrupt();
+        }
+        assertTrue("fetchSearchConfigurationsAsync must not block the calling thread on a pending config future", returnedPromptly);
+
+        assertEquals(1, actuallyFinished.getCount());
+    }
+
     public void testStartExperimentRunReject() {
         // Make sure that only at most one experiment run for a given scheduled experiment run id
         // can be scheduled at a given time
