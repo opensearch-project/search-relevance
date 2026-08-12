@@ -21,9 +21,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.opensearch.action.search.SearchResponse;
 import org.opensearch.core.action.ActionListener;
-import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.executors.ExperimentTaskManager;
 import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.ExperimentType;
@@ -45,7 +43,6 @@ import lombok.extern.log4j.Log4j2;
 @AllArgsConstructor
 public class HybridOptimizerExperimentProcessor {
 
-    private final JudgmentDao judgmentDao;
     private final ExperimentTaskManager taskManager;
 
     /**
@@ -55,6 +52,7 @@ public class HybridOptimizerExperimentProcessor {
      * @param queryEntry QuerySetEntry containing query text and custom fields
      * @param searchConfigurations Map of search configuration IDs to SearchConfigurationDetails
      * @param judgmentList List of judgment IDs
+     * @param queryTextToDocIdToRatings Pre-built map of query text to doc id to rating
      * @param size Result size
      * @param scheduledRunId id for the experiment to be scheduled
      * @param cancellationToken token to indicate whether the task has been cancelled
@@ -66,6 +64,7 @@ public class HybridOptimizerExperimentProcessor {
         QuerySetEntry queryEntry,
         Map<String, SearchConfigurationDetails> searchConfigurations,
         List<String> judgmentList,
+        Map<String, Map<String, String>> queryTextToDocIdToRatings,
         int size,
         String scheduledRunId,
         ExperimentCancellationToken cancellationToken,
@@ -109,86 +108,27 @@ public class HybridOptimizerExperimentProcessor {
             experimentVariants.size()
         );
 
-        // Process judgments asynchronously
-        processJudgmentsAsync(queryText, judgmentList).thenAccept(docIdToScores -> {
-            log.info("Processing search configurations for query '{}' with {} document ratings", queryText, docIdToScores.size());
-
-            // Process search configurations with optimized task manager
-            processSearchConfigurationsAsync(
-                experimentId,
-                queryEntry,
-                searchConfigurations,
-                judgmentList,
-                size,
-                experimentVariants,
-                docIdToScores,
-                hasFailure,
-                scheduledRunId,
-                cancellationToken,
-                runningFutures,
-                listener
-            );
-        }).exceptionally(e -> {
-            if (hasFailure.compareAndSet(false, true)) {
-                listener.onFailure(new Exception("Failed to process judgments", e));
-            }
-            return null;
-        });
-    }
-
-    /**
-     * Process judgments asynchronously using CompletableFuture
-     */
-    private CompletableFuture<Map<String, String>> processJudgmentsAsync(String queryText, List<String> judgmentList) {
-        log.info("Processing {} judgments for query: {}", judgmentList.size(), queryText);
-
-        List<CompletableFuture<SearchResponse>> judgmentFutures = judgmentList.stream().map(judgmentId -> {
-            CompletableFuture<SearchResponse> future = new CompletableFuture<>();
-            judgmentDao.getJudgment(judgmentId, ActionListener.wrap(future::complete, future::completeExceptionally));
-            return future;
-        }).toList();
-
-        return CompletableFuture.allOf(judgmentFutures.toArray(new CompletableFuture[0])).thenApply(v -> {
-            Map<String, String> docIdToScores = new HashMap<>();
-            for (CompletableFuture<SearchResponse> future : judgmentFutures) {
-                SearchResponse response = future.join();
-                extractJudgmentScores(queryText, response, docIdToScores);
-            }
-
-            if (docIdToScores.isEmpty()) {
-                log.warn("No ratings found for query: {} in any judgment responses", queryText);
-            } else {
-                log.info("Found {} document ratings for query: {}", docIdToScores.size(), queryText);
-            }
-
-            return docIdToScores;
-        });
-    }
-
-    /**
-     * Extract judgment scores from SearchResponse
-     */
-    private void extractJudgmentScores(String queryText, SearchResponse response, Map<String, String> docIdToScores) {
-        if (response.getHits().getTotalHits().value() == 0) {
-            log.warn("No judgment found in response");
-            return;
+        Map<String, String> docIdToScores = queryTextToDocIdToRatings != null ? queryTextToDocIdToRatings.get(queryText) : null;
+        if (docIdToScores == null) {
+            docIdToScores = Collections.emptyMap();
         }
+        log.info("Processing search configurations for query '{}' with {} document ratings", queryText, docIdToScores.size());
 
-        Map<String, Object> sourceAsMap = response.getHits().getHits()[0].getSourceAsMap();
-        List<Map<String, Object>> judgmentRatings = (List<Map<String, Object>>) sourceAsMap.getOrDefault(
-            "judgmentRatings",
-            Collections.emptyList()
+        // Process search configurations with optimized task manager
+        processSearchConfigurationsAsync(
+            experimentId,
+            queryEntry,
+            searchConfigurations,
+            judgmentList,
+            size,
+            experimentVariants,
+            docIdToScores,
+            hasFailure,
+            scheduledRunId,
+            cancellationToken,
+            runningFutures,
+            listener
         );
-
-        for (Map<String, Object> rating : judgmentRatings) {
-            if (queryText.equals(rating.get("query"))) {
-                List<Map<String, String>> docScoreRatings = (List<Map<String, String>>) rating.get("ratings");
-                if (docScoreRatings != null) {
-                    docScoreRatings.forEach(docScoreRating -> docIdToScores.put(docScoreRating.get("docId"), docScoreRating.get("rating")));
-                }
-                break;
-            }
-        }
     }
 
     private boolean checkIfCancelled(ExperimentCancellationToken cancellationToken) {

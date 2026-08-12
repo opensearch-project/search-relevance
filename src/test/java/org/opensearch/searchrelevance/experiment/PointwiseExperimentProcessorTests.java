@@ -8,11 +8,7 @@
 package org.opensearch.searchrelevance.experiment;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Arrays;
@@ -27,9 +23,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.Before;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.opensearch.action.search.SearchResponse;
 import org.opensearch.core.action.ActionListener;
-import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.executors.ExperimentTaskManager;
 import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.model.QuerySetEntry;
@@ -44,9 +38,6 @@ import lombok.SneakyThrows;
 public class PointwiseExperimentProcessorTests extends OpenSearchTestCase {
 
     @Mock
-    private JudgmentDao judgmentDao;
-
-    @Mock
     private ExperimentTaskManager taskManager;
 
     private PointwiseExperimentProcessor processor;
@@ -56,7 +47,7 @@ public class PointwiseExperimentProcessorTests extends OpenSearchTestCase {
     public void setUp() {
         super.setUp();
         MockitoAnnotations.openMocks(this);
-        processor = new PointwiseExperimentProcessor(judgmentDao, taskManager);
+        processor = new PointwiseExperimentProcessor(taskManager);
     }
 
     @SneakyThrows
@@ -70,29 +61,28 @@ public class PointwiseExperimentProcessorTests extends OpenSearchTestCase {
             SearchConfigurationDetails.builder().index("test-index").query("test-query").pipeline("test-pipeline").build()
         );
         List<String> judgmentList = Arrays.asList("judgment1");
+        Map<String, Map<String, String>> queryTextToDocIdToRatings = Map.of(queryText, Map.of("doc1", "5", "doc2", "3"));
         int size = 10;
         AtomicBoolean hasFailure = new AtomicBoolean(false);
 
-        // Mock successful judgment response with actual judgment data
+        AtomicBoolean captured = new AtomicBoolean(false);
         doAnswer(invocation -> {
-            ActionListener<SearchResponse> listener = invocation.getArgument(1);
-            SearchResponse mockResponse = mock(SearchResponse.class);
-            when(mockResponse.getHits()).thenReturn(null);
-            listener.onResponse(mockResponse);
-            return null;
-        }).when(judgmentDao).getJudgment(anyString(), any(ActionListener.class));
-
-        // Mock task manager response
-        CompletableFuture<Map<String, Object>> mockFuture = CompletableFuture.completedFuture(
-            Map.of("evaluationResults", List.of(Map.of("evaluationId", "eval1", "variantId", "var1")))
-        );
-        when(
-            taskManager.scheduleTasksAsync(
+            @SuppressWarnings("unchecked")
+            Map<String, String> docIdToScores = invocation.getArgument(9);
+            captured.set(true);
+            assertEquals(2, docIdToScores.size());
+            assertEquals("5", docIdToScores.get("doc1"));
+            assertEquals("3", docIdToScores.get("doc2"));
+            return CompletableFuture.completedFuture(
+                Map.of("evaluationResults", List.of(Map.of("evaluationId", "eval1", "variantId", "var1")))
+            );
+        }).when(taskManager)
+            .scheduleTasksAsync(
                 any(ExperimentType.class),
-                anyString(),
-                anyString(),
-                anyString(),
-                anyString(),
+                any(),
+                any(),
+                any(),
+                any(),
                 any(QuerySetEntry.class),
                 any(Integer.class),
                 any(List.class),
@@ -100,11 +90,10 @@ public class PointwiseExperimentProcessorTests extends OpenSearchTestCase {
                 any(Map.class),
                 any(Map.class),
                 any(AtomicBoolean.class),
-                isNull(),
-                isNull(),
-                isNull()
-            )
-        ).thenReturn(mockFuture);
+                any(),
+                any(),
+                any()
+            );
 
         // Mock ActionListener with CountDownLatch to wait for completion
         CountDownLatch latch = new CountDownLatch(1);
@@ -129,6 +118,7 @@ public class PointwiseExperimentProcessorTests extends OpenSearchTestCase {
             new QuerySetEntry(queryText, Map.of()),
             searchConfigurations,
             judgmentList,
+            queryTextToDocIdToRatings,
             size,
             hasFailure,
             null,
@@ -138,13 +128,11 @@ public class PointwiseExperimentProcessorTests extends OpenSearchTestCase {
 
         // Wait for async operation to complete
         assertTrue("Async operation should complete within timeout", latch.await(5, TimeUnit.SECONDS));
-
-        // Verify interactions
-        verify(judgmentDao).getJudgment(anyString(), any(ActionListener.class));
+        assertTrue("Task manager should have been invoked with ratings", captured.get());
     }
 
     @SneakyThrows
-    public void testProcessPointwiseExperiment_JudgmentFailure() {
+    public void testProcessPointwiseExperiment_MissingRatingsForQuery() {
         // Setup test data
         String experimentId = "test-experiment-id";
         String queryText = "test query";
@@ -154,28 +142,44 @@ public class PointwiseExperimentProcessorTests extends OpenSearchTestCase {
             SearchConfigurationDetails.builder().index("test-index").query("test-query").pipeline(null).build()
         );
         List<String> judgmentList = Arrays.asList("judgment1");
+        Map<String, Map<String, String>> queryTextToDocIdToRatings = Map.of();
         int size = 10;
         AtomicBoolean hasFailure = new AtomicBoolean(false);
 
-        // Mock judgment failure
-        doAnswer(invocation -> {
-            ActionListener<SearchResponse> listener = invocation.getArgument(1);
-            listener.onFailure(new RuntimeException("Judgment fetch failed"));
-            return null;
-        }).when(judgmentDao).getJudgment(anyString(), any(ActionListener.class));
+        when(
+            taskManager.scheduleTasksAsync(
+                any(ExperimentType.class),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(QuerySetEntry.class),
+                any(Integer.class),
+                any(List.class),
+                any(List.class),
+                any(Map.class),
+                any(Map.class),
+                any(AtomicBoolean.class),
+                any(),
+                any(),
+                any()
+            )
+        ).thenReturn(
+            CompletableFuture.completedFuture(Map.of("evaluationResults", List.of(Map.of("evaluationId", "eval1", "variantId", "var1"))))
+        );
 
         // Mock ActionListener with CountDownLatch to wait for completion
         CountDownLatch latch = new CountDownLatch(1);
         ActionListener<Map<String, Object>> listener = new ActionListener<Map<String, Object>>() {
             @Override
             public void onResponse(Map<String, Object> response) {
-                fail("Should have failed, but got response");
+                assertNotNull(response);
                 latch.countDown();
             }
 
             @Override
             public void onFailure(Exception e) {
-                assertNotNull(e);
+                fail("Should not have failed: " + e.getMessage());
                 latch.countDown();
             }
         };
@@ -186,6 +190,7 @@ public class PointwiseExperimentProcessorTests extends OpenSearchTestCase {
             new QuerySetEntry(queryText, Map.of()),
             searchConfigurations,
             judgmentList,
+            queryTextToDocIdToRatings,
             size,
             hasFailure,
             null,
@@ -200,9 +205,6 @@ public class PointwiseExperimentProcessorTests extends OpenSearchTestCase {
     public void testCreatePointwiseVariants() {
         // Test constructor to ensure processor is properly initialized
         assertNotNull("Processor should be initialized", processor);
-
-        // Test that the processor has proper dependencies
-        assertNotNull("JudgmentDao should be injected", judgmentDao);
         assertNotNull("TaskManager should be injected", taskManager);
     }
 }

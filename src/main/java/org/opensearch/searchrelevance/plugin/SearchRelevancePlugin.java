@@ -236,7 +236,7 @@ public class SearchRelevancePlugin extends Plugin
             experimentVariantDao,
             threadPool
         );
-        this.metricsHelper = new MetricsHelper(clusterService, client, judgmentDao, evaluationResultDao, experimentVariantDao);
+        this.metricsHelper = new MetricsHelper(clusterService, client, evaluationResultDao, experimentVariantDao);
         this.settingsAccessor = new SearchRelevanceSettingsAccessor(clusterService, environment.settings());
         ClusterUtil.instance().initialize(clusterService);
         this.clusterUtil = ClusterUtil.instance();
@@ -251,8 +251,8 @@ public class SearchRelevancePlugin extends Plugin
             judgmentDao,
             scheduledExperimentHistoryDao,
             metricsHelper,
-            new HybridOptimizerExperimentProcessor(judgmentDao, experimentTaskManager),
-            new PointwiseExperimentProcessor(judgmentDao, experimentTaskManager),
+            new HybridOptimizerExperimentProcessor(experimentTaskManager),
+            new PointwiseExperimentProcessor(experimentTaskManager),
             threadPool,
             settingsAccessor
         );

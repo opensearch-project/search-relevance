@@ -44,7 +44,6 @@ import org.opensearch.core.action.ActionListener;
 import org.opensearch.search.SearchHit;
 import org.opensearch.searchrelevance.dao.EvaluationResultDao;
 import org.opensearch.searchrelevance.dao.ExperimentVariantDao;
-import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.EvaluationResult;
 import org.opensearch.searchrelevance.model.ExperimentVariant;
@@ -63,7 +62,6 @@ import reactor.util.annotation.NonNull;
  */
 public class MetricsHelper {
     private final Client client;
-    private final JudgmentDao judgmentDao;
     private final EvaluationResultDao evaluationResultDao;
     private final ExperimentVariantDao experimentVariantDao;
 
@@ -71,12 +69,10 @@ public class MetricsHelper {
     public MetricsHelper(
         @NonNull ClusterService clusterService,
         @NonNull Client client,
-        @NonNull JudgmentDao judgmentDao,
         @NonNull EvaluationResultDao evaluationResultDao,
         @NonNull ExperimentVariantDao experimentVariantDao
     ) {
         this.client = client;
-        this.judgmentDao = judgmentDao;
         this.evaluationResultDao = evaluationResultDao;
         this.experimentVariantDao = experimentVariantDao;
     }
@@ -184,6 +180,7 @@ public class MetricsHelper {
         Map<String, List<String>> indexAndQueries,
         int size,
         List<String> judgmentIds,
+        Map<String, Map<String, String>> queryTextToDocIdToRatings,
         ActionListener<Map<String, Object>> listener,
         List<ExperimentVariant> experimentVariants
     ) {
@@ -194,79 +191,25 @@ public class MetricsHelper {
 
         try {
             Map<String, Object> configToEvalIds = Collections.synchronizedMap(new HashMap<>());
-            Map<String, String> docIdToRatings = new HashMap<>();
-            AtomicInteger completedJudgments = new AtomicInteger(0);
-
-            for (String judgmentId : judgmentIds) {
-                judgmentDao.getJudgment(judgmentId, new ActionListener<>() {
-                    @Override
-                    public void onResponse(SearchResponse judgmentResponse) {
-                        try {
-                            if (judgmentResponse.getHits().getTotalHits().value() == 0) {
-                                log.warn("No judgment found for ID: {}", judgmentId);
-                            } else {
-                                Map<String, Object> sourceAsMap = judgmentResponse.getHits().getHits()[0].getSourceAsMap();
-                                List<Map<String, Object>> judgmentRatings = (List<Map<String, Object>>) sourceAsMap.getOrDefault(
-                                    "judgmentRatings",
-                                    Collections.emptyList()
-                                );
-                                // TODO change this to more efficient approach, this is O(n) because we need to scan all list to find query
-                                for (Map<String, Object> rating : judgmentRatings) {
-                                    if (queryText.equals(rating.get("query"))) {
-                                        List<Map<String, String>> docScoreRatings = (List<Map<String, String>>) rating.get("ratings");
-                                        docScoreRatings.forEach(
-                                            docScoreRating -> docIdToRatings.put(docScoreRating.get("docId"), docScoreRating.get("rating"))
-                                        );
-                                        break;
-                                    }
-                                }
-                            }
-
-                            // Check if all judgments have been processed
-                            if (completedJudgments.incrementAndGet() == judgmentIds.size()) {
-                                if (docIdToRatings.isEmpty()) {
-                                    log.warn("No ratings found for query: {} in any judgments", queryText);
-                                }
-
-                                processSearchConfigurations(
-                                    queryText,
-                                    indexAndQueries,
-                                    size,
-                                    judgmentIds,
-                                    docIdToRatings,
-                                    configToEvalIds,
-                                    listener,
-                                    experimentVariants
-                                );
-                            }
-                        } catch (Exception e) {
-                            listener.onFailure(e);
-                        }
-                    }
-
-                    @Override
-                    public void onFailure(Exception e) {
-                        log.error("Failed to fetch judgment {}: {}", judgmentId, e);
-                        if (completedJudgments.incrementAndGet() == judgmentIds.size()) {
-                            if (docIdToRatings.isEmpty()) {
-                                listener.onFailure(new IllegalStateException("Failed to fetch any valid judgments"));
-                            } else {
-                                // Proceed with the judgments we were able to fetch
-                                processSearchConfigurations(
-                                    queryText,
-                                    indexAndQueries,
-                                    size,
-                                    judgmentIds,
-                                    docIdToRatings,
-                                    configToEvalIds,
-                                    listener,
-                                    experimentVariants
-                                );
-                            }
-                        }
-                    }
-                });
+            Map<String, String> docIdToRatings = queryTextToDocIdToRatings != null ? queryTextToDocIdToRatings.get(queryText) : null;
+            if (docIdToRatings == null) {
+                docIdToRatings = new HashMap<>();
             }
+
+            if (docIdToRatings.isEmpty()) {
+                log.warn("No ratings found for query: {} in any judgments", queryText);
+            }
+
+            processSearchConfigurations(
+                queryText,
+                indexAndQueries,
+                size,
+                judgmentIds,
+                docIdToRatings,
+                configToEvalIds,
+                listener,
+                experimentVariants
+            );
         } catch (Exception e) {
             log.error("Unexpected error in evaluateQueryTextAsync: {}", e.getMessage());
             listener.onFailure(e);

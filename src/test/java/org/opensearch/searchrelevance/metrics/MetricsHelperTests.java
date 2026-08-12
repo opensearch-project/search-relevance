@@ -26,17 +26,14 @@ import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.settings.Settings;
-import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.bytes.BytesArray;
-import org.opensearch.core.common.bytes.BytesReference;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.search.SearchHit;
 import org.opensearch.search.SearchHits;
 import org.opensearch.search.SearchModule;
 import org.opensearch.searchrelevance.dao.EvaluationResultDao;
 import org.opensearch.searchrelevance.dao.ExperimentVariantDao;
-import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.model.QuerySetEntry;
 import org.opensearch.searchrelevance.model.SearchConfigurationDetails;
 import org.opensearch.searchrelevance.model.builder.SearchRequestBuilder;
@@ -47,7 +44,6 @@ public class MetricsHelperTests extends OpenSearchTestCase {
 
     private ClusterService clusterService;
     private Client client;
-    private JudgmentDao judgmentDao;
     private EvaluationResultDao evaluationResultDao;
     private ExperimentVariantDao experimentVariantDao;
     private MetricsHelper metricsHelper;
@@ -57,10 +53,9 @@ public class MetricsHelperTests extends OpenSearchTestCase {
         super.setUp();
         clusterService = mock(ClusterService.class);
         client = mock(Client.class);
-        judgmentDao = mock(JudgmentDao.class);
         evaluationResultDao = mock(EvaluationResultDao.class);
         experimentVariantDao = mock(ExperimentVariantDao.class);
-        metricsHelper = new MetricsHelper(clusterService, client, judgmentDao, evaluationResultDao, experimentVariantDao);
+        metricsHelper = new MetricsHelper(clusterService, client, evaluationResultDao, experimentVariantDao);
 
         // Initialize SearchRequestBuilder NamedXContentRegistry for tests
         NamedXContentRegistry reg = new NamedXContentRegistry(
@@ -231,17 +226,10 @@ public class MetricsHelperTests extends OpenSearchTestCase {
         String queryText = "test query";
         int size = 10;
         List<String> judgmentIds = Arrays.asList("judgment1");
+        Map<String, Map<String, String>> queryTextToDocIdToRatings = Map.of(queryText, Map.of("doc1", "5", "doc2", "3"));
 
         Map<String, List<String>> indexAndQueries = new HashMap<>();
         indexAndQueries.put("config1", Arrays.asList("index1", "{\"query\":{\"match\":{\"title\":\"%SearchText%\"}}}", "pipeline1"));
-
-        // Mock judgment response
-        SearchResponse judgmentResponse = createMockJudgmentResponse(queryText);
-        doAnswer(invocation -> {
-            ActionListener<SearchResponse> listener = invocation.getArgument(1);
-            listener.onResponse(judgmentResponse);
-            return null;
-        }).when(judgmentDao).getJudgment(any(String.class), any(ActionListener.class));
 
         // Mock search response
         SearchResponse mockResponse = createMockSearchResponse("doc1", "doc2");
@@ -264,7 +252,15 @@ public class MetricsHelperTests extends OpenSearchTestCase {
 
         // Execute the method
         ActionListener<Map<String, Object>> resultListener = mock(ActionListener.class);
-        metricsHelper.processEvaluationMetrics(queryText, indexAndQueries, size, judgmentIds, resultListener, null);
+        metricsHelper.processEvaluationMetrics(
+            queryText,
+            indexAndQueries,
+            size,
+            judgmentIds,
+            queryTextToDocIdToRatings,
+            resultListener,
+            null
+        );
 
         // Verify pipeline is passed correctly
         verify(client, times(1)).search(
@@ -278,17 +274,10 @@ public class MetricsHelperTests extends OpenSearchTestCase {
         String queryText = "test query";
         int size = 10;
         List<String> judgmentIds = Arrays.asList("judgment1");
+        Map<String, Map<String, String>> queryTextToDocIdToRatings = Map.of(queryText, Map.of("doc1", "5", "doc2", "3"));
 
         Map<String, List<String>> indexAndQueries = new HashMap<>();
         indexAndQueries.put("config1", Arrays.asList("index1", "{\"query\":{\"match\":{\"title\":\"%SearchText%\"}}}", ""));
-
-        // Mock judgment response
-        SearchResponse judgmentResponse = createMockJudgmentResponse(queryText);
-        doAnswer(invocation -> {
-            ActionListener<SearchResponse> listener = invocation.getArgument(1);
-            listener.onResponse(judgmentResponse);
-            return null;
-        }).when(judgmentDao).getJudgment(any(String.class), any(ActionListener.class));
 
         // Mock search response
         SearchResponse mockResponse = createMockSearchResponse("doc1", "doc2");
@@ -311,7 +300,15 @@ public class MetricsHelperTests extends OpenSearchTestCase {
 
         // Execute the method
         ActionListener<Map<String, Object>> resultListener = mock(ActionListener.class);
-        metricsHelper.processEvaluationMetrics(queryText, indexAndQueries, size, judgmentIds, resultListener, null);
+        metricsHelper.processEvaluationMetrics(
+            queryText,
+            indexAndQueries,
+            size,
+            judgmentIds,
+            queryTextToDocIdToRatings,
+            resultListener,
+            null
+        );
 
         // Verify empty pipeline is handled correctly
         verify(client, times(1)).search(
@@ -335,31 +332,4 @@ public class MetricsHelperTests extends OpenSearchTestCase {
         return response;
     }
 
-    private SearchResponse createMockJudgmentResponse(String queryText) {
-        SearchResponse response = mock(SearchResponse.class);
-
-        Map<String, Object> sourceMap = new HashMap<>();
-        List<Map<String, Object>> judgmentRatings = Arrays.asList(
-            Map.of(
-                "query",
-                queryText,
-                "ratings",
-                Arrays.asList(Map.of("docId", "doc1", "rating", "5"), Map.of("docId", "doc2", "rating", "3"))
-            )
-        );
-        sourceMap.put("judgmentRatings", judgmentRatings);
-
-        SearchHit hit = new SearchHit(1, "judgment1", Map.of(), Map.of());
-        try {
-            BytesReference sourceBytes = BytesReference.bytes(XContentFactory.jsonBuilder().map(sourceMap));
-            hit.sourceRef(sourceBytes);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to create judgment response", e);
-        }
-
-        SearchHits hits = new SearchHits(new SearchHit[] { hit }, new TotalHits(1, TotalHits.Relation.EQUAL_TO), 1.0f);
-
-        when(response.getHits()).thenReturn(hits);
-        return response;
-    }
 }

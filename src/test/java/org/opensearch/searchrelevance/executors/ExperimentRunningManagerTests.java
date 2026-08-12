@@ -189,6 +189,7 @@ public class ExperimentRunningManagerTests extends OpenSearchTestCase {
             null,
             new AtomicBoolean(false),
             null,
+            Map.of(),
             cancellationToken,
             actuallyFinished
         );

@@ -11,7 +11,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Queue;
@@ -20,15 +19,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
-import org.opensearch.action.search.SearchResponse;
-import org.opensearch.common.cache.Cache;
-import org.opensearch.common.cache.CacheBuilder;
-import org.opensearch.common.unit.TimeValue;
 import org.opensearch.core.action.ActionListener;
-import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.executors.ExperimentTaskManager;
 import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.ExperimentType;
@@ -46,25 +39,10 @@ import lombok.extern.log4j.Log4j2;
 @Log4j2
 public class PointwiseExperimentProcessor {
 
-    private final JudgmentDao judgmentDao;
     private final ExperimentTaskManager taskManager;
 
-    // Use OpenSearch's built-in cache implementation with bounded size
-    private final Cache<String, Map<String, String>> judgmentCache;
-
-    // Configuration constants
-    private static final long CACHE_SIZE = 100_000;
-    private static final TimeValue CACHE_EXPIRE_TIME = TimeValue.timeValueHours(1);
-
-    public PointwiseExperimentProcessor(JudgmentDao judgmentDao, ExperimentTaskManager taskManager) {
-        this.judgmentDao = judgmentDao;
+    public PointwiseExperimentProcessor(ExperimentTaskManager taskManager) {
         this.taskManager = taskManager;
-
-        // Initialize cache with size limit and TTL
-        this.judgmentCache = CacheBuilder.<String, Map<String, String>>builder()
-            .setMaximumWeight(CACHE_SIZE)
-            .setExpireAfterAccess(CACHE_EXPIRE_TIME)
-            .build();
     }
 
     /**
@@ -75,6 +53,7 @@ public class PointwiseExperimentProcessor {
         QuerySetEntry queryEntry,
         Map<String, SearchConfigurationDetails> searchConfigurations,
         List<String> judgmentList,
+        Map<String, Map<String, String>> queryTextToDocIdToRatings,
         int size,
         AtomicBoolean hasFailure,
         String scheduledRunId,
@@ -89,100 +68,23 @@ public class PointwiseExperimentProcessor {
             queryText
         );
 
-        // Load judgments once and cache them
-        loadJudgmentsAsync(experimentId, judgmentList, queryText).thenAccept(docIdToScores -> {
-            log.info("Loaded {} document ratings for experiment {}", docIdToScores.size(), experimentId);
-            processExperimentWithJudgments(
-                experimentId,
-                queryEntry,
-                searchConfigurations,
-                judgmentList,
-                size,
-                docIdToScores,
-                hasFailure,
-                scheduledRunId,
-                cancellationToken,
-                listener
-            );
-        }).exceptionally(e -> {
-            if (hasFailure.compareAndSet(false, true)) {
-                listener.onFailure(new Exception("Failed to load judgments", e));
-            }
-            return null;
-        });
-    }
-
-    /**
-     * Load and cache judgments for the experiment
-     */
-    private CompletableFuture<Map<String, String>> loadJudgmentsAsync(String experimentId, List<String> judgmentList, String queryText) {
-        String cacheKey = experimentId + ":" + queryText;
-        Map<String, String> cached = judgmentCache.get(cacheKey);
-        if (Objects.nonNull(cached)) {
-            return CompletableFuture.completedFuture(cached);
+        Map<String, String> docIdToScores = queryTextToDocIdToRatings != null ? queryTextToDocIdToRatings.get(queryText) : null;
+        if (docIdToScores == null) {
+            docIdToScores = Collections.emptyMap();
         }
-
-        AtomicInteger failureCount = new AtomicInteger(0);
-        int failureThreshold = Math.min(5, judgmentList.size());
-
-        // Load judgments in parallel
-        List<CompletableFuture<SearchResponse>> judgmentFutures = judgmentList.stream().map(judgmentId -> {
-            CompletableFuture<SearchResponse> future = new CompletableFuture<>();
-            judgmentDao.getJudgment(judgmentId, ActionListener.wrap(future::complete, future::completeExceptionally));
-            return future;
-        }).toList();
-
-        return CompletableFuture.allOf(judgmentFutures.toArray(new CompletableFuture[0])).thenApply(v -> {
-            Map<String, String> docIdToScores = new HashMap<>();
-
-            for (CompletableFuture<SearchResponse> future : judgmentFutures) {
-                try {
-                    SearchResponse response = future.join();
-                    extractJudgmentScores(queryText, response, docIdToScores);
-                } catch (Exception e) {
-                    log.error("Failed to process judgment response: {}", e.getMessage());
-                    if (failureCount.incrementAndGet() >= failureThreshold) {
-                        throw new RuntimeException(
-                            String.format(
-                                Locale.ROOT,
-                                "Failed to load judgments: exceeded failure threshold %d/%d",
-                                failureCount.get(),
-                                failureThreshold
-                            ),
-                            e
-                        );
-                    }
-                }
-            }
-
-            judgmentCache.put(cacheKey, docIdToScores);
-            return docIdToScores;
-        });
-    }
-
-    /**
-     * Extract judgment scores from SearchResponse
-     */
-    private void extractJudgmentScores(String queryText, SearchResponse response, Map<String, String> docIdToScores) {
-        if (Objects.isNull(response.getHits()) || response.getHits().getTotalHits().value() == 0) {
-            return;
-        }
-
-        Map<String, Object> sourceAsMap = response.getHits().getHits()[0].getSourceAsMap();
-        List<Map<String, Object>> judgmentRatings = (List<Map<String, Object>>) sourceAsMap.getOrDefault(
-            "judgmentRatings",
-            Collections.emptyList()
+        log.info("Loaded {} document ratings for experiment {}", docIdToScores.size(), experimentId);
+        processExperimentWithJudgments(
+            experimentId,
+            queryEntry,
+            searchConfigurations,
+            judgmentList,
+            size,
+            docIdToScores,
+            hasFailure,
+            scheduledRunId,
+            cancellationToken,
+            listener
         );
-
-        for (Map<String, Object> rating : judgmentRatings) {
-            if (queryText.equals(rating.get("query"))) {
-                List<Map<String, String>> docScoreRatings = (List<Map<String, String>>) rating.get("ratings");
-                if (Objects.nonNull(docScoreRatings)) {
-                    docScoreRatings.forEach(docScoreRating -> docIdToScores.put(docScoreRating.get("docId"), docScoreRating.get("rating")));
-                }
-                break;
-            }
-        }
     }
 
     /**
