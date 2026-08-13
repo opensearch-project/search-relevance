@@ -19,7 +19,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -227,26 +226,29 @@ public class ExperimentRunningManager {
             configFutures.add(singleSearchConfigurationFuture);
         }
 
-        for (CompletableFuture<Entry<String, Object>> configFuture : configFutures) {
-            Entry<String, Object> configEntry;
+        CompletableFuture.allOf(configFutures.toArray(new CompletableFuture[0])).whenComplete((ignored, ex) -> {
             try {
-                // The config future will be waited on, but there is a chance the future might be null.
-                configEntry = configFuture.get();
-            } catch (InterruptedException e) {
-                handleFailure(e, hasFailure, context, actuallyFinished);
-                return;
-            } catch (ExecutionException e) {
+                for (CompletableFuture<Entry<String, Object>> configFuture : configFutures) {
+                    Entry<String, Object> configEntry = configFuture.join();
+                    searchConfigurations.put(configEntry.getKey(), (SearchConfigurationDetails) configEntry.getValue());
+                }
+            } catch (Exception e) {
                 handleFailure(e, hasFailure, context, actuallyFinished);
                 return;
             }
-            searchConfigurations.put(configEntry.getKey(), (SearchConfigurationDetails) configEntry.getValue());
-        }
 
-        if (queryEntries == null || searchConfigurations == null) {
-            throw new IllegalStateException("Missing required data for metrics calculation");
-        }
+            if (queryEntries == null || searchConfigurations == null) {
+                handleFailure(
+                    new IllegalStateException("Missing required data for metrics calculation"),
+                    hasFailure,
+                    context,
+                    actuallyFinished
+                );
+                return;
+            }
 
-        loadJudgmentsThenContinue(context, searchConfigurations, queryEntries, hasFailure, cancellationToken, actuallyFinished);
+            loadJudgmentsThenContinue(context, searchConfigurations, queryEntries, hasFailure, cancellationToken, actuallyFinished);
+        });
     }
 
     private void loadJudgmentsThenContinue(

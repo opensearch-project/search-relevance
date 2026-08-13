@@ -25,12 +25,8 @@ public final class MinClusterVersionUtil {
      * position of PutLlmJudgmentRequest. Older versions wrote an optional boolean there (the removed
      * "overwriteCache"), so the wire format is gated on the cluster's minimum node version being at
      * least this.
-     *
-     * <p>NOTE: set to {@code V_3_8_0} because this ships in the current 3.8 line. This MUST be bumped
-     * to {@code V_3_9_0} before the 3.9 release (tracked in a GitHub issue), otherwise a 3.8 node in a
-     * mixed 3.8/3.9 cluster would be sent the new list format it cannot deserialize.
      */
-    private static final Version MINIMAL_SUPPORTED_VERSION_EXISTING_JUDGMENTS = Version.V_3_8_0;
+    private static final Version MINIMAL_SUPPORTED_VERSION_EXISTING_JUDGMENTS = Version.V_3_9_0;
 
     /**
      * @return true if every node in the cluster is on or after the minimum version that supports the

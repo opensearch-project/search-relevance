@@ -815,9 +815,7 @@ public class SearchRelevanceIndicesManager {
     ) {
         StepListener<Void> createIndexStep = new StepListener<>();
         createIndexIfAbsent(context.getIndex(), createIndexStep);
-        createIndexStep.whenComplete(v -> action.accept(context, listener), e -> {
-            throw e instanceof RuntimeException ? (RuntimeException) e : new IllegalStateException(e);
-        });
+        createIndexStep.whenComplete(v -> action.accept(context, listener), e -> listener.onFailure(e));
     }
 
     /**

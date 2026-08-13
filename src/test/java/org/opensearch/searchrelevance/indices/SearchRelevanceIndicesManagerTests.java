@@ -159,6 +159,26 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         listenerCaptor.getValue().onFailure(exception);
     }
 
+    public void testPutDocOnProtectedIndexNotifiesListenerWhenIndexCreationFails() throws IOException {
+        QuerySet querySet = new QuerySet("test_id", "test_name", "test_description", "test_timestamp", "test_sampling", List.of());
+        XContentBuilder xContentBuilder = querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
+
+        when(metadata.hasIndex(SearchRelevanceIndices.EXPERIMENT.getIndexName())).thenReturn(false);
+
+        @SuppressWarnings("unchecked")
+        ActionListener<DocWriteResponse> listener = mock(ActionListener.class);
+        indicesManager.putDoc("test_id", xContentBuilder, SearchRelevanceIndices.EXPERIMENT, listener);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<ActionListener<CreateIndexResponse>> createListenerCaptor = ArgumentCaptor.forClass(ActionListener.class);
+        verify(indicesAdminClient).create(any(CreateIndexRequest.class), createListenerCaptor.capture());
+
+        RuntimeException creationFailure = new RuntimeException("Creation failed");
+        createListenerCaptor.getValue().onFailure(creationFailure);
+
+        verify(listener).onFailure(any(Exception.class));
+    }
+
     public void testPutDocWhenSucceeded() throws IOException {
         QuerySet querySet = new QuerySet("test_id", "test_name", "test_description", "test_timestamp", "test_sampling", List.of());
         XContentBuilder xContentBuilder = querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
