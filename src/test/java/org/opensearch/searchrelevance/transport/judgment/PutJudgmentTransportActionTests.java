@@ -27,6 +27,8 @@ import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.cluster.ClusterState;
+import org.opensearch.cluster.metadata.IndexMetadata;
+import org.opensearch.cluster.metadata.MappingMetadata;
 import org.opensearch.cluster.metadata.Metadata;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.core.action.ActionListener;
@@ -37,6 +39,7 @@ import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
+import org.opensearch.searchrelevance.judgments.BaseJudgmentsProcessor;
 import org.opensearch.searchrelevance.judgments.JudgmentsProcessorFactory;
 import org.opensearch.searchrelevance.model.JudgmentType;
 import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
@@ -512,14 +515,29 @@ public class PutJudgmentTransportActionTests extends OpenSearchTestCase {
         verify(judgmentDao, org.mockito.Mockito.never()).putJudgement(any(), any(ActionListener.class));
     }
 
-    public void testValidation_UbiJudgment_EventsIndexNotFound_Returns400() {
+    private void stubIndexAbsent(String index) {
         ClusterState clusterState = mock(ClusterState.class);
         Metadata metadata = mock(Metadata.class);
         when(clusterService.state()).thenReturn(clusterState);
         when(clusterState.metadata()).thenReturn(metadata);
-        when(metadata.hasIndex("ubi_events")).thenReturn(false);
+        when(metadata.hasIndex(index)).thenReturn(false);
+    }
 
-        PutUbiJudgmentRequest request = new PutUbiJudgmentRequest(
+    private void stubIndexPresentWithMappingFields(String index, Map<String, Object> properties) {
+        ClusterState clusterState = mock(ClusterState.class);
+        Metadata metadata = mock(Metadata.class);
+        IndexMetadata indexMetadata = mock(IndexMetadata.class);
+        MappingMetadata mappingMetadata = mock(MappingMetadata.class);
+        when(clusterService.state()).thenReturn(clusterState);
+        when(clusterState.metadata()).thenReturn(metadata);
+        when(metadata.hasIndex(index)).thenReturn(true);
+        when(metadata.index(index)).thenReturn(indexMetadata);
+        when(indexMetadata.mapping()).thenReturn(mappingMetadata);
+        when(mappingMetadata.sourceAsMap()).thenReturn(Map.of("properties", properties));
+    }
+
+    private PutUbiJudgmentRequest ubiJudgmentRequest(String ubiEventsIndex) {
+        return new PutUbiJudgmentRequest(
             JudgmentType.UBI_JUDGMENT,
             "my-implicit-judgments",
             "test description",
@@ -527,9 +545,11 @@ public class PutJudgmentTransportActionTests extends OpenSearchTestCase {
             20,
             "",
             "",
-            null
+            ubiEventsIndex
         );
+    }
 
+    private SearchRelevanceException runUbiValidationExpectingFailure(PutUbiJudgmentRequest request) {
         ActionListener<IndexResponse> responseListener = mock(ActionListener.class);
         action.doExecute(null, request, responseListener);
 
@@ -540,7 +560,85 @@ public class PutJudgmentTransportActionTests extends OpenSearchTestCase {
         Exception exception = exceptionCaptor.getValue();
         assertTrue(exception instanceof SearchRelevanceException);
         assertEquals(RestStatus.BAD_REQUEST, ((SearchRelevanceException) exception).status());
-        assertTrue(exception.getMessage(), exception.getMessage().contains("UBI events index [ubi_events]"));
-        assertTrue(exception.getMessage(), exception.getMessage().contains("ubiEventsIndex"));
+        return (SearchRelevanceException) exception;
+    }
+
+    public void testValidation_UbiJudgment_DefaultEventsIndexNotFound_Returns400() {
+        stubIndexAbsent("ubi_events");
+
+        String message = runUbiValidationExpectingFailure(ubiJudgmentRequest(null)).getMessage();
+
+        assertTrue(message, message.contains("No 'ubiEventsIndex' parameter was provided"));
+        assertTrue(message, message.contains("default UBI events index [ubi_events]"));
+    }
+
+    public void testValidation_UbiJudgment_ExplicitEventsIndexNotFound_Returns400() {
+        stubIndexAbsent("my_custom_events");
+
+        String message = runUbiValidationExpectingFailure(ubiJudgmentRequest("my_custom_events")).getMessage();
+
+        assertTrue(message, message.contains("UBI events index [my_custom_events] set by the 'ubiEventsIndex' parameter"));
+        assertFalse(message, message.contains("No 'ubiEventsIndex' parameter was provided"));
+    }
+
+    public void testValidation_UbiJudgment_ExplicitDefaultEventsIndexNotFound_ReportedAsProvided_Returns400() {
+        stubIndexAbsent("ubi_events");
+
+        String message = runUbiValidationExpectingFailure(ubiJudgmentRequest("ubi_events")).getMessage();
+
+        assertTrue(message, message.contains("UBI events index [ubi_events] set by the 'ubiEventsIndex' parameter"));
+        assertFalse(message, message.contains("No 'ubiEventsIndex' parameter was provided"));
+    }
+
+    public void testValidation_UbiJudgment_NoParameter_ValidDefaultIndex_Succeeds() {
+        Map<String, Object> validProperties = Map.of(
+            "query_id",
+            Map.of("type", "keyword"),
+            "action_name",
+            Map.of("type", "keyword"),
+            "event_attributes",
+            Map.of("properties", Map.of("object", Map.of("properties", Map.of("object_id", Map.of("type", "keyword")))))
+        );
+        stubIndexPresentWithMappingFields("ubi_events", validProperties);
+
+        IndexResponse indexResponse = mock(IndexResponse.class);
+        doAnswer(invocation -> {
+            ActionListener<IndexResponse> listener = invocation.getArgument(1);
+            listener.onResponse(indexResponse);
+            return null;
+        }).when(judgmentDao).putJudgement(any(), any(ActionListener.class));
+
+        BaseJudgmentsProcessor processor = mock(BaseJudgmentsProcessor.class);
+        when(judgmentsProcessorFactory.getProcessor(any())).thenReturn(processor);
+        doAnswer(invocation -> {
+            ActionListener<List<Map<String, Object>>> listener = invocation.getArgument(1);
+            listener.onResponse(List.of());
+            return null;
+        }).when(processor).generateJudgmentRating(any(), any(ActionListener.class));
+
+        ActionListener<IndexResponse> responseListener = mock(ActionListener.class);
+        action.doExecute(null, ubiJudgmentRequest(null), responseListener);
+
+        verify(judgmentDao).putJudgement(any(), any(ActionListener.class));
+        verify(responseListener).onResponse(indexResponse);
+        verify(responseListener, org.mockito.Mockito.never()).onFailure(any());
+    }
+
+    public void testValidation_UbiJudgment_EventsIndexExistsButMissingRequiredField_Returns400() {
+        Map<String, Object> propertiesMissingObjectId = Map.of(
+            "query_id",
+            Map.of("type", "keyword"),
+            "action_name",
+            Map.of("type", "keyword")
+        );
+        stubIndexPresentWithMappingFields("my_custom_events", propertiesMissingObjectId);
+
+        String message = runUbiValidationExpectingFailure(ubiJudgmentRequest("my_custom_events")).getMessage();
+
+        assertTrue(message, message.contains("UBI events index [my_custom_events] set by the 'ubiEventsIndex' parameter"));
+        assertTrue(
+            message,
+            message.contains("missing required UBI event fields (query_id, action_name, event_attributes.object.object_id)")
+        );
     }
 }

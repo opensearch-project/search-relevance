@@ -111,18 +111,7 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
                 PutUbiJudgmentRequest ubiRequest = (PutUbiJudgmentRequest) request;
                 String ubiEventsIndex = ubiRequest.getUbiEventsIndex();
                 if (!checkUbiEventsIndexExists(clusterService, ubiEventsIndex)) {
-                    listener.onFailure(
-                        new SearchRelevanceException(
-                            String.format(
-                                Locale.ROOT,
-                                "UBI events index [%s] does not exist or does not have the required UBI event fields. "
-                                    + "Ingest UBI events data into it, or set the '%s' parameter to an existing UBI events index.",
-                                ubiEventsIndex,
-                                UBI_EVENTS_INDEX_PARAM
-                            ),
-                            RestStatus.BAD_REQUEST
-                        )
-                    );
+                    listener.onFailure(invalidUbiEventsIndexException(ubiEventsIndex, ubiRequest.isUbiEventsIndexProvided()));
                     return;
                 }
                 createJudgment(request, listener);
@@ -133,6 +122,35 @@ public class PutJudgmentTransportAction extends HandledTransportAction<PutJudgme
             LOGGER.error("Failed to process judgment request", e);
             listener.onFailure(new SearchRelevanceException("Failed to process judgment request", e, RestStatus.INTERNAL_SERVER_ERROR));
         }
+    }
+
+    private static SearchRelevanceException invalidUbiEventsIndexException(String ubiEventsIndex, boolean ubiEventsIndexProvided) {
+        String requiredFields = "query_id, action_name, event_attributes.object.object_id";
+        String message;
+        if (ubiEventsIndexProvided) {
+            message = String.format(
+                Locale.ROOT,
+                "The UBI events index [%s] set by the '%s' parameter does not exist or is missing required UBI event "
+                    + "fields (%s). Ingest UBI events data into it, or set the '%s' parameter to an existing UBI events index.",
+                ubiEventsIndex,
+                UBI_EVENTS_INDEX_PARAM,
+                requiredFields,
+                UBI_EVENTS_INDEX_PARAM
+            );
+        } else {
+            message = String.format(
+                Locale.ROOT,
+                "No '%s' parameter was provided and the default UBI events index [%s] does not exist or is missing "
+                    + "required UBI event fields (%s). Ingest UBI events data into [%s], or set the '%s' parameter to an "
+                    + "existing UBI events index.",
+                UBI_EVENTS_INDEX_PARAM,
+                ubiEventsIndex,
+                requiredFields,
+                ubiEventsIndex,
+                UBI_EVENTS_INDEX_PARAM
+            );
+        }
+        return new SearchRelevanceException(message, RestStatus.BAD_REQUEST);
     }
 
     private void createJudgment(PutJudgmentRequest request, ActionListener<IndexResponse> listener) {
