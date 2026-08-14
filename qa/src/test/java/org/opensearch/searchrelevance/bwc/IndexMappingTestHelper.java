@@ -301,39 +301,96 @@ public final class IndexMappingTestHelper {
         logger.info("Updated mapping for index {}", indexName);
     }
 
+    /** Consecutive healthy polls required before the cluster is treated as stably re-formed. */
+    private static final int REQUIRED_CONSECUTIVE_STABLE_POLLS = 3;
+
     /**
-     * Polls {@code GET /_cluster/health} until {@code number_of_nodes >= minNodes} and status is not {@code red}.
-     * Used in restart-upgrade BWC after a full version bump, before REST assertions.
+     * Waits until the upgraded cluster has <em>stably</em> re-formed before REST assertions issue
+     * cluster-state-mutating requests (create-index, {@code PUT search_configuration}).
+     *
+     * <p>A plain "non-red with N nodes" check is insufficient for restart-upgrade: after a full
+     * restart the nodes are still rediscovering each other and re-electing a cluster-manager, and
+     * health can briefly report green with N nodes in between elections. Returning on that transient
+     * state lets a test write into a cluster with no stable cluster-manager, so the cluster-state
+     * change never durably commits — the mapping migration is silently skipped (leaving
+     * {@code schema_version} at 0) or the write fails with {@code cluster_manager_not_discovered}
+     * (HTTP 500). This gate closes that race by requiring, for
+     * {@value #REQUIRED_CONSECUTIVE_STABLE_POLLS} consecutive polls, that:
+     * <ul>
+     *   <li>the server-side wait ({@code wait_for_status=green}, {@code wait_for_nodes=ge(N)},
+     *       {@code wait_for_events=languid}) returns without timing out — languid only completes once
+     *       the elected cluster-manager has drained its pending cluster-state task queue;</li>
+     *   <li>status is {@code green}, at least {@code minNodes} nodes have (re)joined, and an elected
+     *       cluster-manager is reported ({@code discovered_cluster_manager}).</li>
+     * </ul>
      */
     public static void waitForClusterNodesReady(RestClient client, int minNodes, int maxWaitSeconds, Logger logger) throws Exception {
         final long deadline = System.currentTimeMillis() + maxWaitSeconds * 1000L;
+        int consecutiveStable = 0;
+        String lastObserved = "no successful health response yet";
         while (System.currentTimeMillis() < deadline) {
             try {
+                // Server-side gate: block (up to the per-call timeout) for the target state so we poll a
+                // settling cluster rather than busy-loop. languid only returns once the elected
+                // cluster-manager has drained its pending cluster-state tasks.
                 Request request = new Request("GET", "/_cluster/health");
+                request.addParameter("wait_for_status", "green");
+                request.addParameter("wait_for_nodes", "ge(" + minNodes + ")");
+                request.addParameter("wait_for_events", "languid");
+                request.addParameter("timeout", "10s");
+                request.addParameter("cluster_manager_timeout", "10s");
                 setPermissiveWarningsHandler(request);
                 Response response = client.performRequest(request);
-                if (response.getStatusLine().getStatusCode() != 200) {
-                    logger.debug("Cluster health HTTP {}", response.getStatusLine().getStatusCode());
-                } else {
+                if (response.getStatusLine().getStatusCode() == 200) {
                     Map<String, Object> map = parseResponse(response);
                     String status = map.get("status") != null ? map.get("status").toString() : "";
-                    int nodes = 0;
-                    Object nn = map.get("number_of_nodes");
-                    if (nn instanceof Number) {
-                        nodes = ((Number) nn).intValue();
+                    boolean timedOut = Boolean.TRUE.equals(map.get("timed_out"));
+                    int nodes = map.get("number_of_nodes") instanceof Number ? ((Number) map.get("number_of_nodes")).intValue() : 0;
+                    // discovered_cluster_manager (2.0+), discovered_master (older). Absent -> rely on green + languid.
+                    Object clusterManagerFlag = map.getOrDefault("discovered_cluster_manager", map.get("discovered_master"));
+                    boolean hasClusterManager = !Boolean.FALSE.equals(clusterManagerFlag);
+                    lastObserved = "status="
+                        + status
+                        + ", number_of_nodes="
+                        + nodes
+                        + ", timed_out="
+                        + timedOut
+                        + ", discovered_cluster_manager="
+                        + clusterManagerFlag;
+                    if (!timedOut && "green".equals(status) && nodes >= minNodes && hasClusterManager) {
+                        consecutiveStable++;
+                        if (consecutiveStable >= REQUIRED_CONSECUTIVE_STABLE_POLLS) {
+                            logger.info("Cluster stably formed for BWC ({} consecutive checks): {}", consecutiveStable, lastObserved);
+                            return;
+                        }
+                        logger.debug(
+                            "Cluster healthy, confirming stability ({}/{}): {}",
+                            consecutiveStable,
+                            REQUIRED_CONSECUTIVE_STABLE_POLLS,
+                            lastObserved
+                        );
+                    } else {
+                        consecutiveStable = 0;
+                        logger.debug("Cluster not stably ready yet: {}", lastObserved);
                     }
-                    if (!"red".equals(status) && nodes >= minNodes) {
-                        logger.info("Cluster ready for BWC: status={}, number_of_nodes={}", status, nodes);
-                        return;
-                    }
-                    logger.debug("Cluster not ready yet: status={}, number_of_nodes={} (need {})", status, nodes, minNodes);
+                } else {
+                    consecutiveStable = 0;
+                    logger.debug("Cluster health HTTP {}", response.getStatusLine().getStatusCode());
                 }
             } catch (Exception e) {
-                logger.debug("Cluster health poll failed: {}", e.getMessage());
+                consecutiveStable = 0;
+                logger.debug("Cluster readiness poll failed: {}", e.getMessage());
             }
             Thread.sleep(3000);
         }
-        throw new AssertionError("Timeout after " + maxWaitSeconds + "s waiting for >= " + minNodes + " nodes and non-red cluster health");
+        throw new AssertionError(
+            "Timeout after "
+                + maxWaitSeconds
+                + "s waiting for a stably-formed cluster (>= "
+                + minNodes
+                + " nodes, elected cluster-manager, green) for BWC; last observed: "
+                + lastObserved
+        );
     }
 
     /**

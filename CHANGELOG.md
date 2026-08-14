@@ -15,6 +15,7 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 - Report an invalid UBI events index as a `400` naming the index and the `ubiEventsIndex` parameter instead of a `500` ([#558](https://github.com/opensearch-project/search-relevance/pull/558))
 
 ### Infrastructure
+- Stabilize flaky restart-upgrade BWC tests by waiting for a stable cluster-manager before cluster-state writes, raising the test cluster's fault-detection/publish tolerances so a transient node stall does not trigger re-election churn, and pinning the test cluster heap to a fixed `2g` per node ([#562](https://github.com/opensearch-project/search-relevance/pull/562))
 
 ### Documentation
 
