@@ -7,6 +7,7 @@
  */
 package org.opensearch.searchrelevance.judgments;
 
+import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
@@ -22,6 +23,7 @@ public class JudgmentsProcessorFactory {
     private final SearchConfigurationDao searchConfigurationDao;
     private final JudgmentDao judgmentDao;
     private final Client client;
+    private final ClusterService clusterService;
     private final ThreadPool threadPool;
 
     @Inject
@@ -31,6 +33,7 @@ public class JudgmentsProcessorFactory {
         SearchConfigurationDao searchConfigurationDao,
         JudgmentDao judgmentDao,
         Client client,
+        ClusterService clusterService,
         ThreadPool threadPool
     ) {
         this.mlAccessor = mlAccessor;
@@ -38,6 +41,7 @@ public class JudgmentsProcessorFactory {
         this.searchConfigurationDao = searchConfigurationDao;
         this.judgmentDao = judgmentDao;
         this.client = client;
+        this.clusterService = clusterService;
         this.threadPool = threadPool;
     }
 
@@ -49,6 +53,7 @@ public class JudgmentsProcessorFactory {
                 searchConfigurationDao,
                 judgmentDao,
                 client,
+                clusterService,
                 threadPool
             );
             case UBI_JUDGMENT -> new UbiJudgmentsProcessor(client);

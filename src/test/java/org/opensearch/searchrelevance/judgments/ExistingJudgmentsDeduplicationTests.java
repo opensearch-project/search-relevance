@@ -19,6 +19,7 @@ import org.junit.Before;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.opensearch.action.search.SearchResponse;
+import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.core.common.bytes.BytesReference;
 import org.opensearch.core.xcontent.XContentBuilder;
@@ -51,6 +52,8 @@ public class ExistingJudgmentsDeduplicationTests extends OpenSearchTestCase {
     @Mock
     private Client client;
     @Mock
+    private ClusterService clusterService;
+    @Mock
     private ThreadPool threadPool;
 
     private LlmJudgmentsProcessor processor;
@@ -64,7 +67,15 @@ public class ExistingJudgmentsDeduplicationTests extends OpenSearchTestCase {
             ((Runnable) invocation.getArgument(0)).run();
             return null;
         }).when(directExecutor).execute(org.mockito.ArgumentMatchers.any(Runnable.class));
-        processor = new LlmJudgmentsProcessor(mlAccessor, querySetDao, searchConfigurationDao, judgmentDao, client, threadPool);
+        processor = new LlmJudgmentsProcessor(
+            mlAccessor,
+            querySetDao,
+            searchConfigurationDao,
+            judgmentDao,
+            client,
+            clusterService,
+            threadPool
+        );
     }
 
     public void testFetchRatingsForQuery_JudgmentNotFound() {

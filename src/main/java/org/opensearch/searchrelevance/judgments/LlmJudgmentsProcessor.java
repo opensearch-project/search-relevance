@@ -37,6 +37,9 @@ import org.opensearch.action.get.MultiGetResponse;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.support.PlainActionFuture;
+import org.opensearch.cluster.metadata.IndexMetadata;
+import org.opensearch.cluster.metadata.MappingMetadata;
+import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
@@ -78,8 +81,12 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
     private final SearchConfigurationDao searchConfigurationDao;
     private final JudgmentDao judgmentDao;
     private final Client client;
+    private final ClusterService clusterService;
     private final ThreadPool threadPool;
     private final LlmJudgmentTaskManager taskManager;
+
+    // Field types whose _source values are embeddings; dropped from the LLM prompt when contextFields is not set.
+    private static final Set<String> VECTOR_FIELD_TYPES = Set.of("knn_vector", "rank_features", "sparse_vector");
 
     @Inject
     public LlmJudgmentsProcessor(
@@ -88,6 +95,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         SearchConfigurationDao searchConfigurationDao,
         JudgmentDao judgmentDao,
         Client client,
+        ClusterService clusterService,
         ThreadPool threadPool
     ) {
         this.mlAccessor = mlAccessor;
@@ -95,6 +103,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         this.searchConfigurationDao = searchConfigurationDao;
         this.judgmentDao = judgmentDao;
         this.client = client;
+        this.clusterService = clusterService;
         this.threadPool = threadPool;
         this.taskManager = new LlmJudgmentTaskManager(threadPool);
     }
@@ -205,6 +214,8 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
             // from the judgment's own metadata — same parsing used by the initial generation.
             ScoringConfig config = new ScoringConfig(metadata, searchConfigurationDao);
             String index = config.index;
+            // Resolve the vector fields to drop from the prompt once for the whole retry.
+            Set<String> excludedVectorFields = resolveExcludedVectorFields(index);
             List<Map<String, Object>> results = new ArrayList<>();
 
             // Pass 1: fetch every failed doc up front and detect any that no longer exist. If a
@@ -272,7 +283,8 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                     index,
                     docIdToScore,
                     config.promptTemplate,
-                    config.ratingType
+                    config.ratingType,
+                    excludedVectorFields
                 );
 
                 // Build result: use queryTextWithCustomInput as the key so it matches the original judgment
@@ -414,6 +426,9 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
 
         log.info("Starting LLM judgment generation for {} total queries", totalQueries);
 
+        // Resolve the vector fields to drop from the prompt once for the whole run.
+        Set<String> excludedVectorFields = resolveExcludedVectorFields(searchConfigurations.get(0).index());
+
         taskManager.scheduleTasksAsync(querySetEntries, querySetEntry -> {
             try {
                 return processQueryTextAsync(
@@ -426,7 +441,8 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                     ignoreFailure,
                     promptTemplate,
                     ratingType,
-                    existingRatingsByQuery
+                    existingRatingsByQuery,
+                    excludedVectorFields
                 );
             } catch (Exception e) {
                 if (ignoreFailure) {
@@ -490,7 +506,8 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         boolean ignoreFailure,
         String promptTemplate,
         LLMJudgmentRatingType ratingType,
-        Map<String, Map<String, String>> existingRatingsByQuery
+        Map<String, Map<String, String>> existingRatingsByQuery,
+        Set<String> excludedVectorFields
     ) {
         String queryText = querySetEntry.queryText();
         Map<String, String> customFields = querySetEntry.customFields();
@@ -538,7 +555,8 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                     index,
                     docIdToScore,
                     promptTemplate,
-                    ratingType
+                    ratingType,
+                    excludedVectorFields
                 );
             }
 
@@ -668,7 +686,8 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         String index,
         ConcurrentMap<String, String> docIdToScore,
         String promptTemplate,
-        LLMJudgmentRatingType ratingType
+        LLMJudgmentRatingType ratingType,
+        Set<String> excludedVectorFields
     ) throws Exception {
         Map<String, String> unionHits = new HashMap<>();
 
@@ -676,7 +695,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         for (String docId : unprocessedDocIds) {
             SearchHit hit = allHits.get(docId);
             String compositeKey = combinedIndexAndDocId(index, docId);
-            String contextSource = getContextSource(hit, contextFields);
+            String contextSource = getContextSource(hit, contextFields, excludedVectorFields);
             unionHits.put(compositeKey, contextSource);
         }
 
@@ -855,7 +874,7 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         chunkResult.getFailedChunks().forEach((index, error) -> log.warn("Chunk {} failed: {}", index, error));
     }
 
-    private String getContextSource(SearchHit hit, List<String> contextFields) {
+    String getContextSource(SearchHit hit, List<String> contextFields, Set<String> excludedVectorFields) {
         try {
             if (contextFields != null && !contextFields.isEmpty()) {
                 Map<String, Object> filteredSource = new HashMap<>();
@@ -868,12 +887,77 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
                 }
                 return OBJECT_MAPPER.writeValueAsString(filteredSource);
             }
-            return hit.getSourceAsString();
+
+            // Send the full _source minus any vector fields resolved from the mapping. When none were
+            // resolved (no vector fields, or the mapping could not be read), send _source unchanged.
+            if (excludedVectorFields.isEmpty()) {
+                return hit.getSourceAsString();
+            }
+            return OBJECT_MAPPER.writeValueAsString(removeFieldsByName(hit.getSourceAsMap(), excludedVectorFields));
 
         } catch (JacksonException e) {
             log.error("Failed to process context source for hit: {}", hit.getId(), e);
             throw new RuntimeException("Failed to process context source", e);
         }
+    }
+
+    /**
+     * Returns the names of the index's vector fields (knn_vector, rank_features and sparse_vector),
+     * descending into nested objects. The mapping is read from the node's local cluster state, so
+     * there is no network call. When the mapping cannot be read the result is an empty set, which
+     * makes the caller send the full document source unchanged. Package-private so the test in the
+     * same package can exercise it directly without widening the class's public surface.
+     */
+    @SuppressWarnings("unchecked")
+    Set<String> resolveExcludedVectorFields(String index) {
+        Set<String> vectorFields = new HashSet<>();
+        try {
+            IndexMetadata indexMetadata = clusterService.state().metadata().index(index);
+            MappingMetadata mappingMetadata = indexMetadata != null ? indexMetadata.mapping() : null;
+            Map<String, Object> mappingSource = mappingMetadata != null ? mappingMetadata.sourceAsMap() : null;
+            Object properties = mappingSource != null ? mappingSource.get("properties") : null;
+            if (properties instanceof Map) {
+                collectVectorFields((Map<String, Object>) properties, vectorFields);
+            }
+        } catch (Exception e) {
+            log.warn("Could not read mapping for index [{}]; sending full _source to the LLM", index, e);
+        }
+        return vectorFields;
+    }
+
+    @SuppressWarnings("unchecked")
+    private void collectVectorFields(Map<String, Object> properties, Set<String> out) {
+        for (Map.Entry<String, Object> entry : properties.entrySet()) {
+            if (!(entry.getValue() instanceof Map)) {
+                continue;
+            }
+            Map<String, Object> fieldDef = (Map<String, Object>) entry.getValue();
+            Object type = fieldDef.get("type");
+            if (type instanceof String && VECTOR_FIELD_TYPES.contains(type)) {
+                out.add(entry.getKey());
+            }
+            Object nested = fieldDef.get("properties");
+            if (nested instanceof Map) {
+                collectVectorFields((Map<String, Object>) nested, out);
+            }
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> removeFieldsByName(Map<String, Object> source, Set<String> namesToRemove) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> entry : source.entrySet()) {
+            if (namesToRemove.contains(entry.getKey())) {
+                continue;
+            }
+            Object value = entry.getValue();
+            if (value instanceof Map) {
+                result.put(entry.getKey(), removeFieldsByName((Map<String, Object>) value, namesToRemove));
+            } else {
+                result.put(entry.getKey(), value);
+            }
+        }
+        return result;
     }
 
 }
