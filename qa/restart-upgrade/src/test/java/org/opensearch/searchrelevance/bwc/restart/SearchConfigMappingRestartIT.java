@@ -8,6 +8,7 @@
 package org.opensearch.searchrelevance.bwc.restart;
 
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import org.opensearch.client.Request;
 import org.opensearch.client.Response;
@@ -66,29 +67,46 @@ public class SearchConfigMappingRestartIT extends AbstractSearchRelevanceRestart
             IndexMappingTestHelper.createIndexWithMapping(client(), TARGET_INDEX, "{\"properties\": {}}", logger);
         }
 
-        // Create via plugin API — triggers auto-migration
-        Request request = new Request("PUT", SEARCH_CONFIG_ENDPOINT);
-        request.setJsonEntity(
-            "{"
-                + "\"name\": \"bwc-restart-config\","
-                + "\"description\": \"Created after restart to test auto-migration\","
-                + "\"index\": \""
-                + TARGET_INDEX
-                + "\","
-                + "\"query\": \"{\\\"match_all\\\": {}}\""
-                + "}"
-        );
+        // Create via plugin API — triggers auto-migration of the search-config index mapping.
+        //
+        // The migration is a cluster-state change and needs a stable cluster-manager to durably
+        // commit. On resource-constrained CI runners the upgraded cluster can still be re-electing a
+        // cluster-manager when the write lands, so a single attempt may fail (HTTP 500) or silently
+        // no-op the migration (schema_version stays 0). Each request generates a fresh config id, so
+        // re-issuing the PUT is safe; retry until the cluster is stable enough for one attempt to
+        // durably commit the migration.
+        String requestBody = "{"
+            + "\"name\": \"bwc-restart-config\","
+            + "\"description\": \"Created after restart to test auto-migration\","
+            + "\"index\": \""
+            + TARGET_INDEX
+            + "\","
+            + "\"query\": \"{\\\"match_all\\\": {}}\""
+            + "}";
 
-        Response response = client().performRequest(request);
-        assertEquals("Plugin API should succeed after auto-migration", 200, response.getStatusLine().getStatusCode());
+        assertBusy(() -> {
+            try {
+                Request request = new Request("PUT", SEARCH_CONFIG_ENDPOINT);
+                request.setJsonEntity(requestBody);
+                Response response = client().performRequest(request);
+                assertEquals("Plugin API should succeed after auto-migration", 200, response.getStatusLine().getStatusCode());
 
-        // Verify mapping updated
-        Map<String, Object> mapping = IndexMappingTestHelper.getIndexMapping(client(), SEARCH_CONFIG_INDEX);
-        Map<String, Object> properties = IndexMappingTestHelper.getMappingProperties(mapping);
-        assertTrue("Mapping should have description field", properties.containsKey("description"));
+                Map<String, Object> mapping = IndexMappingTestHelper.getIndexMapping(client(), SEARCH_CONFIG_INDEX);
+                Map<String, Object> properties = IndexMappingTestHelper.getMappingProperties(mapping);
+                assertNotNull("Mapping properties should be present", properties);
+                assertTrue("Mapping should have description field", properties.containsKey("description"));
 
-        Map<String, Object> meta = IndexMappingTestHelper.getMappingMeta(mapping);
-        assertEquals("Schema version should be 1", 1, ((Number) meta.get("schema_version")).intValue());
+                Map<String, Object> meta = IndexMappingTestHelper.getMappingMeta(mapping);
+                assertNotNull("Mapping _meta should be present", meta);
+                assertNotNull("schema_version should be present", meta.get("schema_version"));
+                assertEquals("Schema version should be 1", 1, ((Number) meta.get("schema_version")).intValue());
+            } catch (Exception e) {
+                // Transient failure while the cluster settles (e.g. cluster_manager_not_discovered).
+                // Rethrow as AssertionError so assertBusy retries; genuine assertion failures above
+                // are AssertionErrors and propagate/retry the same way.
+                throw new AssertionError("search-config migration not committed yet while cluster settles: " + e.getMessage(), e);
+            }
+        }, 3, TimeUnit.MINUTES);
 
         // Old data still accessible
         oldDoc = IndexMappingTestHelper.getDocument(client(), SEARCH_CONFIG_INDEX, TEST_DOC_ID, logger);
