@@ -8,6 +8,7 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ### Enhancements
 - Add retry endpoint for failed LLM judgments, existingJudgments parameter for rating reuse, and remove broken global cache ([#525](https://github.com/opensearch-project/search-relevance/issues/525))
+- Truncate oversized LLM judgment hits at clean boundaries with a truncation marker and always truncate a solo-oversized hit regardless of ordering ([#563](https://github.com/opensearch-project/search-relevance/pull/563))
 
 ### Bug Fixes
 - Return correct delete REST status codes and honor querySetSize for sampling ([#542](https://github.com/opensearch-project/search-relevance/pull/542))
