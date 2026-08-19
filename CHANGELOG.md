@@ -7,6 +7,7 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 ### Features
 
 ### Enhancements
+- Stop re-fetching judgments on every query for Hybrid and Pointwise experiments ([#560](https://github.com/opensearch-project/search-relevance/pull/560))
 - Add retry endpoint for failed LLM judgments, existingJudgments parameter for rating reuse, and remove broken global cache ([#525](https://github.com/opensearch-project/search-relevance/issues/525))
 
 ### Bug Fixes

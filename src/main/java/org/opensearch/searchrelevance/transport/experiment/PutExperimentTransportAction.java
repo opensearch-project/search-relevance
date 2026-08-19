@@ -78,8 +78,8 @@ public class PutExperimentTransportAction extends HandledTransportAction<PutExpe
         this.searchConfigurationDao = searchConfigurationDao;
         this.judgmentDao = judgmentDao;
         this.metricsHelper = metricsHelper;
-        this.hybridOptimizerExperimentProcessor = new HybridOptimizerExperimentProcessor(judgmentDao, experimentTaskManager);
-        this.pointwiseExperimentProcessor = new PointwiseExperimentProcessor(judgmentDao, experimentTaskManager);
+        this.hybridOptimizerExperimentProcessor = new HybridOptimizerExperimentProcessor(experimentTaskManager);
+        this.pointwiseExperimentProcessor = new PointwiseExperimentProcessor(experimentTaskManager);
         this.experimentRunningManager = experimentRunningManager;
     }
 

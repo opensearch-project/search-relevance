@@ -35,6 +35,7 @@ import org.opensearch.searchrelevance.dao.ScheduledExperimentHistoryDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.experiment.HybridOptimizerExperimentProcessor;
+import org.opensearch.searchrelevance.experiment.JudgmentRatingsMapper;
 import org.opensearch.searchrelevance.experiment.PointwiseExperimentProcessor;
 import org.opensearch.searchrelevance.experiment.signature.ExperimentInputSignatureComputer;
 import org.opensearch.searchrelevance.metrics.MetricsHelper;
@@ -350,6 +351,7 @@ public class ExperimentRunningManager {
 
         List<Map<String, Object>> finalResults = Collections.synchronizedList(new ArrayList<>());
         AtomicInteger pendingQueries = new AtomicInteger(queryEntries.size());
+        Map<String, Map<String, String>> queryTextToDocIdToRatings = JudgmentRatingsMapper.buildQueryTextToDocIdRatingsMap(judgments);
         executeExperimentEvaluation(
             context,
             searchConfigurations,
@@ -358,6 +360,7 @@ public class ExperimentRunningManager {
             pendingQueries,
             hasFailure,
             context.getRequest().getJudgmentList(),
+            queryTextToDocIdToRatings,
             cancellationToken,
             actuallyFinished
         );
@@ -468,6 +471,7 @@ public class ExperimentRunningManager {
         AtomicInteger pendingQueries,
         AtomicBoolean hasFailure,
         List<String> judgmentList,
+        Map<String, Map<String, String>> queryTextToDocIdToRatings,
         ExperimentCancellationToken cancellationToken,
         CountDownLatch actuallyFinished
     ) {
@@ -519,6 +523,7 @@ public class ExperimentRunningManager {
                     queryEntry,
                     searchConfigurations,
                     judgmentList,
+                    queryTextToDocIdToRatings,
                     request.getSize(),
                     request.getScheduledExperimentResultId(),
                     cancellationToken,
@@ -544,6 +549,7 @@ public class ExperimentRunningManager {
                     queryEntry,
                     searchConfigurations,
                     judgmentList,
+                    queryTextToDocIdToRatings,
                     request.getSize(),
                     hasFailure,
                     request.getScheduledExperimentResultId(),
