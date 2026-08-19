@@ -9,26 +9,25 @@ package org.opensearch.searchrelevance.experiment;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.when;
 
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.Before;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.opensearch.ResourceNotFoundException;
-import org.opensearch.action.search.SearchResponse;
 import org.opensearch.core.action.ActionListener;
-import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.executors.ExperimentTaskManager;
+import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.model.QuerySetEntry;
 import org.opensearch.searchrelevance.model.SearchConfigurationDetails;
 import org.opensearch.searchrelevance.scheduler.ExperimentCancellationToken;
@@ -37,8 +36,6 @@ import org.opensearch.test.OpenSearchTestCase;
 import lombok.SneakyThrows;
 
 public class HybridOptimizerExperimentProcessorTests extends OpenSearchTestCase {
-    @Mock
-    private JudgmentDao judgmentDao;
 
     @Mock
     private ExperimentTaskManager taskManager;
@@ -50,36 +47,48 @@ public class HybridOptimizerExperimentProcessorTests extends OpenSearchTestCase 
     public void setUp() {
         super.setUp();
         MockitoAnnotations.openMocks(this);
-        processor = new HybridOptimizerExperimentProcessor(judgmentDao, taskManager);
+        processor = new HybridOptimizerExperimentProcessor(taskManager);
     }
 
     /**
-     * Run experiment after deleting a judgment
+     * When ratings are missing for the query, the processor continues with an empty map.
      */
-    public void testRunExperimentAfterDeletedJudgment_TransitionsToError() throws InterruptedException {
-        // Setup test data
+    public void testRunExperimentWithNoRatingsForQuery_ContinuesWithEmptyRatings() throws InterruptedException {
         String experimentId = "exp1";
         String queryText = "hello world";
         List<String> judgmentList = List.of("judgment1");
+        Map<String, Map<String, String>> queryTextToDocIdToRatings = Map.of();
         Map<String, SearchConfigurationDetails> searchConfigs = Map.of(
             "config1",
             SearchConfigurationDetails.builder().index("idx").query("q").pipeline("p").build()
         );
 
-        // Mock deleted judgment
-        doAnswer(invocation -> {
-            ActionListener<SearchResponse> listener = invocation.getArgument(1);
-            listener.onFailure(new ResourceNotFoundException("Document not found"));
-            return null;
-        }).when(judgmentDao).getJudgment(any(), any());
+        when(
+            taskManager.scheduleTasksAsync(
+                any(ExperimentType.class),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(QuerySetEntry.class),
+                any(Integer.class),
+                any(List.class),
+                any(List.class),
+                any(Map.class),
+                any(Map.class),
+                any(AtomicBoolean.class),
+                any(),
+                any(),
+                any(ExperimentCancellationToken.class)
+            )
+        ).thenReturn(CompletableFuture.completedFuture(Map.of("evaluationResults", List.of())));
 
-        AtomicBoolean failureTriggered = new AtomicBoolean(false);
         CountDownLatch latch = new CountDownLatch(1);
-
+        AtomicBoolean failureTriggered = new AtomicBoolean(false);
         ActionListener<Map<String, Object>> listener = new ActionListener<>() {
             @Override
             public void onResponse(Map<String, Object> response) {
-                fail("Experiment should not succeed when judgment is deleted");
+                latch.countDown();
             }
 
             @Override
@@ -94,6 +103,7 @@ public class HybridOptimizerExperimentProcessorTests extends OpenSearchTestCase 
             new QuerySetEntry(queryText, Map.of()),
             searchConfigs,
             judgmentList,
+            queryTextToDocIdToRatings,
             10,
             "run1",
             new ExperimentCancellationToken(experimentId),
@@ -101,61 +111,77 @@ public class HybridOptimizerExperimentProcessorTests extends OpenSearchTestCase 
             listener
         );
 
-        boolean completed = latch.await(1, TimeUnit.SECONDS);
-        assertTrue("Listener should complete within timeout", completed);
-        assertTrue("Failure listener should be triggered on deleted judgment", failureTriggered.get());
+        assertTrue("Listener should complete within timeout", latch.await(1, TimeUnit.SECONDS));
+        assertFalse("Failure listener should not be triggered when ratings are missing", failureTriggered.get());
     }
 
     /**
-     * Concurrent failures → single failure notification
+     * Verify pre-built ratings are passed to the task manager for the current query.
      */
-    public void testConcurrentDeletedJudgments_SingleFailureNotification() {
-        // Setup test data
+    public void testPreBuiltRatingsArePassedToTaskManager() throws InterruptedException {
         String experimentId = "exp2";
         String queryText = "query";
-        List<String> judgmentList = List.of("judgmentA", "judgmentB", "judgmentC");
+        String otherQueryText = "other query";
+        List<String> judgmentList = List.of("judgmentA");
+        Map<String, Map<String, String>> queryTextToDocIdToRatings = Map.of(
+            queryText,
+            Map.of("doc1", "5", "doc2", "3"),
+            otherQueryText,
+            Map.of("doc3", "1")
+        );
         Map<String, SearchConfigurationDetails> searchConfigs = Map.of(
             "config1",
             SearchConfigurationDetails.builder().index("i").query("q").pipeline("p").build()
         );
 
-        // Mock deleted judgment
+        AtomicBoolean captured = new AtomicBoolean(false);
         doAnswer(invocation -> {
-            ActionListener<SearchResponse> listener = invocation.getArgument(1);
-            listener.onFailure(new ResourceNotFoundException("Document not found"));
-            return null;
-        }).when(judgmentDao).getJudgment(any(), any());
+            @SuppressWarnings("unchecked")
+            Map<String, String> docIdToScores = invocation.getArgument(9);
+            captured.set(true);
+            assertEquals(2, docIdToScores.size());
+            assertEquals("5", docIdToScores.get("doc1"));
+            assertEquals("3", docIdToScores.get("doc2"));
+            assertNull(docIdToScores.get("doc3"));
+            return CompletableFuture.completedFuture(Map.of("evaluationResults", List.of()));
+        }).when(taskManager)
+            .scheduleTasksAsync(
+                any(ExperimentType.class),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(QuerySetEntry.class),
+                any(Integer.class),
+                any(List.class),
+                any(List.class),
+                any(Map.class),
+                any(Map.class),
+                any(AtomicBoolean.class),
+                any(),
+                any(),
+                any(ExperimentCancellationToken.class)
+            );
 
-        AtomicInteger failureCount = new AtomicInteger(0);
-        ActionListener<Map<String, Object>> listener = new ActionListener<>() {
-            @Override
-            public void onResponse(Map<String, Object> response) {
-                fail("Experiment should not succeed when judgment is deleted");
-            }
-
-            @Override
-            public void onFailure(Exception e) {
-                failureCount.incrementAndGet();
-            }
-        };
-
+        CountDownLatch latch = new CountDownLatch(1);
         processor.processHybridOptimizerExperiment(
             experimentId,
             new QuerySetEntry(queryText, Map.of()),
             searchConfigs,
             judgmentList,
+            queryTextToDocIdToRatings,
             10,
             "run2",
             new ExperimentCancellationToken(experimentId),
             new ConcurrentHashMap<>(),
-            listener
+            ActionListener.wrap(r -> latch.countDown(), e -> latch.countDown())
         );
 
-        assertEquals("Only one onFailure() should trigger for concurrent failures", 1L, failureCount.get());
+        assertTrue("Listener should complete within timeout", latch.await(1, TimeUnit.SECONDS));
+        assertTrue("Task manager should have been invoked with ratings", captured.get());
     }
 
     public void testCancelWhenProcessingSearchConfigs() {
-        // Setup test data
         String experimentId = "test-experiment-id";
         String queryText = "test query";
         Map<String, SearchConfigurationDetails> searchConfigurations = new HashMap<>();
