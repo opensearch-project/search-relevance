@@ -25,6 +25,13 @@ public class TokenizerUtil {
     // cl100k_base is used by GPT-3.5/GPT-4 and is a good default choice
     private static final Encoding encoding = registry.getEncoding(EncodingType.CL100K_BASE);
 
+    // Cut-point separators, highest priority first: paragraph, line, sentence, clause, word.
+    private static final String[] BOUNDARY_SEPARATORS = { "\n\n", "\n", ". ", "! ", "? ", "; ", ", ", " " };
+    // Emitted when a token cut lands inside a multi-byte codepoint (e.g. CJK, emoji).
+    private static final char REPLACEMENT_CHAR = '\uFFFD';
+    // Lowest fraction of the fitting window to keep when backing up to a coarser boundary.
+    private static final double MIN_RETENTION_RATIO = 0.5;
+
     /**
      * helper method to count tokens if no model type is provided
      */
@@ -56,6 +63,49 @@ public class TokenizerUtil {
             tokenList.add(tokens.get(i));
         }
         return decode(tokenList.subList(0, tokenLimit));
+    }
+
+    /**
+     * helper method to truncate text to token limit at a clean separator boundary,
+     * falling back to a hard token cut when none fits
+     */
+    public static String truncateStringAtBoundary(String text, int tokenLimit) {
+        if (text == null || text.isEmpty()) {
+            return text;
+        }
+        if (tokenLimit <= 0) {
+            return "";
+        }
+        if (countTokens(text) <= tokenLimit) { // no truncation needed
+            return text;
+        }
+
+        // largest window that fits; any prefix of it is still within the budget
+        String window = stripTrailingReplacementChars(truncateString(text, tokenLimit));
+        if (window.isEmpty()) {
+            return window;
+        }
+
+        int minLength = (int) Math.floor(window.length() * MIN_RETENTION_RATIO);
+        for (String separator : BOUNDARY_SEPARATORS) {
+            int idx = window.lastIndexOf(separator);
+            if (idx <= 0) {
+                continue;
+            }
+            int cut = idx + separator.length(); // keep the separator with the retained text
+            if (cut >= minLength) {
+                return window.substring(0, cut);
+            }
+        }
+        return window; // no acceptable boundary: hard cut
+    }
+
+    private static String stripTrailingReplacementChars(String text) {
+        int end = text.length();
+        while (end > 0 && text.charAt(end - 1) == REPLACEMENT_CHAR) {
+            end--;
+        }
+        return text.substring(0, end);
     }
 
     // Method to decode tokens back to text

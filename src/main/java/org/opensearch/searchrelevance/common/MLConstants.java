@@ -141,6 +141,9 @@ public class MLConstants {
     public static final String INPUT_FORMAT_SEARCH = "SearchText - %s; Hits - %s";
     public static final String INPUT_FORMAT_SEARCH_WITH_REFERENCE = "SearchText: %s; Reference: %s; Hits: %s";
 
+    // appended to a hit's content when truncated, so the LLM knows the document is incomplete
+    public static final String TRUNCATION_MARKER = "...[content truncated]";
+
     public static String escapeJson(String str) {
         if (str == null) {
             return "";

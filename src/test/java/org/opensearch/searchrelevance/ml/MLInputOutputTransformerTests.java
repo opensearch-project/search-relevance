@@ -10,6 +10,7 @@ package org.opensearch.searchrelevance.ml;
 import static org.mockito.Mockito.mock;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -350,6 +351,134 @@ public class MLInputOutputTransformerTests extends OpenSearchTestCase {
             LLMJudgmentRatingType.SCORE0_1
         );
         assertTrue(inputs.isEmpty());
+    }
+
+    // ============================================
+    // Boundary-aware truncation tests
+    // ============================================
+
+    public void testCreateMLInputs_oversizedHitIsMarkedTruncated() {
+        int limit = overheadTokens() + 40;
+        Map<String, String> hits = new HashMap<>();
+        hits.put("doc1", longContent());
+
+        List<MLInput> inputs = transformer.createMLInputs(
+            limit,
+            "q",
+            new HashMap<>(),
+            hits,
+            "{{searchText}} {{hits}}",
+            LLMJudgmentRatingType.SCORE0_1
+        );
+
+        assertEquals(1, inputs.size());
+        assertTrue("truncated hit should carry the truncation marker", userPromptOf(inputs.get(0)).contains("[content truncated]"));
+    }
+
+    public void testCreateMLInputs_oversizedHitStaysWithinTokenLimitAfterWrapping() {
+        int limit = overheadTokens() + 40;
+        Map<String, String> hits = new HashMap<>();
+        hits.put("doc1", longContent());
+
+        List<MLInput> inputs = transformer.createMLInputs(
+            limit,
+            "q",
+            new HashMap<>(),
+            hits,
+            "{{searchText}} {{hits}}",
+            LLMJudgmentRatingType.SCORE0_1
+        );
+
+        assertEquals(1, inputs.size());
+        int actual = TokenizerUtil.countTokens(messagesOf(inputs.get(0)));
+        assertTrue("wrapped payload (" + actual + ") must not exceed the token limit (" + limit + ")", actual <= limit);
+    }
+
+    public void testCreateMLInputs_oversizedHitAfterNormalHitIsStillTruncated() {
+        int limit = overheadTokens() + 40;
+        // LinkedHashMap forces the oversized hit to be processed after a normal one
+        Map<String, String> hits = new LinkedHashMap<>();
+        hits.put("normal", "short content");
+        hits.put("oversized", longContent());
+
+        List<MLInput> inputs = transformer.createMLInputs(
+            limit,
+            "q",
+            new HashMap<>(),
+            hits,
+            "{{searchText}} {{hits}}",
+            LLMJudgmentRatingType.SCORE0_1
+        );
+
+        for (MLInput input : inputs) {
+            int actual = TokenizerUtil.countTokens(messagesOf(input));
+            assertTrue("every chunk must stay within the limit, but one was " + actual, actual <= limit);
+        }
+        boolean marked = inputs.stream().anyMatch(input -> userPromptOf(input).contains("[content truncated]"));
+        assertTrue("oversized hit following a normal hit must still be truncated and marked", marked);
+    }
+
+    public void testCreateMLInputs_normalSizedHitIsNotMarked() {
+        Map<String, String> hits = new HashMap<>();
+        hits.put("doc1", "a perfectly reasonable short description");
+
+        List<MLInput> inputs = transformer.createMLInputs(
+            10000,
+            "q",
+            new HashMap<>(),
+            hits,
+            "{{searchText}} {{hits}}",
+            LLMJudgmentRatingType.SCORE0_1
+        );
+
+        assertEquals(1, inputs.size());
+        assertFalse("content that fits must not be marked truncated", userPromptOf(inputs.get(0)).contains("[content truncated]"));
+    }
+
+    public void testCreateMLInputs_tinyLimitStillProducesMarkedBestEffortChunk() {
+        Map<String, String> hits = new HashMap<>();
+        hits.put("doc1", longContent());
+        // limit far below the fixed wrapping overhead: cannot truly fit, but must still return a
+        // single best-effort chunk (marked), without looping forever or throwing
+        List<MLInput> inputs = transformer.createMLInputs(
+            5,
+            "q",
+            new HashMap<>(),
+            hits,
+            "{{searchText}} {{hits}}",
+            LLMJudgmentRatingType.SCORE0_1
+        );
+
+        assertEquals(1, inputs.size());
+        assertTrue("best-effort truncated chunk should still be marked", userPromptOf(inputs.get(0)).contains("[content truncated]"));
+    }
+
+    // fixed wrapping overhead (system prompt + JSON shell + template) measured on a tiny hit
+    private int overheadTokens() {
+        MLInput tiny = transformer.createMLInput(
+            "q",
+            new HashMap<>(),
+            Map.of("d", "x"),
+            "{{searchText}} {{hits}}",
+            LLMJudgmentRatingType.SCORE0_1
+        );
+        return TokenizerUtil.countTokens(messagesOf(tiny));
+    }
+
+    private static String longContent() {
+        StringBuilder big = new StringBuilder();
+        for (int i = 0; i < 1000; i++) {
+            big.append("very long descriptive token text ");
+        }
+        return big.toString();
+    }
+
+    private static String messagesOf(MLInput input) {
+        return ((RemoteInferenceInputDataSet) input.getInputDataset()).getParameters().get("messages");
+    }
+
+    private static String userPromptOf(MLInput input) {
+        return ((RemoteInferenceInputDataSet) input.getInputDataset()).getParameters().get("user_prompt");
     }
 
     private static MLOutput outputWithDataMap(Map<String, ?> dataMap) {

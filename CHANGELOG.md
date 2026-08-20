@@ -9,6 +9,7 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 ### Enhancements
 - Stop re-fetching judgments on every query for Hybrid and Pointwise experiments ([#560](https://github.com/opensearch-project/search-relevance/pull/560))
 - Add retry endpoint for failed LLM judgments, existingJudgments parameter for rating reuse, and remove broken global cache ([#525](https://github.com/opensearch-project/search-relevance/issues/525))
+- Truncate oversized LLM judgment hits at clean boundaries with a truncation marker and always truncate a solo-oversized hit regardless of ordering ([#563](https://github.com/opensearch-project/search-relevance/pull/563))
 
 ### Bug Fixes
 - Exclude vector fields (`knn_vector`, `rank_features`, `sparse_vector`) from LLM judgment prompts when `contextFields` is not specified ([#565](https://github.com/opensearch-project/search-relevance/pull/565))

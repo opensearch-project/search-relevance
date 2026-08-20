@@ -21,6 +21,7 @@ import static org.opensearch.searchrelevance.common.MLConstants.RESPONSE_CONTENT
 import static org.opensearch.searchrelevance.common.MLConstants.RESPONSE_FIELD;
 import static org.opensearch.searchrelevance.common.MLConstants.RESPONSE_FORMAT_TEMPLATE;
 import static org.opensearch.searchrelevance.common.MLConstants.RESPONSE_MESSAGE_FIELD;
+import static org.opensearch.searchrelevance.common.MLConstants.TRUNCATION_MARKER;
 import static org.opensearch.searchrelevance.common.MLConstants.escapeJson;
 
 import java.io.IOException;
@@ -50,6 +51,8 @@ import lombok.extern.log4j.Log4j2;
 @Log4j2
 public class MLInputOutputTransformer {
 
+    private static final int MAX_TRUNCATION_ATTEMPTS = 5;
+
     public List<MLInput> createMLInputs(
         int tokenLimit,
         String searchText,
@@ -69,11 +72,17 @@ public class MLInputOutputTransformer {
             int totalTokens = TokenizerUtil.countTokens(messages);
 
             if (totalTokens > tokenLimit) {
-                if (currentChunk.isEmpty()) {
-                    mlInputs.add(handleOversizedEntry(entry, searchText, referenceData, tokenLimit, promptTemplate, ratingType));
-                } else {
+                // flush the buffered chunk, then evaluate this entry on its own so a solo-oversized
+                // entry is always truncated regardless of its position in the unordered hits
+                if (!currentChunk.isEmpty()) {
                     mlInputs.add(createMLInput(searchText, referenceData, currentChunk, promptTemplate, ratingType));
                     currentChunk = new HashMap<>();
+                }
+                Map<String, String> singleEntry = Map.of(entry.getKey(), entry.getValue());
+                String singleMessages = buildMessagesArray(searchText, referenceData, singleEntry, promptTemplate, ratingType);
+                if (TokenizerUtil.countTokens(singleMessages) > tokenLimit) {
+                    mlInputs.add(handleOversizedEntry(entry, searchText, referenceData, tokenLimit, promptTemplate, ratingType));
+                } else {
                     currentChunk.put(entry.getKey(), entry.getValue());
                 }
             } else {
@@ -98,15 +107,54 @@ public class MLInputOutputTransformer {
     ) {
         log.warn("Entry with key {} causes total tokens to exceed limit of {}", entry.getKey(), tokenLimit);
 
-        Map<String, String> testChunk = Map.of(entry.getKey(), entry.getValue());
+        String originalValue = entry.getValue();
+        Map<String, String> testChunk = Map.of(entry.getKey(), originalValue);
         String testMessages = buildMessagesArray(searchText, referenceData, testChunk, promptTemplate, ratingType);
         int excessTokens = TokenizerUtil.countTokens(testMessages) - tokenLimit;
 
-        int currentTokens = TokenizerUtil.countTokens(entry.getValue());
-        String truncatedValue = TokenizerUtil.truncateString(entry.getValue(), Math.max(1, currentTokens - excessTokens));
+        int currentTokens = TokenizerUtil.countTokens(originalValue);
+        int markerTokens = TokenizerUtil.countTokens(TRUNCATION_MARKER);
+
+        // reserve room for the wrapping overhead and the appended marker
+        int targetValueTokens = Math.max(1, currentTokens - excessTokens - markerTokens);
+
+        // re-measure against the exact wrapped form and shrink until it fits; bounded and
+        // monotonically decreasing toward a floor of 1, so it always terminates
+        String truncatedValue = originalValue;
+        int finalTokens = 0;
+        for (int attempt = 0; attempt < MAX_TRUNCATION_ATTEMPTS; attempt++) {
+            String cut = TokenizerUtil.truncateStringAtBoundary(originalValue, targetValueTokens);
+            truncatedValue = appendTruncationMarker(cut, originalValue);
+
+            Map<String, String> candidateChunk = Map.of(entry.getKey(), truncatedValue);
+            finalTokens = TokenizerUtil.countTokens(
+                buildMessagesArray(searchText, referenceData, candidateChunk, promptTemplate, ratingType)
+            );
+            if (finalTokens <= tokenLimit || targetValueTokens <= 1) {
+                break;
+            }
+            targetValueTokens = Math.max(1, targetValueTokens - (finalTokens - tokenLimit) - 1);
+        }
+
+        if (finalTokens > tokenLimit) {
+            log.warn(
+                "Entry with key {} still exceeds limit {} after truncation ({} tokens); tokenLimit may be too small",
+                entry.getKey(),
+                tokenLimit,
+                finalTokens
+            );
+        }
 
         Map<String, String> singleEntryChunk = Map.of(entry.getKey(), truncatedValue);
         return createMLInput(searchText, referenceData, singleEntryChunk, promptTemplate, ratingType);
+    }
+
+    // mark only content that was actually shortened, so a hit that fits is never mislabeled
+    private static String appendTruncationMarker(String truncated, String original) {
+        if (truncated.length() < original.length()) {
+            return truncated + TRUNCATION_MARKER;
+        }
+        return truncated;
     }
 
     public MLInput createMLInput(
