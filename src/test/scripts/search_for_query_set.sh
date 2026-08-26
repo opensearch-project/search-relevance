@@ -1,3 +1,6 @@
+# Copyright OpenSearch Contributors
+# SPDX-License-Identifier: Apache-2.0
+
 # Exact match on a name.
 curl -X POST "localhost:9200/_plugins/_search_relevance/query_sets/_search" \
   -H "Content-Type: application/json" \
