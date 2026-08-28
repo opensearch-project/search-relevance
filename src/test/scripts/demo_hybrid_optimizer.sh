@@ -1,5 +1,8 @@
 #!/bin/bash -e
 
+# Copyright OpenSearch Contributors
+# SPDX-License-Identifier: Apache-2.0
+
 # This script quickly sets up a local Search Relevance Workbench from scratch with:
 # * An "ecommerce" style sample data
 # You can now exercise all the capabilities of Hybrid Optimizer!
