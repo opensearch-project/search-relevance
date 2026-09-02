@@ -21,6 +21,7 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 - Retry the search-config write in the restart-upgrade BWC test until the upgraded cluster settles, so a transient cluster-manager re-election does not fail the mapping migration assertion ([#564](https://github.com/opensearch-project/search-relevance/pull/564))
 
 ### Documentation
+- Add LTR model registry design doc ([#582](https://github.com/opensearch-project/search-relevance/pull/582))
 
 ### Maintenance
 
