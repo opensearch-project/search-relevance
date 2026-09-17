@@ -1,3 +1,6 @@
+# Copyright OpenSearch Contributors
+# SPDX-License-Identifier: Apache-2.0
+
 # Search for experiments by ID
 curl -X POST "localhost:9200/_plugins/_search_relevance/experiments/_search" \
   -H "Content-Type: application/json" \

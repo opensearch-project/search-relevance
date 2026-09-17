@@ -1,3 +1,6 @@
+# Copyright OpenSearch Contributors
+# SPDX-License-Identifier: Apache-2.0
+
 curl -s -X POST "http://localhost:9200/sample_index/_doc/1" \
 -H "Content-type: application/json" \
 -d'{
