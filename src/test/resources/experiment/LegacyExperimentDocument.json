@@ -1,0 +1,13 @@
+{
+  "id": "legacy-experiment",
+  "timestamp": "2026-01-01T00:00:00.000Z",
+  "type": "PAIRWISE_COMPARISON",
+  "status": "COMPLETED",
+  "querySetId": "legacy-query-set",
+  "searchConfigurationList": [],
+  "judgmentList": [],
+  "size": 0,
+  "isScheduled": false,
+  "scheduledExperimentJobId": null,
+  "results": []
+}

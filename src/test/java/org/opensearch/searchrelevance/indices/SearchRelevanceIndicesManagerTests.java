@@ -11,8 +11,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.EXPERIMENT;
 import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.QUERY_SET;
 
 import java.io.IOException;
@@ -803,46 +805,131 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
     }
 
     /**
-     * Test that when mapping update fails all 3 retries, stepListener.onFailure is called.
+     * Test that exhausted mapping update retries do not block the pending operation.
      */
-    public void testCreateIndexIfAbsent_MappingUpdateFailsAfterRetries_ServiceFails() {
-        // Setup: index exists with older schema version
-        when(metadata.hasIndex(QUERY_SET.getIndexName())).thenReturn(true);
-
-        IndexMetadata indexMetadata = mock(IndexMetadata.class);
-        MappingMetadata mappingMetadata = mock(MappingMetadata.class);
-        when(metadata.index(QUERY_SET.getIndexName())).thenReturn(indexMetadata);
-        when(indexMetadata.mapping()).thenReturn(mappingMetadata);
-
-        // Set explicit schema_version = -1 (older than current version 0)
-        Map<String, Object> metaMap = new HashMap<>();
-        metaMap.put(SearchRelevanceIndices.META_SCHEMA_VERSION_KEY, -1);
-        Map<String, Object> mappingSource = new HashMap<>();
-        mappingSource.put("_meta", metaMap);
-        when(mappingMetadata.sourceAsMap()).thenReturn(mappingSource);
-
-        // Mock putMapping to always fail (async 2-arg version)
-        doAnswer(invocation -> {
-            ActionListener<org.opensearch.action.support.clustermanager.AcknowledgedResponse> putListener = invocation.getArgument(1);
-            putListener.onFailure(new RuntimeException("Mapping update failed"));
-            return null;
-        }).when(indicesAdminClient).putMapping(any(PutMappingRequest.class), any(ActionListener.class));
+    public void testCreateIndexIfAbsent_MappingUpdateFailsAfterRetries_ContinuesWithWarning() {
+        mockExistingIndexWithSchemaVersion(QUERY_SET, -1);
+        mockPutMappingFailure(new RuntimeException("Mapping update failed"));
 
         StepListener<Void> stepListener = new StepListener<>();
         indicesManager.createIndexIfAbsent(QUERY_SET, stepListener);
 
-        // Verify: putMapping was called 3 times (initial + 2 retries)
-        verify(indicesAdminClient, org.mockito.Mockito.times(3)).putMapping(any(PutMappingRequest.class), any(ActionListener.class));
+        verify(indicesAdminClient, times(3)).putMapping(any(PutMappingRequest.class), any(ActionListener.class));
+        assertNull(stepListener.result());
+    }
 
-        // Verify: stepListener was called with failure
-        try {
-            stepListener.result();
-            fail("Expected exception from stepListener");
-        } catch (Exception e) {
-            assertTrue(e instanceof SearchRelevanceException);
-            assertTrue(e.getMessage().contains("Failed to update mapping"));
-            assertTrue(e.getMessage().contains("after 3 attempts"));
-        }
+    /**
+     * Test that a mapping type conflict is not retried.
+     */
+    public void testCreateIndexIfAbsent_MappingConflict_ContinuesWithoutRetrying() {
+        mockExistingIndexWithSchemaVersion(EXPERIMENT, -1);
+        mockPutMappingFailure(new IllegalArgumentException("mapper [isScheduled] cannot be changed from type [boolean] to [keyword]"));
+
+        StepListener<Void> stepListener = new StepListener<>();
+        indicesManager.createIndexIfAbsent(EXPERIMENT, stepListener);
+
+        verify(indicesAdminClient).putMapping(any(PutMappingRequest.class), any(ActionListener.class));
+        assertNull(stepListener.result());
+    }
+
+    /**
+     * Test that a cached mapping type conflict skips subsequent mapping updates.
+     */
+    public void testCreateIndexIfAbsent_MappingConflict_SkipsPutMappingOnSubsequentCalls() {
+        mockExistingIndexWithSchemaVersion(EXPERIMENT, -1);
+        mockPutMappingFailure(new IllegalArgumentException("mapper [futureField] cannot be changed from type [long] to [keyword]"));
+
+        StepListener<Void> firstListener = new StepListener<>();
+        indicesManager.createIndexIfAbsent(EXPERIMENT, firstListener);
+        StepListener<Void> secondListener = new StepListener<>();
+        indicesManager.createIndexIfAbsent(EXPERIMENT, secondListener);
+
+        verify(indicesAdminClient).putMapping(any(PutMappingRequest.class), any(ActionListener.class));
+        assertNull(firstListener.result());
+        assertNull(secondListener.result());
+    }
+
+    /**
+     * Test that a wrapped mapping type conflict is detected.
+     */
+    public void testCreateIndexIfAbsent_WrappedMappingConflict_ContinuesWithoutRetrying() {
+        mockExistingIndexWithSchemaVersion(EXPERIMENT, -1);
+        mockPutMappingFailure(
+            new RuntimeException("wrapped", new IllegalArgumentException("mapper [isScheduled] cannot be changed from type [boolean]"))
+        );
+
+        StepListener<Void> stepListener = new StepListener<>();
+        indicesManager.createIndexIfAbsent(EXPERIMENT, stepListener);
+
+        verify(indicesAdminClient).putMapping(any(PutMappingRequest.class), any(ActionListener.class));
+        assertNull(stepListener.result());
+    }
+
+    /**
+     * Test that an unrelated IllegalArgumentException is retried by a subsequent operation.
+     */
+    public void testCreateIndexIfAbsent_UnrelatedIllegalArgumentException_RetriesOnSubsequentCall() {
+        mockExistingIndexWithSchemaVersion(EXPERIMENT, -1);
+        mockPutMappingFailure(new IllegalArgumentException("invalid mapping parameter"));
+
+        StepListener<Void> firstListener = new StepListener<>();
+        indicesManager.createIndexIfAbsent(EXPERIMENT, firstListener);
+        StepListener<Void> secondListener = new StepListener<>();
+        indicesManager.createIndexIfAbsent(EXPERIMENT, secondListener);
+
+        verify(indicesAdminClient, times(6)).putMapping(any(PutMappingRequest.class), any(ActionListener.class));
+        assertNull(firstListener.result());
+        assertNull(secondListener.result());
+    }
+
+    /**
+     * Test that protected-index search executes after a mapping type conflict.
+     */
+    public void testListDocsOnProtectedIndex_MappingConflict_ExecutesSearch() {
+        mockExistingIndexWithSchemaVersion(EXPERIMENT, -1);
+        mockPutMappingFailure(new IllegalArgumentException("mapper [isScheduled] cannot be changed from type [boolean] to [keyword]"));
+
+        SearchResponse searchResponse = mock(SearchResponse.class);
+        doAnswer(invocation -> {
+            ActionListener<SearchResponse> searchListener = invocation.getArgument(1);
+            searchListener.onResponse(searchResponse);
+            return null;
+        }).when(client).search(any(SearchRequest.class), any(ActionListener.class));
+
+        SearchSourceBuilder sourceBuilder = new SearchSourceBuilder().query(QueryBuilders.matchAllQuery());
+        @SuppressWarnings("unchecked")
+        ActionListener<SearchResponse> listener = mock(ActionListener.class);
+
+        indicesManager.listDocsBySearchRequest(sourceBuilder, EXPERIMENT, listener);
+
+        verify(indicesAdminClient).putMapping(any(PutMappingRequest.class), any(ActionListener.class));
+        verify(client).search(any(SearchRequest.class), any(ActionListener.class));
+        verify(listener).onResponse(searchResponse);
+    }
+
+    /** Configures an existing index with the given schema version. */
+    private void mockExistingIndexWithSchemaVersion(final SearchRelevanceIndices index, final int schemaVersion) {
+        when(metadata.hasIndex(index.getIndexName())).thenReturn(true);
+
+        IndexMetadata indexMetadata = mock(IndexMetadata.class);
+        MappingMetadata mappingMetadata = mock(MappingMetadata.class);
+        when(metadata.index(index.getIndexName())).thenReturn(indexMetadata);
+        when(indexMetadata.mapping()).thenReturn(mappingMetadata);
+
+        Map<String, Object> metaMap = new HashMap<>();
+        metaMap.put(SearchRelevanceIndices.META_SCHEMA_VERSION_KEY, schemaVersion);
+        Map<String, Object> mappingSource = new HashMap<>();
+        mappingSource.put("_meta", metaMap);
+        when(mappingMetadata.sourceAsMap()).thenReturn(mappingSource);
+    }
+
+    /** Configures putMapping to fail with the given exception. */
+    private void mockPutMappingFailure(final Exception failure) {
+        doAnswer(invocation -> {
+            ActionListener<org.opensearch.action.support.clustermanager.AcknowledgedResponse> putListener = invocation.getArgument(1);
+            putListener.onFailure(failure);
+            return null;
+        }).when(indicesAdminClient).putMapping(any(PutMappingRequest.class), any(ActionListener.class));
     }
 
     /**

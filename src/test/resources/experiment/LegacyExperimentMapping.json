@@ -1,0 +1,21 @@
+{
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0
+  },
+  "mappings": {
+    "properties": {
+      "id": { "type": "keyword" },
+      "timestamp": { "type": "date", "format": "strict_date_time" },
+      "type": { "type": "keyword" },
+      "status": { "type": "keyword" },
+      "querySetId": { "type": "keyword" },
+      "searchConfigurationList": { "type": "keyword" },
+      "judgmentList": { "type": "keyword" },
+      "size": { "type": "keyword" },
+      "isScheduled": { "type": "boolean" },
+      "scheduledExperimentJobId": { "type": "keyword" },
+      "results": { "type": "object", "dynamic": false }
+    }
+  }
+}

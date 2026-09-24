@@ -11,10 +11,16 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import java.util.List;
 import java.util.Map;
 
+import org.apache.hc.core5.http.Header;
+import org.apache.hc.core5.http.HttpHeaders;
+import org.apache.hc.core5.http.message.BasicHeader;
 import org.opensearch.client.Response;
+import org.opensearch.client.ResponseException;
 import org.opensearch.searchrelevance.BaseSearchRelevanceIT;
+import org.opensearch.searchrelevance.common.PluginConstants;
 import org.opensearch.searchrelevance.indices.SearchRelevanceIndices;
 
 /**
@@ -112,6 +118,57 @@ public class IndexMappingVersionIT extends BaseSearchRelevanceIT {
     }
 
     /**
+     * Verifies search availability for a legacy Experiment index with isScheduled mapped as boolean.
+     */
+    public void testExperimentSearchContinuesWithLegacyBooleanMapping() throws Exception {
+        String indexName = PluginConstants.EXPERIMENT_INDEX;
+        List<Header> systemIndexHeaders = List.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT));
+
+        deleteIndexIfPresent(indexName, systemIndexHeaders);
+        try {
+            String legacyIndex = readTemplate("experiment/LegacyExperimentMapping.json");
+            Response createResponse = makeRequest(
+                adminClient(),
+                "PUT",
+                "/" + indexName,
+                null,
+                toHttpEntity(legacyIndex),
+                systemIndexHeaders
+            );
+            assertEquals(200, createResponse.getStatusLine().getStatusCode());
+
+            String legacyExperiment = readTemplate("experiment/LegacyExperimentDocument.json");
+            Response indexResponse = makeRequest(
+                adminClient(),
+                "PUT",
+                "/" + indexName + "/_doc/legacy-experiment",
+                Map.of("refresh", "true"),
+                toHttpEntity(legacyExperiment),
+                systemIndexHeaders
+            );
+            assertEquals(201, indexResponse.getStatusLine().getStatusCode());
+
+            String endpoint = PluginConstants.EXPERIMENTS_URI + "/_search";
+            Response firstSearch = makeRequest(client(), "GET", endpoint, null, null, null);
+            assertEquals(200, firstSearch.getStatusLine().getStatusCode());
+            assertSearchContainsLegacyExperiment(firstSearch);
+
+            Response secondSearch = makeRequest(client(), "GET", endpoint, null, null, null);
+            assertEquals(200, secondSearch.getStatusLine().getStatusCode());
+            assertSearchContainsLegacyExperiment(secondSearch);
+
+            Map<String, Object> mapping = getIndexMapping(indexName);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> properties = (Map<String, Object>) mapping.get("properties");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> isScheduled = (Map<String, Object>) properties.get("isScheduled");
+            assertEquals("boolean", isScheduled.get("type"));
+        } finally {
+            deleteIndexIfPresent(indexName, systemIndexHeaders);
+        }
+    }
+
+    /**
      * Helper method to verify an index has the expected schema_version in its mapping.
      */
     private void verifyIndexHasSchemaVersion(String indexName, int expectedVersion) throws Exception {
@@ -174,6 +231,35 @@ public class IndexMappingVersionIT extends BaseSearchRelevanceIT {
                 throw new IllegalArgumentException("Resource not found on classpath: " + resourcePath);
             }
             return new String(is.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void assertSearchContainsLegacyExperiment(Response response) throws Exception {
+        Map<String, Object> responseMap = convertToMap(response);
+        Map<String, Object> hits = (Map<String, Object>) responseMap.get("hits");
+        List<Map<String, Object>> documents = (List<Map<String, Object>>) hits.get("hits");
+        assertEquals(1, documents.size());
+        Map<String, Object> source = (Map<String, Object>) documents.get(0).get("_source");
+        assertEquals("legacy-experiment", source.get("id"));
+        assertEquals(Boolean.FALSE, source.get("isScheduled"));
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> getIndexMapping(String indexName) throws Exception {
+        Response mappingResponse = makeRequest(client(), "GET", "/" + indexName + "/_mapping", null, null, null);
+        Map<String, Object> mappingResponseMap = convertToMap(mappingResponse);
+        Map<String, Object> indexMapping = (Map<String, Object>) mappingResponseMap.get(indexName);
+        return (Map<String, Object>) indexMapping.get("mappings");
+    }
+
+    private void deleteIndexIfPresent(String indexName, List<Header> headers) throws Exception {
+        try {
+            makeRequest(adminClient(), "DELETE", "/" + indexName, null, null, headers);
+        } catch (ResponseException e) {
+            if (e.getResponse().getStatusLine().getStatusCode() != 404) {
+                throw e;
+            }
         }
     }
 

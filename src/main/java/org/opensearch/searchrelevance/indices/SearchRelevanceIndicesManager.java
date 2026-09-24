@@ -16,12 +16,15 @@ import java.io.InputStream;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.BiConsumer;
 
+import org.opensearch.ExceptionsHelper;
 import org.opensearch.ResourceAlreadyExistsException;
 import org.opensearch.ResourceNotFoundException;
 import org.opensearch.action.DocWriteRequest.OpType;
@@ -39,6 +42,7 @@ import org.opensearch.action.update.UpdateRequest;
 import org.opensearch.action.update.UpdateResponse;
 import org.opensearch.cluster.metadata.MappingMetadata;
 import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.common.Nullable;
 import org.opensearch.common.io.Streams;
 import org.opensearch.common.util.concurrent.ThreadContext;
 import org.opensearch.core.action.ActionListener;
@@ -66,18 +70,18 @@ import reactor.util.annotation.NonNull;
 @Log4j2
 public class SearchRelevanceIndicesManager {
 
+    private static final int MAX_MAPPING_UPDATE_RETRIES = 3;
+    private static final int MAPPING_UPDATE_ACK_TIMEOUT_SECONDS = 120;
+    private static final String MAPPING_TYPE_CONFLICT_MESSAGE_FRAGMENT = "cannot be changed from type";
+
     private final ClusterService clusterService;
     private final Client client;
+    private final Set<String> indicesWithMappingTypeConflicts = ConcurrentHashMap.newKeySet();
 
     public SearchRelevanceIndicesManager(@NonNull ClusterService clusterService, @NonNull Client client) {
         this.clusterService = clusterService;
         this.client = client;
     }
-
-    private static final int MAX_MAPPING_UPDATE_RETRIES = 3;
-
-    /** Upper bound for awaiting putMapping acknowledgement; accommodates slow cluster-state publication on busy clusters. */
-    private static final int MAPPING_UPDATE_ACK_TIMEOUT_SECONDS = 120;
 
     /**
      * Create a search relevance index if not exists, or update mapping if index exists but has older schema version.
@@ -96,6 +100,12 @@ public class SearchRelevanceIndicesManager {
 
                 if (existingVersion >= currentVersion) {
                     log.debug("Index [{}] already exists with schema version [{}], skipping update", indexName, existingVersion);
+                    stepListener.onResponse(null);
+                    return;
+                }
+
+                if (indicesWithMappingTypeConflicts.contains(indexName)) {
+                    log.debug("Skipping mapping update for index [{}] because a mapping type conflict was previously detected", indexName);
                     stepListener.onResponse(null);
                     return;
                 }
@@ -165,16 +175,22 @@ public class SearchRelevanceIndicesManager {
             return;
         }
 
-        // Existing version is older - update mapping (best-effort)
-        // If the update fails or times out (e.g., during rolling upgrade cluster transitions),
-        // log a warning and continue. Reads work fine with the old mapping, and the next
-        // write operation will retry the update.
+        if (indicesWithMappingTypeConflicts.contains(indexName)) {
+            return;
+        }
+
         try {
             log.info("Updating index [{}] mapping from schema version [{}] to [{}]", indexName, existingVersion, currentVersion);
             updateMappingSync(index);
         } catch (Exception e) {
+            IllegalArgumentException mappingConflict = findMappingTypeConflict(e);
+            if (mappingConflict != null) {
+                recordMappingTypeConflict(indexName, currentVersion, mappingConflict);
+                return;
+            }
             log.warn(
-                "Failed to update mapping for index [{}] from version [{}] to [{}]: {}. " + "Will retry on next operation.",
+                "Failed to update mapping for index [{}] from version [{}] to [{}]: {}. "
+                    + "The update will be retried on a subsequent operation.",
                 indexName,
                 existingVersion,
                 currentVersion,
@@ -279,11 +295,11 @@ public class SearchRelevanceIndicesManager {
     }
 
     /**
-     * Update the mapping for an existing index with retry logic.
-     * Retries up to maxRetries times before failing.
+     * Update the mapping for an existing index with retry logic. Mapping update failures do not prevent
+     * the pending index operation from executing against the existing mapping.
      * @param index the index whose mapping should be updated
      * @param maxRetries maximum number of retry attempts
-     * @param stepListener listener to notify on success or failure
+     * @param stepListener listener to notify once the update has been attempted
      */
     private void updateMappingWithRetry(final SearchRelevanceIndices index, final int maxRetries, final StepListener<Void> stepListener) {
         String indexName = index.getIndexName();
@@ -297,10 +313,16 @@ public class SearchRelevanceIndicesManager {
                 return;
             } catch (Exception e) {
                 lastException = e;
+                IllegalArgumentException mappingConflict = findMappingTypeConflict(e);
+                if (mappingConflict != null) {
+                    recordMappingTypeConflict(indexName, index.getSchemaVersion(), mappingConflict);
+                    stepListener.onResponse(null);
+                    return;
+                }
                 log.warn("Failed to update mapping for index [{}] on attempt {}/{}: {}", indexName, attempt, maxRetries, e.getMessage());
                 if (attempt < maxRetries) {
                     try {
-                        Thread.sleep(1000L * attempt); // Exponential backoff: 1s, 2s, 3s
+                        TimeUnit.SECONDS.sleep(attempt);
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
                         break;
@@ -309,14 +331,42 @@ public class SearchRelevanceIndicesManager {
             }
         }
 
-        // All retries exhausted - fail the service
-        log.error("Failed to update mapping for index [{}] after {} attempts", indexName, maxRetries);
-        stepListener.onFailure(
-            new SearchRelevanceException(
-                String.format(Locale.ROOT, "Failed to update mapping for index [%s] after %d attempts", indexName, maxRetries),
-                lastException,
-                RestStatus.INTERNAL_SERVER_ERROR
-            )
+        log.warn(
+            "Failed to update mapping for index [{}] after {} attempts: {}. "
+                + "The existing mapping will be used and a subsequent operation will retry the update.",
+            indexName,
+            maxRetries,
+            lastException == null ? "unknown cause" : lastException.getMessage()
+        );
+        stepListener.onResponse(null);
+    }
+
+    /**
+     * Returns the field type conflict in the exception chain, or {@code null} when none is present.
+     */
+    @Nullable
+    private static IllegalArgumentException findMappingTypeConflict(final Exception exception) {
+        Throwable cause = ExceptionsHelper.unwrap(exception, IllegalArgumentException.class);
+        if (cause instanceof IllegalArgumentException mappingConflict
+            && mappingConflict.getMessage() != null
+            && mappingConflict.getMessage().contains(MAPPING_TYPE_CONFLICT_MESSAGE_FRAGMENT)) {
+            return mappingConflict;
+        }
+        return null;
+    }
+
+    private void recordMappingTypeConflict(
+        final String indexName,
+        final int schemaVersion,
+        final IllegalArgumentException mappingConflict
+    ) {
+        indicesWithMappingTypeConflicts.add(indexName);
+        log.warn(
+            "Mapping update for index [{}] to schema version [{}] conflicts with the existing mapping: {}. "
+                + "Subsequent mapping updates for this index will be skipped.",
+            indexName,
+            schemaVersion,
+            mappingConflict.getMessage()
         );
     }
 
