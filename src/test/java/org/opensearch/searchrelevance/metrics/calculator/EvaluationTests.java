@@ -9,6 +9,7 @@ package org.opensearch.searchrelevance.metrics.calculator;
 
 import java.util.*;
 
+import org.opensearch.searchrelevance.metrics.EvaluationMetrics;
 import org.opensearch.test.OpenSearchTestCase;
 
 /**
@@ -282,5 +283,41 @@ public class EvaluationTests extends OpenSearchTestCase {
         // Empty results -> 0.0
         dcg = Evaluation.calculateDCGAtK(Collections.emptyList(), this.judgments, 5);
         assertEquals(0.0, dcg, 0.001);
+    }
+
+    // ----------------------------------------------------------------
+    // Invalid stored ratings fail loudly
+    // ----------------------------------------------------------------
+
+    public void testInvalidRatingFailsEvaluationWithOffendingDocument() {
+        for (String invalid : List.of("banana", "NaN", "Infinity", "-Infinity")) {
+            // d9 is not retrieved: the bad rating must still be reported, since the threshold, Recall
+            // and IDCG read the whole judgment set.
+            Map<String, String> poisoned = Map.of("d1", "1", "d2", "2", "d9", invalid);
+            IllegalArgumentException e = expectThrows(
+                IllegalArgumentException.class,
+                () -> EvaluationMetrics.calculateEvaluationMetrics(List.of("d1", "d2"), poisoned, 5)
+            );
+            assertTrue(e.getMessage().contains("[" + invalid + "]"));
+            assertTrue(e.getMessage().contains("[d9]"));
+        }
+    }
+
+    public void testRoundToTwoDecimals() {
+        assertEquals(0.33, Evaluation.roundToTwoDecimals(1.0 / 3), 0.0);
+        for (double invalid : new double[] { Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY, Math.pow(2, 999) }) {
+            expectThrows(IllegalArgumentException.class, () -> Evaluation.roundToTwoDecimals(invalid));
+        }
+    }
+
+    public void testExtremeRatingFailsEvaluation() {
+        // 2^999 is finite but too large to round, and 2^1e308 overflows to Infinity; neither may be
+        // reported as a score (previously Long.MAX_VALUE / 100 and NaN -> 0 respectively).
+        for (String rating : List.of("999", "1e308")) {
+            expectThrows(
+                IllegalArgumentException.class,
+                () -> EvaluationMetrics.calculateEvaluationMetrics(List.of("d1"), Map.of("d1", rating), 1)
+            );
+        }
     }
 }
