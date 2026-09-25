@@ -30,9 +30,11 @@ import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.core.rest.RestStatus;
 import org.opensearch.search.SearchHit;
 import org.opensearch.search.SearchHits;
 import org.opensearch.searchrelevance.dao.JudgmentDao;
+import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.Judgment;
 import org.opensearch.searchrelevance.model.JudgmentType;
@@ -363,6 +365,199 @@ public class UpdateJudgmentRatingsTransportActionTests extends OpenSearchTestCas
         verify(listener).onFailure(exceptionCaptor.capture());
         assertTrue(exceptionCaptor.getValue().getMessage().contains("Query not found in judgment"));
         verify(judgmentDao, never()).updateJudgment(any(), anyLong(), anyLong(), any());
+    }
+
+    public void testUpdate_UnknownDocId_Returns400AndWritesNothing() {
+        // docId "42" is neither rated nor failed under "superhero": manual edits must not add new
+        // documents to a judgment, and the valid first adjustment must not be persisted either.
+        Map<String, Object> source = buildJudgmentSource(JudgmentType.LLM_JUDGMENT.name(), AsyncStatus.COMPLETED.name());
+        SearchResponse loaded = buildMockSearchResponse(source);
+        when(judgmentDao.getJudgmentSync("ok-id")).thenReturn(loaded);
+
+        UpdateJudgmentRatingsRequest request = new UpdateJudgmentRatingsRequest(
+            "ok-id",
+            List.of(new RatingAdjustment("superhero", "1", "0.3"), new RatingAdjustment("superhero", "42", "0.7"))
+        );
+        ActionListener<IndexResponse> listener = mock(ActionListener.class);
+        action.doExecute(null, request, listener);
+
+        ArgumentCaptor<Exception> exceptionCaptor = ArgumentCaptor.forClass(Exception.class);
+        verify(listener).onFailure(exceptionCaptor.capture());
+        assertTrue(exceptionCaptor.getValue() instanceof SearchRelevanceException);
+        assertEquals(RestStatus.BAD_REQUEST, ((SearchRelevanceException) exceptionCaptor.getValue()).status());
+        assertTrue(exceptionCaptor.getValue().getMessage().contains("is not part of query"));
+        verify(judgmentDao, never()).updateJudgment(any(), anyLong(), anyLong(), any());
+    }
+
+    public void testUpdate_RelevantIrrelevantJudgment_RejectsNonBinaryRating() {
+        Map<String, Object> source = buildJudgmentSource(JudgmentType.LLM_JUDGMENT.name(), AsyncStatus.COMPLETED.name());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> metadata = (Map<String, Object>) source.get("metadata");
+        metadata.put("llmJudgmentRatingType", "RELEVANT_IRRELEVANT");
+        SearchResponse loaded = buildMockSearchResponse(source);
+        when(judgmentDao.getJudgmentSync("binary-id")).thenReturn(loaded);
+
+        UpdateJudgmentRatingsRequest request = new UpdateJudgmentRatingsRequest(
+            "binary-id",
+            List.of(new RatingAdjustment("superhero", "1", "0.5"))
+        );
+        ActionListener<IndexResponse> listener = mock(ActionListener.class);
+        action.doExecute(null, request, listener);
+
+        ArgumentCaptor<Exception> exceptionCaptor = ArgumentCaptor.forClass(Exception.class);
+        verify(listener).onFailure(exceptionCaptor.capture());
+        assertEquals(RestStatus.BAD_REQUEST, ((SearchRelevanceException) exceptionCaptor.getValue()).status());
+        assertTrue(exceptionCaptor.getValue().getMessage().contains("must be 0 or 1"));
+        verify(judgmentDao, never()).updateJudgment(any(), anyLong(), anyLong(), any());
+    }
+
+    public void testUpdate_Score01Judgment_RejectsOffScaleRating() {
+        // The transport action checks the scale itself, independent of request validation.
+        for (String rating : List.of("1.5", "-0.1", "NaN", "Infinity", "banana")) {
+            Map<String, Object> source = buildJudgmentSource(JudgmentType.LLM_JUDGMENT.name(), AsyncStatus.COMPLETED.name());
+            @SuppressWarnings("unchecked")
+            Map<String, Object> metadata = (Map<String, Object>) source.get("metadata");
+            metadata.put("llmJudgmentRatingType", "SCORE0_1");
+            SearchResponse loaded = buildMockSearchResponse(source);
+            when(judgmentDao.getJudgmentSync("score-id")).thenReturn(loaded);
+
+            UpdateJudgmentRatingsRequest request = new UpdateJudgmentRatingsRequest(
+                "score-id",
+                List.of(new RatingAdjustment("superhero", "1", rating))
+            );
+            ActionListener<IndexResponse> listener = mock(ActionListener.class);
+            action.doExecute(null, request, listener);
+
+            ArgumentCaptor<Exception> exceptionCaptor = ArgumentCaptor.forClass(Exception.class);
+            verify(listener).onFailure(exceptionCaptor.capture());
+            assertEquals(RestStatus.BAD_REQUEST, ((SearchRelevanceException) exceptionCaptor.getValue()).status());
+            assertTrue(exceptionCaptor.getValue().getMessage().contains("rating '" + rating + "'"));
+        }
+        verify(judgmentDao, never()).updateJudgment(any(), anyLong(), anyLong(), any());
+    }
+
+    public void testUpdate_NoRecordedRatingType_UsesScore01() {
+        // Judgments that predate llmJudgmentRatingType are SCORE0_1: 0.5 is valid there.
+        Map<String, Object> source = buildJudgmentSource(JudgmentType.LLM_JUDGMENT.name(), AsyncStatus.COMPLETED.name());
+        SearchResponse loaded = buildMockSearchResponse(source);
+        when(judgmentDao.getJudgmentSync("legacy-id")).thenReturn(loaded);
+
+        doAnswer(invocation -> {
+            ActionListener<IndexResponse> l = invocation.getArgument(3);
+            l.onResponse(mock(IndexResponse.class));
+            return null;
+        }).when(judgmentDao).updateJudgment(any(), anyLong(), anyLong(), any());
+
+        UpdateJudgmentRatingsRequest request = new UpdateJudgmentRatingsRequest(
+            "legacy-id",
+            List.of(new RatingAdjustment("superhero", "1", "0.5"))
+        );
+        ActionListener<IndexResponse> listener = mock(ActionListener.class);
+        action.doExecute(null, request, listener);
+
+        verify(listener).onResponse(any(IndexResponse.class));
+    }
+
+    public void testUpdate_RelevantIrrelevantJudgment_AcceptsBinaryRatings() {
+        Map<String, Object> source = buildJudgmentSource(JudgmentType.LLM_JUDGMENT.name(), AsyncStatus.COMPLETED.name());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> metadata = (Map<String, Object>) source.get("metadata");
+        metadata.put("llmJudgmentRatingType", "RELEVANT_IRRELEVANT");
+        SearchResponse loaded = buildMockSearchResponse(source);
+        when(judgmentDao.getJudgmentSync("binary-id")).thenReturn(loaded);
+
+        doAnswer(invocation -> {
+            ActionListener<IndexResponse> l = invocation.getArgument(3);
+            l.onResponse(mock(IndexResponse.class));
+            return null;
+        }).when(judgmentDao).updateJudgment(any(), anyLong(), anyLong(), any());
+
+        UpdateJudgmentRatingsRequest request = new UpdateJudgmentRatingsRequest(
+            "binary-id",
+            List.of(new RatingAdjustment("superhero", "1", "0"), new RatingAdjustment("superhero", "5", "1.0"))
+        );
+        ActionListener<IndexResponse> listener = mock(ActionListener.class);
+        action.doExecute(null, request, listener);
+
+        verify(listener).onResponse(any(IndexResponse.class));
+    }
+
+    public void testUpdate_UnrecognizedRatingType_Returns400() {
+        Map<String, Object> source = buildJudgmentSource(JudgmentType.LLM_JUDGMENT.name(), AsyncStatus.COMPLETED.name());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> metadata = (Map<String, Object>) source.get("metadata");
+        metadata.put("llmJudgmentRatingType", "FIVE_STAR");
+        SearchResponse loaded = buildMockSearchResponse(source);
+        when(judgmentDao.getJudgmentSync("odd-id")).thenReturn(loaded);
+
+        UpdateJudgmentRatingsRequest request = new UpdateJudgmentRatingsRequest(
+            "odd-id",
+            List.of(new RatingAdjustment("superhero", "1", "0.5"))
+        );
+        ActionListener<IndexResponse> listener = mock(ActionListener.class);
+        action.doExecute(null, request, listener);
+
+        ArgumentCaptor<Exception> exceptionCaptor = ArgumentCaptor.forClass(Exception.class);
+        verify(listener).onFailure(exceptionCaptor.capture());
+        assertEquals(RestStatus.BAD_REQUEST, ((SearchRelevanceException) exceptionCaptor.getValue()).status());
+        verify(judgmentDao, never()).updateJudgment(any(), anyLong(), anyLong(), any());
+    }
+
+    public void testUpdate_SameFailedDocTwice_RatedOnceWithLastValue() {
+        Map<String, Object> source = buildJudgmentSource(JudgmentType.LLM_JUDGMENT.name(), AsyncStatus.COMPLETED.name());
+        SearchResponse loaded = buildMockSearchResponse(source);
+        when(judgmentDao.getJudgmentSync("ok-id")).thenReturn(loaded);
+
+        doAnswer(invocation -> {
+            ActionListener<IndexResponse> l = invocation.getArgument(3);
+            l.onResponse(mock(IndexResponse.class));
+            return null;
+        }).when(judgmentDao).updateJudgment(any(), anyLong(), anyLong(), any());
+
+        UpdateJudgmentRatingsRequest request = new UpdateJudgmentRatingsRequest(
+            "ok-id",
+            List.of(new RatingAdjustment("superhero", "5", "0.2"), new RatingAdjustment("superhero", "5", "0.6"))
+        );
+        ActionListener<IndexResponse> listener = mock(ActionListener.class);
+        action.doExecute(null, request, listener);
+
+        ArgumentCaptor<Judgment> judgmentCaptor = ArgumentCaptor.forClass(Judgment.class);
+        verify(judgmentDao).updateJudgment(judgmentCaptor.capture(), anyLong(), anyLong(), any());
+        Map<String, Object> superhero = findQueryEntry(judgmentCaptor.getValue().getJudgmentRatings(), "superhero");
+        assertEquals(2, ((List<?>) superhero.get("ratings")).size());
+        assertEquals("0.6", ratingOf(superhero, "5"));
+        assertTrue(((List<?>) superhero.get("failures")).isEmpty());
+    }
+
+    public void testRequestValidation_RatingOutOfRangeOrNotNumeric() {
+        for (String rating : List.of("banana", "-5", "999", "NaN", "Infinity", "-Infinity", "1e308", "1.5", "-0.1", "=1+1")) {
+            UpdateJudgmentRatingsRequest request = new UpdateJudgmentRatingsRequest(
+                "id-1",
+                List.of(new RatingAdjustment("superhero", "1", rating))
+            );
+            assertNotNull("rating '" + rating + "' must be rejected", request.validate());
+        }
+    }
+
+    public void testRequestValidation_RatingBoundsAccepted() {
+        for (String rating : List.of("0", "1", "0.0", "1.0", "0.25")) {
+            UpdateJudgmentRatingsRequest request = new UpdateJudgmentRatingsRequest(
+                "id-1",
+                List.of(new RatingAdjustment("superhero", "1", rating))
+            );
+            assertNull("rating '" + rating + "' must be accepted", request.validate());
+        }
+    }
+
+    public void testRequestValidation_TooManyAdjustments() {
+        List<RatingAdjustment> adjustments = new ArrayList<>();
+        for (int i = 0; i <= UpdateJudgmentRatingsRequest.MAX_ADJUSTMENTS; i++) {
+            adjustments.add(new RatingAdjustment("superhero", String.valueOf(i), "0.5"));
+        }
+        assertNotNull(new UpdateJudgmentRatingsRequest("id-1", adjustments).validate());
+        assertNull(
+            new UpdateJudgmentRatingsRequest("id-1", adjustments.subList(0, UpdateJudgmentRatingsRequest.MAX_ADJUSTMENTS)).validate()
+        );
     }
 
     public void testRequestValidation_NullId() {
