@@ -34,6 +34,30 @@ import java.util.Map;
  */
 public class EvaluationMetrics {
 
+    /**
+     * Fail the evaluation on a stored rating that is not a finite number. Checked up front over the
+     * whole judgment set because a bad rating on a document that is not retrieved still feeds the
+     * threshold, Recall and IDCG, where NaN or Infinity would otherwise silently yield 0.
+     *
+     * @throws IllegalArgumentException naming the document if a rating is unparseable or not finite
+     */
+    private static void validateRatings(Map<String, String> judgments) {
+        for (Map.Entry<String, String> entry : judgments.entrySet()) {
+            String rating = entry.getValue();
+            boolean valid;
+            try {
+                valid = rating != null && Double.isFinite(Double.parseDouble(rating));
+            } catch (NumberFormatException e) {
+                valid = false;
+            }
+            if (!valid) {
+                throw new IllegalArgumentException(
+                    "Invalid judgment rating [" + rating + "] for document [" + entry.getKey() + "]: rating must be a finite number"
+                );
+            }
+        }
+    }
+
     private static void addMetric(List<Map<String, Object>> metrics, String metricName, double value) {
         Map<String, Object> metric = new HashMap<>();
         metric.put(PAIRWISE_FIELD_NAME_METRIC, metricName);
@@ -51,6 +75,7 @@ public class EvaluationMetrics {
      * affected.
      */
     public static List<Map<String, Object>> calculateEvaluationMetrics(List<String> docIds, Map<String, String> judgments, int k) {
+        validateRatings(judgments);
         List<Map<String, Object>> metrics = new ArrayList<>();
         List<String> docsWithScores = docIds.stream().filter(judgments::containsKey).toList();
 

@@ -20,6 +20,25 @@ public class Evaluation {
     public static final String METRICS_RECALL_AT = "Recall@";
     public static final String METRICS_MEAN_RECIPROCAL_RANK = "MRR";
 
+    private static final double MAX_ROUNDABLE = Long.MAX_VALUE / 100.0;
+
+    /**
+     * Round a metric to two decimals, failing loudly on a value that cannot be a real score.
+     * {@code Math.round} would otherwise turn NaN into 0 and saturate Infinity or any value too large
+     * for {@code value * 100} to fit in a long to {@code Long.MAX_VALUE}, making a corrupt metric (e.g.
+     * DCG overflowing from an extreme rating) look like a real score.
+     *
+     * @throws IllegalArgumentException if the value is not finite or too large to round
+     */
+    static double roundToTwoDecimals(double value) {
+        if (!Double.isFinite(value) || Math.abs(value) >= MAX_ROUNDABLE) {
+            throw new IllegalArgumentException(
+                "Metric value [" + value + "] is not a finite number that can be rounded; check the judgment ratings"
+            );
+        }
+        return Math.round(value * 100.0) / 100.0;
+    }
+
     /**
      * Precision@K - measures precision at a specific rank k.
      *
@@ -41,8 +60,10 @@ public class Evaluation {
             count++;
         }
 
-        double precision = k > 0 ? (double) relevantCount / Math.min(k, docIds.size()) : 0.0;
-        return Math.round(precision * 100.0) / 100.0;
+        // Guard the denominator directly: with no results it is 0, and 0/0 would be NaN.
+        int evaluated = Math.min(k, docIds.size());
+        double precision = evaluated > 0 ? (double) relevantCount / evaluated : 0.0;
+        return roundToTwoDecimals(precision);
     }
 
     /**
@@ -98,7 +119,7 @@ public class Evaluation {
         // MAP is computed over the full set of relevant documents, not just the ones retrieved.
         // see https://en.wikipedia.org/wiki/Evaluation_measures_(information_retrieval)#Average_precision
         double map = relevantCount > 0 ? sum / numRel : 0.0;
-        return Math.round(map * 100.0) / 100.0;
+        return roundToTwoDecimals(map);
     }
 
     /**
@@ -117,7 +138,7 @@ public class Evaluation {
         double idcg = calculateIDCG(docIds, judgmentScores, k);
 
         double ndcg = idcg > 0 ? dcg / idcg : 0.0;
-        return Math.round(ndcg * 100.0) / 100.0;
+        return roundToTwoDecimals(ndcg);
     }
 
     /**
@@ -147,7 +168,7 @@ public class Evaluation {
 
         int totalRelevant = countRelevant(judgmentScores, threshold);
         double recall = totalRelevant > 0 ? (double) relevantInTopK / totalRelevant : 0.0;
-        return Math.round(recall * 100.0) / 100.0;
+        return roundToTwoDecimals(recall);
     }
 
     /**
@@ -169,7 +190,7 @@ public class Evaluation {
             String docId = docIds.get(i);
             if (isRelevant(docId, judgmentScores, threshold)) {
                 // Rank is i + 1 (1-based)
-                return Math.round((1.0 / (i + 1)) * 100.0) / 100.0;
+                return roundToTwoDecimals((1.0 / (i + 1)));
             }
         }
         return 0.0;
@@ -187,7 +208,7 @@ public class Evaluation {
      * @return DCG value rounded to 2 decimal places
      */
     public static double calculateDCGAtK(List<String> docIds, Map<String, String> judgmentScores, int k) {
-        return Math.round(rawDCGAtK(docIds, judgmentScores, k) * 100.0) / 100.0;
+        return roundToTwoDecimals(rawDCGAtK(docIds, judgmentScores, k));
     }
 
     /**

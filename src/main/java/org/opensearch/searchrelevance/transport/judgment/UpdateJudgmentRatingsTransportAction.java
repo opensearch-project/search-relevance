@@ -7,10 +7,14 @@
  */
 package org.opensearch.searchrelevance.transport.judgment;
 
+import static org.opensearch.searchrelevance.common.MLConstants.LLM_JUDGMENT_RATING_TYPE;
+
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -28,6 +32,7 @@ import org.opensearch.searchrelevance.judgments.JudgmentDataTransformer;
 import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.Judgment;
 import org.opensearch.searchrelevance.model.JudgmentType;
+import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.tasks.Task;
 import org.opensearch.threadpool.ThreadPool;
@@ -134,24 +139,19 @@ public class UpdateJudgmentRatingsTransportAction extends HandledTransportAction
                 metadata = new HashMap<>();
             }
 
+            // Check each rating against the scale this judgment was generated on.
+            validateRatingsMatchScale(resolveRatingType(metadata), request.getAdjustments());
+
             List<Map<String, Object>> currentRatings = (List<Map<String, Object>>) source.get(Judgment.JUDGMENT_RATINGS);
             if (currentRatings == null) {
                 listener.onFailure(new SearchRelevanceException("Judgment has no ratings to update", RestStatus.BAD_REQUEST));
                 return;
             }
 
-            // Apply every (query, docId) rating adjustment in place. Throws a 404
-            // SearchRelevanceException if any adjustment names a query not part of this judgment,
-            // in which case nothing is written (the whole request fails).
-            List<Map<String, Object>> updatedRatings = currentRatings;
-            for (RatingAdjustment adjustment : request.getAdjustments()) {
-                updatedRatings = applyRatingAdjustment(
-                    updatedRatings,
-                    adjustment.getQuery(),
-                    adjustment.getDocId(),
-                    adjustment.getRating()
-                );
-            }
+            // Apply every (query, docId) rating adjustment in place. Throws a SearchRelevanceException
+            // (404 unknown query, 400 unknown docId) if any adjustment does not target an existing
+            // entry, in which case nothing is written (the whole request fails).
+            List<Map<String, Object>> updatedRatings = applyRatingAdjustments(currentRatings, request.getAdjustments());
 
             // Recompute the summary counts so metadata stays consistent with the edited ratings. Also
             // clears a stale failure reason once the edit has rated every previously failed doc.
@@ -186,61 +186,181 @@ public class UpdateJudgmentRatingsTransportAction extends HandledTransportAction
     }
 
     /**
-     * Apply a single (query, docId) rating adjustment to the judgment's ratings. Locates the query
-     * entry, sets docId's rating (adding it to "ratings" if absent), and removes docId from that
-     * query's "failures" list if present.
+     * Resolve the rating scale recorded on the judgment. Stored as an enum while in memory or as a
+     * String once read back from the index; a judgment that records none predates the field and is
+     * treated as the default (SCORE0_1), mirroring {@code LlmJudgmentsProcessor}.
+     *
+     * @throws SearchRelevanceException with 400 if the recorded rating type is unrecognized
+     */
+    private LLMJudgmentRatingType resolveRatingType(Map<String, Object> metadata) {
+        Object ratingTypeObj = metadata.get(LLM_JUDGMENT_RATING_TYPE);
+        if (ratingTypeObj instanceof LLMJudgmentRatingType) {
+            return (LLMJudgmentRatingType) ratingTypeObj;
+        }
+        if (ratingTypeObj instanceof String) {
+            try {
+                return LLMJudgmentRatingType.valueOf((String) ratingTypeObj);
+            } catch (IllegalArgumentException e) {
+                throw new SearchRelevanceException(
+                    "Judgment records an unrecognized rating type [" + ratingTypeObj + "]; cannot edit ratings",
+                    e,
+                    RestStatus.BAD_REQUEST
+                );
+            }
+        }
+        return LLMJudgmentRatingType.DEFAULT;
+    }
+
+    /**
+     * Reject ratings that do not fit the judgment's scale:
+     * <ul>
+     *   <li>SCORE0_1: any finite number in [0, 1]</li>
+     *   <li>RELEVANT_IRRELEVANT: exactly 0 (irrelevant) or 1 (relevant), the values the LLM output is stored as</li>
+     * </ul>
+     *
+     * @throws SearchRelevanceException with 400 if any rating is not a number or is off the judgment's scale
+     */
+    private void validateRatingsMatchScale(LLMJudgmentRatingType ratingType, List<RatingAdjustment> adjustments) {
+        for (RatingAdjustment adjustment : adjustments) {
+            double value;
+            try {
+                value = Double.parseDouble(adjustment.getRating());
+            } catch (NumberFormatException e) {
+                throw invalidRating(adjustment, "must be a number", ratingType);
+            }
+            // Exhaustive switches: a new rating type fails to compile until it defines its valid values.
+            boolean valid = switch (ratingType) {
+                case SCORE0_1 -> Double.isFinite(value) && value >= 0.0 && value <= 1.0;
+                case RELEVANT_IRRELEVANT -> value == 0.0 || value == 1.0;
+            };
+            if (!valid) {
+                String requirement = switch (ratingType) {
+                    case SCORE0_1 -> "must be a number between 0 and 1";
+                    case RELEVANT_IRRELEVANT -> "must be 0 or 1";
+                };
+                throw invalidRating(adjustment, requirement, ratingType);
+            }
+        }
+    }
+
+    private static SearchRelevanceException invalidRating(
+        RatingAdjustment adjustment,
+        String requirement,
+        LLMJudgmentRatingType ratingType
+    ) {
+        return new SearchRelevanceException(
+            "rating '"
+                + adjustment.getRating()
+                + "' for docId "
+                + adjustment.getDocId()
+                + " "
+                + requirement
+                + " for a "
+                + ratingType
+                + " judgment",
+            RestStatus.BAD_REQUEST
+        );
+    }
+
+    /**
+     * Apply every (query, docId) rating adjustment to the judgment's ratings. For each adjustment,
+     * overwrites docId's rating if it is already rated, or moves it from the query's "failures" list
+     * into "ratings" if it previously failed. Only docs that are already part of the judgment can be
+     * edited; new docIds are rejected so manual edits cannot change the set of judged documents.
+     *
+     * <p>Each query's ratings and failures are indexed once, so the cost is linear in the size of the
+     * judgment plus the number of adjustments.
      *
      * <p>Mutates {@code currentRatings} in place — the nested rating and failure collections are
      * modified directly, and the returned list is the same instance that was passed in, not a copy.
-     * Callers applying several adjustments can therefore chain calls on the same list; the return
-     * value exists for readability, not to signal a new object.
      *
      * @param currentRatings the judgment's ratings list, modified in place
-     * @return the same {@code currentRatings} instance, now including this adjustment
-     * @throws SearchRelevanceException with 404 if the query is not part of the judgment
+     * @param adjustments the rating adjustments to apply
+     * @return the same {@code currentRatings} instance, now including every adjustment
+     * @throws SearchRelevanceException with 404 if a query is not part of the judgment, or 400 if a
+     *         docId is neither rated nor failed under its query
      */
-    @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> applyRatingAdjustment(
-        List<Map<String, Object>> currentRatings,
-        String query,
-        String docId,
-        String rating
-    ) {
+    private List<Map<String, Object>> applyRatingAdjustments(List<Map<String, Object>> currentRatings, List<RatingAdjustment> adjustments) {
+        // First entry wins for a query, matching how lookups resolve elsewhere.
+        Map<String, Map<String, Object>> queryEntries = new HashMap<>();
         for (Map<String, Object> queryEntry : currentRatings) {
-            if (!query.equals(queryEntry.get("query"))) {
-                continue;
+            Object query = queryEntry.get("query");
+            if (query != null) {
+                queryEntries.putIfAbsent(query.toString(), queryEntry);
             }
-
-            // Update (or add) the rating for this docId under the matched query.
-            List<Map<String, Object>> ratings = (List<Map<String, Object>>) queryEntry.get("ratings");
-            if (ratings == null) {
-                ratings = new ArrayList<>();
-                queryEntry.put("ratings", ratings);
-            }
-            boolean found = false;
-            for (Map<String, Object> ratingEntry : ratings) {
-                if (docId.equals(ratingEntry.get("docId"))) {
-                    ratingEntry.put("rating", rating);
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                Map<String, Object> newRating = new HashMap<>();
-                newRating.put("docId", docId);
-                newRating.put("rating", rating);
-                ratings.add(newRating);
-            }
-
-            // The doc is now rated, so drop it from this query's failures list if present.
-            List<Map<String, Object>> failures = (List<Map<String, Object>>) queryEntry.get("failures");
-            if (failures != null) {
-                failures.removeIf(f -> docId.equals(f.get("docId")));
-            }
-
-            return currentRatings;
         }
 
-        throw new SearchRelevanceException("Query not found in judgment: " + query, RestStatus.NOT_FOUND);
+        Map<String, QueryIndex> indexes = new HashMap<>();
+        for (RatingAdjustment adjustment : adjustments) {
+            String query = adjustment.getQuery();
+            String docId = adjustment.getDocId();
+            Map<String, Object> queryEntry = queryEntries.get(query);
+            if (queryEntry == null) {
+                throw new SearchRelevanceException("Query not found in judgment: " + query, RestStatus.NOT_FOUND);
+            }
+            QueryIndex index = indexes.computeIfAbsent(query, q -> new QueryIndex(queryEntry));
+
+            Map<String, Object> ratingEntry = index.ratingsByDocId.get(docId);
+            if (ratingEntry != null) {
+                ratingEntry.put("rating", adjustment.getRating());
+            } else if (index.failedDocIds.contains(docId)) {
+                // The doc previously failed; rate it now and drop it from failures below.
+                Map<String, Object> newRating = new HashMap<>();
+                newRating.put("docId", docId);
+                newRating.put("rating", adjustment.getRating());
+                index.ratings.add(newRating);
+                index.ratingsByDocId.put(docId, newRating);
+                index.rescuedDocIds.add(docId);
+            } else {
+                throw new SearchRelevanceException(
+                    "Document " + docId + " is not part of query [" + query + "] in this judgment",
+                    RestStatus.BAD_REQUEST
+                );
+            }
+        }
+
+        for (QueryIndex index : indexes.values()) {
+            if (!index.rescuedDocIds.isEmpty() && index.failures != null) {
+                index.failures.removeIf(f -> f.get("docId") != null && index.rescuedDocIds.contains(f.get("docId").toString()));
+            }
+        }
+        return currentRatings;
+    }
+
+    /**
+     * Lookup view over one query entry's ratings and failures, built once per query touched by a request.
+     */
+    private static final class QueryIndex {
+        private final List<Map<String, Object>> ratings;
+        private final List<Map<String, Object>> failures;
+        private final Map<String, Map<String, Object>> ratingsByDocId = new HashMap<>();
+        private final Set<String> failedDocIds = new HashSet<>();
+        private final Set<String> rescuedDocIds = new HashSet<>();
+
+        @SuppressWarnings("unchecked")
+        QueryIndex(Map<String, Object> queryEntry) {
+            List<Map<String, Object>> existingRatings = (List<Map<String, Object>>) queryEntry.get("ratings");
+            if (existingRatings == null) {
+                existingRatings = new ArrayList<>();
+                queryEntry.put("ratings", existingRatings);
+            }
+            this.ratings = existingRatings;
+            this.failures = (List<Map<String, Object>>) queryEntry.get("failures");
+
+            for (Map<String, Object> ratingEntry : ratings) {
+                Object docId = ratingEntry.get("docId");
+                if (docId != null) {
+                    ratingsByDocId.putIfAbsent(docId.toString(), ratingEntry);
+                }
+            }
+            if (failures != null) {
+                for (Map<String, Object> failure : failures) {
+                    Object docId = failure.get("docId");
+                    if (docId != null) {
+                        failedDocIds.add(docId.toString());
+                    }
+                }
+            }
+        }
     }
 }
