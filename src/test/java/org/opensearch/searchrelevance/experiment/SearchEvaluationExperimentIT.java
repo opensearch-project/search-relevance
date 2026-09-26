@@ -56,6 +56,8 @@ public class SearchEvaluationExperimentIT extends BaseExperimentIT {
 
         Map<String, String> queryTextToEvaluationId = extractQueryTextToEvaluationId(experimentSource);
         assertEvaluationResults(queryTextToEvaluationId, judgmentId, searchConfigurationId);
+        assertEvaluationResultMappingHasTookMs();
+        assertLegacyEvaluationDocumentWithoutTookMsStillLoads();
 
         deleteIndex(INDEX_NAME_ESCI);
     }
@@ -217,6 +219,8 @@ public class SearchEvaluationExperimentIT extends BaseExperimentIT {
             assertNotNull("Document IDs should exist", documentIds);
             assertFalse("Document IDs should not be empty", documentIds.isEmpty());
 
+            assertTookMsPresentAndNonNegative(evaluationSource);
+
             // For specific queries, verify detailed results match expectations
             if (EXPECT_EVALUATION_RESULTS.containsKey(actualQueryTerm)) {
                 Map<String, Object> expectedResult = (Map<String, Object>) EXPECT_EVALUATION_RESULTS.get(actualQueryTerm);
@@ -238,5 +242,70 @@ public class SearchEvaluationExperimentIT extends BaseExperimentIT {
                 }
             }
         }
+    }
+
+    @SneakyThrows
+    private void assertEvaluationResultMappingHasTookMs() {
+        Response mappingResponse = makeRequest(
+            client(),
+            RestRequest.Method.GET.name(),
+            "/" + EVALUATION_RESULT_INDEX + "/_mapping",
+            null,
+            null,
+            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
+        );
+        Map<String, Object> mappingJson = entityAsMap(mappingResponse);
+        Map<String, Object> indexMapping = (Map<String, Object>) mappingJson.get(EVALUATION_RESULT_INDEX);
+        assertNotNull(indexMapping);
+        Map<String, Object> mappings = (Map<String, Object>) indexMapping.get("mappings");
+        assertNotNull(mappings);
+        Map<String, Object> meta = (Map<String, Object>) mappings.get("_meta");
+        assertNotNull(meta);
+        assertEquals(1, ((Number) meta.get("schema_version")).intValue());
+        Map<String, Object> properties = (Map<String, Object>) mappings.get("properties");
+        assertNotNull(properties);
+        Map<String, Object> tookMs = (Map<String, Object>) properties.get("tookMs");
+        assertNotNull("tookMs should be mapped as a first-class long field", tookMs);
+        assertEquals("long", tookMs.get("type"));
+    }
+
+    @SneakyThrows
+    private void assertLegacyEvaluationDocumentWithoutTookMsStillLoads() {
+        String legacyId = "legacy-eval-without-tookms";
+        String legacyBody = "{"
+            + "\"id\":\""
+            + legacyId
+            + "\","
+            + "\"timestamp\":\"2024-01-01T00:00:00.000Z\","
+            + "\"searchConfigurationId\":\"legacy-config\","
+            + "\"searchText\":\"legacy query\","
+            + "\"judgmentIds\":[],"
+            + "\"documentIds\":[\"d1\"],"
+            + "\"metrics\":[{\"metric\":\"NDCG@5\",\"value\":0.5}]"
+            + "}";
+        Response indexResponse = makeRequest(
+            client(),
+            RestRequest.Method.PUT.name(),
+            String.join("/", EVALUATION_RESULT_INDEX, "_doc", legacyId),
+            Map.of("refresh", "true"),
+            toHttpEntity(legacyBody),
+            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
+        );
+        int status = indexResponse.getStatusLine().getStatusCode();
+        assertTrue("legacy evaluation document should index, got " + status, status == 200 || status == 201);
+
+        Response getResponse = makeRequest(
+            client(),
+            RestRequest.Method.GET.name(),
+            String.join("/", EVALUATION_RESULT_INDEX, "_doc", legacyId),
+            null,
+            null,
+            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
+        );
+        Map<String, Object> getJson = entityAsMap(getResponse);
+        Map<String, Object> source = (Map<String, Object>) getJson.get("_source");
+        assertNotNull(source);
+        assertEquals("legacy query", source.get("searchText"));
+        assertFalse("pre-upgrade evaluation documents omit tookMs", source.containsKey("tookMs"));
     }
 }

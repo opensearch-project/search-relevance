@@ -10,6 +10,7 @@ package org.opensearch.searchrelevance.executors;
 import static org.opensearch.searchrelevance.metrics.EvaluationMetrics.calculateEvaluationMetrics;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -23,6 +24,7 @@ import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.EvaluationResult;
 import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.model.ExperimentVariant;
+import org.opensearch.searchrelevance.utils.SearchTookMs;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 
 import lombok.RequiredArgsConstructor;
@@ -56,8 +58,9 @@ public class SearchResponseProcessor {
         if (taskContext.getHasFailure().get()) return;
 
         try {
+            Long tookMs = SearchTookMs.from(response);
             if (response.getHits().getTotalHits().value() == 0) {
-                handleNoHits(experimentVariant, experimentId, searchConfigId, evaluationId, taskContext);
+                handleNoHits(experimentVariant, experimentId, searchConfigId, evaluationId, taskContext, tookMs);
                 return;
             }
 
@@ -82,7 +85,8 @@ public class SearchResponseProcessor {
                 experimentId,
                 experimentVariant.getId(),
                 experimentVariantParameters,
-                scheduledRunId
+                scheduledRunId,
+                tookMs
             );
 
             evaluationResultDao.putEvaluationResultEfficient(
@@ -102,9 +106,17 @@ public class SearchResponseProcessor {
         String experimentId,
         String searchConfigId,
         String evaluationId,
-        ExperimentTaskContext taskContext
+        ExperimentTaskContext taskContext,
+        Long tookMs
     ) {
         log.warn("No hits found for search config: {} and variant: {}", searchConfigId, experimentVariant.getId());
+
+        Map<String, Object> noHitsResults = new HashMap<>();
+        noHitsResults.put("evaluationResultId", evaluationId);
+        noHitsResults.put("details", "no search hits found");
+        if (tookMs != null) {
+            noHitsResults.put(EvaluationResult.TOOK_MS, tookMs);
+        }
 
         ExperimentVariant noHitsVariant = new ExperimentVariant(
             experimentVariant.getId(),
@@ -113,7 +125,7 @@ public class SearchResponseProcessor {
             AsyncStatus.COMPLETED,
             experimentId,
             experimentVariant.getParameters(),
-            Map.of("evaluationResultId", evaluationId, "details", "no search hits found")
+            noHitsResults
         );
 
         experimentVariantDao.putExperimentVariantEfficient(noHitsVariant, ActionListener.wrap(success -> {

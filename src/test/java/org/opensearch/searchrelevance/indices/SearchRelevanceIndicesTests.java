@@ -76,4 +76,10 @@ public class SearchRelevanceIndicesTests extends OpenSearchTestCase {
         }
     }
 
+    public void testEvaluationResultMappingIncludesTookMs() {
+        assertEquals(1, SearchRelevanceIndices.EVALUATION_RESULT.getSchemaVersion());
+        String mapping = SearchRelevanceIndices.EVALUATION_RESULT.getMapping();
+        assertTrue("evaluation_result mapping should declare tookMs", mapping.contains("\"tookMs\""));
+    }
+
 }

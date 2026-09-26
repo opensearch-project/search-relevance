@@ -26,6 +26,7 @@ import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.settings.Settings;
+import org.opensearch.common.unit.TimeValue;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.bytes.BytesArray;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
@@ -34,6 +35,7 @@ import org.opensearch.search.SearchHits;
 import org.opensearch.search.SearchModule;
 import org.opensearch.searchrelevance.dao.EvaluationResultDao;
 import org.opensearch.searchrelevance.dao.ExperimentVariantDao;
+import org.opensearch.searchrelevance.model.EvaluationResult;
 import org.opensearch.searchrelevance.model.QuerySetEntry;
 import org.opensearch.searchrelevance.model.SearchConfigurationDetails;
 import org.opensearch.searchrelevance.model.builder.SearchRequestBuilder;
@@ -317,7 +319,86 @@ public class MetricsHelperTests extends OpenSearchTestCase {
         );
     }
 
+    public void testProcessPairwiseMetricsPersistsTookMsOnSnapshots() {
+        Map<String, SearchConfigurationDetails> searchConfigurations = new HashMap<>();
+        searchConfigurations.put(
+            "config-a",
+            SearchConfigurationDetails.builder().index("index-a").query("{\"query\":{\"match\":{\"title\":\"%SearchText%\"}}}").build()
+        );
+        searchConfigurations.put(
+            "config-b",
+            SearchConfigurationDetails.builder().index("index-b").query("{\"query\":{\"match\":{\"title\":\"%SearchText%\"}}}").build()
+        );
+
+        doAnswer(invocation -> {
+            SearchRequest request = invocation.getArgument(0);
+            ActionListener<SearchResponse> listener = invocation.getArgument(1);
+            if ("index-a".equals(request.indices()[0])) {
+                listener.onResponse(createMockSearchResponse(12L, "d1", "d2"));
+            } else {
+                listener.onResponse(createMockSearchResponse(41L, "d1", "d3"));
+            }
+            return null;
+        }).when(client).search(any(SearchRequest.class), any(ActionListener.class));
+
+        @SuppressWarnings("unchecked")
+        ActionListener<Map<String, Object>> resultListener = mock(ActionListener.class);
+        metricsHelper.processPairwiseMetrics(new QuerySetEntry("red shoes", Map.of()), searchConfigurations, 10, resultListener);
+
+        ArgumentCaptor<Map<String, Object>> resultCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(resultListener).onResponse(resultCaptor.capture());
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> snapshots = (List<Map<String, Object>>) resultCaptor.getValue().get("snapshots");
+        assertEquals(2, snapshots.size());
+
+        Map<String, Long> tookByConfig = new HashMap<>();
+        for (Map<String, Object> snapshot : snapshots) {
+            tookByConfig.put((String) snapshot.get("searchConfigurationId"), ((Number) snapshot.get("tookMs")).longValue());
+        }
+        assertEquals(Long.valueOf(12L), tookByConfig.get("config-a"));
+        assertEquals(Long.valueOf(41L), tookByConfig.get("config-b"));
+    }
+
+    public void testProcessEvaluationMetricsPersistsTookMs() {
+        String queryText = "red shoes";
+        Map<String, List<String>> indexAndQueries = new HashMap<>();
+        indexAndQueries.put("config1", Arrays.asList("index1", "{\"query\":{\"match\":{\"title\":\"%SearchText%\"}}}", ""));
+
+        doAnswer(invocation -> {
+            ActionListener<SearchResponse> listener = invocation.getArgument(1);
+            listener.onResponse(createMockSearchResponse(18L, "doc1", "doc2"));
+            return null;
+        }).when(client).search(any(SearchRequest.class), any(ActionListener.class));
+
+        doAnswer(invocation -> {
+            ActionListener<Void> listener = invocation.getArgument(1);
+            listener.onResponse(null);
+            return null;
+        }).when(evaluationResultDao).putEvaluationResult(any(), any(ActionListener.class));
+
+        @SuppressWarnings("unchecked")
+        ActionListener<Map<String, Object>> resultListener = mock(ActionListener.class);
+        metricsHelper.processEvaluationMetrics(
+            queryText,
+            indexAndQueries,
+            10,
+            Arrays.asList("judgment1"),
+            Map.of(queryText, Map.of("doc1", "5")),
+            resultListener,
+            null
+        );
+
+        ArgumentCaptor<EvaluationResult> resultCaptor = ArgumentCaptor.forClass(EvaluationResult.class);
+        verify(evaluationResultDao).putEvaluationResult(resultCaptor.capture(), any(ActionListener.class));
+        assertEquals(Long.valueOf(18L), resultCaptor.getValue().tookMs());
+    }
+
     private SearchResponse createMockSearchResponse(String... docIds) {
+        return createMockSearchResponse(5L, docIds);
+    }
+
+    private SearchResponse createMockSearchResponse(long tookMs, String... docIds) {
         SearchResponse response = mock(SearchResponse.class);
 
         SearchHit[] searchHits = new SearchHit[docIds.length];
@@ -329,6 +410,7 @@ public class MetricsHelperTests extends OpenSearchTestCase {
         SearchHits hits = new SearchHits(searchHits, new TotalHits(docIds.length, TotalHits.Relation.EQUAL_TO), 1.0f);
 
         when(response.getHits()).thenReturn(hits);
+        when(response.getTook()).thenReturn(TimeValue.timeValueMillis(tookMs));
         return response;
     }
 
