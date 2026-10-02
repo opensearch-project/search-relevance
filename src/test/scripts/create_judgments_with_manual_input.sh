@@ -1,3 +1,6 @@
+# Copyright OpenSearch Contributors
+# SPDX-License-Identifier: Apache-2.0
+
 curl -s -X PUT "localhost:9200/_plugins/_search_relevance/judgments" \
 -H "Content-type: application/json" \
 -d'{
