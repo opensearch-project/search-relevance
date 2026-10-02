@@ -40,7 +40,6 @@ import org.opensearch.action.update.UpdateResponse;
 import org.opensearch.cluster.metadata.MappingMetadata;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.io.Streams;
-import org.opensearch.common.util.concurrent.ThreadContext;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.core.xcontent.XContentBuilder;
@@ -52,7 +51,6 @@ import org.opensearch.index.reindex.DeleteByQueryRequest;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.search.internal.InternalSearchResponse;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
-import org.opensearch.searchrelevance.shared.StashedThreadContext;
 import org.opensearch.transport.client.Client;
 
 import lombok.Builder;
@@ -68,10 +66,16 @@ public class SearchRelevanceIndicesManager {
 
     private final ClusterService clusterService;
     private final Client client;
+    private final Client pluginClient;
 
-    public SearchRelevanceIndicesManager(@NonNull ClusterService clusterService, @NonNull Client client) {
+    /**
+     * @param client runs as the caller, so it is evaluated against the caller's own privileges
+     * @param pluginClient runs as the plugin subject, which is what grants access to the indices this plugin owns
+     */
+    public SearchRelevanceIndicesManager(@NonNull ClusterService clusterService, @NonNull Client client, @NonNull Client pluginClient) {
         this.clusterService = clusterService;
         this.client = client;
+        this.pluginClient = pluginClient;
     }
 
     private static final int MAX_MAPPING_UPDATE_RETRIES = 3;
@@ -118,7 +122,7 @@ public class SearchRelevanceIndicesManager {
 
         final CreateIndexRequest createIndexRequest = new CreateIndexRequest(indexName).mapping(mapping)
             .settings(org.opensearch.common.settings.Settings.builder().put("index.auto_expand_replicas", "0-1").build());
-        StashedThreadContext.run(client, () -> client.admin().indices().create(createIndexRequest, new ActionListener<>() {
+        pluginClient.admin().indices().create(createIndexRequest, new ActionListener<>() {
             @Override
             public void onResponse(final CreateIndexResponse createIndexResponse) {
                 log.info("Successfully created index [{}]", indexName);
@@ -135,7 +139,7 @@ public class SearchRelevanceIndicesManager {
                 log.warn("Failed to create index [{}] - continuing without cache optimization", indexName);
                 stepListener.onResponse(null);
             }
-        }));
+        });
     }
 
     /**
@@ -152,7 +156,7 @@ public class SearchRelevanceIndicesManager {
             log.info("Creating new index [{}] with schema version [{}]", indexName, index.getSchemaVersion());
             final CreateIndexRequest createIndexRequest = new CreateIndexRequest(indexName).mapping(mapping)
                 .settings(org.opensearch.common.settings.Settings.builder().put("index.auto_expand_replicas", "0-1").build());
-            StashedThreadContext.run(client, () -> client.admin().indices().create(createIndexRequest));
+            pluginClient.admin().indices().create(createIndexRequest);
             return;
         }
 
@@ -244,8 +248,8 @@ public class SearchRelevanceIndicesManager {
             org.opensearch.common.xcontent.XContentType.JSON
         );
         final CompletableFuture<Void> future = new CompletableFuture<>();
-        try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
-            client.admin().indices().putMapping(putMappingRequest, new ActionListener<>() {
+        try {
+            pluginClient.admin().indices().putMapping(putMappingRequest, new ActionListener<>() {
                 @Override
                 public void onResponse(org.opensearch.action.support.clustermanager.AcknowledgedResponse response) {
                     future.complete(null);
@@ -384,11 +388,11 @@ public class SearchRelevanceIndicesManager {
             .xContentBuilder(xContentBuilder)
             .index(index)
             .build();
-        BiConsumer<SearchOperationContext, ActionListener<?>> action = (context, actionListener) -> StashedThreadContext.run(client, () -> {
+        BiConsumer<SearchOperationContext, ActionListener<?>> action = (context, actionListener) -> {
             try {
                 @SuppressWarnings("unchecked")
                 ActionListener<IndexResponse> typedListener = (ActionListener<IndexResponse>) actionListener;
-                client.prepareIndex(context.getIndex().getIndexName())
+                pluginClient.prepareIndex(context.getIndex().getIndexName())
                     .setId(context.getDocumentId())
                     .setOpType(OpType.CREATE)
                     .setRefreshPolicy(refreshPolicy)
@@ -397,7 +401,7 @@ public class SearchRelevanceIndicesManager {
             } catch (Exception e) {
                 throw new SearchRelevanceException("Failed to store doc", e, RestStatus.INTERNAL_SERVER_ERROR);
             }
-        });
+        };
         executeAction(listener, searchOperationContext, action);
     }
 
@@ -453,19 +457,18 @@ public class SearchRelevanceIndicesManager {
             .xContentBuilder(xContentBuilder)
             .documentId(docId)
             .build();
-        BiConsumer<SearchOperationContext, ActionListener<?>> action = (searchOperationContext1, actionListener) -> StashedThreadContext
-            .run(client, () -> {
-                try {
-                    client.prepareIndex(searchOperationContext1.getIndex().getIndexName())
-                        .setId(searchOperationContext1.getDocumentId())
-                        .setOpType(OpType.INDEX)
-                        .setRefreshPolicy(refreshPolicy)
-                        .setSource(searchOperationContext1.getXContentBuilder())
-                        .execute((ActionListener) actionListener);
-                } catch (Exception e) {
-                    throw new SearchRelevanceException("Failed to store doc", e, RestStatus.INTERNAL_SERVER_ERROR);
-                }
-            });
+        BiConsumer<SearchOperationContext, ActionListener<?>> action = (searchOperationContext1, actionListener) -> {
+            try {
+                pluginClient.prepareIndex(searchOperationContext1.getIndex().getIndexName())
+                    .setId(searchOperationContext1.getDocumentId())
+                    .setOpType(OpType.INDEX)
+                    .setRefreshPolicy(refreshPolicy)
+                    .setSource(searchOperationContext1.getXContentBuilder())
+                    .execute((ActionListener) actionListener);
+            } catch (Exception e) {
+                throw new SearchRelevanceException("Failed to store doc", e, RestStatus.INTERNAL_SERVER_ERROR);
+            }
+        };
         executeAction(listener, searchOperationContext, action);
     }
 
@@ -495,23 +498,22 @@ public class SearchRelevanceIndicesManager {
             .xContentBuilder(xContentBuilder)
             .documentId(docId)
             .build();
-        BiConsumer<SearchOperationContext, ActionListener<?>> action = (searchOperationContext1, actionListener) -> StashedThreadContext
-            .run(client, () -> {
-                try {
-                    client.prepareIndex(searchOperationContext1.getIndex().getIndexName())
-                        .setId(searchOperationContext1.getDocumentId())
-                        .setOpType(OpType.INDEX)
-                        .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
-                        .setIfSeqNo(seqNo)
-                        .setIfPrimaryTerm(primaryTerm)
-                        .setSource(searchOperationContext1.getXContentBuilder())
-                        .execute((ActionListener) actionListener);
-                } catch (Exception e) {
-                    // Notify the listener rather than throwing, so the caller is always informed
-                    // (a thrown exception here would be lost on the executing thread).
-                    actionListener.onFailure(new SearchRelevanceException("Failed to store doc", e, RestStatus.INTERNAL_SERVER_ERROR));
-                }
-            });
+        BiConsumer<SearchOperationContext, ActionListener<?>> action = (searchOperationContext1, actionListener) -> {
+            try {
+                pluginClient.prepareIndex(searchOperationContext1.getIndex().getIndexName())
+                    .setId(searchOperationContext1.getDocumentId())
+                    .setOpType(OpType.INDEX)
+                    .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
+                    .setIfSeqNo(seqNo)
+                    .setIfPrimaryTerm(primaryTerm)
+                    .setSource(searchOperationContext1.getXContentBuilder())
+                    .execute((ActionListener) actionListener);
+            } catch (Exception e) {
+                // Notify the listener rather than throwing, so the caller is always informed
+                // (a thrown exception here would be lost on the executing thread).
+                actionListener.onFailure(new SearchRelevanceException("Failed to store doc", e, RestStatus.INTERNAL_SERVER_ERROR));
+            }
+        };
         executeAction(listener, searchOperationContext, action);
     }
 
@@ -523,30 +525,29 @@ public class SearchRelevanceIndicesManager {
      */
     public void deleteDocByDocId(final String docId, final SearchRelevanceIndices index, final ActionListener<DeleteResponse> listener) {
         SearchOperationContext searchOperationContext = SearchOperationContext.builder().index(index).documentId(docId).build();
-        BiConsumer<SearchOperationContext, ActionListener<?>> action = (searchOperationContextArg, actionListener) -> StashedThreadContext
-            .run(client, () -> {
-                try {
-                    @SuppressWarnings("unchecked")
-                    ActionListener<DeleteResponse> typedListener = (ActionListener<DeleteResponse>) actionListener;
-                    client.prepareDelete(searchOperationContext.getIndex().getIndexName(), searchOperationContext.getDocumentId())
-                        .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
-                        .execute(new ActionListener<>() {  // Specify the generic type
-                            @Override
-                            public void onResponse(DeleteResponse deleteResponse) {  // Properly typed parameter
-                                typedListener.onResponse(deleteResponse);
-                            }
+        BiConsumer<SearchOperationContext, ActionListener<?>> action = (searchOperationContextArg, actionListener) -> {
+            try {
+                @SuppressWarnings("unchecked")
+                ActionListener<DeleteResponse> typedListener = (ActionListener<DeleteResponse>) actionListener;
+                pluginClient.prepareDelete(searchOperationContext.getIndex().getIndexName(), searchOperationContext.getDocumentId())
+                    .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
+                    .execute(new ActionListener<>() {  // Specify the generic type
+                        @Override
+                        public void onResponse(DeleteResponse deleteResponse) {  // Properly typed parameter
+                            typedListener.onResponse(deleteResponse);
+                        }
 
-                            @Override
-                            public void onFailure(Exception e) {
-                                typedListener.onFailure(
-                                    new SearchRelevanceException("Failed to delete doc", e, RestStatus.INTERNAL_SERVER_ERROR)
-                                );
-                            }
-                        });
-                } catch (Exception e) {
-                    actionListener.onFailure(new SearchRelevanceException("Failed to delete doc", e, RestStatus.INTERNAL_SERVER_ERROR));
-                }
-            });
+                        @Override
+                        public void onFailure(Exception e) {
+                            typedListener.onFailure(
+                                new SearchRelevanceException("Failed to delete doc", e, RestStatus.INTERNAL_SERVER_ERROR)
+                            );
+                        }
+                    });
+            } catch (Exception e) {
+                actionListener.onFailure(new SearchRelevanceException("Failed to delete doc", e, RestStatus.INTERNAL_SERVER_ERROR));
+            }
+        };
         executeAction(listener, searchOperationContext, action);
     }
 
@@ -566,37 +567,35 @@ public class SearchRelevanceIndicesManager {
 
             searchRequest.source(sourceBuilder);
 
-            StashedThreadContext.run(client, () -> {
-                try {
-                    @SuppressWarnings("unchecked")
-                    ActionListener<SearchResponse> typedListener = (ActionListener<SearchResponse>) actionListener;
-                    client.search(searchRequest, new ActionListener<>() {
-                        @Override
-                        public void onResponse(SearchResponse response) {
-                            log.info("Successfully get doc id [{}]", searchOperationContextArg.getDocumentId());
-                            if (response.getHits().getTotalHits().value() == 0) {
-                                typedListener.onFailure(
-                                    new ResourceNotFoundException(
-                                        "Document not found: " + searchOperationContextArg.getDocumentId(),
-                                        RestStatus.NOT_FOUND
-                                    )
-                                );
-                                return;
-                            }
-                            typedListener.onResponse(response);
-                        }
-
-                        @Override
-                        public void onFailure(Exception e) {
-                            actionListener.onFailure(
-                                new SearchRelevanceException("Failed to get document", e, RestStatus.INTERNAL_SERVER_ERROR)
+            try {
+                @SuppressWarnings("unchecked")
+                ActionListener<SearchResponse> typedListener = (ActionListener<SearchResponse>) actionListener;
+                pluginClient.search(searchRequest, new ActionListener<>() {
+                    @Override
+                    public void onResponse(SearchResponse response) {
+                        log.info("Successfully get doc id [{}]", searchOperationContextArg.getDocumentId());
+                        if (response.getHits().getTotalHits().value() == 0) {
+                            typedListener.onFailure(
+                                new ResourceNotFoundException(
+                                    "Document not found: " + searchOperationContextArg.getDocumentId(),
+                                    RestStatus.NOT_FOUND
+                                )
                             );
+                            return;
                         }
-                    });
-                } catch (Exception e) {
-                    actionListener.onFailure(new SearchRelevanceException("Failed to get doc", e, RestStatus.INTERNAL_SERVER_ERROR));
-                }
-            });
+                        typedListener.onResponse(response);
+                    }
+
+                    @Override
+                    public void onFailure(Exception e) {
+                        actionListener.onFailure(
+                            new SearchRelevanceException("Failed to get document", e, RestStatus.INTERNAL_SERVER_ERROR)
+                        );
+                    }
+                });
+            } catch (Exception e) {
+                actionListener.onFailure(new SearchRelevanceException("Failed to get doc", e, RestStatus.INTERNAL_SERVER_ERROR));
+            }
         };
         executeAction(listener, searchOperationContext, action);
         return null;
@@ -620,43 +619,41 @@ public class SearchRelevanceIndicesManager {
         BiConsumer<SearchOperationContext, ActionListener<?>> action = (context, actionListener) -> {
             SearchRequest searchRequest = new SearchRequest(context.getIndex().getIndexName());
             searchRequest.source(context.getSearchSourceBuilder());
-            StashedThreadContext.run(client, () -> {
-                try {
-                    client.search(searchRequest, new ActionListener<SearchResponse>() {
-                        @Override
-                        public void onResponse(SearchResponse response) {
-                            log.info("Successfully list documents with search request [{}]", searchRequest);
-                            ((ActionListener<SearchResponse>) actionListener).onResponse(response);
-                        }
+            try {
+                pluginClient.search(searchRequest, new ActionListener<SearchResponse>() {
+                    @Override
+                    public void onResponse(SearchResponse response) {
+                        log.info("Successfully list documents with search request [{}]", searchRequest);
+                        ((ActionListener<SearchResponse>) actionListener).onResponse(response);
+                    }
 
-                        @Override
-                        public void onFailure(Exception e) {
-                            if (e instanceof IndexNotFoundException) {
-                                final InternalSearchResponse internalSearchResponse = InternalSearchResponse.empty();
-                                final SearchResponse emptySearchResponse = new SearchResponse(
-                                    internalSearchResponse,
-                                    null,
-                                    0,
-                                    0,
-                                    0,
-                                    0,
-                                    null,
-                                    new ShardSearchFailure[] {},
-                                    SearchResponse.Clusters.EMPTY,
-                                    null
-                                );
-                                ((ActionListener<SearchResponse>) actionListener).onResponse(emptySearchResponse);
-                            } else {
-                                actionListener.onFailure(
-                                    new SearchRelevanceException("Failed to list documents", e, RestStatus.INTERNAL_SERVER_ERROR)
-                                );
-                            }
+                    @Override
+                    public void onFailure(Exception e) {
+                        if (e instanceof IndexNotFoundException) {
+                            final InternalSearchResponse internalSearchResponse = InternalSearchResponse.empty();
+                            final SearchResponse emptySearchResponse = new SearchResponse(
+                                internalSearchResponse,
+                                null,
+                                0,
+                                0,
+                                0,
+                                0,
+                                null,
+                                new ShardSearchFailure[] {},
+                                SearchResponse.Clusters.EMPTY,
+                                null
+                            );
+                            ((ActionListener<SearchResponse>) actionListener).onResponse(emptySearchResponse);
+                        } else {
+                            actionListener.onFailure(
+                                new SearchRelevanceException("Failed to list documents", e, RestStatus.INTERNAL_SERVER_ERROR)
+                            );
                         }
-                    });
-                } catch (Exception e) {
-                    actionListener.onFailure(new SearchRelevanceException("Failed to list docs", e, RestStatus.INTERNAL_SERVER_ERROR));
-                }
-            });
+                    }
+                });
+            } catch (Exception e) {
+                actionListener.onFailure(new SearchRelevanceException("Failed to list docs", e, RestStatus.INTERNAL_SERVER_ERROR));
+            }
         };
         executeAction(listener, searchOperationContext, action);
         return null;
@@ -691,14 +688,14 @@ public class SearchRelevanceIndicesManager {
         }
 
         SearchOperationContext searchOperationContext = SearchOperationContext.builder().index(index).documentId(docId).build();
-        BiConsumer<SearchOperationContext, ActionListener<?>> action = (context, actionListener) -> StashedThreadContext.run(client, () -> {
+        BiConsumer<SearchOperationContext, ActionListener<?>> action = (context, actionListener) -> {
             try {
                 @SuppressWarnings("unchecked")
                 ActionListener<UpdateResponse> typedListener = (ActionListener<UpdateResponse>) actionListener;
                 UpdateRequest updateRequest = new UpdateRequest(context.getIndex().getIndexName(), context.getDocumentId()).doc(updates)
                     .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
 
-                client.update(updateRequest, new ActionListener<>() {
+                pluginClient.update(updateRequest, new ActionListener<>() {
                     @Override
                     public void onResponse(UpdateResponse updateResponse) {
                         log.info("Successfully patched doc id [{}]", context.getDocumentId());
@@ -715,7 +712,7 @@ public class SearchRelevanceIndicesManager {
             } catch (Exception e) {
                 actionListener.onFailure(new SearchRelevanceException("Failed to patch doc", e, RestStatus.INTERNAL_SERVER_ERROR));
             }
-        });
+        };
         executeAction(listener, searchOperationContext, action);
     }
 
