@@ -14,3 +14,4 @@ This document contains a list of maintainers in this repo. See [opensearch-proje
 | Martin Gaievski       | [martin-gaievski](https://github.com/martin-gaievski)         | Amazon      |
 | Eric Pugh | [epugh](https://github.com/epugh) | OSC         |
 | Daniel Wrigley | [wrigleyDan](https://github.com/wrigleyDan) | OSC         |
+| Prithvi S | [iprithv](https://github.com/iprithv) | Cloudera         |
