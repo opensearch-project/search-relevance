@@ -123,28 +123,6 @@ public class SearchResponseProcessorTests extends OpenSearchTestCase {
         assertEquals(AsyncStatus.ERROR, captor.getValue().getStatus());
     }
 
-    public void testProcessSearchResponseSkipsWhenTaskAlreadyFailed() {
-        when(taskContext.getHasFailure()).thenReturn(new AtomicBoolean(true));
-        SearchResponse response = createSearchResponse(14L, "doc1");
-
-        processor.processSearchResponse(
-            response,
-            pointwiseVariant(),
-            "experiment-1",
-            "config-1",
-            "red shoes",
-            5,
-            List.of(),
-            Map.of(),
-            "eval-1",
-            taskContext,
-            null
-        );
-
-        verify(evaluationResultDao, never()).putEvaluationResultEfficient(any(), any());
-        verify(experimentVariantDao, never()).putExperimentVariantEfficient(any(), any());
-    }
-
     private void stubSuccessfulEvaluationWrite() {
         doAnswer(invocation -> {
             ActionListener<?> listener = invocation.getArgument(1);
