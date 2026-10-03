@@ -373,5 +373,7 @@ public class HybridOptimizerExperimentIT extends BaseExperimentIT {
         List<String> documentIds = (List<String>) evaluationSource.get("documentIds");
         assertNotNull("Document IDs should exist", documentIds);
         assertFalse("Document IDs should not be empty", documentIds.isEmpty());
+
+        assertTookMsPresentAndNonNegative(evaluationSource);
     }
 }

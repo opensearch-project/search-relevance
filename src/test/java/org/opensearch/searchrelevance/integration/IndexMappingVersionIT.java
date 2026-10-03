@@ -96,6 +96,16 @@ public class IndexMappingVersionIT extends BaseSearchRelevanceIT {
     }
 
     /**
+     * Evaluation result mapping bumped schema_version 0 → 1 to add first-class {@code tookMs}.
+     */
+    public void testEvaluationResultMappingDeclaresTookMs() {
+        assertEquals(1, SearchRelevanceIndices.EVALUATION_RESULT.getSchemaVersion());
+        String mapping = SearchRelevanceIndices.EVALUATION_RESULT.getMapping();
+        assertTrue(mapping.contains("\"tookMs\""));
+        assertTrue(mapping.contains("\"schema_version\""));
+    }
+
+    /**
      * Test that all SearchRelevanceIndices have valid schema versions defined.
      * This validates that the enum correctly parses schema_version from JSON mapping files.
      */

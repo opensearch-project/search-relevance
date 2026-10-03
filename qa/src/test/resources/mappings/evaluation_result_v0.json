@@ -1,6 +1,6 @@
 {
   "_meta": {
-    "schema_version": 1
+    "schema_version": 0
   },
   "properties": {
     "id": { "type": "keyword" },
@@ -13,7 +13,6 @@
     "searchText": { "type": "keyword" },
     "judgmentList": { "type": "keyword" },
     "documentIds": { "type": "keyword" },
-    "tookMs": { "type": "long" },
     "metrics": {
       "type": "nested",
       "properties": {

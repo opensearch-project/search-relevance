@@ -1,0 +1,9 @@
+{
+  "id": "test-evaluation-result-bwc",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "searchConfigurationId": "legacy-config",
+  "searchText": "legacy query",
+  "judgmentIds": [],
+  "documentIds": ["d1"],
+  "metrics": [{"metric": "NDCG@5", "value": 0.5}]
+}

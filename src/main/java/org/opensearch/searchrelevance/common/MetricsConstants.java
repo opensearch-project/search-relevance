@@ -26,6 +26,11 @@ public class MetricsConstants {
     public static final String PAIRWISE_FIELD_NAME_SNAPSHOTS = "snapshots";
     public static final String PAIRWISE_FIELD_NAME_SEARCH_CONFIGURATION_ID = "searchConfigurationId";
     public static final String PAIRWISE_FIELD_NAME_DOC_IDS = "docIds";
+    /**
+     * OpenSearch cluster query time in milliseconds ({@code SearchResponse.getTook()}),
+     * not plugin queue time or Dashboards round-trip.
+     */
+    public static final String PAIRWISE_FIELD_NAME_TOOK_MS = "tookMs";
     public static final String PAIRWISE_FIELD_NAME_METRIC = "metric";
     public static final String PAIRWISE_FIELD_NAME_VALUE = "value";
 

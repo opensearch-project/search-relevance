@@ -56,6 +56,7 @@ public class SearchEvaluationExperimentIT extends BaseExperimentIT {
 
         Map<String, String> queryTextToEvaluationId = extractQueryTextToEvaluationId(experimentSource);
         assertEvaluationResults(queryTextToEvaluationId, judgmentId, searchConfigurationId);
+        assertEvaluationResultMappingHasTookMs();
 
         deleteIndex(INDEX_NAME_ESCI);
     }
@@ -217,6 +218,8 @@ public class SearchEvaluationExperimentIT extends BaseExperimentIT {
             assertNotNull("Document IDs should exist", documentIds);
             assertFalse("Document IDs should not be empty", documentIds.isEmpty());
 
+            assertTookMsPresentAndNonNegative(evaluationSource);
+
             // For specific queries, verify detailed results match expectations
             if (EXPECT_EVALUATION_RESULTS.containsKey(actualQueryTerm)) {
                 Map<String, Object> expectedResult = (Map<String, Object>) EXPECT_EVALUATION_RESULTS.get(actualQueryTerm);
@@ -238,5 +241,30 @@ public class SearchEvaluationExperimentIT extends BaseExperimentIT {
                 }
             }
         }
+    }
+
+    @SneakyThrows
+    private void assertEvaluationResultMappingHasTookMs() {
+        Response mappingResponse = makeRequest(
+            client(),
+            RestRequest.Method.GET.name(),
+            "/" + EVALUATION_RESULT_INDEX + "/_mapping",
+            null,
+            null,
+            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
+        );
+        Map<String, Object> mappingJson = entityAsMap(mappingResponse);
+        Map<String, Object> indexMapping = (Map<String, Object>) mappingJson.get(EVALUATION_RESULT_INDEX);
+        assertNotNull(indexMapping);
+        Map<String, Object> mappings = (Map<String, Object>) indexMapping.get("mappings");
+        assertNotNull(mappings);
+        Map<String, Object> meta = (Map<String, Object>) mappings.get("_meta");
+        assertNotNull(meta);
+        assertEquals(1, ((Number) meta.get("schema_version")).intValue());
+        Map<String, Object> properties = (Map<String, Object>) mappings.get("properties");
+        assertNotNull(properties);
+        Map<String, Object> tookMs = (Map<String, Object>) properties.get("tookMs");
+        assertNotNull("tookMs should be mapped as a first-class long field", tookMs);
+        assertEquals("long", tookMs.get("type"));
     }
 }

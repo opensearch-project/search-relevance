@@ -13,6 +13,7 @@ import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FI
 import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_DOC_IDS;
 import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_SEARCH_CONFIGURATION_ID;
 import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_SNAPSHOTS;
+import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_TOOK_MS;
 import static org.opensearch.searchrelevance.common.MetricsConstants.POINTWISE_FIELD_NAME_EVALUATION_ID;
 import static org.opensearch.searchrelevance.common.MetricsConstants.POINTWISE_FIELD_NAME_EVALUATION_RESULTS;
 import static org.opensearch.searchrelevance.common.MetricsConstants.POINTWISE_FIELD_NAME_EXPERIMENT_VARIANT_ID;
@@ -50,6 +51,7 @@ import org.opensearch.searchrelevance.model.ExperimentVariant;
 import org.opensearch.searchrelevance.model.QuerySetEntry;
 import org.opensearch.searchrelevance.model.SearchConfigurationDetails;
 import org.opensearch.searchrelevance.model.builder.SearchRequestBuilder;
+import org.opensearch.searchrelevance.utils.SearchTookMs;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.transport.client.Client;
 
@@ -88,7 +90,7 @@ public class MetricsHelper {
         int size,
         ActionListener<Map<String, Object>> listener
     ) {
-        Map<String, List<String>> searchConfigToDocIds = Collections.synchronizedMap(new HashMap<>());
+        Map<String, PairwiseConfigSnapshot> searchConfigToSnapshot = Collections.synchronizedMap(new HashMap<>());
         AtomicBoolean hasFailure = new AtomicBoolean(false);
         AtomicInteger pendingSearches = new AtomicInteger(searchConfigurations.size());
 
@@ -115,9 +117,9 @@ public class MetricsHelper {
                             .distinct()
                             .collect(Collectors.toList());
 
-                        searchConfigToDocIds.put(searchConfigId, docIds);
+                        searchConfigToSnapshot.put(searchConfigId, new PairwiseConfigSnapshot(docIds, SearchTookMs.from(response)));
                         if (pendingSearches.decrementAndGet() == 0) {
-                            createPairwiseResults(searchConfigToDocIds, listener);
+                            createPairwiseResults(searchConfigToSnapshot, listener);
                         }
                     } catch (Exception e) {
                         handleFailure(e, hasFailure, listener);
@@ -132,32 +134,39 @@ public class MetricsHelper {
         }
     }
 
-    private void createPairwiseResults(Map<String, List<String>> searchConfigToDocIds, ActionListener<Map<String, Object>> listener) {
+    private void createPairwiseResults(
+        Map<String, PairwiseConfigSnapshot> searchConfigToSnapshot,
+        ActionListener<Map<String, Object>> listener
+    ) {
         try {
             Map<String, Object> results = new HashMap<>();
 
-            if (searchConfigToDocIds == null || searchConfigToDocIds.isEmpty()) {
+            if (searchConfigToSnapshot == null || searchConfigToSnapshot.isEmpty()) {
                 results.put(METRICS_PAIRWISE_COMPARISON_FIELD_NAME, Collections.emptyMap());
                 listener.onResponse(results);
                 return;
             }
-            // Add doc IDs for each search configuration
+            // Add doc IDs and cluster latency for each search configuration
             List<Map<String, Object>> snapShots = new ArrayList<>();
-            searchConfigToDocIds.forEach((configId, docIds) -> {
+            searchConfigToSnapshot.forEach((configId, configSnapshot) -> {
                 Map<String, Object> snapshot = new HashMap<>();
                 snapshot.put(PAIRWISE_FIELD_NAME_SEARCH_CONFIGURATION_ID, configId);
+                List<String> docIds = configSnapshot != null ? configSnapshot.docIds : null;
                 snapshot.put(PAIRWISE_FIELD_NAME_DOC_IDS, docIds != null ? docIds : Collections.emptyList());
+                if (configSnapshot != null && configSnapshot.tookMs != null) {
+                    snapshot.put(PAIRWISE_FIELD_NAME_TOOK_MS, configSnapshot.tookMs);
+                }
                 snapShots.add(snapshot);
             });
             results.put(PAIRWISE_FIELD_NAME_SNAPSHOTS, snapShots);
 
             // Prepare input for pairwise calculation
             Map<String, List<String>> pairwiseInput = new HashMap<>();
-            List<String> configIds = new ArrayList<>(searchConfigToDocIds.keySet());
+            List<String> configIds = new ArrayList<>(searchConfigToSnapshot.keySet());
 
             if (configIds.size() >= 2) {
-                pairwiseInput.put(PAIRWISE_FIELD_NAME_A, searchConfigToDocIds.get(configIds.get(0)));
-                pairwiseInput.put(PAIRWISE_FIELD_NAME_B, searchConfigToDocIds.get(configIds.get(1)));
+                pairwiseInput.put(PAIRWISE_FIELD_NAME_A, docIdsOf(searchConfigToSnapshot.get(configIds.get(0))));
+                pairwiseInput.put(PAIRWISE_FIELD_NAME_B, docIdsOf(searchConfigToSnapshot.get(configIds.get(1))));
             }
 
             // Calculate and add pairwise metrics
@@ -340,7 +349,12 @@ public class MetricsHelper {
                         queryText,
                         judgmentIds,
                         docIds,
-                        metrics
+                        metrics,
+                        null,
+                        null,
+                        null,
+                        null,
+                        SearchTookMs.from(response)
                     );
 
                     evaluationResultDao.putEvaluationResult(evaluationResult, ActionListener.wrap(success -> {
@@ -432,7 +446,12 @@ public class MetricsHelper {
                             queryText,
                             judgmentIds,
                             docIds,
-                            metrics
+                            metrics,
+                            null,
+                            null,
+                            null,
+                            null,
+                            SearchTookMs.from(response)
                         );
 
                         evaluationResultDao.putEvaluationResult(evaluationResult, ActionListener.wrap(success -> {
@@ -504,6 +523,26 @@ public class MetricsHelper {
                     listener.onFailure(e);
                 }
             });
+        }
+    }
+
+    private static List<String> docIdsOf(PairwiseConfigSnapshot snapshot) {
+        if (snapshot == null || snapshot.docIds == null) {
+            return Collections.emptyList();
+        }
+        return snapshot.docIds;
+    }
+
+    /**
+     * Per-config search snapshot used while pairwise results are assembled.
+     */
+    private static final class PairwiseConfigSnapshot {
+        private final List<String> docIds;
+        private final Long tookMs;
+
+        private PairwiseConfigSnapshot(List<String> docIds, Long tookMs) {
+            this.docIds = docIds;
+            this.tookMs = tookMs;
         }
     }
 }
