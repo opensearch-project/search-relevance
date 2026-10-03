@@ -1,0 +1,25 @@
+{
+  "_meta": {
+    "schema_version": 1
+  },
+  "properties": {
+    "id": { "type": "keyword" },
+    "timestamp": { "type": "date", "format": "strict_date_time" },
+    "searchConfigurationId": { "type": "keyword" },
+    "experimentId": { "type": "keyword" },
+    "experimentVariantId": { "type": "keyword" },
+    "experimentVariantParameters": { "type": "keyword" },
+    "scheduledRunId": {"type": "keyword"},
+    "searchText": { "type": "keyword" },
+    "judgmentList": { "type": "keyword" },
+    "documentIds": { "type": "keyword" },
+    "tookMs": { "type": "long" },
+    "metrics": {
+      "type": "nested",
+      "properties": {
+        "metric": { "type": "keyword" },
+        "value": { "type": "float" }
+      }
+    }
+  }
+}
