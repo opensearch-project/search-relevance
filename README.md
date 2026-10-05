@@ -14,7 +14,7 @@ Also included are advanced tools such as LLM as a Judge and a Global Parameter S
 Exposing these powerful features through a simple UI is done through the  [Dashboards Search Relevance](https://github.com/opensearch-project/dashboards-search-relevance) plugin.
 
 
-For tutorials on how to leverage these tools, see [here](https://docs.opensearch.org/docs/latest/search-plugins/search-relevance/).
+For tutorials on how to leverage these tools, see [here](https://docs.opensearch.org/latest/search-plugins/search-relevance/).
 
 
 ## Project Resources

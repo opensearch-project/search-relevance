@@ -19,7 +19,7 @@ import java.util.stream.Collectors
 
 buildscript {
     ext {
-        opensearch_version = System.getProperty("opensearch.version", "3.9.0-SNAPSHOT")
+        opensearch_version = System.getProperty("opensearch.version", "3.10.0-SNAPSHOT")
         isSnapshot = "true" == System.getProperty("build.snapshot", "true")
         buildVersionQualifier = System.getProperty("build.version_qualifier", "")
         // 2.2.0-SNAPSHOT -> 2.2.0.0-SNAPSHOT
@@ -49,10 +49,10 @@ buildscript {
 
     dependencies {
         classpath "org.opensearch.gradle:build-tools:${opensearch_version}"
-        classpath "com.diffplug.spotless:spotless-plugin-gradle:8.9.0"
+        classpath "com.diffplug.spotless:spotless-plugin-gradle:8.10.2"
         classpath "com.github.form-com.diff-coverage-gradle:diff-coverage:0.9.5"
         classpath "io.freefair.gradle:lombok-plugin:9.5.0"
-        classpath "de.thetaphi:forbiddenapis:3.10" // Upgrade for JDK 25 support
+        classpath "de.thetaphi:forbiddenapis:3.11" // Upgrade for JDK 25 support
     }
 }
 
@@ -208,8 +208,9 @@ configurations {
 
 configurations.all {
     resolutionStrategy {
-        force("com.google.guava:guava:33.6.0-jre") // CVE for 31.1
+        force("com.google.guava:guava:33.7.1-jre") // CVE for 31.1
         force("com.google.errorprone:error_prone_annotations:2.50.0") // Fix version conflict
+        force("org.jspecify:jspecify:1.0.1") // Fix version conflict between guava and opensearch core
     }
     exclude group: 'org.slf4j', module: 'slf4j-log4j12'
 }
@@ -219,7 +220,7 @@ dependencies {
     api "org.opensearch:opensearch:${opensearch_version}"
     api group: 'org.opensearch', name:'opensearch-ml-client', version: "${opensearch_build}"
     compileOnly "org.opensearch:opensearch-job-scheduler-spi:${opensearch_build}"
-    implementation group: 'com.google.guava', name: 'guava', version:'33.6.0-jre'
+    implementation group: 'com.google.guava', name: 'guava', version:'33.7.1-jre'
     compileOnly group: 'org.apache.commons', name: 'commons-lang3', version: '3.20.0'
     implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.20.0'
     implementation group: 'org.apache.commons', name: 'commons-math3', version: '3.6.1'
@@ -231,11 +232,11 @@ dependencies {
     // https://github.com/opensearch-project/ml-commons/commit/464bfe34c66d7a729a00dd457f03587ea4e504d9
     // TODO: Remove following three lines of dependencies if ml-common include them in their jar
     runtimeOnly group: 'org.reflections', name: 'reflections', version: '0.10.2'  // Note the version change
-    runtimeOnly group: 'org.javassist', name: 'javassist', version: '3.32.0-GA'
+    runtimeOnly group: 'org.javassist', name: 'javassist', version: '3.33.0-GA'
     runtimeOnly group: 'org.opensearch', name: 'common-utils', version: "${opensearch_build}"
     runtimeOnly group: 'org.apache.commons', name: 'commons-text', version: '1.15.0'
     runtimeOnly group: 'com.google.code.gson', name: 'gson', version: '2.14.0'
-    runtimeOnly group: 'org.json', name: 'json', version: '20260719'
+    runtimeOnly group: 'org.json', name: 'json', version: '20260814'
     // json-path 2.9.0 depends on slf4j 2.0.11, which conflicts with the version used by OpenSearch core.
     // Excluding slf4j here since json-path is only used for testing, and logging failures in this context are acceptable.
     runtimeOnly('com.jayway.jsonpath:json-path:3.0.0') {
@@ -651,7 +652,7 @@ task updateVersion {
         if (isPatchVersionBump) {
             println "Detected patch version bump (${currentVersionWithoutSnapshot} -> ${newVersionWithoutSnapshot}), will skip adding to BWC version arrays"
         } else if (isMinorVersionBump) {
-            println "Detected minor version bump (${currentVersionWithoutSnapshot} -> ${newVersionWithoutSnapshot}), will skip updating bwc.bundle.version"
+            println "Detected minor version bump (${currentVersionWithoutSnapshot} -> ${newVersionWithoutSnapshot})"
         } else if (isMajorVersionBump) {
             println "Detected major version bump (${currentVersionWithoutSnapshot} -> ${newVersionWithoutSnapshot})"
         }
@@ -665,8 +666,10 @@ task updateVersion {
             byline: true
         )
 
-        // Step 4: Update gradle.properties - systemProp.bwc.bundle.version (only for major bumps)
-        if (isMajorVersionBump) {
+        // Step 4: Update gradle.properties - systemProp.bwc.bundle.version
+        // Update for minor and major version bumps to point at the previous released version.
+        // Skip for patch bumps (e.g. 3.7.0 -> 3.7.1) since the previous released version is unchanged.
+        if (!isPatchVersionBump) {
             ant.replaceregexp(
                 file: 'gradle.properties',
                 match: "systemProp.bwc.bundle.version=${currentBwcBundleVersion}",
@@ -676,7 +679,7 @@ task updateVersion {
             )
             println "Updated systemProp.bwc.bundle.version to ${currentVersionWithoutSnapshot}"
         } else {
-            println "Skipped updating systemProp.bwc.bundle.version (only updated for major version bumps)"
+            println "Skipped updating systemProp.bwc.bundle.version (only updated for minor and major version bumps)"
         }
 
         // Step 5: Update backwards_compatibility_tests_workflow.yml - opensearch_version
