@@ -42,8 +42,7 @@ public class SearchRequestBuilderTests extends OpenSearchTestCase {
     private static final String TEST_PIPELINE = "test_pipeline";
     private static final int TEST_SIZE = 10;
     private static final String LEGACY_PLACEHOLDER_DEPRECATION_MESSAGE =
-        "The %SearchText% query template placeholder is deprecated and scheduled for removal in "
-            + "OpenSearch 4.0; use %queryText% instead.";
+        "The %SearchText% query template placeholder is deprecated; use %queryText% instead.";
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 

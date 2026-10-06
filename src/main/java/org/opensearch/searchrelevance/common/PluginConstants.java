@@ -40,8 +40,7 @@ public class PluginConstants {
      *
      * @deprecated Use {@link #WILDCARD_QUERY_TEXT} ({@code %queryText%}) instead, which
      *     aligns with the {@code queryText} field name used by Query Set entries. Kept only for
-     *     backward compatibility with existing search configurations and deep links; planned for
-     *     removal in OpenSearch 4.0.
+     *     backward compatibility with existing search configurations and deep links.
      */
     @Deprecated
     public static final String WILDCARD_QUERY_TEXT_DEPRECATED = "%SearchText%";

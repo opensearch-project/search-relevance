@@ -163,8 +163,7 @@ public class SearchRequestBuilder {
                 if (query.contains(WILDCARD_QUERY_TEXT_DEPRECATED)) {
                     DEPRECATION_LOGGER.deprecate(
                         "search_relevance_legacy_search_text_placeholder",
-                        "The %SearchText% query template placeholder is deprecated and scheduled for removal in "
-                            + "OpenSearch 4.0; use %queryText% instead."
+                        "The %SearchText% query template placeholder is deprecated; use %queryText% instead."
                     );
                 }
                 processedQuery = query.replace(WILDCARD_QUERY_TEXT_DEPRECATED, queryText).replace(WILDCARD_QUERY_TEXT, queryText);
@@ -267,8 +266,7 @@ public class SearchRequestBuilder {
                 if (query.contains(WILDCARD_QUERY_TEXT_DEPRECATED)) {
                     DEPRECATION_LOGGER.deprecate(
                         "search_relevance_legacy_search_text_placeholder",
-                        "The %SearchText% query template placeholder is deprecated and scheduled for removal in "
-                            + "OpenSearch 4.0; use %queryText% instead."
+                        "The %SearchText% query template placeholder is deprecated; use %queryText% instead."
                     );
                 }
                 processedQuery = query.replace(WILDCARD_QUERY_TEXT_DEPRECATED, queryText).replace(WILDCARD_QUERY_TEXT, queryText);
