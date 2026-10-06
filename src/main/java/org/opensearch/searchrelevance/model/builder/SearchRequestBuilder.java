@@ -8,6 +8,7 @@
 package org.opensearch.searchrelevance.model.builder;
 
 import static org.opensearch.searchrelevance.common.PluginConstants.WILDCARD_QUERY_TEXT;
+import static org.opensearch.searchrelevance.common.PluginConstants.WILDCARD_QUERY_TEXT_DEPRECATED;
 import static org.opensearch.searchrelevance.experiment.QuerySourceUtil.validateHybridQuery;
 
 import java.io.IOException;
@@ -16,6 +17,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import org.opensearch.action.search.SearchRequest;
+import org.opensearch.common.logging.DeprecationLogger;
 import org.opensearch.common.xcontent.json.JsonXContent;
 import org.opensearch.core.xcontent.DeprecationHandler;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
@@ -47,6 +49,7 @@ public class SearchRequestBuilder {
     private static volatile ScriptService SCRIPT_SERVICE;
     private static final String SIZE_FIELD_NAME = "size";
     private static final String QUERY_FIELD_NAME = "query";
+    private static final DeprecationLogger DEPRECATION_LOGGER = DeprecationLogger.getLogger(SearchRequestBuilder.class);
 
     /**
      * Initialize the builder with the cluster's NamedXContentRegistry so that
@@ -138,6 +141,7 @@ public class SearchRequestBuilder {
         return buildSearchRequest(index, query, queryText, null, searchPipeline, size);
     }
 
+    @SuppressWarnings("deprecation") // intentionally still supports the legacy WILDCARD_QUERY_TEXT_DEPRECATED placeholder
     public static SearchRequest buildSearchRequest(
         String index,
         String query,
@@ -155,8 +159,15 @@ public class SearchRequestBuilder {
                 // Use Mustache templating for queries containing {{
                 processedQuery = processMustacheTemplate(query, queryText, customFields);
             } else {
-                // Fallback to legacy %SearchText% replacement
-                processedQuery = query.replace(WILDCARD_QUERY_TEXT, queryText);
+                // Fallback to legacy %SearchText% / %queryText% replacement
+                if (query.contains(WILDCARD_QUERY_TEXT_DEPRECATED)) {
+                    DEPRECATION_LOGGER.deprecate(
+                        "search_relevance_legacy_search_text_placeholder",
+                        "The %SearchText% query template placeholder is deprecated and scheduled for removal in "
+                            + "OpenSearch 4.0; use %queryText% instead."
+                    );
+                }
+                processedQuery = query.replace(WILDCARD_QUERY_TEXT_DEPRECATED, queryText).replace(WILDCARD_QUERY_TEXT, queryText);
             }
 
             // Parse to map (using EMPTY registry) for validation/log-only purposes such as size check
@@ -234,6 +245,7 @@ public class SearchRequestBuilder {
         return buildRequestForHybridSearch(index, query, temporarySearchPipeline, queryText, null, size);
     }
 
+    @SuppressWarnings("deprecation") // intentionally still supports the legacy WILDCARD_QUERY_TEXT_DEPRECATED placeholder
     public static SearchRequest buildRequestForHybridSearch(
         String index,
         String query,
@@ -251,8 +263,15 @@ public class SearchRequestBuilder {
                 // Use Mustache templating for queries containing {{
                 processedQuery = processMustacheTemplate(query, queryText, customFields);
             } else {
-                // Fallback to legacy %SearchText% replacement
-                processedQuery = query.replace(WILDCARD_QUERY_TEXT, queryText);
+                // Fallback to legacy %SearchText% / %queryText% replacement
+                if (query.contains(WILDCARD_QUERY_TEXT_DEPRECATED)) {
+                    DEPRECATION_LOGGER.deprecate(
+                        "search_relevance_legacy_search_text_placeholder",
+                        "The %SearchText% query template placeholder is deprecated and scheduled for removal in "
+                            + "OpenSearch 4.0; use %queryText% instead."
+                    );
+                }
+                processedQuery = query.replace(WILDCARD_QUERY_TEXT_DEPRECATED, queryText).replace(WILDCARD_QUERY_TEXT, queryText);
             }
 
             // Parse to map (using EMPTY registry) for validation/log-only purposes (hybrid validation, size check)

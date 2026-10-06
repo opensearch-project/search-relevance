@@ -8,6 +8,7 @@
 package org.opensearch.searchrelevance.model.builder;
 
 import static org.opensearch.searchrelevance.common.PluginConstants.WILDCARD_QUERY_TEXT;
+import static org.opensearch.searchrelevance.common.PluginConstants.WILDCARD_QUERY_TEXT_DEPRECATED;
 
 import java.util.HashMap;
 import java.util.List;
@@ -40,6 +41,9 @@ public class SearchRequestBuilderTests extends OpenSearchTestCase {
     private static final String TEST_QUERY_TEXT = "test_query";
     private static final String TEST_PIPELINE = "test_pipeline";
     private static final int TEST_SIZE = 10;
+    private static final String LEGACY_PLACEHOLDER_DEPRECATION_MESSAGE =
+        "The %SearchText% query template placeholder is deprecated and scheduled for removal in "
+            + "OpenSearch 4.0; use %queryText% instead.";
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -411,13 +415,60 @@ public class SearchRequestBuilderTests extends OpenSearchTestCase {
      * This confirms that queries without {{ use the old string replacement
      */
     public void testLegacyWildcardStillWorks() {
-        String legacyQuery = "{\"query\":{\"match\":{\"title\":\"" + WILDCARD_QUERY_TEXT + "\"}}}";
+        String legacyQuery = "{\"query\":{\"match\":{\"title\":\"" + WILDCARD_QUERY_TEXT_DEPRECATED + "\"}}}";
 
         SearchRequest searchRequest = SearchRequestBuilder.buildSearchRequest(TEST_INDEX, legacyQuery, TEST_QUERY_TEXT, null, TEST_SIZE);
 
         assertNotNull(searchRequest);
         assertNotNull(searchRequest.source());
         // The main test is that no exception is thrown - legacy replacement works
+        assertWarnings(LEGACY_PLACEHOLDER_DEPRECATION_MESSAGE);
+    }
+
+    /**
+     * Test the preferred %queryText% placeholder is substituted for non-Mustache
+     * queries, matching the legacy %SearchText% behavior above.
+     */
+    public void testPreferredWildcardWorks() {
+        String preferredQuery = "{\"query\":{\"match\":{\"title\":\"" + WILDCARD_QUERY_TEXT + "\"}}}";
+
+        SearchRequest searchRequest = SearchRequestBuilder.buildSearchRequest(TEST_INDEX, preferredQuery, TEST_QUERY_TEXT, null, TEST_SIZE);
+
+        assertNotNull(searchRequest);
+        SearchSourceBuilder sourceBuilder = searchRequest.source();
+        assertNotNull(sourceBuilder);
+        String renderedSource = sourceBuilder.toString();
+        assertTrue("Query text should be substituted into the query", renderedSource.contains(TEST_QUERY_TEXT));
+        assertFalse(
+            "Preferred placeholder should not remain unsubstituted",
+            renderedSource.contains(WILDCARD_QUERY_TEXT)
+        );
+    }
+
+    /**
+     * Test a single query mixing both the legacy and preferred placeholders
+     * (e.g. one search configuration authored before the rename, one after) has
+     * both substituted correctly.
+     */
+    public void testMixedLegacyAndPreferredWildcardsBothSubstituted() {
+        String mixedQuery = "{\"query\":{\"bool\":{\"must\":[{\"match\":{\"title\":\""
+            + WILDCARD_QUERY_TEXT
+            + "\"}},{\"match\":{\"content\":\""
+            + WILDCARD_QUERY_TEXT_DEPRECATED
+            + "\"}}]}}}";
+
+        SearchRequest searchRequest = SearchRequestBuilder.buildSearchRequest(TEST_INDEX, mixedQuery, TEST_QUERY_TEXT, null, TEST_SIZE);
+
+        assertNotNull(searchRequest);
+        SearchSourceBuilder sourceBuilder = searchRequest.source();
+        assertNotNull(sourceBuilder);
+        String renderedSource = sourceBuilder.toString();
+        assertFalse("Legacy placeholder should not remain unsubstituted", renderedSource.contains(WILDCARD_QUERY_TEXT_DEPRECATED));
+        assertFalse(
+            "Preferred placeholder should not remain unsubstituted",
+            renderedSource.contains(WILDCARD_QUERY_TEXT)
+        );
+        assertWarnings(LEGACY_PLACEHOLDER_DEPRECATION_MESSAGE);
     }
 
     /**
@@ -432,7 +483,7 @@ public class SearchRequestBuilderTests extends OpenSearchTestCase {
         );
 
         // Query WITHOUT {{ should use legacy replacement and not fail
-        String legacyQuery = "{\"query\":{\"match\":{\"title\":\"" + WILDCARD_QUERY_TEXT + "\"}}}";
+        String legacyQuery = "{\"query\":{\"match\":{\"title\":\"" + WILDCARD_QUERY_TEXT_DEPRECATED + "\"}}}";
         SearchRequest sr = SearchRequestBuilder.buildSearchRequest(TEST_INDEX, legacyQuery, "test", null, TEST_SIZE);
         assertNotNull("Legacy query should work without ScriptService", sr);
 
@@ -448,6 +499,7 @@ public class SearchRequestBuilderTests extends OpenSearchTestCase {
                 e.getMessage().contains("ScriptService") || e.getCause() != null && e.getCause().getMessage().contains("ScriptService")
             );
         }
+        assertWarnings(LEGACY_PLACEHOLDER_DEPRECATION_MESSAGE);
     }
 
     /**
@@ -462,10 +514,10 @@ public class SearchRequestBuilderTests extends OpenSearchTestCase {
         // Legacy query should work in hybrid search
         String legacyQuery = "{\"query\":{\"hybrid\":{\"queries\":["
             + "{\"match\":{\"title\":\""
-            + WILDCARD_QUERY_TEXT
+            + WILDCARD_QUERY_TEXT_DEPRECATED
             + "\"}},"
             + "{\"match\":{\"description\":\""
-            + WILDCARD_QUERY_TEXT
+            + WILDCARD_QUERY_TEXT_DEPRECATED
             + "\"}}"
             + "]}}}";
         Map<String, Object> temporarySearchPipeline = Map.of();
@@ -490,6 +542,7 @@ public class SearchRequestBuilderTests extends OpenSearchTestCase {
         } catch (IllegalStateException e) {
             // Expected
         }
+        assertWarnings(LEGACY_PLACEHOLDER_DEPRECATION_MESSAGE);
     }
 
     /*

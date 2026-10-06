@@ -35,8 +35,19 @@ public class PluginConstants {
     public static final String DOCUMENT_ID = "id";
     public static final String QUERY_TEXT = "query_text";
 
-    /** Use %SearchText% to represent wildcard in queryBody and also refer to the text in the search bar */
-    public static final String WILDCARD_QUERY_TEXT = "%SearchText%";
+    /**
+     * Legacy wildcard placeholder for queryBody and the search bar text.
+     *
+     * @deprecated Use {@link #WILDCARD_QUERY_TEXT} ({@code %queryText%}) instead, which
+     *     aligns with the {@code queryText} field name used by Query Set entries. Kept only for
+     *     backward compatibility with existing search configurations and deep links; planned for
+     *     removal in OpenSearch 4.0.
+     */
+    @Deprecated
+    public static final String WILDCARD_QUERY_TEXT_DEPRECATED = "%SearchText%";
+
+    /** Preferred wildcard placeholder, aligned with the queryText field name used by Query Set entries. */
+    public static final String WILDCARD_QUERY_TEXT = "%queryText%";
 
     /**
      * Indices constants
