@@ -30,7 +30,7 @@ public class MetricsConstants {
      * OpenSearch cluster query time in milliseconds ({@code SearchResponse.getTook()}),
      * not plugin queue time or Dashboards round-trip.
      */
-    public static final String PAIRWISE_FIELD_NAME_TOOK_MS = "tookMs";
+    public static final String PAIRWISE_FIELD_NAME_TOOK = "took";
     public static final String PAIRWISE_FIELD_NAME_METRIC = "metric";
     public static final String PAIRWISE_FIELD_NAME_VALUE = "value";
 

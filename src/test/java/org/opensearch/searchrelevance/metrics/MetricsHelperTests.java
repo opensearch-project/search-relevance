@@ -319,7 +319,7 @@ public class MetricsHelperTests extends OpenSearchTestCase {
         );
     }
 
-    public void testProcessPairwiseMetricsPersistsTookMsOnSnapshots() {
+    public void testProcessPairwiseMetricsPersistsTookOnSnapshots() {
         Map<String, SearchConfigurationDetails> searchConfigurations = new HashMap<>();
         searchConfigurations.put(
             "config-a",
@@ -354,13 +354,13 @@ public class MetricsHelperTests extends OpenSearchTestCase {
 
         Map<String, Long> tookByConfig = new HashMap<>();
         for (Map<String, Object> snapshot : snapshots) {
-            tookByConfig.put((String) snapshot.get("searchConfigurationId"), ((Number) snapshot.get("tookMs")).longValue());
+            tookByConfig.put((String) snapshot.get("searchConfigurationId"), ((Number) snapshot.get("took")).longValue());
         }
         assertEquals(Long.valueOf(12L), tookByConfig.get("config-a"));
         assertEquals(Long.valueOf(41L), tookByConfig.get("config-b"));
     }
 
-    public void testProcessEvaluationMetricsPersistsTookMs() {
+    public void testProcessEvaluationMetricsPersistsTook() {
         String queryText = "red shoes";
         Map<String, List<String>> indexAndQueries = new HashMap<>();
         indexAndQueries.put("config1", Arrays.asList("index1", "{\"query\":{\"match\":{\"title\":\"%SearchText%\"}}}", ""));
@@ -391,14 +391,14 @@ public class MetricsHelperTests extends OpenSearchTestCase {
 
         ArgumentCaptor<EvaluationResult> resultCaptor = ArgumentCaptor.forClass(EvaluationResult.class);
         verify(evaluationResultDao).putEvaluationResult(resultCaptor.capture(), any(ActionListener.class));
-        assertEquals(Long.valueOf(18L), resultCaptor.getValue().tookMs());
+        assertEquals(Long.valueOf(18L), resultCaptor.getValue().took());
     }
 
     private SearchResponse createMockSearchResponse(String... docIds) {
         return createMockSearchResponse(5L, docIds);
     }
 
-    private SearchResponse createMockSearchResponse(long tookMs, String... docIds) {
+    private SearchResponse createMockSearchResponse(long took, String... docIds) {
         SearchResponse response = mock(SearchResponse.class);
 
         SearchHit[] searchHits = new SearchHit[docIds.length];
@@ -410,7 +410,7 @@ public class MetricsHelperTests extends OpenSearchTestCase {
         SearchHits hits = new SearchHits(searchHits, new TotalHits(docIds.length, TotalHits.Relation.EQUAL_TO), 1.0f);
 
         when(response.getHits()).thenReturn(hits);
-        when(response.getTook()).thenReturn(TimeValue.timeValueMillis(tookMs));
+        when(response.getTook()).thenReturn(TimeValue.timeValueMillis(took));
         return response;
     }
 

@@ -12,8 +12,8 @@ import org.opensearch.action.search.SearchResponse;
 /**
  * Helpers for OpenSearch cluster query latency ({@code SearchResponse.getTook()}).
  */
-public final class SearchTookMs {
-    private SearchTookMs() {}
+public final class SearchTook {
+    private SearchTook() {}
 
     /**
      * Cluster query time in milliseconds from {@link SearchResponse#getTook()}.

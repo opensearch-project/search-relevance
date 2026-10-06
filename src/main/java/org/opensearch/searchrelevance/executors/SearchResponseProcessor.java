@@ -24,7 +24,7 @@ import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.EvaluationResult;
 import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.model.ExperimentVariant;
-import org.opensearch.searchrelevance.utils.SearchTookMs;
+import org.opensearch.searchrelevance.utils.SearchTook;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 
 import lombok.RequiredArgsConstructor;
@@ -58,9 +58,9 @@ public class SearchResponseProcessor {
         if (taskContext.getHasFailure().get()) return;
 
         try {
-            Long tookMs = SearchTookMs.from(response);
+            Long took = SearchTook.from(response);
             if (response.getHits().getTotalHits().value() == 0) {
-                handleNoHits(experimentVariant, experimentId, searchConfigId, evaluationId, taskContext, tookMs);
+                handleNoHits(experimentVariant, experimentId, searchConfigId, evaluationId, taskContext, took);
                 return;
             }
 
@@ -86,7 +86,7 @@ public class SearchResponseProcessor {
                 experimentVariant.getId(),
                 experimentVariantParameters,
                 scheduledRunId,
-                tookMs
+                took
             );
 
             evaluationResultDao.putEvaluationResultEfficient(
@@ -107,15 +107,15 @@ public class SearchResponseProcessor {
         String searchConfigId,
         String evaluationId,
         ExperimentTaskContext taskContext,
-        Long tookMs
+        Long took
     ) {
         log.warn("No hits found for search config: {} and variant: {}", searchConfigId, experimentVariant.getId());
 
         Map<String, Object> noHitsResults = new HashMap<>();
         noHitsResults.put("evaluationResultId", evaluationId);
         noHitsResults.put("details", "no search hits found");
-        if (tookMs != null) {
-            noHitsResults.put(EvaluationResult.TOOK_MS, tookMs);
+        if (took != null) {
+            noHitsResults.put(EvaluationResult.TOOK, took);
         }
 
         ExperimentVariant noHitsVariant = new ExperimentVariant(

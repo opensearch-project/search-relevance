@@ -13,7 +13,7 @@
     "searchText": { "type": "keyword" },
     "judgmentList": { "type": "keyword" },
     "documentIds": { "type": "keyword" },
-    "tookMs": { "type": "long" },
+    "took": { "type": "long" },
     "metrics": {
       "type": "nested",
       "properties": {

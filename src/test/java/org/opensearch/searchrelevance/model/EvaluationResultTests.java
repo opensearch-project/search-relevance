@@ -21,7 +21,7 @@ import org.opensearch.test.OpenSearchTestCase;
 
 public class EvaluationResultTests extends OpenSearchTestCase {
 
-    public void testToXContentWritesTookMsWhenPresent() throws IOException {
+    public void testToXContentWritesTookWhenPresent() throws IOException {
         EvaluationResult result = new EvaluationResult(
             "eval-1",
             "2024-01-01T00:00:00.000Z",
@@ -39,13 +39,13 @@ public class EvaluationResultTests extends OpenSearchTestCase {
 
         Map<String, Object> source = serialize(result);
 
-        assertEquals(14, ((Number) source.get(EvaluationResult.TOOK_MS)).longValue());
+        assertEquals(14, ((Number) source.get(EvaluationResult.TOOK)).longValue());
         assertEquals("eval-1", source.get(EvaluationResult.ID));
         assertEquals("red shoes", source.get(EvaluationResult.SEARCH_TEXT));
-        assertFalse("tookMs must not be mixed into nested metrics", containsTookMsMetric(source));
+        assertFalse("took must not be mixed into nested metrics", containsTookMetric(source));
     }
 
-    public void testToXContentOmitsTookMsWhenNull() throws IOException {
+    public void testToXContentOmitsTookWhenNull() throws IOException {
         EvaluationResult result = new EvaluationResult(
             "eval-1",
             "2024-01-01T00:00:00.000Z",
@@ -58,11 +58,11 @@ public class EvaluationResultTests extends OpenSearchTestCase {
 
         Map<String, Object> source = serialize(result);
 
-        assertFalse("legacy documents omit tookMs", source.containsKey(EvaluationResult.TOOK_MS));
-        assertNull(result.tookMs());
+        assertFalse("legacy documents omit took", source.containsKey(EvaluationResult.TOOK));
+        assertNull(result.took());
     }
 
-    public void testExistingConstructorsDefaultTookMsToNull() {
+    public void testExistingConstructorsDefaultTookToNull() {
         EvaluationResult withScheduledRun = new EvaluationResult(
             "eval-1",
             "2024-01-01T00:00:00.000Z",
@@ -73,7 +73,7 @@ public class EvaluationResultTests extends OpenSearchTestCase {
             List.of(),
             "scheduled-run-1"
         );
-        assertNull(withScheduledRun.tookMs());
+        assertNull(withScheduledRun.took());
         assertEquals("scheduled-run-1", withScheduledRun.scheduledRunId());
 
         EvaluationResult withExperimentFields = new EvaluationResult(
@@ -88,11 +88,11 @@ public class EvaluationResultTests extends OpenSearchTestCase {
             "variant-1",
             "combination=rrf"
         );
-        assertNull(withExperimentFields.tookMs());
+        assertNull(withExperimentFields.took());
         assertEquals("experiment-1", withExperimentFields.experimentId());
     }
 
-    public void testTookMsZeroIsSerialized() throws IOException {
+    public void testTookZeroIsSerialized() throws IOException {
         EvaluationResult result = new EvaluationResult(
             "eval-1",
             "2024-01-01T00:00:00.000Z",
@@ -109,7 +109,7 @@ public class EvaluationResultTests extends OpenSearchTestCase {
         );
 
         Map<String, Object> source = serialize(result);
-        assertEquals(0, ((Number) source.get(EvaluationResult.TOOK_MS)).longValue());
+        assertEquals(0, ((Number) source.get(EvaluationResult.TOOK)).longValue());
     }
 
     @SuppressWarnings("unchecked")
@@ -120,13 +120,13 @@ public class EvaluationResultTests extends OpenSearchTestCase {
     }
 
     @SuppressWarnings("unchecked")
-    private boolean containsTookMsMetric(Map<String, Object> source) {
+    private boolean containsTookMetric(Map<String, Object> source) {
         Object metrics = source.get(EvaluationResult.METRICS);
         if (!(metrics instanceof List<?>)) {
             return false;
         }
         for (Object metric : (List<Object>) metrics) {
-            if (metric instanceof Map<?, ?> metricMap && EvaluationResult.TOOK_MS.equals(metricMap.get("metric"))) {
+            if (metric instanceof Map<?, ?> metricMap && EvaluationResult.TOOK.equals(metricMap.get("metric"))) {
                 return true;
             }
         }

@@ -96,12 +96,12 @@ public class IndexMappingVersionIT extends BaseSearchRelevanceIT {
     }
 
     /**
-     * Evaluation result mapping bumped schema_version 0 → 1 to add first-class {@code tookMs}.
+     * Evaluation result mapping bumped schema_version 0 → 1 to add first-class {@code took}.
      */
-    public void testEvaluationResultMappingDeclaresTookMs() {
+    public void testEvaluationResultMappingDeclaresTook() {
         assertEquals(1, SearchRelevanceIndices.EVALUATION_RESULT.getSchemaVersion());
         String mapping = SearchRelevanceIndices.EVALUATION_RESULT.getMapping();
-        assertTrue(mapping.contains("\"tookMs\""));
+        assertTrue(mapping.contains("\"took\""));
         assertTrue(mapping.contains("\"schema_version\""));
     }
 

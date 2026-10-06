@@ -34,7 +34,7 @@ public class EvaluationResult implements ToXContentObject {
      * OpenSearch cluster query time in milliseconds ({@code SearchResponse.getTook()}).
      * This is not plugin queue time, judgment scoring, or Dashboards round-trip.
      */
-    public static final String TOOK_MS = "tookMs";
+    public static final String TOOK = "took";
 
     /**
      * Identifier of the system index
@@ -55,7 +55,7 @@ public class EvaluationResult implements ToXContentObject {
      * not plugin queue time, judgment scoring, or Dashboards round-trip.
      * Null on documents written before this field existed, and on failed searches with no SearchResponse.
      */
-    private final Long tookMs;
+    private final Long took;
 
     public EvaluationResult(
         String id,
@@ -69,7 +69,7 @@ public class EvaluationResult implements ToXContentObject {
         String experimentVariantId,
         String experimentVariantParameters,
         String scheduledRunId,
-        Long tookMs
+        Long took
     ) {
         this.id = id;
         this.timestamp = timestamp;
@@ -82,7 +82,7 @@ public class EvaluationResult implements ToXContentObject {
         this.experimentVariantId = experimentVariantId;
         this.experimentVariantParameters = experimentVariantParameters;
         this.scheduledRunId = scheduledRunId;
-        this.tookMs = tookMs;
+        this.took = took;
     }
 
     public EvaluationResult(
@@ -188,8 +188,8 @@ public class EvaluationResult implements ToXContentObject {
         if (this.scheduledRunId != null) {
             xContentBuilder.field(SCHEDULED_RUN_ID, this.scheduledRunId);
         }
-        if (this.tookMs != null) {
-            xContentBuilder.field(TOOK_MS, this.tookMs);
+        if (this.took != null) {
+            xContentBuilder.field(TOOK, this.took);
         }
         return xContentBuilder.endObject();
     }
@@ -238,7 +238,7 @@ public class EvaluationResult implements ToXContentObject {
         return scheduledRunId;
     }
 
-    public Long tookMs() {
-        return tookMs;
+    public Long took() {
+        return took;
     }
 }

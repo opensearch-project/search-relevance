@@ -51,7 +51,7 @@ public class SearchResponseProcessorTests extends OpenSearchTestCase {
         when(taskContext.getHasFailure()).thenReturn(new AtomicBoolean(false));
     }
 
-    public void testProcessSearchResponsePersistsTookMs() {
+    public void testProcessSearchResponsePersistsTook() {
         SearchResponse response = createSearchResponse(14L, "doc1", "doc2");
         ExperimentVariant variant = pointwiseVariant();
         stubSuccessfulEvaluationWrite();
@@ -73,14 +73,14 @@ public class SearchResponseProcessorTests extends OpenSearchTestCase {
         ArgumentCaptor<EvaluationResult> captor = ArgumentCaptor.forClass(EvaluationResult.class);
         verify(evaluationResultDao).putEvaluationResultEfficient(captor.capture(), any(ActionListener.class));
         EvaluationResult stored = captor.getValue();
-        assertEquals(Long.valueOf(14L), stored.tookMs());
+        assertEquals(Long.valueOf(14L), stored.took());
         assertEquals("eval-1", stored.id());
         assertEquals("red shoes", stored.searchText());
         verify(taskContext).completeVariantSuccess();
         verify(experimentVariantDao, never()).putExperimentVariantEfficient(any(), any());
     }
 
-    public void testProcessSearchResponseNoHitsPersistsTookMsOnVariant() {
+    public void testProcessSearchResponseNoHitsPersistsTookOnVariant() {
         SearchResponse response = createSearchResponse(9L);
         ExperimentVariant variant = pointwiseVariant();
         stubSuccessfulVariantWrite();
@@ -106,12 +106,12 @@ public class SearchResponseProcessorTests extends OpenSearchTestCase {
         ExperimentVariant stored = captor.getValue();
         assertEquals(AsyncStatus.COMPLETED, stored.getStatus());
         assertEquals("no search hits found", stored.getResults().get("details"));
-        assertEquals(9L, stored.getResults().get(EvaluationResult.TOOK_MS));
+        assertEquals(9L, stored.getResults().get(EvaluationResult.TOOK));
         assertEquals("eval-1", stored.getResults().get("evaluationResultId"));
         verify(taskContext).completeVariantFailure();
     }
 
-    public void testHandleSearchFailureOmitsTookMs() {
+    public void testHandleSearchFailureOmitsTook() {
         ExperimentVariant variant = pointwiseVariant();
         stubSuccessfulVariantWrite();
 
@@ -119,7 +119,7 @@ public class SearchResponseProcessorTests extends OpenSearchTestCase {
 
         ArgumentCaptor<ExperimentVariant> captor = ArgumentCaptor.forClass(ExperimentVariant.class);
         verify(experimentVariantDao).putExperimentVariantEfficient(captor.capture(), any(ActionListener.class));
-        assertFalse(captor.getValue().getResults().containsKey(EvaluationResult.TOOK_MS));
+        assertFalse(captor.getValue().getResults().containsKey(EvaluationResult.TOOK));
         assertEquals(AsyncStatus.ERROR, captor.getValue().getStatus());
     }
 
@@ -151,7 +151,7 @@ public class SearchResponseProcessorTests extends OpenSearchTestCase {
             .build();
     }
 
-    private SearchResponse createSearchResponse(long tookMs, String... docIds) {
+    private SearchResponse createSearchResponse(long took, String... docIds) {
         SearchResponse response = mock(SearchResponse.class);
         SearchHit[] searchHits = new SearchHit[docIds.length];
         for (int i = 0; i < docIds.length; i++) {
@@ -160,7 +160,7 @@ public class SearchResponseProcessorTests extends OpenSearchTestCase {
         }
         SearchHits hits = new SearchHits(searchHits, new TotalHits(docIds.length, TotalHits.Relation.EQUAL_TO), 1.0f);
         when(response.getHits()).thenReturn(hits);
-        when(response.getTook()).thenReturn(TimeValue.timeValueMillis(tookMs));
+        when(response.getTook()).thenReturn(TimeValue.timeValueMillis(took));
         return response;
     }
 }

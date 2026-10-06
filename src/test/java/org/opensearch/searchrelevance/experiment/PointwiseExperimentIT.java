@@ -231,7 +231,7 @@ public class PointwiseExperimentIT extends BaseExperimentIT {
                 evaluationSource.get("experimentVariantParameters")
             );
 
-            assertTookMsPresentAndNonNegative(evaluationSource);
+            assertTookPresentAndNonNegative(evaluationSource);
 
             if (EXPECT_EVALUATION_RESULTS.containsKey(actualQueryTerm)) {
                 Map<String, Object> expectedResult = (Map<String, Object>) EXPECT_EVALUATION_RESULTS.get(actualQueryTerm);

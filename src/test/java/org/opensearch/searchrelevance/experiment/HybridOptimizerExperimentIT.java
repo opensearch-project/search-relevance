@@ -374,6 +374,6 @@ public class HybridOptimizerExperimentIT extends BaseExperimentIT {
         assertNotNull("Document IDs should exist", documentIds);
         assertFalse("Document IDs should not be empty", documentIds.isEmpty());
 
-        assertTookMsPresentAndNonNegative(evaluationSource);
+        assertTookPresentAndNonNegative(evaluationSource);
     }
 }

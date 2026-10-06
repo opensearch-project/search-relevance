@@ -13,7 +13,7 @@ import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FI
 import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_DOC_IDS;
 import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_SEARCH_CONFIGURATION_ID;
 import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_SNAPSHOTS;
-import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_TOOK_MS;
+import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_TOOK;
 import static org.opensearch.searchrelevance.common.MetricsConstants.POINTWISE_FIELD_NAME_EVALUATION_ID;
 import static org.opensearch.searchrelevance.common.MetricsConstants.POINTWISE_FIELD_NAME_EVALUATION_RESULTS;
 import static org.opensearch.searchrelevance.common.MetricsConstants.POINTWISE_FIELD_NAME_EXPERIMENT_VARIANT_ID;
@@ -51,7 +51,7 @@ import org.opensearch.searchrelevance.model.ExperimentVariant;
 import org.opensearch.searchrelevance.model.QuerySetEntry;
 import org.opensearch.searchrelevance.model.SearchConfigurationDetails;
 import org.opensearch.searchrelevance.model.builder.SearchRequestBuilder;
-import org.opensearch.searchrelevance.utils.SearchTookMs;
+import org.opensearch.searchrelevance.utils.SearchTook;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.transport.client.Client;
 
@@ -117,7 +117,7 @@ public class MetricsHelper {
                             .distinct()
                             .collect(Collectors.toList());
 
-                        searchConfigToSnapshot.put(searchConfigId, new PairwiseConfigSnapshot(docIds, SearchTookMs.from(response)));
+                        searchConfigToSnapshot.put(searchConfigId, new PairwiseConfigSnapshot(docIds, SearchTook.from(response)));
                         if (pendingSearches.decrementAndGet() == 0) {
                             createPairwiseResults(searchConfigToSnapshot, listener);
                         }
@@ -153,8 +153,8 @@ public class MetricsHelper {
                 snapshot.put(PAIRWISE_FIELD_NAME_SEARCH_CONFIGURATION_ID, configId);
                 List<String> docIds = configSnapshot != null ? configSnapshot.docIds : null;
                 snapshot.put(PAIRWISE_FIELD_NAME_DOC_IDS, docIds != null ? docIds : Collections.emptyList());
-                if (configSnapshot != null && configSnapshot.tookMs != null) {
-                    snapshot.put(PAIRWISE_FIELD_NAME_TOOK_MS, configSnapshot.tookMs);
+                if (configSnapshot != null && configSnapshot.took != null) {
+                    snapshot.put(PAIRWISE_FIELD_NAME_TOOK, configSnapshot.took);
                 }
                 snapShots.add(snapshot);
             });
@@ -354,7 +354,7 @@ public class MetricsHelper {
                         null,
                         null,
                         null,
-                        SearchTookMs.from(response)
+                        SearchTook.from(response)
                     );
 
                     evaluationResultDao.putEvaluationResult(evaluationResult, ActionListener.wrap(success -> {
@@ -451,7 +451,7 @@ public class MetricsHelper {
                             null,
                             null,
                             null,
-                            SearchTookMs.from(response)
+                            SearchTook.from(response)
                         );
 
                         evaluationResultDao.putEvaluationResult(evaluationResult, ActionListener.wrap(success -> {
@@ -538,11 +538,11 @@ public class MetricsHelper {
      */
     private static final class PairwiseConfigSnapshot {
         private final List<String> docIds;
-        private final Long tookMs;
+        private final Long took;
 
-        private PairwiseConfigSnapshot(List<String> docIds, Long tookMs) {
+        private PairwiseConfigSnapshot(List<String> docIds, Long took) {
             this.docIds = docIds;
-            this.tookMs = tookMs;
+            this.took = took;
         }
     }
 }

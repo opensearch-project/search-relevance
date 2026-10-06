@@ -26,7 +26,7 @@ import com.google.common.collect.ImmutableList;
 import lombok.SneakyThrows;
 
 /**
- * Integration tests for pairwise comparison experiments, including per-snapshot {@code tookMs}.
+ * Integration tests for pairwise comparison experiments, including per-snapshot {@code took}.
  */
 @ThreadLeakScope(ThreadLeakScope.Scope.NONE)
 @OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.SUITE)
@@ -35,7 +35,7 @@ public class PairwiseComparisonExperimentIT extends BaseExperimentIT {
     private static final String INDEX_NAME_ESCI = generateUniqueIndexName("pairwise");
 
     @SneakyThrows
-    public void testPairwiseComparisonExperiment_persistsTookMsOnSnapshots() {
+    public void testPairwiseComparisonExperiment_persistsTookOnSnapshots() {
         initializeIndexIfNotExist(INDEX_NAME_ESCI);
 
         String searchConfigurationIdA = createSimpleSearchConfiguration(INDEX_NAME_ESCI);
@@ -63,7 +63,7 @@ public class PairwiseComparisonExperimentIT extends BaseExperimentIT {
         assertNotNull(results);
         assertFalse(results.isEmpty());
 
-        boolean sawTookMs = false;
+        boolean sawTook = false;
         for (Map<String, Object> result : results) {
             List<Map<String, Object>> snapshots = (List<Map<String, Object>>) result.get("snapshots");
             assertNotNull("pairwise results should include snapshots", snapshots);
@@ -71,13 +71,13 @@ public class PairwiseComparisonExperimentIT extends BaseExperimentIT {
             for (Map<String, Object> snapshot : snapshots) {
                 assertNotNull(snapshot.get("searchConfigurationId"));
                 assertNotNull(snapshot.get("docIds"));
-                assertNotNull("snapshot tookMs should round-trip on GET experiment", snapshot.get("tookMs"));
-                long tookMs = ((Number) snapshot.get("tookMs")).longValue();
-                assertTrue("snapshot tookMs should be >= 0 but was " + tookMs, tookMs >= 0);
-                sawTookMs = true;
+                assertNotNull("snapshot took should round-trip on GET experiment", snapshot.get("took"));
+                long took = ((Number) snapshot.get("took")).longValue();
+                assertTrue("snapshot took should be >= 0 but was " + took, took >= 0);
+                sawTook = true;
             }
         }
-        assertTrue("expected at least one pairwise snapshot with tookMs", sawTookMs);
+        assertTrue("expected at least one pairwise snapshot with took", sawTook);
 
         deleteIndex(INDEX_NAME_ESCI);
     }

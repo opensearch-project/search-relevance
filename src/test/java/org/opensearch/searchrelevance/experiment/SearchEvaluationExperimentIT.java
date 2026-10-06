@@ -56,7 +56,7 @@ public class SearchEvaluationExperimentIT extends BaseExperimentIT {
 
         Map<String, String> queryTextToEvaluationId = extractQueryTextToEvaluationId(experimentSource);
         assertEvaluationResults(queryTextToEvaluationId, judgmentId, searchConfigurationId);
-        assertEvaluationResultMappingHasTookMs();
+        assertEvaluationResultMappingHasTook();
 
         deleteIndex(INDEX_NAME_ESCI);
     }
@@ -218,7 +218,7 @@ public class SearchEvaluationExperimentIT extends BaseExperimentIT {
             assertNotNull("Document IDs should exist", documentIds);
             assertFalse("Document IDs should not be empty", documentIds.isEmpty());
 
-            assertTookMsPresentAndNonNegative(evaluationSource);
+            assertTookPresentAndNonNegative(evaluationSource);
 
             // For specific queries, verify detailed results match expectations
             if (EXPECT_EVALUATION_RESULTS.containsKey(actualQueryTerm)) {
@@ -244,7 +244,7 @@ public class SearchEvaluationExperimentIT extends BaseExperimentIT {
     }
 
     @SneakyThrows
-    private void assertEvaluationResultMappingHasTookMs() {
+    private void assertEvaluationResultMappingHasTook() {
         Response mappingResponse = makeRequest(
             client(),
             RestRequest.Method.GET.name(),
@@ -263,8 +263,8 @@ public class SearchEvaluationExperimentIT extends BaseExperimentIT {
         assertEquals(1, ((Number) meta.get("schema_version")).intValue());
         Map<String, Object> properties = (Map<String, Object>) mappings.get("properties");
         assertNotNull(properties);
-        Map<String, Object> tookMs = (Map<String, Object>) properties.get("tookMs");
-        assertNotNull("tookMs should be mapped as a first-class long field", tookMs);
-        assertEquals("long", tookMs.get("type"));
+        Map<String, Object> took = (Map<String, Object>) properties.get("took");
+        assertNotNull("took should be mapped as a first-class long field", took);
+        assertEquals("long", took.get("type"));
     }
 }

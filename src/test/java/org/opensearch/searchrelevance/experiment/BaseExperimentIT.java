@@ -359,18 +359,18 @@ public abstract class BaseExperimentIT extends BaseSearchRelevanceIT {
     }
 
     /**
-     * New evaluation documents persist OpenSearch cluster query time as a first-class {@code tookMs}
+     * New evaluation documents persist OpenSearch cluster query time as a first-class {@code took}
      * field (milliseconds from {@code SearchResponse.getTook()}), not as a nested relevance metric.
      */
-    protected void assertTookMsPresentAndNonNegative(Map<String, Object> source) {
-        assertNotNull("tookMs should be present on new evaluation results", source.get("tookMs"));
-        long tookMs = ((Number) source.get("tookMs")).longValue();
-        assertTrue("tookMs should be >= 0 but was " + tookMs, tookMs >= 0);
+    protected void assertTookPresentAndNonNegative(Map<String, Object> source) {
+        assertNotNull("took should be present on new evaluation results", source.get("took"));
+        long took = ((Number) source.get("took")).longValue();
+        assertTrue("took should be >= 0 but was " + took, took >= 0);
         Object metrics = source.get("metrics");
         if (metrics instanceof List<?>) {
             for (Object metric : (List<?>) metrics) {
                 if (metric instanceof Map<?, ?> metricMap) {
-                    assertFalse("tookMs must not be stored as a nested metric", "tookMs".equals(metricMap.get("metric")));
+                    assertFalse("took must not be stored as a nested metric", "took".equals(metricMap.get("metric")));
                 }
             }
         }

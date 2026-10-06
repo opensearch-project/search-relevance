@@ -14,11 +14,11 @@ import org.opensearch.searchrelevance.bwc.IndexMappingTestHelper;
 /**
  * BWC Integration Test for evaluation_result mapping update during full cluster restart.
  *
- * Validates the schema_version 0 → 1 bump that adds first-class {@code tookMs}:
- * 1. OLD: Create evaluation_result with schema_version 0 (no tookMs) and insert a legacy document
+ * Validates the schema_version 0 → 1 bump that adds first-class {@code took}:
+ * 1. OLD: Create evaluation_result with schema_version 0 (no took) and insert a legacy document
  * 2. UPGRADED: Apply the v1 mapping (simulating createIndexIfAbsent on the next write),
- *    verify tookMs is mapped as long, schema_version is 1, and the pre-upgrade document still
- *    loads without tookMs
+ *    verify took is mapped as long, schema_version is 1, and the pre-upgrade document still
+ *    loads without took
  *
  * Automatic migration is triggered when experiment writes call createIndexIfAbsent. That path
  * needs a full experiment, so this test updates the mapping directly the same way
@@ -63,7 +63,7 @@ public class EvaluationResultMappingRestartIT extends AbstractSearchRelevanceRes
         Map<String, Object> mapping = IndexMappingTestHelper.getIndexMapping(client(), EVALUATION_RESULT_INDEX);
         Map<String, Object> properties = IndexMappingTestHelper.getMappingProperties(mapping);
         assertNotNull("Properties should exist", properties);
-        assertFalse("Old schema should NOT have tookMs", properties.containsKey("tookMs"));
+        assertFalse("Old schema should NOT have took", properties.containsKey("took"));
 
         Map<String, Object> meta = IndexMappingTestHelper.getMappingMeta(mapping);
         assertNotNull("_meta should exist", meta);
@@ -83,20 +83,20 @@ public class EvaluationResultMappingRestartIT extends AbstractSearchRelevanceRes
 
         Map<String, Object> oldDoc = IndexMappingTestHelper.getDocument(client(), EVALUATION_RESULT_INDEX, TEST_DOC_ID, logger);
         assertNotNull("Legacy evaluation document should survive restart upgrade", oldDoc);
-        assertFalse("Pre-upgrade evaluation documents omit tookMs", oldDoc.containsKey("tookMs"));
+        assertFalse("Pre-upgrade evaluation documents omit took", oldDoc.containsKey("took"));
 
-        // Simulate createIndexIfAbsent mapping upgrade (schema_version 0 → 1 adds tookMs).
+        // Simulate createIndexIfAbsent mapping upgrade (schema_version 0 → 1 adds took).
         String newMapping = IndexMappingTestHelper.readMappingResource(NEW_MAPPING_RESOURCE);
         IndexMappingTestHelper.updateMapping(client(), EVALUATION_RESULT_INDEX, newMapping, logger);
-        IndexMappingTestHelper.waitForMappingUpdate(client(), EVALUATION_RESULT_INDEX, new String[] { "tookMs" }, 30, logger);
+        IndexMappingTestHelper.waitForMappingUpdate(client(), EVALUATION_RESULT_INDEX, new String[] { "took" }, 30, logger);
 
         Map<String, Object> mapping = IndexMappingTestHelper.getIndexMapping(client(), EVALUATION_RESULT_INDEX);
         Map<String, Object> properties = IndexMappingTestHelper.getMappingProperties(mapping);
         assertNotNull("Properties should exist after upgrade", properties);
-        assertTrue("Mapping should have tookMs after upgrade", properties.containsKey("tookMs"));
+        assertTrue("Mapping should have took after upgrade", properties.containsKey("took"));
         @SuppressWarnings("unchecked")
-        Map<String, Object> tookMs = (Map<String, Object>) properties.get("tookMs");
-        assertEquals("tookMs should be mapped as long", "long", tookMs.get("type"));
+        Map<String, Object> took = (Map<String, Object>) properties.get("took");
+        assertEquals("took should be mapped as long", "long", took.get("type"));
 
         Map<String, Object> meta = IndexMappingTestHelper.getMappingMeta(mapping);
         assertNotNull("Mapping should have _meta", meta);
@@ -105,8 +105,8 @@ public class EvaluationResultMappingRestartIT extends AbstractSearchRelevanceRes
         oldDoc = IndexMappingTestHelper.getDocument(client(), EVALUATION_RESULT_INDEX, TEST_DOC_ID, logger);
         assertNotNull("Legacy evaluation document should still be accessible after mapping update", oldDoc);
         assertEquals("legacy query", oldDoc.get("searchText"));
-        assertFalse("Pre-upgrade evaluation documents still omit tookMs after mapping update", oldDoc.containsKey("tookMs"));
+        assertFalse("Pre-upgrade evaluation documents still omit took after mapping update", oldDoc.containsKey("took"));
 
-        logger.info("UPGRADED cluster (restart): evaluation_result mapping has tookMs, schema_version=1, legacy docs preserved");
+        logger.info("UPGRADED cluster (restart): evaluation_result mapping has took, schema_version=1, legacy docs preserved");
     }
 }
