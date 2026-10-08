@@ -419,8 +419,14 @@ public class SearchRequestBuilderTests extends OpenSearchTestCase {
         SearchRequest searchRequest = SearchRequestBuilder.buildSearchRequest(TEST_INDEX, legacyQuery, TEST_QUERY_TEXT, null, TEST_SIZE);
 
         assertNotNull(searchRequest);
-        assertNotNull(searchRequest.source());
-        // The main test is that no exception is thrown - legacy replacement works
+        SearchSourceBuilder sourceBuilder = searchRequest.source();
+        assertNotNull(sourceBuilder);
+        String renderedSource = sourceBuilder.toString();
+        assertTrue("Query text should be substituted into the query", renderedSource.contains(TEST_QUERY_TEXT));
+        assertFalse(
+            "Legacy placeholder should not remain unsubstituted",
+            renderedSource.contains(WILDCARD_QUERY_TEXT_DEPRECATED)
+        );
         assertWarnings(LEGACY_PLACEHOLDER_DEPRECATION_MESSAGE);
     }
 
