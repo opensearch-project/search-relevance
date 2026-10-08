@@ -323,11 +323,11 @@ public class MetricsHelperTests extends OpenSearchTestCase {
         Map<String, SearchConfigurationDetails> searchConfigurations = new HashMap<>();
         searchConfigurations.put(
             "config-a",
-            SearchConfigurationDetails.builder().index("index-a").query("{\"query\":{\"match\":{\"title\":\"%SearchText%\"}}}").build()
+            SearchConfigurationDetails.builder().index("index-a").query("{\"query\":{\"match\":{\"title\":\"%queryText%\"}}}").build()
         );
         searchConfigurations.put(
             "config-b",
-            SearchConfigurationDetails.builder().index("index-b").query("{\"query\":{\"match\":{\"title\":\"%SearchText%\"}}}").build()
+            SearchConfigurationDetails.builder().index("index-b").query("{\"query\":{\"match\":{\"title\":\"%queryText%\"}}}").build()
         );
 
         doAnswer(invocation -> {
@@ -363,7 +363,7 @@ public class MetricsHelperTests extends OpenSearchTestCase {
     public void testProcessEvaluationMetricsPersistsTook() {
         String queryText = "red shoes";
         Map<String, List<String>> indexAndQueries = new HashMap<>();
-        indexAndQueries.put("config1", Arrays.asList("index1", "{\"query\":{\"match\":{\"title\":\"%SearchText%\"}}}", ""));
+        indexAndQueries.put("config1", Arrays.asList("index1", "{\"query\":{\"match\":{\"title\":\"%queryText%\"}}}", ""));
 
         doAnswer(invocation -> {
             ActionListener<SearchResponse> listener = invocation.getArgument(1);
