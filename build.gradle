@@ -208,7 +208,7 @@ configurations {
 
 configurations.all {
     resolutionStrategy {
-        force("com.google.guava:guava:33.7.1-jre") // CVE for 31.1
+        force("com.google.guava:guava:33.7.2-jre") // CVE for 31.1
         force("com.google.errorprone:error_prone_annotations:2.50.0") // Fix version conflict
         force("org.jspecify:jspecify:1.0.1") // Fix version conflict between guava and opensearch core
     }
@@ -220,7 +220,7 @@ dependencies {
     api "org.opensearch:opensearch:${opensearch_version}"
     api group: 'org.opensearch', name:'opensearch-ml-client', version: "${opensearch_build}"
     compileOnly "org.opensearch:opensearch-job-scheduler-spi:${opensearch_build}"
-    implementation group: 'com.google.guava', name: 'guava', version:'33.7.1-jre'
+    implementation group: 'com.google.guava', name: 'guava', version:'33.7.2-jre'
     compileOnly group: 'org.apache.commons', name: 'commons-lang3', version: '3.20.0'
     implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.20.0'
     implementation group: 'org.apache.commons', name: 'commons-math3', version: '3.6.1'
