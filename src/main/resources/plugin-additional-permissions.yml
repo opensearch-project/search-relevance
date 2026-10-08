@@ -1,0 +1,28 @@
+# Privileges granted to this plugin's subject, on top of the full access it already has to the
+# system indices it registers through getSystemIndexDescriptors.
+#
+# The indices listed here are deliberately not system indices: users are expected to be able to read
+# query sets, judgments and evaluation results directly, and the scheduled job index is also read by
+# job-scheduler. The plugin subject therefore needs them granted explicitly, since it would otherwise
+# hold no privileges on them at all.
+#
+# The cluster_permissions key must be present even when empty, because the security plugin appends
+# the bulk action to whatever list is parsed here, and an absent key leaves an immutable empty one.
+cluster_permissions: []
+
+index_permissions:
+  - index_patterns:
+      - "search-relevance-queryset"
+      - "search-relevance-search-config"
+      - "search-relevance-judgment"
+      - "search-relevance-evaluation-result"
+      - "search-relevance-experiment-variant"
+      - ".search-relevance-scheduled-experiment-jobs"
+      - ".search-relevance-scheduled-experiment-history"
+    allowed_actions:
+      - "indices:admin/create"
+      - "indices:admin/mapping/put"
+      - "indices:data/read/search"
+      - "indices:data/write/index"
+      - "indices:data/write/update"
+      - "indices:data/write/delete"
