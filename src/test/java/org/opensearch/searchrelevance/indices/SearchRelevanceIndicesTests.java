@@ -76,4 +76,10 @@ public class SearchRelevanceIndicesTests extends OpenSearchTestCase {
         }
     }
 
+    public void testEvaluationResultMappingIncludesTook() {
+        assertEquals(1, SearchRelevanceIndices.EVALUATION_RESULT.getSchemaVersion());
+        String mapping = SearchRelevanceIndices.EVALUATION_RESULT.getMapping();
+        assertTrue("evaluation_result mapping should declare took", mapping.contains("\"took\""));
+    }
+
 }
