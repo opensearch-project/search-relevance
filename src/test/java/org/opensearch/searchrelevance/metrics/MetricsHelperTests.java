@@ -63,8 +63,8 @@ public class MetricsHelperTests extends OpenSearchTestCase {
         NamedXContentRegistry reg = new NamedXContentRegistry(
             new SearchModule(Settings.EMPTY, java.util.Collections.emptyList()).getNamedXContents()
         );
-        // Pass null for ScriptService since these tests only use legacy %SearchText%
-        // queries
+        // Pass null for ScriptService since these tests only use the non-Mustache %queryText%
+        // placeholder
         SearchRequestBuilder.initialize(reg, null);
     }
 
@@ -78,7 +78,7 @@ public class MetricsHelperTests extends OpenSearchTestCase {
             "config1",
             SearchConfigurationDetails.builder()
                 .index("index1")
-                .query("{\"query\":{\"match\":{\"title\":\"%SearchText%\"}}}")
+                .query("{\"query\":{\"match\":{\"title\":\"%queryText%\"}}}")
                 .pipeline("pipeline1")
                 .build()
         );
@@ -86,7 +86,7 @@ public class MetricsHelperTests extends OpenSearchTestCase {
             "config2",
             SearchConfigurationDetails.builder()
                 .index("index2")
-                .query("{\"query\":{\"match\":{\"description\":\"%SearchText%\"}}}")
+                .query("{\"query\":{\"match\":{\"description\":\"%queryText%\"}}}")
                 .pipeline("pipeline2")
                 .build()
         );
@@ -152,7 +152,7 @@ public class MetricsHelperTests extends OpenSearchTestCase {
             "config1",
             SearchConfigurationDetails.builder()
                 .index("index1")
-                .query("{\"query\":{\"match\":{\"title\":\"%SearchText%\"}}}")
+                .query("{\"query\":{\"match\":{\"title\":\"%queryText%\"}}}")
                 .pipeline(null)
                 .build()
         );
@@ -193,7 +193,7 @@ public class MetricsHelperTests extends OpenSearchTestCase {
             "config1",
             SearchConfigurationDetails.builder()
                 .index("index1")
-                .query("{\"query\":{\"match\":{\"title\":\"%SearchText%\"}}}")
+                .query("{\"query\":{\"match\":{\"title\":\"%queryText%\"}}}")
                 .pipeline("")
                 .build()
         );
@@ -231,7 +231,7 @@ public class MetricsHelperTests extends OpenSearchTestCase {
         Map<String, Map<String, String>> queryTextToDocIdToRatings = Map.of(queryText, Map.of("doc1", "5", "doc2", "3"));
 
         Map<String, List<String>> indexAndQueries = new HashMap<>();
-        indexAndQueries.put("config1", Arrays.asList("index1", "{\"query\":{\"match\":{\"title\":\"%SearchText%\"}}}", "pipeline1"));
+        indexAndQueries.put("config1", Arrays.asList("index1", "{\"query\":{\"match\":{\"title\":\"%queryText%\"}}}", "pipeline1"));
 
         // Mock search response
         SearchResponse mockResponse = createMockSearchResponse("doc1", "doc2");
@@ -279,7 +279,7 @@ public class MetricsHelperTests extends OpenSearchTestCase {
         Map<String, Map<String, String>> queryTextToDocIdToRatings = Map.of(queryText, Map.of("doc1", "5", "doc2", "3"));
 
         Map<String, List<String>> indexAndQueries = new HashMap<>();
-        indexAndQueries.put("config1", Arrays.asList("index1", "{\"query\":{\"match\":{\"title\":\"%SearchText%\"}}}", ""));
+        indexAndQueries.put("config1", Arrays.asList("index1", "{\"query\":{\"match\":{\"title\":\"%queryText%\"}}}", ""));
 
         // Mock search response
         SearchResponse mockResponse = createMockSearchResponse("doc1", "doc2");
@@ -323,11 +323,11 @@ public class MetricsHelperTests extends OpenSearchTestCase {
         Map<String, SearchConfigurationDetails> searchConfigurations = new HashMap<>();
         searchConfigurations.put(
             "config-a",
-            SearchConfigurationDetails.builder().index("index-a").query("{\"query\":{\"match\":{\"title\":\"%SearchText%\"}}}").build()
+            SearchConfigurationDetails.builder().index("index-a").query("{\"query\":{\"match\":{\"title\":\"%queryText%\"}}}").build()
         );
         searchConfigurations.put(
             "config-b",
-            SearchConfigurationDetails.builder().index("index-b").query("{\"query\":{\"match\":{\"title\":\"%SearchText%\"}}}").build()
+            SearchConfigurationDetails.builder().index("index-b").query("{\"query\":{\"match\":{\"title\":\"%queryText%\"}}}").build()
         );
 
         doAnswer(invocation -> {
@@ -363,7 +363,7 @@ public class MetricsHelperTests extends OpenSearchTestCase {
     public void testProcessEvaluationMetricsPersistsTook() {
         String queryText = "red shoes";
         Map<String, List<String>> indexAndQueries = new HashMap<>();
-        indexAndQueries.put("config1", Arrays.asList("index1", "{\"query\":{\"match\":{\"title\":\"%SearchText%\"}}}", ""));
+        indexAndQueries.put("config1", Arrays.asList("index1", "{\"query\":{\"match\":{\"title\":\"%queryText%\"}}}", ""));
 
         doAnswer(invocation -> {
             ActionListener<SearchResponse> listener = invocation.getArgument(1);

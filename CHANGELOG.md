@@ -9,6 +9,7 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 * Persist per-query OpenSearch search latency (`took`) on experiment evaluation results and pairwise snapshots. `took` is cluster query time (`SearchResponse.getTook()`), not plugin queue time, judgment scoring, or Dashboards round-trip ([#581](https://github.com/opensearch-project/search-relevance/issues/581))
 
 ### Enhancements
+- Make queryText the default placeholder, deprecate SearchText but preserve fallback, and log deprecation of SearchText. ([#613](https://github.com/opensearch-project/search-relevance/pull/613))
 
 ### Bug Fixes
 * Validate manual judgment rating edits on the server ([#601](https://github.com/opensearch-project/search-relevance/pull/601))
