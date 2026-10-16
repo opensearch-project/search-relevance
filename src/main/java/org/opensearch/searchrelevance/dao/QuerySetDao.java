@@ -47,7 +47,7 @@ public class QuerySetDao {
 
     /**
      * Create query set index if not exists
-     * @param stepListener - step lister for async operation
+     * @param stepListener - step listener for async operation
      */
     public void createIndexIfAbsent(final StepListener<Void> stepListener) {
         searchRelevanceIndicesManager.createIndexIfAbsent(QUERY_SET, stepListener);
@@ -56,7 +56,7 @@ public class QuerySetDao {
     /**
      * Stores query set to in the system index
      * @param querySet - QuerySet content to be stored
-     * @param listener - action lister for async operation
+     * @param listener - action listener for async operation
      */
     public void putQuerySet(final QuerySet querySet, final ActionListener listener) {
         if (querySet == null) {
@@ -78,7 +78,7 @@ public class QuerySetDao {
     /**
      * Delete query set by querySetID
      * @param querySetId - id to be deleted
-     * @param listener - action lister for async operation
+     * @param listener - action listener for async operation
      */
     public void deleteQuerySet(final String querySetId, final ActionListener<DeleteResponse> listener) {
         searchRelevanceIndicesManager.deleteDocByDocId(querySetId, QUERY_SET, listener);
@@ -87,7 +87,7 @@ public class QuerySetDao {
     /**
      * Get query set by querySetID
      * @param querySetId - id to be deleted
-     * @param listener - action lister for async operation
+     * @param listener - action listener for async operation
      */
     public SearchResponse getQuerySet(String querySetId, ActionListener<SearchResponse> listener) {
         if (querySetId == null || querySetId.isEmpty()) {
@@ -108,7 +108,7 @@ public class QuerySetDao {
     /**
      * List query set by source builder
      * @param sourceBuilder - source builder to be searched
-     * @param listener - action lister for async operation
+     * @param listener - action listener for async operation
      */
     public SearchResponse listQuerySet(SearchSourceBuilder sourceBuilder, ActionListener<SearchResponse> listener) {
         // Apply default values if not set
@@ -128,7 +128,7 @@ public class QuerySetDao {
      * Get a queryset given a step stepListener and put it back to results mapping.
      * @param querySetId - id to be searched
      * @param results - the results map
-     * @param stepListener - step lister
+     * @param stepListener - step listener
      */
     public void getQuerySetWithStepListener(
         String querySetId,
@@ -162,6 +162,7 @@ public class QuerySetDao {
         });
     }
 
+    @SuppressWarnings("unchecked")
     private QuerySet convertToQuerySet(SearchResponse response) {
         SearchHit hit = response.getHits().getHits()[0];
         Map<String, Object> sourceMap = hit.getSourceAsMap();
@@ -171,9 +172,7 @@ public class QuerySetDao {
         Object querySetQueriesObj = sourceMap.get(QuerySet.QUERY_SET_QUERIES);
         if (querySetQueriesObj instanceof List) {
             List<Map<String, Object>> querySetQueriesList = (List<Map<String, Object>>) querySetQueriesObj;
-            querySetEntries = querySetQueriesList.stream()
-                .map(entryMap -> QuerySetEntry.Builder.builder().queryText((String) entryMap.get(QuerySetEntry.QUERY_TEXT)).build())
-                .collect(Collectors.toList());
+            querySetEntries = querySetQueriesList.stream().map(QuerySetEntry::fromStoredMap).collect(Collectors.toList());
         }
 
         return QuerySet.Builder.builder()
@@ -184,5 +183,19 @@ public class QuerySetDao {
             .sampling((String) sourceMap.get(QuerySet.SAMPLING))
             .querySetQueries(querySetEntries)
             .build();
+    }
+
+    /**
+     * Check if a query set exists by querySetId
+     * @param querySetId - id to check
+     * @param listener - action listener for async operation
+     */
+    public void checkQuerySetExists(String querySetId, ActionListener<SearchResponse> listener) {
+        if (querySetId == null || querySetId.isEmpty()) {
+            listener.onFailure(new SearchRelevanceException("querySetId must not be null or empty", RestStatus.BAD_REQUEST));
+            return;
+        }
+        SearchSourceBuilder sourceBuilder = new SearchSourceBuilder().query(QueryBuilders.termQuery("_id", querySetId)).size(1);
+        searchRelevanceIndicesManager.listDocsBySearchRequest(sourceBuilder, QUERY_SET, listener);
     }
 }

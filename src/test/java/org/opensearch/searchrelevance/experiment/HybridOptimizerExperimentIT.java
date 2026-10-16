@@ -18,6 +18,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import org.apache.hc.core5.http.HttpHeaders;
@@ -39,7 +40,7 @@ import lombok.SneakyThrows;
 public class HybridOptimizerExperimentIT extends BaseExperimentIT {
 
     // Expected number of variants per query for HYBRID_OPTIMIZER experiments
-    private static final int EXPECTED_VARIANTS_PER_QUERY = 66;
+    private static final int EXPECTED_VARIANTS_PER_QUERY = 82;
     private static final String INDEX_NAME_ESCI = generateUniqueIndexName("hybridoptimizer");
 
     @SneakyThrows
@@ -67,6 +68,22 @@ public class HybridOptimizerExperimentIT extends BaseExperimentIT {
             assertEquals(querySetId, experimentSource.get("querySetId"));
 
             assertExperimentResults(experimentId);
+            int countOfExperimentVariantBeforeDeletion = findExperimentResultCount(EXPERIMENT_VARIANT_INDEX, experimentId);
+            assertTrue(countOfExperimentVariantBeforeDeletion > 0);
+
+            int countOfExperimentResultsBeforeDeletion = findExperimentResultCount(EVALUATION_RESULT_INDEX, experimentId);
+            assertTrue(countOfExperimentResultsBeforeDeletion > 0);
+
+            deleteHybridOptimizerExperiment(experimentId);
+
+            // Wait for all results and variants to get deleted.
+            Thread.sleep(DEFAULT_INTERVAL_MS);
+
+            int countOfExperimentVariantAfterDeletion = findExperimentResultCount(EXPERIMENT_VARIANT_INDEX, experimentId);
+            assertEquals(0, countOfExperimentVariantAfterDeletion);
+
+            int countOfExperimentResultsAfterDeletion = findExperimentResultCount(EVALUATION_RESULT_INDEX, experimentId);
+            assertEquals(0, countOfExperimentResultsAfterDeletion);
         } finally {
             deleteIndex(INDEX_NAME_ESCI);
         }
@@ -94,6 +111,24 @@ public class HybridOptimizerExperimentIT extends BaseExperimentIT {
         // Refresh all related indices to ensure documents are available for search
         Thread.sleep(DEFAULT_INTERVAL_MS);
 
+        return experimentId;
+    }
+
+    private String deleteHybridOptimizerExperiment(String experimentId) throws IOException, URISyntaxException, InterruptedException {
+
+        String deleteExperimentURL = String.format(Locale.ROOT, "%s/%s", EXPERIMENTS_URI, experimentId);
+        Response deleteExperimentResponse = makeRequest(
+            client(),
+            RestRequest.Method.DELETE.name(),
+            deleteExperimentURL,
+            null,
+            null,
+            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
+        );
+        Map<String, Object> deleteExperimentResultJson = entityAsMap(deleteExperimentResponse);
+        String status = deleteExperimentResultJson.get("result").toString();
+        // Refresh all related indices to ensure documents are available for search
+        assertEquals("deleted", status);
         return experimentId;
     }
 
@@ -155,9 +190,13 @@ public class HybridOptimizerExperimentIT extends BaseExperimentIT {
             // Parameters are nested in a "parameters" object
             Map<String, Object> parameters = (Map<String, Object>) source.get("parameters");
             assertNotNull("Parameters object should exist", parameters);
-            assertNotNull("Normalization should exist", parameters.get("normalization"));
             assertNotNull("Combination should exist", parameters.get("combination"));
-            assertNotNull("Weights should exist", parameters.get("weights"));
+            if ("rrf".equals(parameters.get("combination"))) {
+                assertNotNull("rank_constant should exist for RRF variants", parameters.get("rank_constant"));
+            } else {
+                assertNotNull("Normalization should exist", parameters.get("normalization"));
+                assertNotNull("Weights should exist", parameters.get("weights"));
+            }
 
             // Check results
             Map<String, Object> results = (Map<String, Object>) source.get("results");
@@ -334,5 +373,7 @@ public class HybridOptimizerExperimentIT extends BaseExperimentIT {
         List<String> documentIds = (List<String>) evaluationSource.get("documentIds");
         assertNotNull("Document IDs should exist", documentIds);
         assertFalse("Document IDs should not be empty", documentIds.isEmpty());
+
+        assertTookPresentAndNonNegative(evaluationSource);
     }
 }

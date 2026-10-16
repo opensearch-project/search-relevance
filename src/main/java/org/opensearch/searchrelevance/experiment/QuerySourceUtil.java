@@ -7,17 +7,10 @@
  */
 package org.opensearch.searchrelevance.experiment;
 
-import static org.opensearch.searchrelevance.experiment.ExperimentOptionsForHybridSearch.EXPERIMENT_OPTION_COMBINATION_TECHNIQUE;
-import static org.opensearch.searchrelevance.experiment.ExperimentOptionsForHybridSearch.EXPERIMENT_OPTION_NORMALIZATION_TECHNIQUE;
-import static org.opensearch.searchrelevance.experiment.ExperimentOptionsForHybridSearch.EXPERIMENT_OPTION_WEIGHTS_FOR_COMBINATION;
-
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 
 import org.opensearch.searchrelevance.model.ExperimentVariant;
 
@@ -28,36 +21,26 @@ public class QuerySourceUtil {
 
     public static final int NUMBER_OF_SUBQUERIES_IN_HYBRID_QUERY = 2;
 
+    static final String PHASE_RESULTS_PROCESSORS_KEY = "phase_results_processors";
+    static final String NORMALIZATION_PROCESSOR_KEY = "normalization-processor";
+    static final String SCORE_RANKER_PROCESSOR_KEY = "score-ranker-processor";
+    static final String NORMALIZATION_KEY = "normalization";
+    static final String COMBINATION_KEY = "combination";
+    static final String TECHNIQUE_KEY = "technique";
+    static final String PARAMETERS_KEY = "parameters";
+    static final String WEIGHTS_KEY = "weights";
+    static final String RANK_CONSTANT_KEY = "rank_constant";
+
     /**
-     * Creates a definition of a temporary search pipeline for hybrid search.
+     * Creates a definition of a temporary search pipeline for hybrid search by reconstructing
+     * the appropriate variant DTO from the persisted parameters and delegating pipeline
+     * generation to it.
+     *
      * @param experimentVariant sub-experiment to create the pipeline for
      * @return definition of a temporary search pipeline
      */
     public static Map<String, Object> createDefinitionOfTemporarySearchPipeline(final ExperimentVariant experimentVariant) {
-        Map<String, Object> experimentVariantParameters = experimentVariant.getParameters();
-        Map<String, Object> normalizationTechniqueConfig = new HashMap<>(
-            Map.of("technique", experimentVariantParameters.get(EXPERIMENT_OPTION_NORMALIZATION_TECHNIQUE))
-        );
-
-        Map<String, Object> combinationTechniqueConfig = new HashMap<>(
-            Map.of("technique", experimentVariantParameters.get(EXPERIMENT_OPTION_COMBINATION_TECHNIQUE))
-        );
-        if (Objects.nonNull(experimentVariantParameters.get(EXPERIMENT_OPTION_WEIGHTS_FOR_COMBINATION))) {
-            float[] weights = (float[]) experimentVariantParameters.get(EXPERIMENT_OPTION_WEIGHTS_FOR_COMBINATION);
-            List<Double> weightsList = new ArrayList<>(weights.length);
-            for (float weight : weights) {
-                weightsList.add((double) weight);
-            }
-            combinationTechniqueConfig.put("parameters", new HashMap<>(Map.of("weights", weightsList)));
-        }
-
-        Map<String, Object> normalizationProcessorConfig = new HashMap<>(
-            Map.of("normalization", normalizationTechniqueConfig, "combination", combinationTechniqueConfig)
-        );
-        Map<String, Object> phaseProcessorObject = new HashMap<>(Map.of("normalization-processor", normalizationProcessorConfig));
-        Map<String, Object> temporarySearchPipeline = new HashMap<>();
-        temporarySearchPipeline.put("phase_results_processors", List.of(phaseProcessorObject));
-        return temporarySearchPipeline;
+        return ExperimentVariantHybridSearchDTOFactory.fromParameters(experimentVariant.getParameters()).toSearchPipeline();
     }
 
     /**

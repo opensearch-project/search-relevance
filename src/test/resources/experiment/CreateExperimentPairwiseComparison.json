@@ -1,0 +1,7 @@
+{
+  "querySetId": "{{query_set_id}}",
+  "searchConfigurationList": ["{{search_configuration_id_a}}", "{{search_configuration_id_b}}"],
+  "judgmentList": [],
+  "size": 5,
+  "type": "PAIRWISE_COMPARISON"
+}

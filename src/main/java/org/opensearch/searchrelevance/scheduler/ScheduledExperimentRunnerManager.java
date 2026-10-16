@@ -7,6 +7,11 @@
  */
 package org.opensearch.searchrelevance.scheduler;
 
+import static org.opensearch.searchrelevance.common.PluginConstants.DESCRIPTION;
+import static org.opensearch.searchrelevance.common.PluginConstants.NAME;
+
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -17,6 +22,7 @@ import org.opensearch.common.annotation.ExperimentalApi;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
+import org.opensearch.jobscheduler.spi.schedule.CronSchedule;
 import org.opensearch.searchrelevance.dao.ExperimentDao;
 import org.opensearch.searchrelevance.dao.ScheduledExperimentHistoryDao;
 import org.opensearch.searchrelevance.dao.ScheduledJobsDao;
@@ -26,6 +32,7 @@ import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.Experiment;
 import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.model.ScheduledExperimentResult;
+import org.opensearch.searchrelevance.model.ScheduledJob;
 import org.opensearch.searchrelevance.transport.experiment.PutExperimentRequest;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 
@@ -92,6 +99,8 @@ public class ScheduledExperimentRunnerManager {
                     PutExperimentRequest request = new PutExperimentRequest(
                         experiment.type(),
                         scheduledExperimentResultId,
+                        experiment.name(),
+                        experiment.description(),
                         experiment.querySetId(),
                         experiment.searchConfigurationList(),
                         experiment.judgmentList(),
@@ -103,8 +112,31 @@ public class ScheduledExperimentRunnerManager {
                             actuallyFinished.countDown();
                             return;
                         }
-                        experimentRunningManager.startExperimentRun(experimentId, request, cancellationToken, actuallyFinished);
+                        // Update the last time the job was run
+                        scheduledJobsDao.getScheduledJob(experimentId, ActionListener.wrap(jobResponse -> {
+
+                            ScheduledJob scheduledJob = convertToScheduledJob(jobResponse);
+                            scheduledJobsDao.updateScheduledJob(scheduledJob, ActionListener.wrap(updatedJobResponse -> {
+                                experimentRunningManager.startExperimentRun(
+                                    experimentId,
+                                    request,
+                                    experiment.name(),
+                                    experiment.description(),
+                                    cancellationToken,
+                                    actuallyFinished
+                                );
+                            }, e -> {
+                                log.error("Somehow for experiment {}, we cannot update the experiment run job", experimentId);
+                                handleAsyncFailure(experimentId, request, timestamp, e);
+                                actuallyFinished.countDown();
+                            }));
+                        }, e -> {
+                            log.error("Somehow for experiment {}, we cannot retrieve the experiment run job", experimentId);
+                            handleAsyncFailure(experimentId, request, timestamp, e);
+                            actuallyFinished.countDown();
+                        }));
                     }, e -> {
+                        log.error("Somehow for experiment {}, we cannot put the experiment result", experimentId);
                         handleAsyncFailure(experimentId, request, "Failed to put ScheduledExperimentResult", e);
                         actuallyFinished.countDown();
                     }));
@@ -146,7 +178,7 @@ public class ScheduledExperimentRunnerManager {
 
     private Experiment convertToExperiment(SearchResponse response) {
         if (response.getHits().getTotalHits().value() == 0) {
-            throw new SearchRelevanceException("QuerySet not found", RestStatus.NOT_FOUND);
+            throw new SearchRelevanceException("Experiment not found", RestStatus.NOT_FOUND);
         }
 
         Map<String, Object> sourceMap = response.getHits().getHits()[0].getSourceAsMap();
@@ -154,6 +186,8 @@ public class ScheduledExperimentRunnerManager {
         return new Experiment(
             "",
             "",
+            (String) sourceMap.get(NAME),
+            (String) sourceMap.get(DESCRIPTION),
             ExperimentType.valueOf((String) sourceMap.get("type")),
             AsyncStatus.valueOf((String) sourceMap.get("status")),
             (String) sourceMap.get("querySetId"),
@@ -161,6 +195,27 @@ public class ScheduledExperimentRunnerManager {
             (List<String>) sourceMap.get("judgmentList"),
             (int) sourceMap.get("size"),
             List.of()
+        );
+    }
+
+    private ScheduledJob convertToScheduledJob(SearchResponse response) {
+        if (response.getHits().getTotalHits().value() == 0) {
+            throw new SearchRelevanceException("Experiment not found", RestStatus.NOT_FOUND);
+        }
+
+        Map<String, Object> sourceMap = response.getHits().getHits()[0].getSourceAsMap();
+
+        String cronExpression = (String) ((Map<String, Object>) ((Map<String, Object>) sourceMap.get("schedule")).get("cron")).get(
+            "expression"
+        );
+
+        return new ScheduledJob(
+            (String) sourceMap.get("id"),
+            Instant.now(),
+            Instant.ofEpochMilli((long) sourceMap.get("enabledTime")),
+            true,
+            new CronSchedule(cronExpression, ZoneId.systemDefault()),
+            (String) sourceMap.get("timestamp")
         );
     }
 

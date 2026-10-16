@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.opensearch.searchrelevance.model.ExperimentVariant;
+import org.opensearch.searchrelevance.model.QuerySetEntry;
 import org.opensearch.searchrelevance.scheduler.ExperimentCancellationToken;
 
 import lombok.Getter;
@@ -38,7 +39,7 @@ public class PointwiseTaskParameters extends VariantTaskParameters {
         String searchConfigId,
         String index,
         String query,
-        String queryText,
+        QuerySetEntry queryEntry,
         int size,
         ExperimentVariant experimentVariant,
         List<String> judgmentIds,
@@ -52,7 +53,7 @@ public class PointwiseTaskParameters extends VariantTaskParameters {
             .searchConfigId(searchConfigId)
             .index(index)
             .query(query)
-            .queryText(queryText)
+            .queryEntry(queryEntry)
             .size(size)
             .experimentVariant(experimentVariant)
             .judgmentIds(judgmentIds)

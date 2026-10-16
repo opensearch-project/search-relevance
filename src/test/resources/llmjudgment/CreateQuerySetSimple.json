@@ -1,0 +1,12 @@
+{
+  "name": "Simple Query Set",
+  "description": "Simple query set for testing",
+  "querySetQueries": [
+    {
+      "queryText": "laptop"
+    },
+    {
+      "queryText": "chair"
+    }
+  ]
+}

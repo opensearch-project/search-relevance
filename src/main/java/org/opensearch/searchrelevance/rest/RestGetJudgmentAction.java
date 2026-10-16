@@ -69,9 +69,15 @@ public class RestGetJudgmentAction extends BaseRestHandler {
 
         // Otherwise, handle list request
         SearchParams searchParams = ParserUtils.parseSearchParams(request);
-        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder().query(QueryBuilders.matchAllQuery())
-            .size(searchParams.getSize())
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder().size(searchParams.getSize())
             .sort(searchParams.getSortField(), searchParams.getSortOrder());
+
+        String status = request.param("status");
+        if (status != null && !status.isEmpty()) {
+            searchSourceBuilder.query(QueryBuilders.termQuery("status.keyword", status.toUpperCase(Locale.ROOT)));
+        } else {
+            searchSourceBuilder.query(QueryBuilders.matchAllQuery());
+        }
 
         OpenSearchDocRequest getRequest = new OpenSearchDocRequest(searchSourceBuilder);
         return executeGetRequest(client, getRequest);

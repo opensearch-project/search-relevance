@@ -1,4 +1,7 @@
 {
+  "_meta": {
+    "schema_version": 1
+  },
   "properties": {
     "id": { "type": "keyword" },
     "timestamp": { "type": "date", "format": "strict_date_time" },
@@ -10,6 +13,7 @@
     "searchText": { "type": "keyword" },
     "judgmentList": { "type": "keyword" },
     "documentIds": { "type": "keyword" },
+    "took": { "type": "long" },
     "metrics": {
       "type": "nested",
       "properties": {

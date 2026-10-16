@@ -23,6 +23,8 @@ import reactor.util.annotation.NonNull;
 public class PutExperimentRequest extends ActionRequest {
     private final ExperimentType type;
     private final String scheduledExperimentResultId;
+    private final String name;
+    private final String description;
     private final String querySetId;
     private final List<String> searchConfigurationList;
     private final List<String> judgmentList;
@@ -31,6 +33,8 @@ public class PutExperimentRequest extends ActionRequest {
     public PutExperimentRequest(
         @NonNull ExperimentType type,
         String scheduledExperimentResultId,
+        String name,
+        String description,
         @NonNull String querySetId,
         @NonNull List<String> searchConfigurationList,
         @NonNull List<String> judgmentList,
@@ -38,6 +42,8 @@ public class PutExperimentRequest extends ActionRequest {
     ) {
         this.type = type;
         this.scheduledExperimentResultId = scheduledExperimentResultId;
+        this.name = name;
+        this.description = description;
         this.querySetId = querySetId;
         this.searchConfigurationList = searchConfigurationList;
         this.judgmentList = judgmentList;
@@ -48,6 +54,8 @@ public class PutExperimentRequest extends ActionRequest {
         super(in);
         this.type = in.readEnum(ExperimentType.class);
         this.scheduledExperimentResultId = in.readOptionalString();
+        this.name = in.readOptionalString();
+        this.description = in.readOptionalString();
         this.querySetId = in.readString();
         this.searchConfigurationList = in.readStringList();
         this.judgmentList = in.readStringList();
@@ -59,6 +67,8 @@ public class PutExperimentRequest extends ActionRequest {
         super.writeTo(out);
         out.writeEnum(type);
         out.writeOptionalString(scheduledExperimentResultId);
+        out.writeOptionalString(name);
+        out.writeOptionalString(description);
         out.writeString(querySetId);
         out.writeStringArray(searchConfigurationList.toArray(new String[0]));
         out.writeStringArray(judgmentList.toArray(new String[0]));

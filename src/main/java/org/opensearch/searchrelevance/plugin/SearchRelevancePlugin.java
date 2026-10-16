@@ -57,7 +57,6 @@ import org.opensearch.script.ScriptService;
 import org.opensearch.searchrelevance.dao.EvaluationResultDao;
 import org.opensearch.searchrelevance.dao.ExperimentDao;
 import org.opensearch.searchrelevance.dao.ExperimentVariantDao;
-import org.opensearch.searchrelevance.dao.JudgmentCacheDao;
 import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
 import org.opensearch.searchrelevance.dao.ScheduledExperimentHistoryDao;
@@ -72,6 +71,7 @@ import org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager;
 import org.opensearch.searchrelevance.metrics.MetricsHelper;
 import org.opensearch.searchrelevance.ml.MLAccessor;
 import org.opensearch.searchrelevance.model.ScheduledJob;
+import org.opensearch.searchrelevance.model.builder.SearchRequestBuilder;
 import org.opensearch.searchrelevance.rest.RestCreateQuerySetAction;
 import org.opensearch.searchrelevance.rest.RestDeleteExperimentAction;
 import org.opensearch.searchrelevance.rest.RestDeleteJudgmentAction;
@@ -83,12 +83,20 @@ import org.opensearch.searchrelevance.rest.RestGetJudgmentAction;
 import org.opensearch.searchrelevance.rest.RestGetQuerySetAction;
 import org.opensearch.searchrelevance.rest.RestGetScheduledExperimentAction;
 import org.opensearch.searchrelevance.rest.RestGetSearchConfigurationAction;
+import org.opensearch.searchrelevance.rest.RestPatchExperimentAction;
 import org.opensearch.searchrelevance.rest.RestPostScheduledExperimentAction;
 import org.opensearch.searchrelevance.rest.RestPutExperimentAction;
 import org.opensearch.searchrelevance.rest.RestPutJudgmentAction;
 import org.opensearch.searchrelevance.rest.RestPutQuerySetAction;
 import org.opensearch.searchrelevance.rest.RestPutSearchConfigurationAction;
+import org.opensearch.searchrelevance.rest.RestRetryFailedJudgmentAction;
+import org.opensearch.searchrelevance.rest.RestSearchExperimentAction;
+import org.opensearch.searchrelevance.rest.RestSearchJudgmentAction;
+import org.opensearch.searchrelevance.rest.RestSearchQuerySetAction;
 import org.opensearch.searchrelevance.rest.RestSearchRelevanceStatsAction;
+import org.opensearch.searchrelevance.rest.RestSearchSearchConfigurationAction;
+import org.opensearch.searchrelevance.rest.RestUpdateJudgmentRatingsAction;
+import org.opensearch.searchrelevance.rest.RestValidateExperimentAction;
 import org.opensearch.searchrelevance.scheduler.ScheduledExperimentRunnerManager;
 import org.opensearch.searchrelevance.scheduler.SearchRelevanceJobParameters;
 import org.opensearch.searchrelevance.scheduler.SearchRelevanceJobRunner;
@@ -99,14 +107,26 @@ import org.opensearch.searchrelevance.transport.experiment.DeleteExperimentActio
 import org.opensearch.searchrelevance.transport.experiment.DeleteExperimentTransportAction;
 import org.opensearch.searchrelevance.transport.experiment.GetExperimentAction;
 import org.opensearch.searchrelevance.transport.experiment.GetExperimentTransportAction;
+import org.opensearch.searchrelevance.transport.experiment.PatchExperimentAction;
+import org.opensearch.searchrelevance.transport.experiment.PatchExperimentTransportAction;
 import org.opensearch.searchrelevance.transport.experiment.PutExperimentAction;
 import org.opensearch.searchrelevance.transport.experiment.PutExperimentTransportAction;
+import org.opensearch.searchrelevance.transport.experiment.SearchExperimentAction;
+import org.opensearch.searchrelevance.transport.experiment.SearchExperimentTransportAction;
+import org.opensearch.searchrelevance.transport.experiment.ValidateExperimentAction;
+import org.opensearch.searchrelevance.transport.experiment.ValidateExperimentTransportAction;
 import org.opensearch.searchrelevance.transport.judgment.DeleteJudgmentAction;
 import org.opensearch.searchrelevance.transport.judgment.DeleteJudgmentTransportAction;
 import org.opensearch.searchrelevance.transport.judgment.GetJudgmentAction;
 import org.opensearch.searchrelevance.transport.judgment.GetJudgmentTransportAction;
 import org.opensearch.searchrelevance.transport.judgment.PutJudgmentAction;
 import org.opensearch.searchrelevance.transport.judgment.PutJudgmentTransportAction;
+import org.opensearch.searchrelevance.transport.judgment.RetryFailedJudgmentAction;
+import org.opensearch.searchrelevance.transport.judgment.RetryFailedJudgmentTransportAction;
+import org.opensearch.searchrelevance.transport.judgment.SearchJudgmentAction;
+import org.opensearch.searchrelevance.transport.judgment.SearchJudgmentTransportAction;
+import org.opensearch.searchrelevance.transport.judgment.UpdateJudgmentRatingsAction;
+import org.opensearch.searchrelevance.transport.judgment.UpdateJudgmentRatingsTransportAction;
 import org.opensearch.searchrelevance.transport.queryset.DeleteQuerySetAction;
 import org.opensearch.searchrelevance.transport.queryset.DeleteQuerySetTransportAction;
 import org.opensearch.searchrelevance.transport.queryset.GetQuerySetAction;
@@ -115,6 +135,8 @@ import org.opensearch.searchrelevance.transport.queryset.PostQuerySetAction;
 import org.opensearch.searchrelevance.transport.queryset.PostQuerySetTransportAction;
 import org.opensearch.searchrelevance.transport.queryset.PutQuerySetAction;
 import org.opensearch.searchrelevance.transport.queryset.PutQuerySetTransportAction;
+import org.opensearch.searchrelevance.transport.queryset.SearchQuerySetAction;
+import org.opensearch.searchrelevance.transport.queryset.SearchQuerySetTransportAction;
 import org.opensearch.searchrelevance.transport.scheduledJob.DeleteScheduledExperimentAction;
 import org.opensearch.searchrelevance.transport.scheduledJob.DeleteScheduledExperimentTransportAction;
 import org.opensearch.searchrelevance.transport.scheduledJob.GetScheduledExperimentAction;
@@ -127,6 +149,8 @@ import org.opensearch.searchrelevance.transport.searchConfiguration.GetSearchCon
 import org.opensearch.searchrelevance.transport.searchConfiguration.GetSearchConfigurationTransportAction;
 import org.opensearch.searchrelevance.transport.searchConfiguration.PutSearchConfigurationAction;
 import org.opensearch.searchrelevance.transport.searchConfiguration.PutSearchConfigurationTransportAction;
+import org.opensearch.searchrelevance.transport.searchConfiguration.SearchSearchConfigurationAction;
+import org.opensearch.searchrelevance.transport.searchConfiguration.SearchSearchConfigurationTransportAction;
 import org.opensearch.searchrelevance.transport.stats.SearchRelevanceStatsAction;
 import org.opensearch.searchrelevance.transport.stats.SearchRelevanceStatsTransportAction;
 import org.opensearch.searchrelevance.utils.ClusterUtil;
@@ -155,7 +179,6 @@ public class SearchRelevancePlugin extends Plugin
     private ExperimentVariantDao experimentVariantDao;
     private JudgmentDao judgmentDao;
     private EvaluationResultDao evaluationResultDao;
-    private JudgmentCacheDao judgmentCacheDao;
     private ScheduledJobsDao scheduledJobsDao;
     private ScheduledExperimentHistoryDao scheduledExperimentHistoryDao;
     private MLAccessor mlAccessor;
@@ -163,13 +186,17 @@ public class SearchRelevancePlugin extends Plugin
     private SearchRelevanceSettingsAccessor settingsAccessor;
     private ClusterUtil clusterUtil;
     private CronUtil cronUtil;
+    private ScriptService scriptService;
     private InfoStatsManager infoStatsManager;
 
     @Override
     public Collection<SystemIndexDescriptor> getSystemIndexDescriptors(Settings settings) {
         return List.of(
             new SystemIndexDescriptor(EXPERIMENT_INDEX, "System index used for experiment data"),
-            new SystemIndexDescriptor(JUDGMENT_CACHE_INDEX, "System index used for judgment cache data")
+            // Deprecated: the global judgment cache was removed and this index is no longer created
+            // or written to. It stays registered so that leftover cache data on clusters upgraded
+            // from an older version remains protected (hidden and guarded) until manually deleted.
+            new SystemIndexDescriptor(JUDGMENT_CACHE_INDEX, "Deprecated system index previously used for judgment cache data")
         );
     }
 
@@ -189,6 +216,7 @@ public class SearchRelevancePlugin extends Plugin
     ) {
         this.client = client;
         this.clusterService = clusterService;
+        this.scriptService = scriptService;
         this.searchRelevanceIndicesManager = new SearchRelevanceIndicesManager(clusterService, client);
         this.experimentDao = new ExperimentDao(searchRelevanceIndicesManager);
         this.experimentVariantDao = new ExperimentVariantDao(searchRelevanceIndicesManager);
@@ -196,21 +224,22 @@ public class SearchRelevancePlugin extends Plugin
         this.searchConfigurationDao = new SearchConfigurationDao(searchRelevanceIndicesManager);
         this.judgmentDao = new JudgmentDao(searchRelevanceIndicesManager);
         this.evaluationResultDao = new EvaluationResultDao(searchRelevanceIndicesManager);
-        this.judgmentCacheDao = new JudgmentCacheDao(searchRelevanceIndicesManager);
         this.scheduledJobsDao = new ScheduledJobsDao(searchRelevanceIndicesManager);
         this.scheduledExperimentHistoryDao = new ScheduledExperimentHistoryDao(searchRelevanceIndicesManager);
         MachineLearningNodeClient mlClient = new MachineLearningNodeClient(client);
         this.mlAccessor = new MLAccessor(mlClient);
         SearchRelevanceExecutor.initialize(threadPool);
+        SearchRequestBuilder.initialize(xContentRegistry, scriptService);
         ExperimentTaskManager experimentTaskManager = new ExperimentTaskManager(
             client,
             evaluationResultDao,
             experimentVariantDao,
             threadPool
         );
-        this.metricsHelper = new MetricsHelper(clusterService, client, judgmentDao, evaluationResultDao, experimentVariantDao);
+        this.metricsHelper = new MetricsHelper(clusterService, client, evaluationResultDao, experimentVariantDao);
         this.settingsAccessor = new SearchRelevanceSettingsAccessor(clusterService, environment.settings());
-        this.clusterUtil = new ClusterUtil(clusterService);
+        ClusterUtil.instance().initialize(clusterService);
+        this.clusterUtil = ClusterUtil.instance();
         this.cronUtil = new CronUtil(settingsAccessor);
         this.infoStatsManager = new InfoStatsManager(settingsAccessor);
         EventStatsManager.instance().initialize(settingsAccessor);
@@ -219,10 +248,11 @@ public class SearchRelevancePlugin extends Plugin
             experimentDao,
             querySetDao,
             searchConfigurationDao,
+            judgmentDao,
             scheduledExperimentHistoryDao,
             metricsHelper,
-            new HybridOptimizerExperimentProcessor(judgmentDao, experimentTaskManager),
-            new PointwiseExperimentProcessor(judgmentDao, experimentTaskManager),
+            new HybridOptimizerExperimentProcessor(experimentTaskManager),
+            new PointwiseExperimentProcessor(experimentTaskManager),
             threadPool,
             settingsAccessor
         );
@@ -246,7 +276,6 @@ public class SearchRelevancePlugin extends Plugin
             experimentVariantDao,
             judgmentDao,
             evaluationResultDao,
-            judgmentCacheDao,
             scheduledJobsDao,
             scheduledExperimentHistoryDao,
             mlAccessor,
@@ -273,15 +302,23 @@ public class SearchRelevancePlugin extends Plugin
             new RestPutQuerySetAction(settingsAccessor),
             new RestDeleteQuerySetAction(settingsAccessor),
             new RestGetQuerySetAction(settingsAccessor),
+            new RestSearchQuerySetAction(settingsAccessor),
             new RestPutJudgmentAction(settingsAccessor),
             new RestDeleteJudgmentAction(settingsAccessor),
             new RestGetJudgmentAction(settingsAccessor),
+            new RestSearchJudgmentAction(settingsAccessor),
+            new RestRetryFailedJudgmentAction(settingsAccessor),
+            new RestUpdateJudgmentRatingsAction(settingsAccessor),
             new RestPutSearchConfigurationAction(settingsAccessor),
             new RestDeleteSearchConfigurationAction(settingsAccessor),
             new RestGetSearchConfigurationAction(settingsAccessor),
+            new RestSearchSearchConfigurationAction(settingsAccessor),
             new RestPutExperimentAction(settingsAccessor),
+            new RestPatchExperimentAction(settingsAccessor),
             new RestGetExperimentAction(settingsAccessor),
             new RestDeleteExperimentAction(settingsAccessor),
+            new RestSearchExperimentAction(settingsAccessor),
+            new RestValidateExperimentAction(settingsAccessor),
             new RestSearchRelevanceStatsAction(settingsAccessor, clusterUtil),
             new RestPostScheduledExperimentAction(settingsAccessor, cronUtil),
             new RestDeleteScheduledExperimentAction(settingsAccessor),
@@ -296,15 +333,23 @@ public class SearchRelevancePlugin extends Plugin
             new ActionHandler<>(PutQuerySetAction.INSTANCE, PutQuerySetTransportAction.class),
             new ActionHandler<>(DeleteQuerySetAction.INSTANCE, DeleteQuerySetTransportAction.class),
             new ActionHandler<>(GetQuerySetAction.INSTANCE, GetQuerySetTransportAction.class),
+            new ActionHandler<>(SearchQuerySetAction.INSTANCE, SearchQuerySetTransportAction.class),
             new ActionHandler<>(PutJudgmentAction.INSTANCE, PutJudgmentTransportAction.class),
             new ActionHandler<>(DeleteJudgmentAction.INSTANCE, DeleteJudgmentTransportAction.class),
             new ActionHandler<>(GetJudgmentAction.INSTANCE, GetJudgmentTransportAction.class),
+            new ActionHandler<>(SearchJudgmentAction.INSTANCE, SearchJudgmentTransportAction.class),
+            new ActionHandler<>(RetryFailedJudgmentAction.INSTANCE, RetryFailedJudgmentTransportAction.class),
+            new ActionHandler<>(UpdateJudgmentRatingsAction.INSTANCE, UpdateJudgmentRatingsTransportAction.class),
             new ActionHandler<>(PutSearchConfigurationAction.INSTANCE, PutSearchConfigurationTransportAction.class),
             new ActionHandler<>(DeleteSearchConfigurationAction.INSTANCE, DeleteSearchConfigurationTransportAction.class),
             new ActionHandler<>(GetSearchConfigurationAction.INSTANCE, GetSearchConfigurationTransportAction.class),
+            new ActionHandler<>(SearchSearchConfigurationAction.INSTANCE, SearchSearchConfigurationTransportAction.class),
             new ActionHandler<>(PutExperimentAction.INSTANCE, PutExperimentTransportAction.class),
+            new ActionHandler<>(PatchExperimentAction.INSTANCE, PatchExperimentTransportAction.class),
             new ActionHandler<>(DeleteExperimentAction.INSTANCE, DeleteExperimentTransportAction.class),
             new ActionHandler<>(GetExperimentAction.INSTANCE, GetExperimentTransportAction.class),
+            new ActionHandler<>(SearchExperimentAction.INSTANCE, SearchExperimentTransportAction.class),
+            new ActionHandler<>(ValidateExperimentAction.INSTANCE, ValidateExperimentTransportAction.class),
             new ActionHandler<>(SearchRelevanceStatsAction.INSTANCE, SearchRelevanceStatsTransportAction.class),
             new ActionHandler<>(PostScheduledExperimentAction.INSTANCE, PostScheduledExperimentTransportAction.class),
             new ActionHandler<>(DeleteScheduledExperimentAction.INSTANCE, DeleteScheduledExperimentTransportAction.class),

@@ -1,0 +1,14 @@
+{
+  "name": "LLM Judgment SCORE0_1",
+  "type": "LLM_JUDGMENT",
+  "querySetId": "{{querySetId}}",
+  "searchConfigurationList": ["{{searchConfigId}}"],
+  "modelId": "test_model_id",
+  "size": 5,
+  "tokenLimit": 4000,
+  "contextFields": ["name", "description"],
+  "ignoreFailure": false,
+  "llmJudgmentRatingType": "SCORE0_1",
+  "promptTemplate": "Query: {{queryText}}\n\nDocuments: {{hits}}\n\nRate the relevance from 0.0 to 1.0",
+  "overwriteCache": false
+}

@@ -40,7 +40,7 @@ public class ScheduledJobsDao {
 
     /**
      * Create scheduled jobs index if not exists
-     * @param stepListener - step lister for async operation
+     * @param stepListener - step listener for async operation
      */
     public void createIndexIfAbsent(final StepListener<Void> stepListener) {
         searchRelevanceIndicesManager.createIndexIfAbsent(SCHEDULED_JOBS, stepListener);
@@ -49,7 +49,7 @@ public class ScheduledJobsDao {
     /**
      * Stores scheduled job to in the system index
      * @param scheduledJob - Scheduled job content to be stored
-     * @param listener - action lister for async operation
+     * @param listener - action listener for async operation
      */
     public void putScheduledJob(final ScheduledJob scheduledJob, final ActionListener listener) {
         if (scheduledJob == null) {
@@ -88,7 +88,7 @@ public class ScheduledJobsDao {
     /**
      * Delete scheduled job by scheduledJobId
      * @param scheduledJobId - id to be deleted
-     * @param listener - action lister for async operation
+     * @param listener - action listener for async operation
      */
     public void deleteScheduledJob(final String scheduledJobId, final ActionListener<DeleteResponse> listener) {
         searchRelevanceIndicesManager.deleteDocByDocId(scheduledJobId, SCHEDULED_JOBS, listener);
@@ -97,7 +97,7 @@ public class ScheduledJobsDao {
     /**
      * Get scheduled job by scheduledJobId
      * @param scheduledJobId - id to be deleted
-     * @param listener - action lister for async operation
+     * @param listener - action listener for async operation
      */
     public SearchResponse getScheduledJob(String scheduledJobId, ActionListener<SearchResponse> listener) {
         if (scheduledJobId == null || scheduledJobId.isEmpty()) {

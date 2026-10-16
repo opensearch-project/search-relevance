@@ -14,41 +14,43 @@ import org.opensearch.test.OpenSearchTestCase;
 
 public class ExperimentOptionsFactoryTests extends OpenSearchTestCase {
 
-    private static final float DELTA_FOR_FLOAT_ASSERTION = 0.0001f;
-
-    public void testCreateExperimentOptions_whenValidHybridSearchOptions_thenSuccessful() {
+    public void testCreateExperimentOptions_whenHybridSearchOptions_thenReturnsHybridOptions() {
         // When
-        ExperimentOptions experimentOptions = ExperimentOptionsFactory.createExperimentOptions(
+        ExperimentOptions options = ExperimentOptionsFactory.createExperimentOptions(
             ExperimentOptionsFactory.HYBRID_SEARCH_EXPERIMENT_OPTIONS,
-            ExperimentOptionsFactory.createDefaultExperimentParametersForHybridSearch()
+            Map.of()
         );
 
         // Then
-        assertNotNull(experimentOptions);
-        assertTrue(experimentOptions instanceof ExperimentOptionsForHybridSearch);
-        ExperimentOptionsForHybridSearch result = (ExperimentOptionsForHybridSearch) experimentOptions;
-        assertNotNull(result.getWeightsRange());
-        ExperimentOptionsForHybridSearch.WeightsRange resultWeightsRange = result.getWeightsRange();
-        assertEquals(0.0f, resultWeightsRange.getRangeMin(), DELTA_FOR_FLOAT_ASSERTION);
-        assertEquals(1.0f, resultWeightsRange.getRangeMax(), DELTA_FOR_FLOAT_ASSERTION);
-        assertEquals(0.1f, resultWeightsRange.getIncrement(), DELTA_FOR_FLOAT_ASSERTION);
+        assertNotNull(options);
+        assertTrue(options instanceof ExperimentOptionsForHybridSearch);
     }
 
-    public void testCreateExperimentOptions_whenInvalidHybridSearchOptions_thenFail() {
+    public void testCreateExperimentOptions_whenEmptyExperimentOptions_thenReturnsEmptyOptions() {
+        // When
+        ExperimentOptions options = ExperimentOptionsFactory.createExperimentOptions(
+            ExperimentOptionsFactory.EMPTY_EXPERIMENT_OPTIONS,
+            Map.of()
+        );
+
+        // Then
+        assertNotNull(options);
+        assertTrue(options instanceof EmptyExperimentOptions);
+    }
+
+    public void testCreateExperimentOptions_whenUnknownName_thenThrows() {
         // Given
-        Map<String, Object> invalidOptions = Map.of(
+        Map<String, Object> ignoredOptions = Map.of(
             "normalizationTechniques",
             Set.of("min_max", "l2"),
             "combinationTechniques",
-            Set.of("arithmetic_mean", "geometric_mean", "harmonic_mean"),
-            "weightsRange",
-            Map.of("rangeMin", 1.0, "rangeMax", 0.0, "increment", 0.1)
+            Set.of("arithmetic_mean", "geometric_mean", "harmonic_mean")
         );
 
         // When & Then
         IllegalArgumentException exception = assertThrows(
             IllegalArgumentException.class,
-            () -> ExperimentOptionsFactory.createExperimentOptions("random_experiment_name", invalidOptions)
+            () -> ExperimentOptionsFactory.createExperimentOptions("random_experiment_name", ignoredOptions)
         );
 
         assertEquals("provided experiment name is not supported", exception.getMessage());

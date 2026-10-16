@@ -48,7 +48,6 @@ import org.opensearch.script.ScriptService;
 import org.opensearch.searchrelevance.dao.EvaluationResultDao;
 import org.opensearch.searchrelevance.dao.ExperimentDao;
 import org.opensearch.searchrelevance.dao.ExperimentVariantDao;
-import org.opensearch.searchrelevance.dao.JudgmentCacheDao;
 import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
 import org.opensearch.searchrelevance.dao.ScheduledExperimentHistoryDao;
@@ -64,6 +63,7 @@ import org.opensearch.searchrelevance.stats.info.InfoStatsManager;
 import org.opensearch.searchrelevance.transport.experiment.DeleteExperimentAction;
 import org.opensearch.searchrelevance.transport.experiment.GetExperimentAction;
 import org.opensearch.searchrelevance.transport.experiment.PutExperimentAction;
+import org.opensearch.searchrelevance.transport.experiment.ValidateExperimentAction;
 import org.opensearch.searchrelevance.transport.queryset.DeleteQuerySetAction;
 import org.opensearch.searchrelevance.transport.queryset.GetQuerySetAction;
 import org.opensearch.searchrelevance.transport.queryset.PostQuerySetAction;
@@ -113,7 +113,6 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
         SearchConfigurationDao.class,
         JudgmentDao.class,
         EvaluationResultDao.class,
-        JudgmentCacheDao.class,
         ScheduledJobsDao.class,
         ScheduledExperimentHistoryDao.class,
         MLAccessor.class,
@@ -201,7 +200,7 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
     }
 
     public void testTotalRestHandlers() {
-        assertEquals(17, plugin.getRestHandlers(Settings.EMPTY, null, null, null, null, null, null).size());
+        assertEquals(25, plugin.getRestHandlers(Settings.EMPTY, null, null, null, null, null, null).size());
     }
 
     public void testQuerySetTransportIsAdded() {
@@ -225,6 +224,7 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
         assertEquals(1, actions.stream().filter(actionHandler -> actionHandler.getAction() instanceof PutExperimentAction).count());
         assertEquals(1, actions.stream().filter(actionHandler -> actionHandler.getAction() instanceof GetExperimentAction).count());
         assertEquals(1, actions.stream().filter(actionHandler -> actionHandler.getAction() instanceof DeleteExperimentAction).count());
+        assertEquals(1, actions.stream().filter(actionHandler -> actionHandler.getAction() instanceof ValidateExperimentAction).count());
     }
 
     public void testGetSettings() {

@@ -7,8 +7,6 @@
  */
 package org.opensearch.searchrelevance.transport.queryset;
 
-import static org.opensearch.searchrelevance.model.QueryWithReference.DELIMITER;
-
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -16,7 +14,6 @@ import java.util.stream.Collectors;
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.HandledTransportAction;
-import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.inject.Inject;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
@@ -30,18 +27,11 @@ import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
 
 public class PutQuerySetTransportAction extends HandledTransportAction<PutQuerySetRequest, IndexResponse> {
-    private final ClusterService clusterService;
     private final QuerySetDao querySetDao;
 
     @Inject
-    public PutQuerySetTransportAction(
-        ClusterService clusterService,
-        TransportService transportService,
-        ActionFilters actionFilters,
-        QuerySetDao querySetDao
-    ) {
+    public PutQuerySetTransportAction(TransportService transportService, ActionFilters actionFilters, QuerySetDao querySetDao) {
         super(PutQuerySetAction.NAME, transportService, actionFilters, PutQuerySetRequest::new);
-        this.clusterService = clusterService;
         this.querySetDao = querySetDao;
     }
 
@@ -65,31 +55,16 @@ public class PutQuerySetTransportAction extends HandledTransportAction<PutQueryS
             );
         }
         List<QueryWithReference> queryWithReferenceList = request.getQuerySetQueries();
-        List<QuerySetEntry> querySetQueries = convertQuerySetQueriesList(queryWithReferenceList);
+        List<QuerySetEntry> querySetQueries = queryWithReferenceList.stream()
+            .map(
+                queryWithReference -> QuerySetEntry.Builder.builder()
+                    .queryText(queryWithReference.getQueryText())
+                    .customFields(queryWithReference.getCustomizedKeyValueMap())
+                    .build()
+            )
+            .collect(Collectors.toList());
 
         QuerySet querySet = new QuerySet(id, name, description, timestamp, sampling, querySetQueries);
         querySetDao.putQuerySet(querySet, listener);
-    }
-
-    /**
-     * Query set input is a list of queryText and referenceAnswer pair.
-     * e.g:
-     * {
-     *     "queryText": "What is OpenSearch?",
-     *     "referenceAnswer": "OpenSearch is a community-driven, open source search and analytics suite"
-     * }
-     * @param queryWithReferenceList - list of queryText and referenceAnswer pair
-     * @return - querySetQueries as a list of QuerySetEntry objects
-     */
-    private List<QuerySetEntry> convertQuerySetQueriesList(List<QueryWithReference> queryWithReferenceList) {
-        return queryWithReferenceList.stream().map(queryWithReference -> {
-            String queryText;
-            if (queryWithReference.getReferenceAnswer() != null && !queryWithReference.getReferenceAnswer().isEmpty()) {
-                queryText = String.join(DELIMITER, queryWithReference.getQueryText(), queryWithReference.getReferenceAnswer());
-            } else {
-                queryText = queryWithReference.getQueryText();
-            }
-            return QuerySetEntry.Builder.builder().queryText(queryText).build();
-        }).collect(Collectors.toList());
     }
 }

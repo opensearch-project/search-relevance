@@ -11,6 +11,8 @@ import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_I
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENTS_URL;
 import static org.opensearch.searchrelevance.common.PluginConstants.QUERYSETS_URL;
 import static org.opensearch.searchrelevance.common.PluginConstants.SEARCH_CONFIGURATIONS_URL;
+import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.METRICS_DISCOUNTED_CUMULATIVE_GAIN_AT;
+import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.METRICS_MEAN_RECIPROCAL_RANK;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -25,6 +27,8 @@ import java.util.Map;
 import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.hc.core5.http.message.BasicHeader;
 import org.opensearch.client.Response;
+import org.opensearch.common.xcontent.XContentFactory;
+import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.searchrelevance.BaseSearchRelevanceIT;
 
@@ -55,7 +59,7 @@ public abstract class BaseExperimentIT extends BaseSearchRelevanceIT {
             "documentIds",
             List.of("B06Y1L1YJD", "B01M3XBRRX", "B07D29PHFY"),
             "metrics",
-            Map.of("Coverage@5", 1.0, "Precision@5", 1.0, "MAP@5", 1.0, "NDCG@5", 0.94)
+            Map.of("Coverage@5", 1.0, "Precision@5", 0.33, "MAP@5", 0.5, "NDCG@5", 0.94, "Recall@5", 1.0, "MRR", 0.5, "DCG@5", 1.43)
         ),
 
         "metal frame",
@@ -63,7 +67,7 @@ public abstract class BaseExperimentIT extends BaseSearchRelevanceIT {
             "documentIds",
             List.of("B07MBG53JD", "B097Q69V1B", "B00TLYRBMG", "B08G46SS1T", "B07H81Z91C"),
             "metrics",
-            Map.of("Coverage@5", 1.0, "Precision@5", 1.0, "MAP@5", 1.0, "NDCG@5", 0.9)
+            Map.of("Coverage@5", 1.0, "Precision@5", 0.2, "MAP@5", 0.5, "NDCG@5", 0.9, "Recall@5", 1.0, "MRR", 0.5, "DCG@5", 1.68)
         )
     );
 
@@ -105,8 +109,29 @@ public abstract class BaseExperimentIT extends BaseSearchRelevanceIT {
         return querySetId;
     }
 
+    protected String createQuerySetWithCustomFields() throws IOException, URISyntaxException {
+        String createQuerySetBody = Files.readString(
+            Path.of(classLoader.getResource("queryset/CreateQuerySetWithCustomFields.json").toURI())
+        );
+        Response createQuerySetResponse = makeRequest(
+            client(),
+            RestRequest.Method.PUT.name(),
+            QUERYSETS_URL,
+            null,
+            toHttpEntity(createQuerySetBody),
+            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
+        );
+        Map<String, Object> createQuerySetResultJson = entityAsMap(createQuerySetResponse);
+        String querySetId = createQuerySetResultJson.get("query_set_id").toString();
+        assertNotNull(querySetId);
+        return querySetId;
+    }
+
     @SneakyThrows
     protected String createSearchConfiguration(String indexName) {
+        // Ensure index exists before creating SearchConfiguration
+        initializeIndexIfNotExist(indexName);
+
         String createSearchConfigurationRequestBody = Files.readString(
             Path.of(classLoader.getResource("searchconfig/CreateSearchConfigurationQueryWithPlaceholder.json").toURI())
         );
@@ -129,6 +154,9 @@ public abstract class BaseExperimentIT extends BaseSearchRelevanceIT {
 
     @SneakyThrows
     protected String createHybridSearchConfiguration(String indexName) {
+        // Ensure index exists before creating SearchConfiguration
+        initializeIndexIfNotExist(indexName);
+
         String createSearchConfigurationRequestBody = Files.readString(
             Path.of(classLoader.getResource("searchconfig/CreateSearchConfigurationHybridQuery.json").toURI())
         );
@@ -151,9 +179,75 @@ public abstract class BaseExperimentIT extends BaseSearchRelevanceIT {
 
     @SneakyThrows
     protected String createSimpleSearchConfiguration(String indexName) {
+        // Ensure index exists before creating SearchConfiguration
+        initializeIndexIfNotExist(indexName);
+
         String createSearchConfigurationRequestBody = Files.readString(
             Path.of(classLoader.getResource("searchconfig/CreateSearchConfigurationSimpleMatch.json").toURI())
         );
+        // Replace the placeholder with the actual index name
+        createSearchConfigurationRequestBody = createSearchConfigurationRequestBody.replace("{{index_name}}", indexName);
+
+        Response createSearchConfigurationResponse = makeRequest(
+            client(),
+            RestRequest.Method.PUT.name(),
+            SEARCH_CONFIGURATIONS_URL,
+            null,
+            toHttpEntity(createSearchConfigurationRequestBody),
+            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
+        );
+        Map<String, Object> createSearchConfigurationResultJson = entityAsMap(createSearchConfigurationResponse);
+        String searchConfigurationId = createSearchConfigurationResultJson.get("search_configuration_id").toString();
+        assertNotNull(searchConfigurationId);
+        return searchConfigurationId;
+    }
+
+    @SneakyThrows
+    protected String createSearchConfigurationWithMustache(String indexName) {
+        initializeIndexIfNotExist(indexName);
+
+        String createSearchConfigurationRequestBody = null;
+        try {
+            createSearchConfigurationRequestBody = Files.readString(
+                Path.of(classLoader.getResource("searchconfig/CreateSearchConfigurationQueryWithMustache.json").toURI())
+            );
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        // Replace the placeholder with the actual index name
+        createSearchConfigurationRequestBody = createSearchConfigurationRequestBody.replace("{{index_name}}", indexName);
+
+        Response createSearchConfigurationResponse = makeRequest(
+            client(),
+            RestRequest.Method.PUT.name(),
+            SEARCH_CONFIGURATIONS_URL,
+            null,
+            toHttpEntity(createSearchConfigurationRequestBody),
+            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
+        );
+        Map<String, Object> createSearchConfigurationResultJson = entityAsMap(createSearchConfigurationResponse);
+        String searchConfigurationId = createSearchConfigurationResultJson.get("search_configuration_id").toString();
+        assertNotNull(searchConfigurationId);
+        return searchConfigurationId;
+    }
+
+    /**
+     * Creates a search configuration whose query is an invalid Mustache template (an unsupported
+     * partial, {{>...}}). Used to verify that a template which fails to compile does not strand the
+     * experiment in PROCESSING.
+     */
+    @SneakyThrows
+    protected String createSearchConfigurationWithPartialTemplate(String indexName) {
+        initializeIndexIfNotExist(indexName);
+
+        String createSearchConfigurationRequestBody = null;
+        try {
+            createSearchConfigurationRequestBody = Files.readString(
+                Path.of(classLoader.getResource("searchconfig/CreateSearchConfigurationQueryWithPartial.json").toURI())
+            );
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
         // Replace the placeholder with the actual index name
         createSearchConfigurationRequestBody = createSearchConfigurationRequestBody.replace("{{index_name}}", indexName);
 
@@ -184,7 +278,8 @@ public abstract class BaseExperimentIT extends BaseSearchRelevanceIT {
     }
 
     /**
-     * Generate a unique index name for the test class to avoid collisions during parallel execution
+     * Generate a unique index name for the test class to avoid collisions during
+     * parallel execution
      */
     protected static String generateUniqueIndexName(String testClassName) {
         return BASE_INDEX_NAME_ESCI + "_" + testClassName.toLowerCase(Locale.ROOT);
@@ -231,12 +326,54 @@ public abstract class BaseExperimentIT extends BaseSearchRelevanceIT {
         return source;
     }
 
+    protected int findExperimentResultCount(String index, String experimentId) throws IOException {
+        String getExperimentVariantCountByIdUrl = String.format(Locale.ROOT, "/%s/_count", index);
+        XContentBuilder builder = XContentFactory.jsonBuilder()
+            .startObject()
+            .startObject("query")
+            .startObject("term")
+            .field("experimentId", experimentId)
+            .endObject()
+            .endObject()
+            .endObject();
+        Response getCountResponse = makeRequest(
+            adminClient(),
+            RestRequest.Method.GET.name(),
+            getExperimentVariantCountByIdUrl,
+            null,
+            toHttpEntity(builder.toString()),
+            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
+        );
+
+        Map<String, Object> entityMap = entityAsMap(getCountResponse);
+        assertNotNull(entityMap);
+        return (int) entityMap.get("count");
+    }
+
     protected void assertListsHaveSameElements(List<String> expected, List<String> actual) {
         List<String> sortedExpected = new ArrayList<>(expected);
         List<String> sortedActual = new ArrayList<>(actual);
         Collections.sort(sortedExpected);
         Collections.sort(sortedActual);
         assertArrayEquals(sortedExpected.toArray(new String[0]), sortedActual.toArray(new String[0]));
+    }
+
+    /**
+     * New evaluation documents persist OpenSearch cluster query time as a first-class {@code took}
+     * field (milliseconds from {@code SearchResponse.getTook()}), not as a nested relevance metric.
+     */
+    protected void assertTookPresentAndNonNegative(Map<String, Object> source) {
+        assertNotNull("took should be present on new evaluation results", source.get("took"));
+        long took = ((Number) source.get("took")).longValue();
+        assertTrue("took should be >= 0 but was " + took, took >= 0);
+        Object metrics = source.get("metrics");
+        if (metrics instanceof List<?>) {
+            for (Object metric : (List<?>) metrics) {
+                if (metric instanceof Map<?, ?> metricMap) {
+                    assertFalse("took must not be stored as a nested metric", "took".equals(metricMap.get("metric")));
+                }
+            }
+        }
     }
 
     protected void assertCommonExperimentFields(
@@ -261,5 +398,17 @@ public abstract class BaseExperimentIT extends BaseSearchRelevanceIT {
 
         assertEquals(expectedType, source.get("type"));
         assertEquals(querySetId, source.get("querySetId"));
+    }
+
+    /**
+     * Returns the assertion tolerance for a given metric. Position-sensitive metrics
+     * (DCG, MRR) use a wider tolerance because BM25 per-shard IDF variation in
+     * multi-node clusters can change document ranking order between runs.
+     */
+    protected double getMetricTolerance(String metricName) {
+        if (metricName.startsWith(METRICS_DISCOUNTED_CUMULATIVE_GAIN_AT) || metricName.equals(METRICS_MEAN_RECIPROCAL_RANK)) {
+            return 0.2;
+        }
+        return 0.02;
     }
 }

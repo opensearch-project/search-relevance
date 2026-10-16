@@ -55,14 +55,31 @@ public class PutSearchConfigurationTransportAction extends HandledTransportActio
             listener.onFailure(new SearchRelevanceException("Name cannot be null or empty. Request: " + request, RestStatus.BAD_REQUEST));
             return;
         }
+        String description = request.getDescription();
+
         String index = request.getIndex();
+
+        // Validate that the referenced index exists
+        if (!clusterService.state().metadata().hasIndex(index)) {
+            listener.onFailure(new SearchRelevanceException("Index [" + index + "] does not exist in the cluster", RestStatus.BAD_REQUEST));
+            return;
+        }
+
         String queryBody = request.getQueryBody();
         String searchPipeline = request.getSearchPipeline();
 
         StepListener<Void> createIndexStep = new StepListener<>();
         searchConfigurationDao.createIndexIfAbsent(createIndexStep);
         createIndexStep.whenComplete(v -> {
-            SearchConfiguration searchConfiguration = new SearchConfiguration(id, name, timestamp, index, queryBody, searchPipeline);
+            SearchConfiguration searchConfiguration = new SearchConfiguration(
+                id,
+                name,
+                timestamp,
+                index,
+                queryBody,
+                searchPipeline,
+                description
+            );
             searchConfigurationDao.putSearchConfiguration(searchConfiguration, listener);
         }, listener::onFailure);
     }

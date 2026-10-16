@@ -1,0 +1,8 @@
+{
+  "id": "test-search-config-bwc",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "name": "bwc-test-config",
+  "index": "test-index",
+  "queryBody": "{\"query\":{\"match_all\":{}}}",
+  "searchPipeline": "test-pipeline"
+}

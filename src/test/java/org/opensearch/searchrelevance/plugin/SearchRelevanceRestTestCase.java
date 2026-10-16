@@ -91,4 +91,16 @@ public abstract class SearchRelevanceRestTestCase extends OpenSearchTestCase {
             .build();
     }
 
+    protected RestRequest createPatchRestRequestWithContent(String content, String endpoint, String documentId) {
+        Map<String, String> params = new HashMap<>();
+        if (documentId != null && !documentId.isEmpty()) {
+            params.put(DOCUMENT_ID, documentId);
+        }
+        return new FakeRestRequest.Builder(NamedXContentRegistry.EMPTY).withContent(new BytesArray(content), XContentType.JSON)
+            .withParams(params)
+            .withMethod(RestRequest.Method.PATCH)
+            .withPath("/_plugins/_search_relevance/" + endpoint + "/" + documentId)
+            .build();
+    }
+
 }

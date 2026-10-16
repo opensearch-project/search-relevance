@@ -29,7 +29,7 @@ import lombok.extern.log4j.Log4j2;
 @Log4j2
 @Getter
 public class JudgmentTaskContext {
-    private final String queryTextWithReference;
+    private final String queryTextWithCustomInput;
     private final String modelId;
     private final List<String> contextFields;
     private final List<SearchConfiguration> searchConfigurations;
@@ -47,14 +47,14 @@ public class JudgmentTaskContext {
     private ActionListener<Map<String, String>> completionListener;
 
     public JudgmentTaskContext(
-        String queryTextWithReference,
+        String queryTextWithCustomInput,
         String modelId,
         List<String> contextFields,
         List<SearchConfiguration> searchConfigurations,
         boolean ignoreFailure,
         ActionListener<Map<String, String>> completionListener
     ) {
-        this.queryTextWithReference = queryTextWithReference;
+        this.queryTextWithCustomInput = queryTextWithCustomInput;
         this.modelId = modelId;
         this.contextFields = contextFields;
         this.searchConfigurations = searchConfigurations;
@@ -72,7 +72,7 @@ public class JudgmentTaskContext {
 
         log.info(
             "JudgmentTaskContext initialized for query: {} with {} search configurations",
-            queryTextWithReference,
+            queryTextWithCustomInput,
             searchConfigurations.size()
         );
     }
@@ -88,11 +88,11 @@ public class JudgmentTaskContext {
             successfulTasks.incrementAndGet();
         } else {
             failedTasks.incrementAndGet();
-            log.warn("Search task failed for query: {} (ignoreFailure={})", queryTextWithReference, ignoreFailure);
+            log.warn("Search task failed for query: {} (ignoreFailure={})", queryTextWithCustomInput, ignoreFailure);
         }
 
         if (pendingSearchTasks.decrementAndGet() == 0) {
-            log.debug("All search tasks completed for query: {}", queryTextWithReference);
+            log.debug("All search tasks completed for query: {}", queryTextWithCustomInput);
         }
     }
 
@@ -103,11 +103,11 @@ public class JudgmentTaskContext {
             successfulTasks.incrementAndGet();
         } else {
             failedTasks.incrementAndGet();
-            log.warn("Cache task failed for query: {} (ignoreFailure={})", queryTextWithReference, ignoreFailure);
+            log.warn("Cache task failed for query: {} (ignoreFailure={})", queryTextWithCustomInput, ignoreFailure);
         }
 
         if (pendingCacheTasks.decrementAndGet() == 0) {
-            log.debug("All cache tasks completed for query: {}", queryTextWithReference);
+            log.debug("All cache tasks completed for query: {}", queryTextWithCustomInput);
         }
     }
 
@@ -122,7 +122,7 @@ public class JudgmentTaskContext {
 
         log.info(
             "Judgment completed for query: {} with {} ratings (success: {}, failed: {}, status: {})",
-            queryTextWithReference,
+            queryTextWithCustomInput,
             docIdToScore.size(),
             successfulTasks.get(),
             failedTasks.get(),
@@ -161,7 +161,7 @@ public class JudgmentTaskContext {
     public void failJudgment(Exception e) {
         if (hasTerminated.getAndSet(true)) return;
 
-        log.error("Judgment failed for query: {} (ignoreFailure={})", queryTextWithReference, ignoreFailure, e);
+        log.error("Judgment failed for query: {} (ignoreFailure={})", queryTextWithCustomInput, ignoreFailure, e);
         if (completionListener != null) {
             completionListener.onFailure(e);
         }

@@ -88,7 +88,10 @@ public class ImportJudgmentsProcessor implements BaseJudgmentsProcessor {
 
                 String rating = String.valueOf(ratingObj);
                 try {
-                    Float.parseFloat(rating);
+                    // parseFloat accepts "NaN" and "Infinity"; reject them so they cannot fail evaluation later.
+                    if (!Float.isFinite(Float.parseFloat(rating))) {
+                        throw new NumberFormatException("non-finite rating: " + rating);
+                    }
                 } catch (NumberFormatException e) {
                     listener.onFailure(
                         new SearchRelevanceException(

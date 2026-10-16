@@ -12,7 +12,9 @@ import java.util.List;
 
 import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.core.common.io.stream.StreamOutput;
+import org.opensearch.searchrelevance.common.MinClusterVersionUtil;
 import org.opensearch.searchrelevance.model.JudgmentType;
+import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
 
 import reactor.util.annotation.NonNull;
 
@@ -41,6 +43,22 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
      */
     private boolean ignoreFailure;
 
+    /**
+     * Customized prompt template input by customers.
+     */
+    private String promptTemplate;  // contains place_holder with vals defined in QuerySet
+
+    /**
+     * Output type defined for prefilled prompt and JSON output processor
+     */
+    private LLMJudgmentRatingType llmJudgmentRatingType;
+
+    /**
+     * Optional list of existing judgment IDs whose ratings can be reused
+     * to avoid redundant LLM calls for already-rated (query, doc) pairs.
+     */
+    private List<String> existingJudgments;
+
     public PutLlmJudgmentRequest(
         @NonNull JudgmentType type,
         @NonNull String name,
@@ -51,7 +69,10 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         int size,
         int tokenLimit,
         List<String> contextFields,
-        boolean ignoreFailure
+        boolean ignoreFailure,
+        String promptTemplate,
+        LLMJudgmentRatingType llmJudgmentRatingType,
+        List<String> existingJudgments
     ) {
         super(type, name, description);
         this.modelId = modelId;
@@ -61,6 +82,9 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         this.tokenLimit = tokenLimit;
         this.contextFields = contextFields;
         this.ignoreFailure = ignoreFailure;
+        this.promptTemplate = promptTemplate;
+        this.llmJudgmentRatingType = llmJudgmentRatingType;
+        this.existingJudgments = existingJudgments;
     }
 
     public PutLlmJudgmentRequest(StreamInput in) throws IOException {
@@ -72,6 +96,16 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         this.tokenLimit = in.readOptionalInt();
         this.contextFields = in.readOptionalStringList();
         this.ignoreFailure = Boolean.TRUE.equals(in.readOptionalBoolean()); // by defaulted as false if not provided
+        this.promptTemplate = in.readOptionalString();
+        this.llmJudgmentRatingType = in.readOptionalWriteable(LLMJudgmentRatingType::readFromStream);
+        // BWC: this trailing field changed shape. Older nodes wrote an optional boolean here (the
+        // removed "overwriteCache"); newer nodes write the "existingJudgments" list. Gate on the
+        // cluster's minimum node version so both directions agree during a rolling upgrade.
+        if (MinClusterVersionUtil.isClusterOnOrAfterMinReqVersionForExistingJudgments()) {
+            this.existingJudgments = in.readOptionalStringList();
+        } else {
+            in.readOptionalBoolean(); // discard the old overwriteCache flag; existingJudgments stays null
+        }
     }
 
     @Override
@@ -84,6 +118,16 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
         out.writeOptionalInt(tokenLimit);
         out.writeOptionalStringArray(contextFields.toArray(new String[0]));
         out.writeOptionalBoolean(ignoreFailure);
+        out.writeOptionalString(promptTemplate);
+        out.writeOptionalWriteable(llmJudgmentRatingType);
+        // BWC: match the format the peer expects at this trailing position. An older node reads an
+        // optional boolean here (the removed "overwriteCache"), so write a null boolean for it;
+        // newer nodes read the "existingJudgments" list. Gate on the cluster's minimum node version.
+        if (MinClusterVersionUtil.isClusterOnOrAfterMinReqVersionForExistingJudgments()) {
+            out.writeOptionalStringCollection(existingJudgments);
+        } else {
+            out.writeOptionalBoolean(null);
+        }
     }
 
     public String getModelId() {
@@ -112,6 +156,18 @@ public class PutLlmJudgmentRequest extends PutJudgmentRequest {
 
     public boolean isIgnoreFailure() {
         return ignoreFailure;
+    }
+
+    public String getPromptTemplate() {
+        return promptTemplate;
+    }
+
+    public LLMJudgmentRatingType getLlmJudgmentRatingType() {
+        return llmJudgmentRatingType;
+    }
+
+    public List<String> getExistingJudgments() {
+        return existingJudgments;
     }
 
 }

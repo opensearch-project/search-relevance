@@ -1,4 +1,7 @@
 {
+  "_meta": {
+    "schema_version": 0
+  },
   "properties": {
     "id": { "type": "keyword" },
     "enabled": {

@@ -1,0 +1,26 @@
+{
+  "_meta": {
+    "schema_version": 0
+  },
+  "properties": {
+    "id": {
+      "type": "keyword"
+    },
+    "timestamp": {
+      "type": "date",
+      "format": "strict_date_time"
+    },
+    "querySet": {
+      "type": "keyword"
+    },
+    "documentId": {
+      "type": "keyword"
+    },
+    "contextFieldsStr": {
+      "type": "keyword"
+    },
+    "rating": {
+      "type": "keyword"
+    }
+  }
+}

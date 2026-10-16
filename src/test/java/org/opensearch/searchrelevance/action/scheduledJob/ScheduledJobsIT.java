@@ -8,6 +8,7 @@
 package org.opensearch.searchrelevance.action.scheduledJob;
 
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENTS_URI;
+import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_EXPERIMENT_HISTORY_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_EXPERIMENT_URL;
 import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_JOBS_INDEX;
@@ -22,6 +23,7 @@ import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.hc.core5.http.message.BasicHeader;
 import org.opensearch.client.Response;
 import org.opensearch.client.ResponseException;
+import org.opensearch.common.unit.TimeValue;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.searchrelevance.experiment.BaseExperimentIT;
 import org.opensearch.test.OpenSearchIntegTestCase;
@@ -40,6 +42,9 @@ public class ScheduledJobsIT extends BaseExperimentIT {
     String experimentId;
 
     public static final int CRON_JOB_COMPLETION_MS = 65000;
+    public static final int CRON_JOB_POLL_INTERVAL_MS = 5000;
+    public static final int SCHEDULED_RESULT_COMPLETION_MS = 10000;
+    public static final int SCHEDULED_RESULT_POLL_INTERVAL_MS = 1000;
 
     public void setUpEnvironment() throws Exception {
         // Arrange
@@ -62,6 +67,8 @@ public class ScheduledJobsIT extends BaseExperimentIT {
         // Create the Scheduled Experiment and check that the results are as expected
         String scheduledExperimentId = createScheduledExperiment();
 
+        // Read the experiment that should be updated after putting the schedule.
+        String getSingleExperimentByIdUrl = String.join("/", EXPERIMENT_INDEX, "_doc", experimentId);
         // Read the scheduled experiment that was created
         String getScheduledExperimentByIdUrl = String.join("/", SCHEDULED_JOBS_INDEX, "_doc", scheduledExperimentId);
         Response getScheduledExperimentResponse = makeRequest(
@@ -72,54 +79,87 @@ public class ScheduledJobsIT extends BaseExperimentIT {
             null,
             ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
         );
+
         Map<String, Object> getScheduledExperimentResultJson = entityAsMap(getScheduledExperimentResponse);
         assertNotNull(getScheduledExperimentResultJson);
         assertEquals(scheduledExperimentId, getScheduledExperimentResultJson.get("_id").toString());
-        Map<String, Object> source = (Map<String, Object>) getScheduledExperimentResultJson.get("_source");
-        assertNotNull(source);
-        assertNotNull(source.get("id"));
-        assertNotNull(source.get("schedule"));
-        assertEquals(experimentId, source.get("id"));
+        Map<String, Object> scheduledExperimentSource = (Map<String, Object>) getScheduledExperimentResultJson.get("_source");
+        assertNotNull(scheduledExperimentSource);
+        assertNotNull(scheduledExperimentSource.get("id"));
+        assertNotNull(scheduledExperimentSource.get("schedule"));
+        assertEquals(experimentId, scheduledExperimentSource.get("id"));
 
-        // Here we have to wait until at last one
-        Thread.sleep(CRON_JOB_COMPLETION_MS);
+        String getScheduledExperimentJobRunByIdUrl = String.join("/", SCHEDULED_JOBS_INDEX, "_doc", experimentId);
 
-        // Read the scheduled experiment results that have been run
+        // Wait until the scheduled job updates its metadata after the first run.
+        assertBusyWithFixedSleepTime(() -> {
+            Response getScheduledExperimentJobRunResponse;
+            try {
+                getScheduledExperimentJobRunResponse = makeRequest(
+                    client(),
+                    RestRequest.Method.GET.name(),
+                    getScheduledExperimentJobRunByIdUrl,
+                    null,
+                    null,
+                    ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
+                );
+            } catch (ResponseException e) {
+                assertNotEquals(404, e.getResponse().getStatusLine().getStatusCode());
+                throw e;
+            }
+            Map<String, Object> getScheduledExperimentJobRunResponseJson = entityAsMap(getScheduledExperimentJobRunResponse);
+            assertNotNull(getScheduledExperimentJobRunResponseJson);
+            assertEquals(experimentId, getScheduledExperimentJobRunResponseJson.get("_id").toString());
+            Map<String, Object> scheduledExperimentJobRunSource = (Map<String, Object>) getScheduledExperimentJobRunResponseJson.get(
+                "_source"
+            );
+            assertNotNull(scheduledExperimentJobRunSource);
+            assertNotEquals(scheduledExperimentJobRunSource.get("enabledTime"), scheduledExperimentJobRunSource.get("lastUpdateTime"));
+        }, TimeValue.timeValueMillis(CRON_JOB_COMPLETION_MS), TimeValue.timeValueMillis(CRON_JOB_POLL_INTERVAL_MS));
 
         String getScheduledExperimentResultsUrl = String.join("/", SCHEDULED_EXPERIMENT_HISTORY_INDEX, "_search");
-        Response getScheduledExperimentResultsResponse = makeRequest(
-            client(),
-            RestRequest.Method.POST.name(),
-            getScheduledExperimentResultsUrl,
-            null,
-            null,
-            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
-        );
-        Map<String, Object> getScheduledExperimentResultListJson = entityAsMap(getScheduledExperimentResultsResponse);
 
-        assertNotNull(getScheduledExperimentResultListJson);
-        List<Object> listOfScheduledExperimentResults = (List<Object>) (((Map<String, Object>) (getScheduledExperimentResultListJson.get(
-            "hits"
-        ))).get("hits"));
-        assertTrue(listOfScheduledExperimentResults.size() > 0);
+        // Wait until the scheduled experiment result completes.
+        assertBusyWithFixedSleepTime(() -> {
+            Response getScheduledExperimentResultsResponse;
+            try {
+                getScheduledExperimentResultsResponse = makeRequest(
+                    client(),
+                    RestRequest.Method.POST.name(),
+                    getScheduledExperimentResultsUrl,
+                    null,
+                    null,
+                    ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
+                );
+            } catch (ResponseException e) {
+                assertNotEquals(404, e.getResponse().getStatusLine().getStatusCode());
+                throw e;
+            }
+            Map<String, Object> getScheduledExperimentResultListJson = entityAsMap(getScheduledExperimentResultsResponse);
 
-        Map<String, Object> getSingleScheduledExperimentResultJson = (Map<String, Object>) (listOfScheduledExperimentResults.get(0));
+            assertNotNull(getScheduledExperimentResultListJson);
+            List<Object> listOfScheduledExperimentResults = (List<Object>) (((Map<String, Object>) (getScheduledExperimentResultListJson
+                .get("hits"))).get("hits"));
+            assertTrue(listOfScheduledExperimentResults.size() > 0);
 
-        Map<String, Object> experimentSource = (Map<String, Object>) (getSingleScheduledExperimentResultJson.get("_source"));
+            Map<String, Object> getSingleScheduledExperimentResultJson = (Map<String, Object>) (listOfScheduledExperimentResults.get(0));
 
-        assertNotNull(experimentSource);
-        assertEquals("COMPLETED", experimentSource.get("status"));
+            Map<String, Object> experimentSource = (Map<String, Object>) (getSingleScheduledExperimentResultJson.get("_source"));
 
-        List<Map<String, Object>> results = (List<Map<String, Object>>) experimentSource.get("results");
-        assertNotNull(results);
+            assertNotNull(experimentSource);
+            assertEquals("COMPLETED", experimentSource.get("status"));
 
-        // convert list of actual results to map of query text and evaluation id
-        Map<String, Object> resultsMap = new HashMap<>();
-        results.forEach(result -> {
-            assertEquals(searchConfigurationId, result.get("searchConfigurationId"));
-            resultsMap.put((String) result.get("queryText"), result.get("evaluationId"));
-        });
-        assertEquals(results.size(), resultsMap.size());
+            List<Map<String, Object>> results = (List<Map<String, Object>>) experimentSource.get("results");
+            assertNotNull(results);
+
+            // convert list of actual results to map of query text and evaluation id
+            Map<String, Object> resultsMap = new HashMap<>();
+            results.forEach(result -> {
+                assertEquals(searchConfigurationId, result.get("searchConfigurationId"));
+                resultsMap.put((String) result.get("queryText"), result.get("evaluationId"));
+            });
+            assertEquals(results.size(), resultsMap.size());
+        }, TimeValue.timeValueMillis(SCHEDULED_RESULT_COMPLETION_MS), TimeValue.timeValueMillis(SCHEDULED_RESULT_POLL_INTERVAL_MS));
 
         Response deleteScheduledExperimentResponse = makeRequest(
             client(),

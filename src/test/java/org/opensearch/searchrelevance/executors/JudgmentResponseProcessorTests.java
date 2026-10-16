@@ -23,20 +23,17 @@ import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.bytes.BytesArray;
 import org.opensearch.search.SearchHit;
 import org.opensearch.search.SearchHits;
-import org.opensearch.searchrelevance.dao.JudgmentCacheDao;
 import org.opensearch.test.OpenSearchTestCase;
 
 public class JudgmentResponseProcessorTests extends OpenSearchTestCase {
 
-    private JudgmentCacheDao judgmentCacheDao;
     private JudgmentResponseProcessor processor;
     private JudgmentTaskContext context;
 
     @Override
     public void setUp() throws Exception {
         super.setUp();
-        judgmentCacheDao = mock(JudgmentCacheDao.class);
-        processor = new JudgmentResponseProcessor(judgmentCacheDao);
+        processor = new JudgmentResponseProcessor();
         context = createMockContext();
     }
 
