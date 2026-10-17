@@ -260,12 +260,13 @@ public class RestPutJudgmentAction extends BaseRestHandler {
     }
 
     private BytesRestResponse validateImportJudgmentRatings(List<Map<String, Object>> judgmentRatings) {
-        int maxQueries = settingsAccessor.getMaxJudgmentImportQueriesAllowed();
-        if (judgmentRatings != null && judgmentRatings.size() > maxQueries) {
-            return new BytesRestResponse(RestStatus.FORBIDDEN, "Judgment Import Query Limit Exceeded. Maximum allowed: " + maxQueries);
-        }
         if (judgmentRatings == null) {
-            return null;
+            return new BytesRestResponse(RestStatus.BAD_REQUEST, "judgmentRatings is required for IMPORT_JUDGMENT");
+        }
+
+        int maxQueries = settingsAccessor.getMaxJudgmentImportQueriesAllowed();
+        if (judgmentRatings.size() > maxQueries) {
+            return new BytesRestResponse(RestStatus.FORBIDDEN, "Judgment Import Query Limit Exceeded. Maximum allowed: " + maxQueries);
         }
 
         int maxRatingsPerQuery = settingsAccessor.getMaxJudgmentImportRatingsPerQueryAllowed();
@@ -276,8 +277,12 @@ public class RestPutJudgmentAction extends BaseRestHandler {
                 return new BytesRestResponse(RestStatus.BAD_REQUEST, "Invalid query: " + queryValidation.getErrorMessage());
             }
 
-            List<?> ratings = (List<?>) entry.get("ratings");
-            if (ratings != null && ratings.size() > maxRatingsPerQuery) {
+            Object ratingsObj = entry.get("ratings");
+            if (!(ratingsObj instanceof List)) {
+                return new BytesRestResponse(RestStatus.BAD_REQUEST, "Invalid query " + query + ": ratings must be a list");
+            }
+            List<?> ratings = (List<?>) ratingsObj;
+            if (ratings.size() > maxRatingsPerQuery) {
                 return new BytesRestResponse(
                     RestStatus.FORBIDDEN,
                     "Judgment Import Ratings Per Query Limit Exceeded. Maximum allowed: " + maxRatingsPerQuery

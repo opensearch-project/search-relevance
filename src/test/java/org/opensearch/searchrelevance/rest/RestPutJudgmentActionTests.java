@@ -264,6 +264,49 @@ public class RestPutJudgmentActionTests extends SearchRelevanceRestTestCase {
         assertEquals(RestStatus.BAD_REQUEST, responseCaptor.getValue().status());
     }
 
+    public void testPutImportJudgment_MissingJudgmentRatings() throws Exception {
+        // Setup
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        String content = "{" + "\"name\": \"test_name\"," + "\"description\": \"test_description\"," + "\"type\": \"IMPORT_JUDGMENT\"" + "}";
+        RestRequest request = createPutRestRequestWithContent(content, "judgment");
+        when(channel.request()).thenReturn(request);
+
+        // Execute
+        restPutJudgmentAction.handleRequest(request, channel, client);
+
+        // Verify
+        ArgumentCaptor<BytesRestResponse> responseCaptor = ArgumentCaptor.forClass(BytesRestResponse.class);
+        verify(channel).sendResponse(responseCaptor.capture());
+        assertEquals(RestStatus.BAD_REQUEST, responseCaptor.getValue().status());
+    }
+
+    public void testPutImportJudgment_RatingsNotAList() throws Exception {
+        // Setup
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        String content = """
+            {
+              "name": "test_name",
+              "description": "test_description",
+              "type": "IMPORT_JUDGMENT",
+              "judgmentRatings": [
+                {
+                  "query": "red shoes",
+                  "ratings": "not-a-list"
+                }
+              ]
+            }""";
+        RestRequest request = createPutRestRequestWithContent(content, "judgment");
+        when(channel.request()).thenReturn(request);
+
+        // Execute
+        restPutJudgmentAction.handleRequest(request, channel, client);
+
+        // Verify
+        ArgumentCaptor<BytesRestResponse> responseCaptor = ArgumentCaptor.forClass(BytesRestResponse.class);
+        verify(channel).sendResponse(responseCaptor.capture());
+        assertEquals(RestStatus.BAD_REQUEST, responseCaptor.getValue().status());
+    }
+
     public void testPutJudgment_InvalidType() {
         // Setup
         when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
