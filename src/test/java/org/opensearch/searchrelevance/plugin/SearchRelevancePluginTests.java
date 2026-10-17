@@ -11,6 +11,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_CACHE_INDEX;
+import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_JUDGMENT_IMPORT_MAX_QUERIES;
+import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_JUDGMENT_IMPORT_MAX_RATINGS_PER_QUERY;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_ENABLED;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_MINIMUM_INTERVAL;
@@ -148,7 +150,9 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
                         SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT,
                         SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_ENABLED,
                         SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_TIMEOUT,
-                        SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_MINIMUM_INTERVAL
+                        SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_MINIMUM_INTERVAL,
+                        SEARCH_RELEVANCE_JUDGMENT_IMPORT_MAX_QUERIES,
+                        SEARCH_RELEVANCE_JUDGMENT_IMPORT_MAX_RATINGS_PER_QUERY
                     )
                 )
             )
@@ -229,7 +233,7 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
 
     public void testGetSettings() {
         List<Setting<?>> settings = plugin.getSettings();
-        assertEquals(6, settings.size());
+        assertEquals(8, settings.size());
 
         Setting<?> setting0 = settings.get(0);
         assertEquals("plugins.search_relevance.workbench_enabled", setting0.getKey());
@@ -254,5 +258,13 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
         Setting<?> setting5 = settings.get(5);
         assertEquals("plugins.search_relevance.scheduled_experiments_minimum_interval", setting5.getKey());
         assertEquals(TimeValue.timeValueSeconds(1), setting5.get(Settings.EMPTY));
+
+        Setting<?> setting6 = settings.get(6);
+        assertEquals("plugins.search_relevance.judgment_import.max_queries", setting6.getKey());
+        assertEquals(1000, setting6.get(Settings.EMPTY));
+
+        Setting<?> setting7 = settings.get(7);
+        assertEquals("plugins.search_relevance.judgment_import.max_ratings_per_query", setting7.getKey());
+        assertEquals(1000, setting7.get(Settings.EMPTY));
     }
 }

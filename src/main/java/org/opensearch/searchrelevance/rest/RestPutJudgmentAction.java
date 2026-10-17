@@ -24,6 +24,7 @@ import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_RAT
 import static org.opensearch.searchrelevance.common.PluginConstants.NAME;
 import static org.opensearch.searchrelevance.common.PluginConstants.NAX_RANK;
 import static org.opensearch.searchrelevance.common.PluginConstants.OVERWRITE_CACHE;
+import static org.opensearch.searchrelevance.common.PluginConstants.QUERY;
 import static org.opensearch.searchrelevance.common.PluginConstants.QUERYSET_ID;
 import static org.opensearch.searchrelevance.common.PluginConstants.SEARCH_CONFIGURATION_LIST;
 import static org.opensearch.searchrelevance.common.PluginConstants.SIZE;
@@ -222,6 +223,10 @@ public class RestPutJudgmentAction extends BaseRestHandler {
             }
             case IMPORT_JUDGMENT -> {
                 List<Map<String, Object>> judgmentRatings = (List<Map<String, Object>>) source.get(JUDGMENT_RATINGS);
+                BytesRestResponse validationError = validateImportJudgmentRatings(judgmentRatings);
+                if (validationError != null) {
+                    return channel -> channel.sendResponse(validationError);
+                }
                 createRequest = new PutImportJudgmentRequest(type, name, description, judgmentRatings);
             }
             default -> {
@@ -252,5 +257,33 @@ public class RestPutJudgmentAction extends BaseRestHandler {
                 }
             }
         });
+    }
+
+    private BytesRestResponse validateImportJudgmentRatings(List<Map<String, Object>> judgmentRatings) {
+        int maxQueries = settingsAccessor.getMaxJudgmentImportQueriesAllowed();
+        if (judgmentRatings != null && judgmentRatings.size() > maxQueries) {
+            return new BytesRestResponse(RestStatus.FORBIDDEN, "Judgment Import Query Limit Exceeded. Maximum allowed: " + maxQueries);
+        }
+        if (judgmentRatings == null) {
+            return null;
+        }
+
+        int maxRatingsPerQuery = settingsAccessor.getMaxJudgmentImportRatingsPerQueryAllowed();
+        for (Map<String, Object> entry : judgmentRatings) {
+            Object query = entry.get(QUERY);
+            TextValidationUtil.ValidationResult queryValidation = TextValidationUtil.validateText(query != null ? query.toString() : null);
+            if (!queryValidation.isValid()) {
+                return new BytesRestResponse(RestStatus.BAD_REQUEST, "Invalid query: " + queryValidation.getErrorMessage());
+            }
+
+            List<?> ratings = (List<?>) entry.get("ratings");
+            if (ratings != null && ratings.size() > maxRatingsPerQuery) {
+                return new BytesRestResponse(
+                    RestStatus.FORBIDDEN,
+                    "Judgment Import Ratings Per Query Limit Exceeded. Maximum allowed: " + maxRatingsPerQuery
+                );
+            }
+        }
+        return null;
     }
 }
