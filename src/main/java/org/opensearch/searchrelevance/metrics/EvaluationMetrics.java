@@ -33,6 +33,7 @@ import java.util.Map;
  * Evaluation Metrics.
  */
 public class EvaluationMetrics {
+    public static final int TOTAL_METRIC_COUNT = 4;
 
     /**
      * Fail the evaluation on a stored rating that is not a finite number. Checked up front over the

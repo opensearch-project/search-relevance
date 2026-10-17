@@ -10,7 +10,6 @@ package org.opensearch.searchrelevance.executors;
 import static org.opensearch.searchrelevance.metrics.EvaluationMetrics.calculateEvaluationMetrics;
 
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -59,10 +58,6 @@ public class SearchResponseProcessor {
 
         try {
             Long took = SearchTook.from(response);
-            if (response.getHits().getTotalHits().value() == 0) {
-                handleNoHits(experimentVariant, experimentId, searchConfigId, evaluationId, taskContext, took);
-                return;
-            }
 
             SearchHit[] hits = response.getHits().getHits();
             List<String> docIds = Arrays.stream(hits).map(SearchHit::getId).collect(Collectors.toList());
@@ -99,39 +94,6 @@ public class SearchResponseProcessor {
         } catch (Exception e) {
             handleTaskFailure(experimentVariant, e, taskContext);
         }
-    }
-
-    private void handleNoHits(
-        ExperimentVariant experimentVariant,
-        String experimentId,
-        String searchConfigId,
-        String evaluationId,
-        ExperimentTaskContext taskContext,
-        Long took
-    ) {
-        log.warn("No hits found for search config: {} and variant: {}", searchConfigId, experimentVariant.getId());
-
-        Map<String, Object> noHitsResults = new HashMap<>();
-        noHitsResults.put("evaluationResultId", evaluationId);
-        noHitsResults.put("details", "no search hits found");
-        if (took != null) {
-            noHitsResults.put(EvaluationResult.TOOK, took);
-        }
-
-        ExperimentVariant noHitsVariant = new ExperimentVariant(
-            experimentVariant.getId(),
-            TimeUtils.getTimestamp(),
-            experimentVariant.getType(),
-            AsyncStatus.COMPLETED,
-            experimentId,
-            experimentVariant.getParameters(),
-            noHitsResults
-        );
-
-        experimentVariantDao.putExperimentVariantEfficient(noHitsVariant, ActionListener.wrap(success -> {
-            log.debug("Persisted no-hits variant: {}", experimentVariant.getId());
-            taskContext.completeVariantFailure();
-        }, error -> handleTaskFailure(experimentVariant, error, taskContext)));
     }
 
     private void updateExperimentVariant(

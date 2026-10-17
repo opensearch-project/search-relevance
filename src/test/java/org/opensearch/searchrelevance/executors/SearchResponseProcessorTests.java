@@ -72,6 +72,7 @@ public class SearchResponseProcessorTests extends OpenSearchTestCase {
 
         ArgumentCaptor<EvaluationResult> captor = ArgumentCaptor.forClass(EvaluationResult.class);
         verify(evaluationResultDao).putEvaluationResultEfficient(captor.capture(), any(ActionListener.class));
+
         EvaluationResult stored = captor.getValue();
         assertEquals(Long.valueOf(14L), stored.took());
         assertEquals("eval-1", stored.id());
@@ -80,10 +81,16 @@ public class SearchResponseProcessorTests extends OpenSearchTestCase {
         verify(experimentVariantDao, never()).putExperimentVariantEfficient(any(), any());
     }
 
-    public void testProcessSearchResponseNoHitsPersistsTookOnVariant() {
+    /**
+     * A zero-hit query must still produce a real evaluation result with zero-valued
+     * metrics, not be silently skipped - see
+     * https://github.com/opensearch-project/search-relevance/issues/66
+     */
+    public void testProcessSearchResponseWithZeroHitsPersistsEvaluationResult() {
+        // No docIds -> zero hits; empty docIdToScores keeps every metric well-defined at 0.0
         SearchResponse response = createSearchResponse(9L);
         ExperimentVariant variant = pointwiseVariant();
-        stubSuccessfulVariantWrite();
+        stubSuccessfulEvaluationWrite();
 
         processor.processSearchResponse(
             response,
@@ -99,15 +106,68 @@ public class SearchResponseProcessorTests extends OpenSearchTestCase {
             null
         );
 
-        verify(evaluationResultDao, never()).putEvaluationResultEfficient(any(), any());
-        ArgumentCaptor<ExperimentVariant> captor = ArgumentCaptor.forClass(ExperimentVariant.class);
-        verify(experimentVariantDao).putExperimentVariantEfficient(captor.capture(), any(ActionListener.class));
+        ArgumentCaptor<EvaluationResult> captor = ArgumentCaptor.forClass(EvaluationResult.class);
+        verify(evaluationResultDao).putEvaluationResultEfficient(captor.capture(), any(ActionListener.class));
 
-        ExperimentVariant stored = captor.getValue();
-        assertEquals(AsyncStatus.COMPLETED, stored.getStatus());
-        assertEquals("no search hits found", stored.getResults().get("details"));
-        assertEquals(9L, stored.getResults().get(EvaluationResult.TOOK));
-        assertEquals("eval-1", stored.getResults().get("evaluationResultId"));
+        EvaluationResult stored = captor.getValue();
+        assertEquals(7, stored.metrics().size());
+        for (Map<String, Object> metric : stored.metrics()) {
+            assertEquals(0.0, ((Number) metric.get("value")).doubleValue(), 0.001);
+        }
+        assertEquals(Long.valueOf(9L), stored.took());
+        assertEquals("eval-1", stored.id());
+        assertEquals("experiment-1", stored.experimentId());
+        assertEquals("variant-1", stored.experimentVariantId());
+
+        verify(taskContext).completeVariantSuccess();
+        verify(experimentVariantDao, never()).putExperimentVariantEfficient(any(), any());
+    }
+
+    public void testProcessSearchResponseWithHits() {
+        SearchResponse response = createSearchResponse(3L, "doc1");
+        ExperimentVariant variant = pointwiseVariant();
+        stubSuccessfulEvaluationWrite();
+
+        processor.processSearchResponse(
+            response,
+            variant,
+            "experiment-1",
+            "config-1",
+            "red shoes",
+            10,
+            List.of(),
+            Map.of(),
+            "eval-1",
+            taskContext,
+            "scheduled-1"
+        );
+
+        ArgumentCaptor<EvaluationResult> captor = ArgumentCaptor.forClass(EvaluationResult.class);
+        verify(evaluationResultDao).putEvaluationResultEfficient(captor.capture(), any(ActionListener.class));
+
+        EvaluationResult stored = captor.getValue();
+        assertFalse(stored.metrics().isEmpty());
+        assertEquals(Long.valueOf(3L), stored.took());
+    }
+
+    public void testProcessSearchResponseWithException() {
+        ExperimentVariant variant = pointwiseVariant();
+
+        // Passing a null response triggers an exception inside the try block
+        processor.processSearchResponse(
+            null,
+            variant,
+            "experiment-1",
+            "config-1",
+            "red shoes",
+            10,
+            List.of(),
+            Map.of(),
+            "eval-1",
+            taskContext,
+            "scheduled-1"
+        );
+
         verify(taskContext).completeVariantFailure();
     }
 
