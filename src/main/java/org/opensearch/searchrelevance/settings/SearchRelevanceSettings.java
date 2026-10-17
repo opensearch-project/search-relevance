@@ -91,4 +91,29 @@ public class SearchRelevanceSettings {
         Setting.Property.NodeScope,
         Setting.Property.Dynamic
     );
+
+    /**
+     * Gates the maximum number of query entries allowed in an IMPORT_JUDGMENT request's judgmentRatings list.
+     * The defaultValue is 1,000
+     */
+    public static final String SEARCH_RELEVANCE_JUDGMENT_IMPORT_MAX_QUERIES_KEY = "plugins.search_relevance.judgment_import.max_queries";
+    public static final Setting<Integer> SEARCH_RELEVANCE_JUDGMENT_IMPORT_MAX_QUERIES = Setting.intSetting(
+        SEARCH_RELEVANCE_JUDGMENT_IMPORT_MAX_QUERIES_KEY,
+        1000,
+        Setting.Property.NodeScope,
+        Setting.Property.Dynamic
+    );
+
+    /**
+     * Gates the maximum number of ratings allowed per query entry in an IMPORT_JUDGMENT request.
+     * The defaultValue is 1,000
+     */
+    public static final String SEARCH_RELEVANCE_JUDGMENT_IMPORT_MAX_RATINGS_PER_QUERY_KEY =
+        "plugins.search_relevance.judgment_import.max_ratings_per_query";
+    public static final Setting<Integer> SEARCH_RELEVANCE_JUDGMENT_IMPORT_MAX_RATINGS_PER_QUERY = Setting.intSetting(
+        SEARCH_RELEVANCE_JUDGMENT_IMPORT_MAX_RATINGS_PER_QUERY_KEY,
+        1000,
+        Setting.Property.NodeScope,
+        Setting.Property.Dynamic
+    );
 }
