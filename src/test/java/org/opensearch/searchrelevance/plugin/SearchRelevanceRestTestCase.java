@@ -63,7 +63,7 @@ public abstract class SearchRelevanceRestTestCase extends OpenSearchTestCase {
         Map<String, String> params = new HashMap<>(); // Create params map
         return new FakeRestRequest.Builder(NamedXContentRegistry.EMPTY).withContent(new BytesArray(content), XContentType.JSON)
             .withParams(params)
-            .withMethod(RestRequest.Method.PUT)
+            .withMethod(RestRequest.Method.POST)
             .withPath("/_plugins/_search_relevance/" + endpoint)
             .build();
     }

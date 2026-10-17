@@ -6,6 +6,8 @@ This directory contains:
 
 3) ESCI source ecommerce data (`esci_us_ecommerce_shrunk.ndjson.zip`) which is a subset of ESCI dataset that has images and overlap with the judgments in `esci_us_judgments.json`.
 
+4) An externally run experiment (`esci_us_external_experiment.json`) that can be imported into SRW that was built using the same ESCI data set.
+
 https://github.com/amazon-science/esci-data
 
 @article{reddy2022shopping,

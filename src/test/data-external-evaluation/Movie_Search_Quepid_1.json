@@ -1,0 +1,454 @@
+{
+  "case_name": "Movie Search OSC Demo",
+  "owned": false,
+  "owner_email": "tquaynor@aila.org",
+  "public": null,
+  "archived": false,
+  "options": null,
+  "scorer": {
+    "name": "nDCG@10"
+  },
+  "queries": [
+    {
+      "arranged_at": 0,
+      "arranged_next": 1844674407370955300,
+      "query_text": "Willis",
+      "options": null,
+      "notes": "Bruce Willis is a perfect, everybody else is a fair.  If it is not a Willis name, like \"Willie\" then it's a poor aka 0.",
+      "information_need": "I am searching for movies done by Actor Bruce Willis",
+      "ratings": [
+        {
+          "doc_id": "1634",
+          "rating": 0
+        },
+        {
+          "doc_id": "252",
+          "rating": 0
+        },
+        {
+          "doc_id": "338964",
+          "rating": 0
+        },
+        {
+          "doc_id": "298",
+          "rating": 0
+        },
+        {
+          "doc_id": "53729",
+          "rating": 1
+        },
+        {
+          "doc_id": "17908",
+          "rating": 0
+        },
+        {
+          "doc_id": "42807",
+          "rating": 0
+        },
+        {
+          "doc_id": "3172",
+          "rating": 3
+        },
+        {
+          "doc_id": "2026",
+          "rating": 3
+        },
+        {
+          "doc_id": "307081",
+          "rating": 0
+        },
+        {
+          "doc_id": "18925",
+          "rating": 1
+        },
+        {
+          "doc_id": "9760",
+          "rating": 0
+        },
+        {
+          "doc_id": "345934",
+          "rating": 3
+        },
+        {
+          "doc_id": "474377",
+          "rating": 0
+        },
+        {
+          "doc_id": "84305",
+          "rating": 3
+        },
+        {
+          "doc_id": "384737",
+          "rating": 3
+        },
+        {
+          "doc_id": "13159",
+          "rating": 1
+        },
+        {
+          "doc_id": "16553",
+          "rating": 0
+        },
+        {
+          "doc_id": "75736",
+          "rating": 3
+        },
+        {
+          "doc_id": "2122",
+          "rating": 3
+        }
+      ]
+    },
+    {
+      "arranged_at": 1844674407370955300,
+      "arranged_next": 3689348814741910500,
+      "query_text": "star wars",
+      "options": null,
+      "notes": null,
+      "information_need": "I am looking for the Stars Wars movies.   Star Wars a New Hope is a perfect, everything else star wars related is a good.",
+      "ratings": [
+        {
+          "doc_id": "12180",
+          "rating": 2
+        },
+        {
+          "doc_id": "602",
+          "rating": 0
+        },
+        {
+          "doc_id": "28029",
+          "rating": 0
+        },
+        {
+          "doc_id": "11596",
+          "rating": 0
+        },
+        {
+          "doc_id": "455980",
+          "rating": 0
+        },
+        {
+          "doc_id": "116741",
+          "rating": 0
+        },
+        {
+          "doc_id": "559",
+          "rating": 0
+        },
+        {
+          "doc_id": "354287",
+          "rating": 0
+        },
+        {
+          "doc_id": "322506",
+          "rating": 1
+        },
+        {
+          "doc_id": "181812",
+          "rating": 2
+        },
+        {
+          "doc_id": "348350",
+          "rating": 2
+        },
+        {
+          "doc_id": "181808",
+          "rating": 2
+        }
+      ]
+    },
+    {
+      "arranged_at": 3689348814741910500,
+      "arranged_next": 5534023222112865000,
+      "query_text": "Ice Age",
+      "options": null,
+      "notes": null,
+      "information_need": "I am looking for the kids movie series Ice Age",
+      "ratings": [
+        {
+          "doc_id": "10436",
+          "rating": 0
+        },
+        {
+          "doc_id": "99861",
+          "rating": 3
+        },
+        {
+          "doc_id": "91314",
+          "rating": 3
+        },
+        {
+          "doc_id": "201132",
+          "rating": 0
+        },
+        {
+          "doc_id": "293863",
+          "rating": 3
+        },
+        {
+          "doc_id": "425",
+          "rating": 3
+        },
+        {
+          "doc_id": "950",
+          "rating": 3
+        },
+        {
+          "doc_id": "278154",
+          "rating": 3
+        },
+        {
+          "doc_id": "57800",
+          "rating": 3
+        },
+        {
+          "doc_id": "8355",
+          "rating": 3
+        },
+        {
+          "doc_id": "80585",
+          "rating": 3
+        },
+        {
+          "doc_id": "59883",
+          "rating": 3
+        },
+        {
+          "doc_id": "17306",
+          "rating": 3
+        },
+        {
+          "doc_id": "13374",
+          "rating": 3
+        },
+        {
+          "doc_id": "607776",
+          "rating": 0
+        },
+        {
+          "doc_id": "71440",
+          "rating": 0
+        },
+        {
+          "doc_id": "22004",
+          "rating": 0
+        },
+        {
+          "doc_id": "25186",
+          "rating": 0
+        },
+        {
+          "doc_id": "13950",
+          "rating": 0
+        },
+        {
+          "doc_id": "11637",
+          "rating": 0
+        },
+        {
+          "doc_id": "9360",
+          "rating": 0
+        },
+        {
+          "doc_id": "10426",
+          "rating": 0
+        },
+        {
+          "doc_id": "10611",
+          "rating": 0
+        },
+        {
+          "doc_id": "17585",
+          "rating": 0
+        },
+        {
+          "doc_id": "75622",
+          "rating": 0
+        },
+        {
+          "doc_id": "454458",
+          "rating": 0
+        }
+      ]
+    },
+    {
+      "arranged_at": 5534023222112865000,
+      "arranged_next": 7378697629483821000,
+      "query_text": "Wizard of Oz",
+      "options": null,
+      "notes": null,
+      "information_need": "I want to watch the classic movie Wizard of Oz",
+      "ratings": [
+        {
+          "doc_id": "15515",
+          "rating": 0
+        },
+        {
+          "doc_id": "68728",
+          "rating": 2
+        },
+        {
+          "doc_id": "183",
+          "rating": 0
+        },
+        {
+          "doc_id": "630",
+          "rating": 3
+        },
+        {
+          "doc_id": "16220",
+          "rating": 0
+        },
+        {
+          "doc_id": "456375",
+          "rating": 3
+        },
+        {
+          "doc_id": "13155",
+          "rating": 2
+        },
+        {
+          "doc_id": "59981",
+          "rating": 2
+        },
+        {
+          "doc_id": "23506",
+          "rating": 0
+        },
+        {
+          "doc_id": "338952",
+          "rating": 0
+        },
+        {
+          "doc_id": "259138",
+          "rating": 0
+        },
+        {
+          "doc_id": "11013",
+          "rating": 0
+        },
+        {
+          "doc_id": "6795",
+          "rating": 0
+        },
+        {
+          "doc_id": "331588",
+          "rating": 0
+        },
+        {
+          "doc_id": "10208",
+          "rating": 0
+        },
+        {
+          "doc_id": "11568",
+          "rating": 0
+        },
+        {
+          "doc_id": "10576",
+          "rating": 0
+        },
+        {
+          "doc_id": "11639",
+          "rating": 0
+        },
+        {
+          "doc_id": "10437",
+          "rating": 0
+        },
+        {
+          "doc_id": "8835",
+          "rating": 0
+        },
+        {
+          "doc_id": "407451",
+          "rating": 0
+        },
+        {
+          "doc_id": "546554",
+          "rating": 0
+        }
+      ]
+    },
+    {
+      "arranged_at": 7378697629483821000,
+      "arranged_next": 9223372036854776000,
+      "query_text": "Titanic",
+      "options": null,
+      "notes": null,
+      "information_need": null,
+      "ratings": [
+        {
+          "doc_id": "57165",
+          "rating": 0
+        },
+        {
+          "doc_id": "597",
+          "rating": 3
+        },
+        {
+          "doc_id": "18823",
+          "rating": 0
+        },
+        {
+          "doc_id": "7450",
+          "rating": 0
+        },
+        {
+          "doc_id": "10637",
+          "rating": 0
+        },
+        {
+          "doc_id": "474395",
+          "rating": 0
+        },
+        {
+          "doc_id": "10323",
+          "rating": 0
+        },
+        {
+          "doc_id": "24575",
+          "rating": 3
+        },
+        {
+          "doc_id": "86938",
+          "rating": 1
+        },
+        {
+          "doc_id": "16535",
+          "rating": 3
+        },
+        {
+          "doc_id": "323676",
+          "rating": 0
+        },
+        {
+          "doc_id": "299534",
+          "rating": 0
+        },
+        {
+          "doc_id": "24982",
+          "rating": 0
+        }
+      ]
+    }
+  ],
+  "try": {
+    "escape_query": true,
+    "field_spec": "title:title, id, overview, cast, thumb:poster_path, release_date, tagline, vote_average",
+    "name": "Try 19",
+    "number_of_rows": 12,
+    "query_params": "{\n  \"query\": {\n    \"multi_match\": {\n      \"query\": \"#$query##\",\n      \"type\": \"best_fields\",\n      \"fields\": [\n        \"title\",\n        \"overview\",\n        \"cast^10\"\n      ]\n    }\n  },\n  \"sort\": [\n    {\n      \"_script\": {\n        \"type\": \"number\",\n        \"script\": {\n          \"lang\": \"painless\",\n          \"source\": \"long docDateYear = doc['release_date'].value.getYear(); double ageInYears = 2023 - docDateYear; double ageDecay = 1/Math.exp(0.01 * ageInYears); return _score * ageDecay;\"\n        },\n        \"order\": \"desc\"\n      }\n    },\n    \"_score\"\n  ]\n}",
+    "curator_variables": [],
+    "search_endpoint": {
+      "name": "Es http://quepi...06/tmdb/_search",
+      "endpoint_url": "http://quepid-elasticsearch.dev.o19s.com:9206/tmdb/_search",
+      "search_engine": "es",
+      "api_method": "POST",
+      "custom_headers": "",
+      "basic_auth_credential": "",
+      "mapper_code": "",
+      "proxy_requests": true,
+      "options": ""
+    }
+  }
+}
