@@ -251,6 +251,36 @@ public class ImportJudgmentsProcessorTests extends OpenSearchTestCase {
         );
     }
 
+    public void testGenerateJudgmentRatingWithNonFiniteRating() throws Exception {
+        // Float.parseFloat accepts these, but they would fail metric evaluation later; reject at import.
+        for (String rating : List.of("NaN", "Infinity", "-Infinity", "1e308")) {
+            Map<String, Object> queryJudgment = new HashMap<>();
+            queryJudgment.put("query", "test query");
+            queryJudgment.put("ratings", List.of(Map.of("docId", "doc1", "rating", rating)));
+            Map<String, Object> metadata = new HashMap<>();
+            metadata.put("judgmentRatings", List.of(queryJudgment));
+
+            CountDownLatch latch = new CountDownLatch(1);
+            AtomicReference<Exception> exceptionRef = new AtomicReference<>();
+            processor.generateJudgmentRating(metadata, new ActionListener<>() {
+                @Override
+                public void onResponse(List<Map<String, Object>> response) {
+                    latch.countDown();
+                }
+
+                @Override
+                public void onFailure(Exception e) {
+                    exceptionRef.set(e);
+                    latch.countDown();
+                }
+            });
+
+            assertTrue(latch.await(5, TimeUnit.SECONDS));
+            assertTrue("rating '" + rating + "' must be rejected", exceptionRef.get() instanceof SearchRelevanceException);
+            assertTrue(exceptionRef.get().getMessage().contains("rating '" + rating + "' for queryText test query must be a valid float"));
+        }
+    }
+
     public void testGenerateJudgmentRatingWithInvalidRatingsType() throws Exception {
         // Prepare metadata with ratings that is not a list
         Map<String, Object> metadata = new HashMap<>();

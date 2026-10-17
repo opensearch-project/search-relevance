@@ -9,12 +9,18 @@ package org.opensearch.searchrelevance.metrics;
 
 import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_METRIC;
 import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_VALUE;
+import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.METRICS_DISCOUNTED_CUMULATIVE_GAIN_AT;
 import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.METRICS_MEAN_AVERAGE_PRECISION_AT;
+import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.METRICS_MEAN_RECIPROCAL_RANK;
 import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.METRICS_NORMALIZED_DISCOUNTED_CUMULATIVE_GAIN_AT;
 import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.METRICS_PRECISION_AT;
+import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.METRICS_RECALL_AT;
+import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.calculateDCGAtK;
 import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.calculateMAPAtK;
 import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.calculateNDCGAtK;
 import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.calculatePrecisionAtK;
+import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.calculateRecallAtK;
+import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.calculateReciprocalRank;
 import static org.opensearch.searchrelevance.metrics.calculator.JudgmentThresholdCalculator.computeThreshold;
 
 import java.util.ArrayList;
@@ -28,6 +34,30 @@ import java.util.Map;
  */
 public class EvaluationMetrics {
     public static final int TOTAL_METRIC_COUNT = 4;
+
+    /**
+     * Fail the evaluation on a stored rating that is not a finite number. Checked up front over the
+     * whole judgment set because a bad rating on a document that is not retrieved still feeds the
+     * threshold, Recall and IDCG, where NaN or Infinity would otherwise silently yield 0.
+     *
+     * @throws IllegalArgumentException naming the document if a rating is unparseable or not finite
+     */
+    private static void validateRatings(Map<String, String> judgments) {
+        for (Map.Entry<String, String> entry : judgments.entrySet()) {
+            String rating = entry.getValue();
+            boolean valid;
+            try {
+                valid = rating != null && Double.isFinite(Double.parseDouble(rating));
+            } catch (NumberFormatException e) {
+                valid = false;
+            }
+            if (!valid) {
+                throw new IllegalArgumentException(
+                    "Invalid judgment rating [" + rating + "] for document [" + entry.getKey() + "]: rating must be a finite number"
+                );
+            }
+        }
+    }
 
     private static void addMetric(List<Map<String, Object>> metrics, String metricName, double value) {
         Map<String, Object> metric = new HashMap<>();
@@ -46,6 +76,7 @@ public class EvaluationMetrics {
      * affected.
      */
     public static List<Map<String, Object>> calculateEvaluationMetrics(List<String> docIds, Map<String, String> judgments, int k) {
+        validateRatings(judgments);
         List<Map<String, Object>> metrics = new ArrayList<>();
         List<String> docsWithScores = docIds.stream().filter(judgments::containsKey).toList();
 
@@ -64,7 +95,10 @@ public class EvaluationMetrics {
         // reliable
         addMetric(metrics, String.format(Locale.ROOT, "Coverage@%d", k), coverage);
         addMetric(metrics, METRICS_PRECISION_AT + k, calculatePrecisionAtK(docIds, judgments, k, threshold));
+        addMetric(metrics, METRICS_RECALL_AT + k, calculateRecallAtK(docIds, judgments, k, threshold));
         addMetric(metrics, METRICS_MEAN_AVERAGE_PRECISION_AT + k, calculateMAPAtK(docIds, judgments, k, threshold));
+        addMetric(metrics, METRICS_MEAN_RECIPROCAL_RANK, calculateReciprocalRank(docIds, judgments, k, threshold));
+        addMetric(metrics, METRICS_DISCOUNTED_CUMULATIVE_GAIN_AT + k, calculateDCGAtK(docIds, judgments, k));
         addMetric(metrics, METRICS_NORMALIZED_DISCOUNTED_CUMULATIVE_GAIN_AT + k, calculateNDCGAtK(docIds, judgments, k));
 
         return metrics;

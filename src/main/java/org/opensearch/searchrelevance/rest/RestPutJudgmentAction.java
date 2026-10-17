@@ -11,7 +11,6 @@ import static java.util.Collections.singletonList;
 import static org.opensearch.rest.RestRequest.Method.PUT;
 import static org.opensearch.searchrelevance.common.MLConstants.DEFAULT_PROMPT_TEMPLATE;
 import static org.opensearch.searchrelevance.common.MLConstants.LLM_JUDGMENT_RATING_TYPE;
-import static org.opensearch.searchrelevance.common.MLConstants.OVERWRITE_CACHE;
 import static org.opensearch.searchrelevance.common.MLConstants.PROMPT_TEMPLATE;
 import static org.opensearch.searchrelevance.common.MLConstants.validateTokenLimit;
 import static org.opensearch.searchrelevance.common.MetricsConstants.MODEL_ID;
@@ -24,6 +23,7 @@ import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENTS_UR
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_RATINGS;
 import static org.opensearch.searchrelevance.common.PluginConstants.NAME;
 import static org.opensearch.searchrelevance.common.PluginConstants.NAX_RANK;
+import static org.opensearch.searchrelevance.common.PluginConstants.OVERWRITE_CACHE;
 import static org.opensearch.searchrelevance.common.PluginConstants.QUERYSET_ID;
 import static org.opensearch.searchrelevance.common.PluginConstants.SEARCH_CONFIGURATION_LIST;
 import static org.opensearch.searchrelevance.common.PluginConstants.SIZE;
@@ -165,7 +165,18 @@ public class RestPutJudgmentAction extends BaseRestHandler {
                         );
                     }
                 }
-                boolean overwriteCache = Optional.ofNullable((Boolean) source.get(OVERWRITE_CACHE)).orElse(Boolean.FALSE);
+                List<String> existingJudgments = ParserUtils.convertObjToList(source, "existingJudgments");
+
+                // "overwriteCache" is deprecated: the global judgment cache was removed, so this
+                // parameter no longer has any effect. We still accept it (and ignore it) so that
+                // older clients sending it do not break. Deduplication is now handled by the
+                // "existingJudgments" parameter and retries by the _retry endpoint.
+                if (source.containsKey(OVERWRITE_CACHE)) {
+                    LOGGER.warn(
+                        "The [overwriteCache] parameter is deprecated and ignored: the judgment cache has been removed. "
+                            + "Use [existingJudgments] to reuse ratings, or the _retry endpoint to re-score failed documents."
+                    );
+                }
 
                 createRequest = new PutLlmJudgmentRequest(
                     type,
@@ -180,7 +191,7 @@ public class RestPutJudgmentAction extends BaseRestHandler {
                     ignoreFailure,
                     promptTemplate,
                     llmJudgmentRatingType,
-                    overwriteCache
+                    existingJudgments
                 );
             }
             case UBI_JUDGMENT -> {

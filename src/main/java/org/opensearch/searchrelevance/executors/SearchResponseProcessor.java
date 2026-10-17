@@ -23,6 +23,7 @@ import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.EvaluationResult;
 import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.model.ExperimentVariant;
+import org.opensearch.searchrelevance.utils.SearchTook;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 
 import lombok.RequiredArgsConstructor;
@@ -56,6 +57,7 @@ public class SearchResponseProcessor {
         if (taskContext.getHasFailure().get()) return;
 
         try {
+            Long took = SearchTook.from(response);
 
             SearchHit[] hits = response.getHits().getHits();
             List<String> docIds = Arrays.stream(hits).map(SearchHit::getId).collect(Collectors.toList());
@@ -78,7 +80,8 @@ public class SearchResponseProcessor {
                 experimentId,
                 experimentVariant.getId(),
                 experimentVariantParameters,
-                scheduledRunId
+                scheduledRunId,
+                took
             );
 
             evaluationResultDao.putEvaluationResultEfficient(

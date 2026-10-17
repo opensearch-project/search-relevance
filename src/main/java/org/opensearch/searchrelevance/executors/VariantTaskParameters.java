@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.concurrent.Future;
 
 import org.opensearch.searchrelevance.model.ExperimentVariant;
+import org.opensearch.searchrelevance.model.QuerySetEntry;
 import org.opensearch.searchrelevance.scheduler.ExperimentCancellationToken;
 
 import lombok.Getter;
@@ -27,7 +28,7 @@ public class VariantTaskParameters {
     private final String searchConfigId;
     private final String index;
     private final String query;
-    private final String queryText;
+    private final QuerySetEntry queryEntry;
     private final int size;
     private final ExperimentVariant experimentVariant;
     private final List<String> judgmentIds;

@@ -30,7 +30,6 @@ import lombok.SneakyThrows;
 /**
  * Integration tests for search evaluation experiments (POINTWISE_EVALUATION type).
  * This test class verifies the functionality of running pointwise evaluation experiments
- * that evaluate search configurations against query sets and judgments.
  */
 @ThreadLeakScope(ThreadLeakScope.Scope.NONE)
 @OpenSearchIntegTestCase.ClusterScope(scope = OpenSearchIntegTestCase.Scope.SUITE)
@@ -57,6 +56,7 @@ public class SearchEvaluationExperimentIT extends BaseExperimentIT {
 
         Map<String, String> queryTextToEvaluationId = extractQueryTextToEvaluationId(experimentSource);
         assertEvaluationResults(queryTextToEvaluationId, judgmentId, searchConfigurationId);
+        assertEvaluationResultMappingHasTook();
 
         deleteIndex(INDEX_NAME_ESCI);
     }
@@ -211,12 +211,14 @@ public class SearchEvaluationExperimentIT extends BaseExperimentIT {
             List<Map> metrics = (List<Map>) evaluationSource.get("metrics");
             assertNotNull("Metrics should exist", metrics);
             assertFalse("Metrics should not be empty", metrics.isEmpty());
-            assertEquals("Should have 4 metrics", 4, metrics.size());
+            assertEquals("Should have exactly 7 metrics", 7, metrics.size());
 
             // Verify we have document IDs
             List<String> documentIds = (List<String>) evaluationSource.get("documentIds");
             assertNotNull("Document IDs should exist", documentIds);
             assertFalse("Document IDs should not be empty", documentIds.isEmpty());
+
+            assertTookPresentAndNonNegative(evaluationSource);
 
             // For specific queries, verify detailed results match expectations
             if (EXPECT_EVALUATION_RESULTS.containsKey(actualQueryTerm)) {
@@ -233,11 +235,36 @@ public class SearchEvaluationExperimentIT extends BaseExperimentIT {
                             "Metric " + metricName + " should match expected value",
                             expectedMetrics.get(metricName),
                             actualValue,
-                            0.02
+                            getMetricTolerance(metricName)
                         );
                     }
                 }
             }
         }
+    }
+
+    @SneakyThrows
+    private void assertEvaluationResultMappingHasTook() {
+        Response mappingResponse = makeRequest(
+            client(),
+            RestRequest.Method.GET.name(),
+            "/" + EVALUATION_RESULT_INDEX + "/_mapping",
+            null,
+            null,
+            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
+        );
+        Map<String, Object> mappingJson = entityAsMap(mappingResponse);
+        Map<String, Object> indexMapping = (Map<String, Object>) mappingJson.get(EVALUATION_RESULT_INDEX);
+        assertNotNull(indexMapping);
+        Map<String, Object> mappings = (Map<String, Object>) indexMapping.get("mappings");
+        assertNotNull(mappings);
+        Map<String, Object> meta = (Map<String, Object>) mappings.get("_meta");
+        assertNotNull(meta);
+        assertEquals(1, ((Number) meta.get("schema_version")).intValue());
+        Map<String, Object> properties = (Map<String, Object>) mappings.get("properties");
+        assertNotNull(properties);
+        Map<String, Object> took = (Map<String, Object>) properties.get("took");
+        assertNotNull("took should be mapped as a first-class long field", took);
+        assertEquals("long", took.get("type"));
     }
 }

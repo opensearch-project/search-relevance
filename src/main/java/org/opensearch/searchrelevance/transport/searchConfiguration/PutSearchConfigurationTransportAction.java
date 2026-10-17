@@ -58,6 +58,13 @@ public class PutSearchConfigurationTransportAction extends HandledTransportActio
         String description = request.getDescription();
 
         String index = request.getIndex();
+
+        // Validate that the referenced index exists
+        if (!clusterService.state().metadata().hasIndex(index)) {
+            listener.onFailure(new SearchRelevanceException("Index [" + index + "] does not exist in the cluster", RestStatus.BAD_REQUEST));
+            return;
+        }
+
         String queryBody = request.getQueryBody();
         String searchPipeline = request.getSearchPipeline();
 

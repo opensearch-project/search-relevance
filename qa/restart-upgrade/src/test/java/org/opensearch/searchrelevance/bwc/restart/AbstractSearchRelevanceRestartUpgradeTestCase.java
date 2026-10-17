@@ -21,6 +21,7 @@ import java.util.Locale;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.junit.Before;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.searchrelevance.bwc.IndexMappingTestHelper;
 import org.opensearch.test.rest.OpenSearchRestTestCase;
@@ -35,6 +36,21 @@ import org.opensearch.test.rest.OpenSearchRestTestCase;
 public abstract class AbstractSearchRelevanceRestartUpgradeTestCase extends OpenSearchRestTestCase {
 
     protected static final Logger logger = LogManager.getLogger(AbstractSearchRelevanceRestartUpgradeTestCase.class);
+
+    private static final int RESTART_UPGRADE_NODE_COUNT = 3;
+
+    /**
+     * After a full-cluster version bump, wait until the cluster has stably re-formed (elected
+     * cluster-manager, all nodes rejoined, green) before REST tests run. The timeout is generous
+     * because, on resource-constrained CI runners, the restarted nodes can take a few minutes to
+     * rediscover each other and settle on a cluster-manager.
+     */
+    @Before
+    public void waitForUpgradedClusterWhenApplicable() throws Exception {
+        if (getClusterType() == ClusterType.UPGRADED) {
+            IndexMappingTestHelper.waitForClusterNodesReady(client(), RESTART_UPGRADE_NODE_COUNT, 300, logger);
+        }
+    }
 
     /**
      * Enum representing the different cluster states during a restart upgrade.

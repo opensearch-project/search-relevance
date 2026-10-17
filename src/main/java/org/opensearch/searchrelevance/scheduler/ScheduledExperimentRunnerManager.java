@@ -7,6 +7,9 @@
  */
 package org.opensearch.searchrelevance.scheduler;
 
+import static org.opensearch.searchrelevance.common.PluginConstants.DESCRIPTION;
+import static org.opensearch.searchrelevance.common.PluginConstants.NAME;
+
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
@@ -96,6 +99,8 @@ public class ScheduledExperimentRunnerManager {
                     PutExperimentRequest request = new PutExperimentRequest(
                         experiment.type(),
                         scheduledExperimentResultId,
+                        experiment.name(),
+                        experiment.description(),
                         experiment.querySetId(),
                         experiment.searchConfigurationList(),
                         experiment.judgmentList(),
@@ -112,7 +117,14 @@ public class ScheduledExperimentRunnerManager {
 
                             ScheduledJob scheduledJob = convertToScheduledJob(jobResponse);
                             scheduledJobsDao.updateScheduledJob(scheduledJob, ActionListener.wrap(updatedJobResponse -> {
-                                experimentRunningManager.startExperimentRun(experimentId, request, cancellationToken, actuallyFinished);
+                                experimentRunningManager.startExperimentRun(
+                                    experimentId,
+                                    request,
+                                    experiment.name(),
+                                    experiment.description(),
+                                    cancellationToken,
+                                    actuallyFinished
+                                );
                             }, e -> {
                                 log.error("Somehow for experiment {}, we cannot update the experiment run job", experimentId);
                                 handleAsyncFailure(experimentId, request, timestamp, e);
@@ -174,6 +186,8 @@ public class ScheduledExperimentRunnerManager {
         return new Experiment(
             "",
             "",
+            (String) sourceMap.get(NAME),
+            (String) sourceMap.get(DESCRIPTION),
             ExperimentType.valueOf((String) sourceMap.get("type")),
             AsyncStatus.valueOf((String) sourceMap.get("status")),
             (String) sourceMap.get("querySetId"),

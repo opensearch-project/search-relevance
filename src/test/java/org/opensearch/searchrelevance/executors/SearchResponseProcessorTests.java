@@ -8,25 +8,27 @@
 package org.opensearch.searchrelevance.executors;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.lucene.search.TotalHits;
-import org.junit.Before;
 import org.mockito.ArgumentCaptor;
 import org.opensearch.action.search.SearchResponse;
+import org.opensearch.common.unit.TimeValue;
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.core.common.bytes.BytesArray;
 import org.opensearch.search.SearchHit;
 import org.opensearch.search.SearchHits;
 import org.opensearch.searchrelevance.dao.EvaluationResultDao;
 import org.opensearch.searchrelevance.dao.ExperimentVariantDao;
-import org.opensearch.searchrelevance.metrics.EvaluationMetrics;
+import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.EvaluationResult;
 import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.model.ExperimentVariant;
@@ -36,125 +38,189 @@ public class SearchResponseProcessorTests extends OpenSearchTestCase {
 
     private EvaluationResultDao evaluationResultDao;
     private ExperimentVariantDao experimentVariantDao;
-    private SearchResponseProcessor searchResponseProcessor;
+    private SearchResponseProcessor processor;
     private ExperimentTaskContext taskContext;
 
-    @Before
+    @Override
     public void setUp() throws Exception {
         super.setUp();
         evaluationResultDao = mock(EvaluationResultDao.class);
         experimentVariantDao = mock(ExperimentVariantDao.class);
-        searchResponseProcessor = new SearchResponseProcessor(evaluationResultDao, experimentVariantDao);
+        processor = new SearchResponseProcessor(evaluationResultDao, experimentVariantDao);
         taskContext = mock(ExperimentTaskContext.class);
         when(taskContext.getHasFailure()).thenReturn(new AtomicBoolean(false));
     }
 
-    public void testProcessSearchResponseWithZeroHits() {
-        SearchResponse response = mock(SearchResponse.class);
-        SearchHits hits = new SearchHits(new SearchHit[0], new TotalHits(0, TotalHits.Relation.EQUAL_TO), 0.0f);
-        when(response.getHits()).thenReturn(hits);
+    public void testProcessSearchResponsePersistsTook() {
+        SearchResponse response = createSearchResponse(14L, "doc1", "doc2");
+        ExperimentVariant variant = pointwiseVariant();
+        stubSuccessfulEvaluationWrite();
 
-        ExperimentVariant variant = mock(ExperimentVariant.class);
-        when(variant.getType()).thenReturn(ExperimentType.POINTWISE_EVALUATION);
-        when(variant.getId()).thenReturn("variantId");
-
-        String experimentId = "experimentId";
-        String searchConfigId = "searchConfigId";
-        String queryText = "queryText";
-        int size = 10;
-        List<String> judgmentIds = Collections.emptyList();
-        Map<String, String> docIdToScores = Collections.emptyMap();
-        String evaluationId = "evaluationId";
-        String scheduledRunId = "scheduledRunId";
-
-        searchResponseProcessor.processSearchResponse(
+        processor.processSearchResponse(
             response,
             variant,
-            experimentId,
-            searchConfigId,
-            queryText,
-            size,
-            judgmentIds,
-            docIdToScores,
-            evaluationId,
+            "experiment-1",
+            "config-1",
+            "red shoes",
+            5,
+            List.of("judgment-1"),
+            Map.of("doc1", "2"),
+            "eval-1",
             taskContext,
-            scheduledRunId
+            null
         );
 
         ArgumentCaptor<EvaluationResult> captor = ArgumentCaptor.forClass(EvaluationResult.class);
         verify(evaluationResultDao).putEvaluationResultEfficient(captor.capture(), any(ActionListener.class));
 
-        EvaluationResult result = captor.getValue();
-        assertEquals(EvaluationMetrics.TOTAL_METRIC_COUNT, result.metrics().size());
-        for (Map<String, Object> metric : result.metrics()) {
+        EvaluationResult stored = captor.getValue();
+        assertEquals(Long.valueOf(14L), stored.took());
+        assertEquals("eval-1", stored.id());
+        assertEquals("red shoes", stored.searchText());
+        verify(taskContext).completeVariantSuccess();
+        verify(experimentVariantDao, never()).putExperimentVariantEfficient(any(), any());
+    }
+
+    /**
+     * A zero-hit query must still produce a real evaluation result with zero-valued
+     * metrics, not be silently skipped - see
+     * https://github.com/opensearch-project/search-relevance/issues/66
+     */
+    public void testProcessSearchResponseWithZeroHitsPersistsEvaluationResult() {
+        // No docIds -> zero hits; empty docIdToScores keeps every metric well-defined at 0.0
+        SearchResponse response = createSearchResponse(9L);
+        ExperimentVariant variant = pointwiseVariant();
+        stubSuccessfulEvaluationWrite();
+
+        processor.processSearchResponse(
+            response,
+            variant,
+            "experiment-1",
+            "config-1",
+            "red shoes",
+            5,
+            List.of("judgment-1"),
+            Map.of(),
+            "eval-1",
+            taskContext,
+            null
+        );
+
+        ArgumentCaptor<EvaluationResult> captor = ArgumentCaptor.forClass(EvaluationResult.class);
+        verify(evaluationResultDao).putEvaluationResultEfficient(captor.capture(), any(ActionListener.class));
+
+        EvaluationResult stored = captor.getValue();
+        assertEquals(7, stored.metrics().size());
+        for (Map<String, Object> metric : stored.metrics()) {
             assertEquals(0.0, ((Number) metric.get("value")).doubleValue(), 0.001);
         }
+        assertEquals(Long.valueOf(9L), stored.took());
+        assertEquals("eval-1", stored.id());
+        assertEquals("experiment-1", stored.experimentId());
+        assertEquals("variant-1", stored.experimentVariantId());
 
-        assertEquals(evaluationId, result.id());
-        assertEquals(experimentId, result.experimentId());
-        assertEquals("variantId", result.experimentVariantId());
+        verify(taskContext).completeVariantSuccess();
+        verify(experimentVariantDao, never()).putExperimentVariantEfficient(any(), any());
     }
 
     public void testProcessSearchResponseWithHits() {
-        SearchResponse response = mock(SearchResponse.class);
-        SearchHit hit = new SearchHit(1, "doc1", Collections.emptyMap(), null);
-        SearchHits hits = new SearchHits(new SearchHit[] { hit }, new TotalHits(1, TotalHits.Relation.EQUAL_TO), 1.0f);
-        when(response.getHits()).thenReturn(hits);
+        SearchResponse response = createSearchResponse(3L, "doc1");
+        ExperimentVariant variant = pointwiseVariant();
+        stubSuccessfulEvaluationWrite();
 
-        ExperimentVariant variant = mock(ExperimentVariant.class);
-        when(variant.getType()).thenReturn(ExperimentType.POINTWISE_EVALUATION);
-        when(variant.getId()).thenReturn("variantId");
-
-        String experimentId = "experimentId";
-        String searchConfigId = "searchConfigId";
-        String queryText = "queryText";
-        int size = 10;
-        List<String> judgmentIds = Collections.emptyList();
-        Map<String, String> docIdToScores = Collections.emptyMap();
-        String evaluationId = "evaluationId";
-        String scheduledRunId = "scheduledRunId";
-
-        searchResponseProcessor.processSearchResponse(
+        processor.processSearchResponse(
             response,
             variant,
-            experimentId,
-            searchConfigId,
-            queryText,
-            size,
-            judgmentIds,
-            docIdToScores,
-            evaluationId,
+            "experiment-1",
+            "config-1",
+            "red shoes",
+            10,
+            List.of(),
+            Map.of(),
+            "eval-1",
             taskContext,
-            scheduledRunId
+            "scheduled-1"
         );
 
         ArgumentCaptor<EvaluationResult> captor = ArgumentCaptor.forClass(EvaluationResult.class);
         verify(evaluationResultDao).putEvaluationResultEfficient(captor.capture(), any(ActionListener.class));
 
-        EvaluationResult result = captor.getValue();
-        assertFalse(result.metrics().isEmpty());
+        EvaluationResult stored = captor.getValue();
+        assertFalse(stored.metrics().isEmpty());
+        assertEquals(Long.valueOf(3L), stored.took());
     }
 
     public void testProcessSearchResponseWithException() {
-        ExperimentVariant variant = mock(ExperimentVariant.class);
-        when(variant.getType()).thenReturn(ExperimentType.POINTWISE_EVALUATION);
-        when(variant.getId()).thenReturn("variantId");
+        ExperimentVariant variant = pointwiseVariant();
 
-        // Passing null response to trigger exception
-        searchResponseProcessor.processSearchResponse(
+        // Passing a null response triggers an exception inside the try block
+        processor.processSearchResponse(
             null,
             variant,
-            "experimentId",
-            "searchConfigId",
-            "queryText",
+            "experiment-1",
+            "config-1",
+            "red shoes",
             10,
-            Collections.emptyList(),
-            Collections.emptyMap(),
-            "evaluationId",
+            List.of(),
+            Map.of(),
+            "eval-1",
             taskContext,
-            "scheduledRunId"
+            "scheduled-1"
         );
 
         verify(taskContext).completeVariantFailure();
+    }
+
+    public void testHandleSearchFailureOmitsTook() {
+        ExperimentVariant variant = pointwiseVariant();
+        stubSuccessfulVariantWrite();
+
+        processor.handleSearchFailure(new RuntimeException("search failed"), variant, "experiment-1", "eval-1", taskContext);
+
+        ArgumentCaptor<ExperimentVariant> captor = ArgumentCaptor.forClass(ExperimentVariant.class);
+        verify(experimentVariantDao).putExperimentVariantEfficient(captor.capture(), any(ActionListener.class));
+        assertFalse(captor.getValue().getResults().containsKey(EvaluationResult.TOOK));
+        assertEquals(AsyncStatus.ERROR, captor.getValue().getStatus());
+    }
+
+    private void stubSuccessfulEvaluationWrite() {
+        doAnswer(invocation -> {
+            ActionListener<?> listener = invocation.getArgument(1);
+            listener.onResponse(null);
+            return null;
+        }).when(evaluationResultDao).putEvaluationResultEfficient(any(), any(ActionListener.class));
+    }
+
+    private void stubSuccessfulVariantWrite() {
+        doAnswer(invocation -> {
+            ActionListener<?> listener = invocation.getArgument(1);
+            listener.onResponse(null);
+            return null;
+        }).when(experimentVariantDao).putExperimentVariantEfficient(any(), any(ActionListener.class));
+    }
+
+    private ExperimentVariant pointwiseVariant() {
+        return ExperimentVariant.builder()
+            .id("variant-1")
+            .timestamp("2024-01-01T00:00:00.000Z")
+            .type(ExperimentType.POINTWISE_EVALUATION)
+            .status(AsyncStatus.PROCESSING)
+            .experimentId("experiment-1")
+            .parameters(Map.of())
+            .results(Map.of())
+            .build();
+    }
+
+    private SearchResponse createSearchResponse(long took, String... docIds) {
+        SearchResponse response = mock(SearchResponse.class);
+        SearchHit[] searchHits = new SearchHit[docIds.length];
+        for (int i = 0; i < docIds.length; i++) {
+            searchHits[i] = new SearchHit(i + 1, docIds[i], Map.of(), Map.of());
+            searchHits[i].sourceRef(new BytesArray("{}"));
+        }
+        SearchHits hits = new SearchHits(searchHits, new TotalHits(docIds.length, TotalHits.Relation.EQUAL_TO), 1.0f);
+        when(response.getHits()).thenReturn(hits);
+        when(response.getTook()).thenReturn(TimeValue.timeValueMillis(took));
+        return response;
     }
 }

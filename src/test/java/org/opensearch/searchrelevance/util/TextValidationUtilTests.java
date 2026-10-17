@@ -7,7 +7,9 @@
  */
 package org.opensearch.searchrelevance.util;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.opensearch.searchrelevance.plugin.SearchRelevanceRestTestCase;
 import org.opensearch.searchrelevance.utils.TextValidationUtil;
@@ -137,7 +139,12 @@ public class TextValidationUtilTests extends SearchRelevanceRestTestCase {
             "$price",
             "value=123",
             "a+b",
-            "item1;item2"
+            "item1;item2",
+            "What is C#?",
+            "color #FF0000",
+            "key: value",
+            "time is 2:30 PM",
+            "text with # hash and : colon"
         );
 
         for (String value : validValues) {
@@ -152,42 +159,40 @@ public class TextValidationUtilTests extends SearchRelevanceRestTestCase {
         String valueWithNewline = "text with\nnewline";
         TextValidationUtil.ValidationResult result = TextValidationUtil.validateQuerySetValue(valueWithNewline);
         assertFalse("Value with newline should be invalid", result.isValid());
-        assertEquals("Text contains reserved characters (newline, #, or : are not allowed in QuerySet values)", result.getErrorMessage());
+        assertEquals("Text contains reserved characters (newline is not allowed in QuerySet values)", result.getErrorMessage());
     }
 
-    public void testValidateQuerySetValue_ReservedCharacter_Hash() {
-        // Test that hash character is rejected
+    public void testValidateQuerySetValue_AllowsHash() {
+        // Test that hash character is now allowed
         String valueWithHash = "text with # hash";
         TextValidationUtil.ValidationResult result = TextValidationUtil.validateQuerySetValue(valueWithHash);
-        assertFalse("Value with # should be invalid", result.isValid());
-        assertEquals("Text contains reserved characters (newline, #, or : are not allowed in QuerySet values)", result.getErrorMessage());
+        assertTrue("Value with # should be valid", result.isValid());
+        assertNull(result.getErrorMessage());
     }
 
-    public void testValidateQuerySetValue_ReservedCharacter_Colon() {
-        // Test that colon character is rejected
+    public void testValidateQuerySetValue_AllowsColon() {
+        // Test that colon character is now allowed
         String valueWithColon = "text with: colon";
         TextValidationUtil.ValidationResult result = TextValidationUtil.validateQuerySetValue(valueWithColon);
-        assertFalse("Value with : should be invalid", result.isValid());
-        assertEquals("Text contains reserved characters (newline, #, or : are not allowed in QuerySet values)", result.getErrorMessage());
+        assertTrue("Value with : should be valid", result.isValid());
+        assertNull(result.getErrorMessage());
     }
 
-    public void testValidateQuerySetValue_MultipleReservedCharacters() {
-        // Test values with multiple reserved characters
-        List<String> invalidValues = List.of(
-            "query#text",
-            "key: value",
-            "line1\nline2",
-            "query#\nkey: value",
-            "text#with:multiple\nreserved"
-        );
+    public void testValidateQuerySetValue_NewlineStillInvalid() {
+        // Test that values with newlines are still invalid
+        List<String> invalidValues = List.of("line1\nline2", "query\nkey: value", "text with\nnewline");
 
         for (String value : invalidValues) {
             TextValidationUtil.ValidationResult result = TextValidationUtil.validateQuerySetValue(value);
-            assertFalse("Value should be invalid: " + value, result.isValid());
-            assertEquals(
-                "Text contains reserved characters (newline, #, or : are not allowed in QuerySet values)",
-                result.getErrorMessage()
-            );
+            assertFalse("Value with newline should be invalid: " + value, result.isValid());
+            assertEquals("Text contains reserved characters (newline is not allowed in QuerySet values)", result.getErrorMessage());
+        }
+
+        // But # and : alone (without newlines) should be valid
+        List<String> validValues = List.of("query#text", "key: value", "C# programming");
+        for (String value : validValues) {
+            TextValidationUtil.ValidationResult result = TextValidationUtil.validateQuerySetValue(value);
+            assertTrue("Value without newline should be valid: " + value, result.isValid());
         }
     }
 
@@ -265,13 +270,20 @@ public class TextValidationUtilTests extends SearchRelevanceRestTestCase {
     }
 
     public void testValidateQuerySetKey_ReservedCharacters() {
-        // Test keys with reserved characters
-        List<String> invalidKeys = List.of("key#with#hash", "key:with:colon", "key\nwith\nnewline", "key#with:multiple\nreserved");
+        // Test keys with newlines are still invalid
+        List<String> invalidKeys = List.of("key\nwith\nnewline", "key\rwith\rcarriage");
 
         for (String key : invalidKeys) {
             TextValidationUtil.ValidationResult result = TextValidationUtil.validateQuerySetKey(key);
-            assertFalse("Key with reserved char should be invalid: " + key, result.isValid());
-            assertEquals("Key contains reserved characters (newline, #, or : are not allowed in QuerySet keys)", result.getErrorMessage());
+            assertFalse("Key with newline should be invalid: " + key, result.isValid());
+            assertEquals("Key contains reserved characters (newline is not allowed in QuerySet keys)", result.getErrorMessage());
+        }
+
+        // But # and : in keys should now be valid
+        List<String> validKeys = List.of("key#with#hash", "key:with:colon");
+        for (String key : validKeys) {
+            TextValidationUtil.ValidationResult result = TextValidationUtil.validateQuerySetKey(key);
+            assertTrue("Key with # or : should be valid: " + key, result.isValid());
         }
     }
 
@@ -352,19 +364,23 @@ public class TextValidationUtilTests extends SearchRelevanceRestTestCase {
     }
 
     public void testQuerySetValidation_InvalidScenarios() {
-        // Test invalid queryText with reserved character
-        String invalidQueryText = "query#with#hash";
-        TextValidationUtil.ValidationResult result = TextValidationUtil.validateQuerySetValue(invalidQueryText);
-        assertFalse("QueryText with # should be invalid", result.isValid());
+        // Test that # and : are now valid in queryText
+        String queryWithHash = "query#with#hash";
+        TextValidationUtil.ValidationResult result = TextValidationUtil.validateQuerySetValue(queryWithHash);
+        assertTrue("QueryText with # should now be valid", result.isValid());
+
+        String queryWithColon = "value: with colon";
+        result = TextValidationUtil.validateQuerySetValue(queryWithColon);
+        assertTrue("Value with : should now be valid", result.isValid());
 
         // Test invalid key name (reserved)
         result = TextValidationUtil.validateQuerySetKey("queryText");
         assertFalse("Reserved key 'queryText' should be invalid", result.isValid());
 
-        // Test invalid value with colon
-        String invalidValue = "value: with colon";
+        // Test invalid key with newline
+        String invalidValue = "value\nwith\nnewline";
         result = TextValidationUtil.validateQuerySetValue(invalidValue);
-        assertFalse("Value with : should be invalid", result.isValid());
+        assertFalse("Value with newline should be invalid", result.isValid());
 
         // Test invalid key with newline
         String invalidKey = "key\nwith\nnewline";
@@ -499,15 +515,20 @@ public class TextValidationUtilTests extends SearchRelevanceRestTestCase {
         assertNull(result.getErrorMessage());
     }
 
-    public void testValidatePromptTemplate_ContainsDelimiter() {
-        // Test that template cannot contain the reserved delimiter character (#)
+    public void testValidatePromptTemplate_DelimiterNoLongerReserved() {
+        // Delimiter-based concatenation has been removed; \u001F is just a regular character
+        String template = "Query: {{queryText}}\u001FDocuments: {{hits}}";
+        TextValidationUtil.ValidationResult result = TextValidationUtil.validatePromptTemplate(template);
+        assertTrue("Template with former delimiter character should be valid", result.isValid());
+        assertNull(result.getErrorMessage());
+    }
+
+    public void testValidatePromptTemplate_HashIsAllowed() {
+        // # character has always been allowed in templates
         String template = "Query: {{queryText}}#Documents: {{hits}}";
         TextValidationUtil.ValidationResult result = TextValidationUtil.validatePromptTemplate(template);
-        assertFalse("Template with delimiter character should be invalid", result.isValid());
-        assertTrue(
-            "Error should mention delimiter character",
-            result.getErrorMessage().contains("reserved delimiter character") && result.getErrorMessage().contains("#")
-        );
+        assertTrue("Template with # should be valid", result.isValid());
+        assertNull(result.getErrorMessage());
     }
 
     public void testValidatePromptTemplate_ExceedsMaxLength() {
@@ -531,5 +552,244 @@ public class TextValidationUtilTests extends SearchRelevanceRestTestCase {
         TextValidationUtil.ValidationResult result = TextValidationUtil.validatePromptTemplate(longTemplate.toString());
         assertTrue("Valid long template should be accepted", result.isValid());
         assertNull(result.getErrorMessage());
+    }
+
+    // ============================================
+    // Experiment Name Validation Tests
+    // ============================================
+
+    public void testValidateExperimentName_ValidNames() {
+        // Test valid experiment names within 50 character limit (same as other
+        // entities)
+        List<String> validNames = List.of("My Experiment", "PAIRWISE_COMPARISON-a1b2c3d4", "Test Experiment 123", "a".repeat(50));
+
+        for (String name : validNames) {
+            TextValidationUtil.ValidationResult result = TextValidationUtil.validateName(name);
+            assertTrue("Name should be valid: " + name, result.isValid());
+            assertNull(result.getErrorMessage());
+        }
+    }
+
+    public void testValidateExperimentName_TooLong() {
+        // Test that experiment names over 50 characters are rejected (same limit as
+        // other entities)
+        String longName = "a".repeat(51);
+        TextValidationUtil.ValidationResult result = TextValidationUtil.validateName(longName);
+        assertFalse("Name over 50 chars should be invalid", result.isValid());
+        assertEquals("Text exceeds maximum length of 50 characters", result.getErrorMessage());
+    }
+
+    public void testValidateExperimentName_InvalidCharacters() {
+        // Test that dangerous characters are rejected
+        List<String> invalidNames = List.of("Name with \"quotes\"", "Name with <html>", "Name with \\backslash");
+
+        for (String name : invalidNames) {
+            TextValidationUtil.ValidationResult result = TextValidationUtil.validateName(name);
+            assertFalse("Name with invalid chars should be invalid: " + name, result.isValid());
+        }
+    }
+
+    // ============================================
+    // ParsedField Tests
+    // ============================================
+
+    public void testParsedField_Valid() {
+        TextValidationUtil.ParsedField field = TextValidationUtil.ParsedField.valid("test value");
+        assertTrue(field.isValid());
+        assertTrue(field.isPresent());
+        assertFalse(field.hasError());
+        assertEquals("test value", field.getValue());
+        assertNull(field.getErrorMessage());
+        assertTrue(field.asOptional().isPresent());
+        assertEquals("test value", field.asOptional().get());
+    }
+
+    public void testParsedField_Invalid() {
+        TextValidationUtil.ParsedField field = TextValidationUtil.ParsedField.invalid("error message");
+        assertFalse(field.isValid());
+        assertTrue(field.isPresent());
+        assertTrue(field.hasError());
+        assertNull(field.getValue());
+        assertEquals("error message", field.getErrorMessage());
+        assertFalse(field.asOptional().isPresent());
+    }
+
+    public void testParsedField_Absent() {
+        TextValidationUtil.ParsedField field = TextValidationUtil.ParsedField.absent();
+        assertTrue(field.isValid());
+        assertFalse(field.isPresent());
+        assertFalse(field.hasError());
+        assertNull(field.getValue());
+        assertNull(field.getErrorMessage());
+        assertFalse(field.asOptional().isPresent());
+    }
+
+    // ============================================
+    // parseOptionalExperimentName Tests
+    // ============================================
+
+    public void testParseOptionalExperimentName_ValidName() {
+        Map<String, Object> source = new HashMap<>();
+        source.put("name", "My Experiment");
+
+        TextValidationUtil.ParsedField result = TextValidationUtil.parseOptionalExperimentName(source, "name");
+        assertTrue(result.isValid());
+        assertTrue(result.isPresent());
+        assertEquals("My Experiment", result.getValue());
+    }
+
+    public void testParseOptionalExperimentName_TrimsWhitespace() {
+        Map<String, Object> source = new HashMap<>();
+        source.put("name", "  My Experiment  ");
+
+        TextValidationUtil.ParsedField result = TextValidationUtil.parseOptionalExperimentName(source, "name");
+        assertTrue(result.isValid());
+        assertTrue(result.isPresent());
+        assertEquals("My Experiment", result.getValue());
+    }
+
+    public void testParseOptionalExperimentName_NullSource() {
+        TextValidationUtil.ParsedField result = TextValidationUtil.parseOptionalExperimentName(null, "name");
+        assertTrue(result.isValid());
+        assertFalse(result.isPresent());
+        assertNull(result.getValue());
+    }
+
+    public void testParseOptionalExperimentName_NullFieldName() {
+        Map<String, Object> source = new HashMap<>();
+        source.put("name", "My Experiment");
+
+        TextValidationUtil.ParsedField result = TextValidationUtil.parseOptionalExperimentName(source, null);
+        assertTrue(result.isValid());
+        assertFalse(result.isPresent());
+    }
+
+    public void testParseOptionalExperimentName_MissingField() {
+        Map<String, Object> source = new HashMap<>();
+        source.put("other", "value");
+
+        TextValidationUtil.ParsedField result = TextValidationUtil.parseOptionalExperimentName(source, "name");
+        assertTrue(result.isValid());
+        assertFalse(result.isPresent());
+        assertNull(result.getValue());
+    }
+
+    public void testParseOptionalExperimentName_NullValue() {
+        Map<String, Object> source = new HashMap<>();
+        source.put("name", null);
+
+        TextValidationUtil.ParsedField result = TextValidationUtil.parseOptionalExperimentName(source, "name");
+        assertTrue(result.isValid());
+        assertFalse(result.isPresent());
+    }
+
+    public void testParseOptionalExperimentName_EmptyValue() {
+        Map<String, Object> source = new HashMap<>();
+        source.put("name", "");
+
+        TextValidationUtil.ParsedField result = TextValidationUtil.parseOptionalExperimentName(source, "name");
+        assertTrue(result.isValid());
+        assertFalse(result.isPresent());
+    }
+
+    public void testParseOptionalExperimentName_BlankValue() {
+        Map<String, Object> source = new HashMap<>();
+        source.put("name", "   ");
+
+        TextValidationUtil.ParsedField result = TextValidationUtil.parseOptionalExperimentName(source, "name");
+        assertTrue(result.isValid());
+        assertFalse(result.isPresent());
+    }
+
+    public void testParseOptionalExperimentName_NonStringValue() {
+        Map<String, Object> source = new HashMap<>();
+        source.put("name", 12345);
+
+        TextValidationUtil.ParsedField result = TextValidationUtil.parseOptionalExperimentName(source, "name");
+        assertFalse(result.isValid());
+        assertTrue(result.hasError());
+        assertTrue(result.getErrorMessage().contains("must be a string"));
+    }
+
+    public void testParseOptionalDescription_NonStringValue() {
+        Map<String, Object> source = new HashMap<>();
+        source.put("description", 12345);
+
+        TextValidationUtil.ParsedField result = TextValidationUtil.parseOptionalDescription(source, "description");
+        assertFalse(result.isValid());
+        assertTrue(result.hasError());
+        assertTrue(result.getErrorMessage().contains("must be a string"));
+    }
+
+    public void testParseOptionalExperimentName_TooLong() {
+        Map<String, Object> source = new HashMap<>();
+        source.put("name", "a".repeat(51));
+
+        TextValidationUtil.ParsedField result = TextValidationUtil.parseOptionalExperimentName(source, "name");
+        assertFalse(result.isValid());
+        assertTrue(result.hasError());
+        assertTrue(result.getErrorMessage().contains("exceeds maximum length"));
+    }
+
+    public void testParseOptionalExperimentName_InvalidCharacters() {
+        Map<String, Object> source = new HashMap<>();
+        source.put("name", "Name with \"quotes\"");
+
+        TextValidationUtil.ParsedField result = TextValidationUtil.parseOptionalExperimentName(source, "name");
+        assertFalse(result.isValid());
+        assertTrue(result.hasError());
+        assertTrue(result.getErrorMessage().contains("invalid characters"));
+    }
+
+    // ============================================
+    // parseOptionalDescription Tests
+    // ============================================
+
+    public void testParseOptionalDescription_ValidDescription() {
+        Map<String, Object> source = new HashMap<>();
+        source.put("description", "This is a valid description");
+
+        TextValidationUtil.ParsedField result = TextValidationUtil.parseOptionalDescription(source, "description");
+        assertTrue(result.isValid());
+        assertTrue(result.isPresent());
+        assertEquals("This is a valid description", result.getValue());
+    }
+
+    public void testParseOptionalDescription_TrimsWhitespace() {
+        Map<String, Object> source = new HashMap<>();
+        source.put("description", "  Description with spaces  ");
+
+        TextValidationUtil.ParsedField result = TextValidationUtil.parseOptionalDescription(source, "description");
+        assertTrue(result.isValid());
+        assertTrue(result.isPresent());
+        assertEquals("Description with spaces", result.getValue());
+    }
+
+    public void testParseOptionalDescription_MissingField() {
+        Map<String, Object> source = new HashMap<>();
+
+        TextValidationUtil.ParsedField result = TextValidationUtil.parseOptionalDescription(source, "description");
+        assertTrue(result.isValid());
+        assertFalse(result.isPresent());
+    }
+
+    public void testParseOptionalDescription_TooLong() {
+        Map<String, Object> source = new HashMap<>();
+        source.put("description", "a".repeat(251));
+
+        TextValidationUtil.ParsedField result = TextValidationUtil.parseOptionalDescription(source, "description");
+        assertFalse(result.isValid());
+        assertTrue(result.hasError());
+        assertTrue(result.getErrorMessage().contains("exceeds maximum length"));
+    }
+
+    public void testParseOptionalDescription_InvalidCharacters() {
+        Map<String, Object> source = new HashMap<>();
+        source.put("description", "Description with <html>");
+
+        TextValidationUtil.ParsedField result = TextValidationUtil.parseOptionalDescription(source, "description");
+        assertFalse(result.isValid());
+        assertTrue(result.hasError());
+        assertTrue(result.getErrorMessage().contains("invalid characters"));
     }
 }

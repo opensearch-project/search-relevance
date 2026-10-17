@@ -9,7 +9,7 @@ package org.opensearch.searchrelevance.utils;
 
 import java.io.IOException;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 
 public class JsonUtils {
 

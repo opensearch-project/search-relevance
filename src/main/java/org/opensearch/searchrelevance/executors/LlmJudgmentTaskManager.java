@@ -13,6 +13,7 @@ import java.util.function.Function;
 
 import org.opensearch.common.inject.Inject;
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.searchrelevance.model.QuerySetEntry;
 import org.opensearch.threadpool.ThreadPool;
 
 import lombok.extern.log4j.Log4j2;
@@ -33,7 +34,7 @@ import lombok.extern.log4j.Log4j2;
 public class LlmJudgmentTaskManager {
     private static final String THREAD_POOL_EXECUTOR_NAME = ThreadPool.Names.GENERIC;
 
-    private final BatchedAsyncExecutor<String, Map<String, Object>> batchedExecutor;
+    private final BatchedAsyncExecutor<QuerySetEntry, Map<String, Object>> batchedExecutor;
 
     @Inject
     public LlmJudgmentTaskManager(ThreadPool threadPool) {
@@ -54,21 +55,21 @@ public class LlmJudgmentTaskManager {
      * tasks to the thread pool concurrently. The next batch begins only after the current batch
      * completes.
      *
-     * @param queryTextsWithCustomInput List of query texts to process
+     * @param querySetEntries List of query set entries to process
      * @param queryProcessor Function that processes a single query and returns results
      * @param ignoreFailure If true, individual query failures don't fail the entire operation
      * @param listener Callback with the aggregated results from all batches
      */
     public void scheduleTasksAsync(
-        List<String> queryTextsWithCustomInput,
-        Function<String, Map<String, Object>> queryProcessor,
+        List<QuerySetEntry> querySetEntries,
+        Function<QuerySetEntry, Map<String, Object>> queryProcessor,
         boolean ignoreFailure,
         ActionListener<List<Map<String, Object>>> listener
     ) {
-        int totalQueries = queryTextsWithCustomInput.size();
+        int totalQueries = querySetEntries.size();
         log.info("Scheduling {} query text tasks for batched processing (batch size: {})", totalQueries, batchedExecutor.getBatchSize());
 
-        batchedExecutor.execute(queryTextsWithCustomInput, queryProcessor, new ActionListener<>() {
+        batchedExecutor.execute(querySetEntries, queryProcessor, new ActionListener<>() {
             @Override
             public void onResponse(List<Map<String, Object>> allResults) {
                 int processedQueries = allResults.size();

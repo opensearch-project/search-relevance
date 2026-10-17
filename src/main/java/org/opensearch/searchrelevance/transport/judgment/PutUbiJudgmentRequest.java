@@ -39,10 +39,7 @@ public class PutUbiJudgmentRequest extends PutJudgmentRequest {
         this.maxRank = maxRank;
         this.startDate = startDate;
         this.endDate = endDate;
-        // Default to standard UBI events index if not specified.
-        // Index existence and required fields (query_id, action_name, event_attributes.object.object_id)
-        // are validated at cluster level in PutJudgmentTransportAction before judgment processing begins.
-        this.ubiEventsIndex = ubiEventsIndex != null ? ubiEventsIndex : UBI_EVENTS_INDEX;
+        this.ubiEventsIndex = ubiEventsIndex;
     }
 
     public PutUbiJudgmentRequest(StreamInput in) throws IOException {
@@ -51,7 +48,7 @@ public class PutUbiJudgmentRequest extends PutJudgmentRequest {
         this.maxRank = in.readInt();
         this.startDate = in.readString();
         this.endDate = in.readString();
-        this.ubiEventsIndex = in.readString();
+        this.ubiEventsIndex = in.readOptionalString();
     }
 
     @Override
@@ -61,7 +58,7 @@ public class PutUbiJudgmentRequest extends PutJudgmentRequest {
         out.writeInt(maxRank);
         out.writeString(startDate);
         out.writeString(endDate);
-        out.writeString(ubiEventsIndex);
+        out.writeOptionalString(ubiEventsIndex);
     }
 
     public String getClickModel() {
@@ -81,6 +78,10 @@ public class PutUbiJudgmentRequest extends PutJudgmentRequest {
     }
 
     public String getUbiEventsIndex() {
-        return ubiEventsIndex;
+        return (ubiEventsIndex == null || ubiEventsIndex.isBlank()) ? UBI_EVENTS_INDEX : ubiEventsIndex;
+    }
+
+    public boolean isUbiEventsIndexProvided() {
+        return ubiEventsIndex != null && !ubiEventsIndex.isBlank();
     }
 }

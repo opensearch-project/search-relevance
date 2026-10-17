@@ -162,6 +162,7 @@ public class QuerySetDao {
         });
     }
 
+    @SuppressWarnings("unchecked")
     private QuerySet convertToQuerySet(SearchResponse response) {
         SearchHit hit = response.getHits().getHits()[0];
         Map<String, Object> sourceMap = hit.getSourceAsMap();
@@ -171,9 +172,7 @@ public class QuerySetDao {
         Object querySetQueriesObj = sourceMap.get(QuerySet.QUERY_SET_QUERIES);
         if (querySetQueriesObj instanceof List) {
             List<Map<String, Object>> querySetQueriesList = (List<Map<String, Object>>) querySetQueriesObj;
-            querySetEntries = querySetQueriesList.stream()
-                .map(entryMap -> QuerySetEntry.Builder.builder().queryText((String) entryMap.get(QuerySetEntry.QUERY_TEXT)).build())
-                .collect(Collectors.toList());
+            querySetEntries = querySetQueriesList.stream().map(QuerySetEntry::fromStoredMap).collect(Collectors.toList());
         }
 
         return QuerySet.Builder.builder()
@@ -184,5 +183,19 @@ public class QuerySetDao {
             .sampling((String) sourceMap.get(QuerySet.SAMPLING))
             .querySetQueries(querySetEntries)
             .build();
+    }
+
+    /**
+     * Check if a query set exists by querySetId
+     * @param querySetId - id to check
+     * @param listener - action listener for async operation
+     */
+    public void checkQuerySetExists(String querySetId, ActionListener<SearchResponse> listener) {
+        if (querySetId == null || querySetId.isEmpty()) {
+            listener.onFailure(new SearchRelevanceException("querySetId must not be null or empty", RestStatus.BAD_REQUEST));
+            return;
+        }
+        SearchSourceBuilder sourceBuilder = new SearchSourceBuilder().query(QueryBuilders.termQuery("_id", querySetId)).size(1);
+        searchRelevanceIndicesManager.listDocsBySearchRequest(sourceBuilder, QUERY_SET, listener);
     }
 }

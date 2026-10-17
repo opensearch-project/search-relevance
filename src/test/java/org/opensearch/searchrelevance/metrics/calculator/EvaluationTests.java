@@ -9,6 +9,7 @@ package org.opensearch.searchrelevance.metrics.calculator;
 
 import java.util.*;
 
+import org.opensearch.searchrelevance.metrics.EvaluationMetrics;
 import org.opensearch.test.OpenSearchTestCase;
 
 /**
@@ -211,5 +212,112 @@ public class EvaluationTests extends OpenSearchTestCase {
         // Relevant: g4(5), g9(5) → 2 out of 10 = 0.2
         double p = Evaluation.calculatePrecisionAtK(docs, graded, 10, t);
         assertEquals(0.2, p, 0.001);
+    }
+
+    // ----------------------------------------------------------------
+    // Recall@K tests with dynamic threshold
+    // ----------------------------------------------------------------
+
+    public void testCalculateRecallAtK() {
+        // With threshold=2: 7 total relevant docs in judgments (d2, d5, d8, d11, d14,
+        // d17, d20)
+        // Top 20: all 7 are retrieved -> Recall = 7/7 = 1.0
+        double recall = Evaluation.calculateRecallAtK(this.results, this.judgments, 20, threshold);
+        assertEquals(1.0, recall, 0.001);
+
+        // Top 5: d1(1), d2(2), d3(0), d4(1), d5(2)
+        // Relevant in top 5: d2, d5 (2 docs)
+        // Recall@5 = 2/7 ~= 0.29
+        recall = Evaluation.calculateRecallAtK(this.results, this.judgments, 5, threshold);
+        assertEquals(0.29, recall, 0.001);
+
+        // k=0 -> 0 relevant retrieved -> Recall = 0.0
+        recall = Evaluation.calculateRecallAtK(this.results, this.judgments, 0, threshold);
+        assertEquals(0.0, recall, 0.001);
+
+        // Empty results -> Recall = 0.0
+        recall = Evaluation.calculateRecallAtK(Collections.emptyList(), this.judgments, 5, threshold);
+        assertEquals(0.0, recall, 0.001);
+    }
+
+    // ----------------------------------------------------------------
+    // Reciprocal Rank (RR) tests with dynamic threshold
+    // ----------------------------------------------------------------
+
+    public void testCalculateReciprocalRank() {
+        // With threshold=2, first relevant doc is d2 (index 1, rank 2)
+        // RR = 1/2 = 0.5
+        double rr = Evaluation.calculateReciprocalRank(this.results, this.judgments, 20, threshold);
+        assertEquals(0.5, rr, 0.001);
+
+        // If top 1 doc (d1, rating 1) is checked: not relevant -> RR = 0.0
+        rr = Evaluation.calculateReciprocalRank(this.results, this.judgments, 1, threshold);
+        assertEquals(0.0, rr, 0.001);
+
+        // Case where no relevant docs exist at all
+        // Create disjoint judgments/results
+        List<String> badResults = List.of("bad1", "bad2");
+        rr = Evaluation.calculateReciprocalRank(badResults, this.judgments, 5, threshold);
+        assertEquals(0.0, rr, 0.001);
+    }
+
+    // ----------------------------------------------------------------
+    // DCG@K tests (uses graded relevance directly)
+    // ----------------------------------------------------------------
+
+    public void testCalculateDCGAtK() {
+        // Standard dataset: d1(1), d2(2), d3(0), d4(1), d5(2) ...
+        // i=0: d1(1) -> (2^1 - 1) / log2(2) = 1/1 = 1.0
+        // i=1: d2(2) -> (2^2 - 1) / log2(3) = 3/1.585 = 1.892
+        // i=2: d3(0) -> 0
+        // i=3: d4(1) -> (2^1 - 1) / log2(5) = 1/2.321 = 0.430
+        // i=4: d5(2) -> (2^2 - 1) / log2(6) = 3/2.585 = 1.160
+        // Total DCG@5 = 1.0 + 1.892 + 0 + 0.430 + 1.160 = 4.482
+        double dcg = Evaluation.calculateDCGAtK(this.results, this.judgments, 5);
+        assertEquals(4.48, dcg, 0.01);
+
+        // k=0 -> 0.0
+        dcg = Evaluation.calculateDCGAtK(this.results, this.judgments, 0);
+        assertEquals(0.0, dcg, 0.001);
+
+        // Empty results -> 0.0
+        dcg = Evaluation.calculateDCGAtK(Collections.emptyList(), this.judgments, 5);
+        assertEquals(0.0, dcg, 0.001);
+    }
+
+    // ----------------------------------------------------------------
+    // Invalid stored ratings fail loudly
+    // ----------------------------------------------------------------
+
+    public void testInvalidRatingFailsEvaluationWithOffendingDocument() {
+        for (String invalid : List.of("banana", "NaN", "Infinity", "-Infinity")) {
+            // d9 is not retrieved: the bad rating must still be reported, since the threshold, Recall
+            // and IDCG read the whole judgment set.
+            Map<String, String> poisoned = Map.of("d1", "1", "d2", "2", "d9", invalid);
+            IllegalArgumentException e = expectThrows(
+                IllegalArgumentException.class,
+                () -> EvaluationMetrics.calculateEvaluationMetrics(List.of("d1", "d2"), poisoned, 5)
+            );
+            assertTrue(e.getMessage().contains("[" + invalid + "]"));
+            assertTrue(e.getMessage().contains("[d9]"));
+        }
+    }
+
+    public void testRoundToTwoDecimals() {
+        assertEquals(0.33, Evaluation.roundToTwoDecimals(1.0 / 3), 0.0);
+        for (double invalid : new double[] { Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY, Math.pow(2, 999) }) {
+            expectThrows(IllegalArgumentException.class, () -> Evaluation.roundToTwoDecimals(invalid));
+        }
+    }
+
+    public void testExtremeRatingFailsEvaluation() {
+        // 2^999 is finite but too large to round, and 2^1e308 overflows to Infinity; neither may be
+        // reported as a score (previously Long.MAX_VALUE / 100 and NaN -> 0 respectively).
+        for (String rating : List.of("999", "1e308")) {
+            expectThrows(
+                IllegalArgumentException.class,
+                () -> EvaluationMetrics.calculateEvaluationMetrics(List.of("d1"), Map.of("d1", rating), 1)
+            );
+        }
     }
 }

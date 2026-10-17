@@ -124,7 +124,7 @@ public enum SearchRelevanceJobRunner implements ScheduledJobRunner {
                 // Wait until all asynchronous operations or timeout complete before cleanup
                 searchEvaluationTask.join();
             } catch (CancellationException e) {
-                log.error("Timeout for scheduled experiment has occured!");
+                log.error("Timeout for scheduled experiment has occurred!");
             } catch (CompletionException e) {
                 log.error("Scheduled experiment has timed out. Moving onto cleanup");
             } finally {

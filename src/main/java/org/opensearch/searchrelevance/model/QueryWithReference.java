@@ -20,8 +20,6 @@ public class QueryWithReference implements Writeable {
     private final String queryText;
     private final Map<String, String> customizedKeyValueMap;
 
-    public final static String DELIMITER = "#";
-
     public QueryWithReference(String queryText, Map<String, String> customizedKeyValueMap) {
         this.queryText = queryText;
         this.customizedKeyValueMap = customizedKeyValueMap != null ? customizedKeyValueMap : Collections.emptyMap();

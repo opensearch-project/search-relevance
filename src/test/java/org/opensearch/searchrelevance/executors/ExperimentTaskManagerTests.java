@@ -30,6 +30,7 @@ import org.opensearch.searchrelevance.dao.ExperimentVariantDao;
 import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.model.ExperimentVariant;
+import org.opensearch.searchrelevance.model.QuerySetEntry;
 import org.opensearch.searchrelevance.scheduler.ExperimentCancellationToken;
 import org.opensearch.test.OpenSearchTestCase;
 import org.opensearch.threadpool.ThreadPool;
@@ -179,7 +180,7 @@ public class ExperimentTaskManagerTests extends OpenSearchTestCase {
             searchConfigId,
             "test-index",
             "test-query",
-            "test query text",
+            new QuerySetEntry("test query text", Map.of()),
             10,
             createTestVariants(experimentId, 1),
             List.of("judgment-1"),
@@ -213,7 +214,7 @@ public class ExperimentTaskManagerTests extends OpenSearchTestCase {
             searchConfigId,
             "test-index",
             "test-query",
-            "test query text",
+            new QuerySetEntry("test query text", Map.of()),
             10,
             createTestVariants(experimentId, 1),
             List.of("judgment-1"),

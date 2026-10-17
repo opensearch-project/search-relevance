@@ -83,7 +83,7 @@ public class RestDeleteJudgmentAction extends BaseRestHandler {
             @Override
             public void onFailure(Exception e) {
                 try {
-                    channel.sendResponse(new BytesRestResponse(channel, RestStatus.INTERNAL_SERVER_ERROR, e));
+                    channel.sendResponse(new BytesRestResponse(channel, e));
                 } catch (IOException ex) {
                     LOGGER.error("Failed to send error response", ex);
                 }

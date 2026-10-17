@@ -9,8 +9,8 @@ package org.opensearch.searchrelevance.utils;
 
 import org.opensearch.test.OpenSearchTestCase;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Unit tests for RatingOutputProcessor with focus on GPT-3.5 unstructured output handling.
@@ -27,7 +27,7 @@ public class RatingOutputProcessorTests extends OpenSearchTestCase {
         JsonNode resultNode = OBJECT_MAPPER.readTree(result);
         assertTrue(resultNode.isArray());
         assertEquals(2, resultNode.size());
-        assertEquals("doc1", resultNode.get(0).get("id").asText());
+        assertEquals("doc1", resultNode.get(0).get("id").asString());
         assertEquals(4, resultNode.get(0).get("rating_score").asInt());
     }
 
@@ -49,7 +49,7 @@ public class RatingOutputProcessorTests extends OpenSearchTestCase {
         JsonNode resultNode = OBJECT_MAPPER.readTree(result);
         assertTrue(resultNode.isArray());
         assertEquals(1, resultNode.size());
-        assertEquals("doc1", resultNode.get(0).get("id").asText());
+        assertEquals("doc1", resultNode.get(0).get("id").asString());
     }
 
     public void testMarkdownCodeBlockWithoutJsonTag() throws Exception {
@@ -101,7 +101,7 @@ public class RatingOutputProcessorTests extends OpenSearchTestCase {
         JsonNode resultNode = OBJECT_MAPPER.readTree(result);
         assertTrue(resultNode.isArray());
         assertEquals(3, resultNode.size());
-        assertEquals("query1_doc1", resultNode.get(0).get("id").asText());
+        assertEquals("query1_doc1", resultNode.get(0).get("id").asString());
         assertEquals(4, resultNode.get(0).get("rating_score").asInt());
     }
 
@@ -137,7 +137,7 @@ public class RatingOutputProcessorTests extends OpenSearchTestCase {
         JsonNode resultNode = OBJECT_MAPPER.readTree(result);
         assertTrue(resultNode.isArray());
         assertEquals(1, resultNode.size());
-        assertEquals("doc1", resultNode.get(0).get("id").asText());
+        assertEquals("doc1", resultNode.get(0).get("id").asString());
     }
 
     public void testArrayAppearsBeforeObject() throws Exception {
@@ -148,7 +148,7 @@ public class RatingOutputProcessorTests extends OpenSearchTestCase {
         JsonNode resultNode = OBJECT_MAPPER.readTree(result);
         assertTrue(resultNode.isArray());
         assertEquals(1, resultNode.size());
-        assertEquals("doc1", resultNode.get(0).get("id").asText());
+        assertEquals("doc1", resultNode.get(0).get("id").asString());
     }
 
     public void testArrayWithMultipleElementsInText() throws Exception {
@@ -160,8 +160,8 @@ public class RatingOutputProcessorTests extends OpenSearchTestCase {
         JsonNode resultNode = OBJECT_MAPPER.readTree(result);
         assertTrue(resultNode.isArray());
         assertEquals(2, resultNode.size());
-        assertEquals("doc1", resultNode.get(0).get("id").asText());
-        assertEquals("doc2", resultNode.get(1).get("id").asText());
+        assertEquals("doc1", resultNode.get(0).get("id").asString());
+        assertEquals("doc2", resultNode.get(1).get("id").asString());
     }
 
     public void testNestedArrayInObject() throws Exception {
@@ -172,7 +172,7 @@ public class RatingOutputProcessorTests extends OpenSearchTestCase {
         JsonNode resultNode = OBJECT_MAPPER.readTree(result);
         assertTrue(resultNode.isArray());
         assertEquals(1, resultNode.size());
-        assertEquals("doc1", resultNode.get(0).get("id").asText());
+        assertEquals("doc1", resultNode.get(0).get("id").asString());
     }
 
     public void testMultipleArraysSelectsFirst() throws Exception {
@@ -183,7 +183,7 @@ public class RatingOutputProcessorTests extends OpenSearchTestCase {
         JsonNode resultNode = OBJECT_MAPPER.readTree(result);
         assertTrue(resultNode.isArray());
         assertEquals(1, resultNode.size());
-        assertEquals("doc1", resultNode.get(0).get("id").asText());
+        assertEquals("doc1", resultNode.get(0).get("id").asString());
     }
 
     public void testObjectBeforeArrayInText() throws Exception {
@@ -208,7 +208,7 @@ public class RatingOutputProcessorTests extends OpenSearchTestCase {
         JsonNode resultNode = OBJECT_MAPPER.readTree(result);
         assertTrue(resultNode.isArray());
         assertEquals(3, resultNode.size());
-        assertEquals("q1_d1", resultNode.get(0).get("id").asText());
+        assertEquals("q1_d1", resultNode.get(0).get("id").asString());
         assertEquals(5, resultNode.get(0).get("rating_score").asInt());
     }
 
@@ -245,7 +245,7 @@ public class RatingOutputProcessorTests extends OpenSearchTestCase {
         JsonNode resultNode = OBJECT_MAPPER.readTree(result);
         assertTrue(resultNode.isArray());
         assertEquals(2, resultNode.size());
-        assertEquals("doc1", resultNode.get(0).get("id").asText());
+        assertEquals("doc1", resultNode.get(0).get("id").asString());
     }
 
     // ============================================
@@ -260,8 +260,8 @@ public class RatingOutputProcessorTests extends OpenSearchTestCase {
         JsonNode resultNode = OBJECT_MAPPER.readTree(result);
         assertTrue(resultNode.isArray());
         assertEquals(1, resultNode.size());
-        assertEquals("doc1", resultNode.get(0).get("id").asText());
-        assertEquals("This {has} braces", resultNode.get(0).get("comment").asText());
+        assertEquals("doc1", resultNode.get(0).get("id").asString());
+        assertEquals("This {has} braces", resultNode.get(0).get("comment").asString());
     }
 
     public void testJsonWithBracketsInsideStrings() throws Exception {
@@ -272,7 +272,7 @@ public class RatingOutputProcessorTests extends OpenSearchTestCase {
         JsonNode resultNode = OBJECT_MAPPER.readTree(result);
         assertTrue(resultNode.isArray());
         assertEquals(1, resultNode.size());
-        assertEquals("Array [1,2,3] reference", resultNode.get(0).get("title").asText());
+        assertEquals("Array [1,2,3] reference", resultNode.get(0).get("title").asString());
     }
 
     public void testJsonWithEscapedQuotesInStrings() throws Exception {
@@ -283,7 +283,7 @@ public class RatingOutputProcessorTests extends OpenSearchTestCase {
         JsonNode resultNode = OBJECT_MAPPER.readTree(result);
         assertTrue(resultNode.isArray());
         assertEquals(1, resultNode.size());
-        assertEquals("He said \"hello\"", resultNode.get(0).get("text").asText());
+        assertEquals("He said \"hello\"", resultNode.get(0).get("text").asString());
     }
 
     public void testJsonWithComplexEscapedContent() throws Exception {
@@ -294,7 +294,7 @@ public class RatingOutputProcessorTests extends OpenSearchTestCase {
         JsonNode resultNode = OBJECT_MAPPER.readTree(result);
         assertTrue(resultNode.isArray());
         assertEquals(1, resultNode.size());
-        assertEquals("Path: C:\\Users\\file.txt", resultNode.get(0).get("note").asText());
+        assertEquals("Path: C:\\Users\\file.txt", resultNode.get(0).get("note").asString());
     }
 
     public void testJsonWithMixedQuotes() throws Exception {
@@ -305,7 +305,7 @@ public class RatingOutputProcessorTests extends OpenSearchTestCase {
         JsonNode resultNode = OBJECT_MAPPER.readTree(result);
         assertTrue(resultNode.isArray());
         assertEquals(1, resultNode.size());
-        assertEquals("It's a good match", resultNode.get(0).get("content").asText());
+        assertEquals("It's a good match", resultNode.get(0).get("content").asString());
     }
 
     // ============================================
@@ -322,7 +322,7 @@ public class RatingOutputProcessorTests extends OpenSearchTestCase {
         JsonNode resultNode = OBJECT_MAPPER.readTree(result);
         assertTrue(resultNode.isArray());
         assertEquals(1, resultNode.size());
-        assertEquals("doc1", resultNode.get(0).get("id").asText());
+        assertEquals("doc1", resultNode.get(0).get("id").asString());
     }
 
     public void testJsonWithMixedLineEndings() throws Exception {
@@ -348,7 +348,7 @@ public class RatingOutputProcessorTests extends OpenSearchTestCase {
         JsonNode resultNode = OBJECT_MAPPER.readTree(result);
         assertTrue(resultNode.isArray());
         assertEquals(1, resultNode.size());
-        assertEquals("doc1", resultNode.get(0).get("id").asText());
+        assertEquals("doc1", resultNode.get(0).get("id").asString());
     }
 
     public void testCodeBlockWithPythonTag() throws Exception {
@@ -386,7 +386,7 @@ public class RatingOutputProcessorTests extends OpenSearchTestCase {
         JsonNode resultNode = OBJECT_MAPPER.readTree(result);
         assertTrue(resultNode.isArray());
         assertEquals(2, resultNode.size());
-        assertEquals("doc1", resultNode.get(0).get("id").asText());
+        assertEquals("doc1", resultNode.get(0).get("id").asString());
     }
 
     // ============================================
@@ -414,7 +414,7 @@ public class RatingOutputProcessorTests extends OpenSearchTestCase {
         JsonNode resultNode = OBJECT_MAPPER.readTree(result);
         assertTrue(resultNode.isArray());
         assertEquals(1, resultNode.size());
-        assertEquals("doc1", resultNode.get(0).get("id").asText());
+        assertEquals("doc1", resultNode.get(0).get("id").asString());
     }
 
     public void testMalformedJsonWithExtraComma() throws Exception {
@@ -436,7 +436,7 @@ public class RatingOutputProcessorTests extends OpenSearchTestCase {
         JsonNode resultNode = OBJECT_MAPPER.readTree(result);
         assertTrue(resultNode.isArray());
         assertEquals(1, resultNode.size());
-        assertEquals("Café résumé", resultNode.get(0).get("title").asText());
+        assertEquals("Café résumé", resultNode.get(0).get("title").asString());
     }
 
     public void testJsonArrayWithEmptyObjects() throws Exception {

@@ -28,6 +28,7 @@ import org.opensearch.searchrelevance.dao.ExperimentVariantDao;
 import org.opensearch.searchrelevance.experiment.QuerySourceUtil;
 import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.model.ExperimentVariant;
+import org.opensearch.searchrelevance.model.QuerySetEntry;
 import org.opensearch.searchrelevance.model.builder.SearchRequestBuilder;
 import org.opensearch.searchrelevance.scheduler.ExperimentCancellationToken;
 import org.opensearch.threadpool.ThreadPool;
@@ -90,7 +91,7 @@ public class ExperimentTaskManager {
         String searchConfigId,
         String index,
         String query,
-        String queryText,
+        QuerySetEntry queryEntry,
         int size,
         List<ExperimentVariant> experimentVariants,
         List<String> judgmentIds,
@@ -106,7 +107,7 @@ public class ExperimentTaskManager {
         ExperimentTaskContext taskContext = new ExperimentTaskContext(
             experimentId,
             searchConfigId,
-            queryText,
+            queryEntry.queryText(),
             experimentVariants.size(),
             new ConcurrentHashMap<>(configToExperimentVariants),
             resultFuture,
@@ -136,7 +137,7 @@ public class ExperimentTaskManager {
                 searchConfigId,
                 index,
                 query,
-                queryText,
+                queryEntry,
                 size,
                 variant,
                 judgmentIds,
@@ -193,7 +194,31 @@ public class ExperimentTaskManager {
         }
 
         final String evaluationId = UUID.randomUUID().toString();
-        SearchRequest searchRequest = buildSearchRequest(params);
+        final SearchRequest searchRequest;
+        try {
+            searchRequest = buildSearchRequest(params);
+        } catch (Exception e) {
+            // Building the request can fail synchronously — e.g. a search configuration whose query
+            // is an invalid Mustache template or contains an unsupported partial ({{>...}}). Route it
+            // through the same failure path as a search error so the variant is still counted; otherwise
+            // remainingVariants never reaches zero and the experiment hangs in PROCESSING forever.
+            log.error(
+                "Failed to build search request (experimentId={}, variantId={}, evaluationId={})",
+                params.getExperimentId(),
+                params.getExperimentVariant().getId(),
+                evaluationId,
+                e
+            );
+            try {
+                handleSearchFailure(e, params.getExperimentVariant(), params.getExperimentId(), evaluationId, params.getTaskContext());
+                future.complete(null);
+            } catch (Exception ex) {
+                // Ensure variant is counted even when failure handling itself throws
+                params.getTaskContext().completeVariantFailure();
+                future.completeExceptionally(ex);
+            }
+            return future;
+        }
 
         log.debug(
             "Experiment search request (experimentId={}, variantId={}, evaluationId={})",
@@ -211,7 +236,7 @@ public class ExperimentTaskManager {
                         params.getExperimentVariant(),
                         params.getExperimentId(),
                         params.getSearchConfigId(),
-                        params.getQueryText(),
+                        params.getQueryEntry().queryText(),
                         params.getSize(),
                         params.getJudgmentIds(),
                         params.getDocIdToScores(),
@@ -252,7 +277,7 @@ public class ExperimentTaskManager {
         String searchConfigId,
         String index,
         String query,
-        String queryText,
+        QuerySetEntry queryEntry,
         int size,
         ExperimentVariant variant,
         List<String> judgmentIds,
@@ -268,7 +293,7 @@ public class ExperimentTaskManager {
                 .searchConfigId(searchConfigId)
                 .index(index)
                 .query(query)
-                .queryText(queryText)
+                .queryEntry(queryEntry)
                 .size(size)
                 .experimentVariant(variant)
                 .judgmentIds(judgmentIds)
@@ -285,7 +310,7 @@ public class ExperimentTaskManager {
                 .searchConfigId(searchConfigId)
                 .index(index)
                 .query(query)
-                .queryText(queryText)
+                .queryEntry(queryEntry)
                 .size(size)
                 .experimentVariant(variant)
                 .judgmentIds(judgmentIds)
@@ -310,7 +335,7 @@ public class ExperimentTaskManager {
             return SearchRequestBuilder.buildSearchRequest(
                 pointwiseParams.getIndex(),
                 pointwiseParams.getQuery(),
-                pointwiseParams.getQueryText(),
+                pointwiseParams.getQueryEntry(),
                 pointwiseParams.getSearchPipeline(),
                 pointwiseParams.getSize()
             );
@@ -322,7 +347,7 @@ public class ExperimentTaskManager {
                 params.getIndex(),
                 params.getQuery(),
                 temporarySearchPipeline,
-                params.getQueryText(),
+                params.getQueryEntry(),
                 params.getSize()
             );
         }

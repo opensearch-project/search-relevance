@@ -22,7 +22,7 @@ String baseName = "searchRelevanceBwcCluster-rolling"
 testClusters {
     "${baseName}" {
         testDistribution = "ARCHIVE"
-        jvmArgs("-Xms1g", "-Xmx4g")
+        jvmArgs("-Xms2g", "-Xmx2g")
         numberOfNodes = 3
         if(ext.bwcBundleTest){
             versions = [ext.search_relevance_bwc_version, ext.currentBundleVersion]
@@ -60,6 +60,15 @@ testClusters {
         }
         setting 'path.repo', "${buildDir}/cluster/shared/repo/${baseName}"
         setting 'http.content_type.required', 'true'
+        // Tolerate transient node stalls (GC / CPU contention on constrained CI runners) during the
+        // upgrade: give the cluster-manager longer to commit cluster state and don't mark a
+        // briefly-unresponsive node faulty, so a stall does not trigger re-election churn that fails
+        // cluster-state writes such as the search-config mapping migration.
+        setting 'cluster.publish.timeout', '60s'
+        setting 'cluster.fault_detection.follower_check.timeout', '30s'
+        setting 'cluster.fault_detection.follower_check.retry_count', '4'
+        setting 'cluster.fault_detection.leader_check.timeout', '30s'
+        setting 'cluster.fault_detection.leader_check.retry_count', '4'
     }
 }
 

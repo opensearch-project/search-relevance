@@ -13,8 +13,6 @@ import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_I
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX_MAPPING;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_VARIANT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_VARIANT_INDEX_MAPPING;
-import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_CACHE_INDEX;
-import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_CACHE_INDEX_MAPPING;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_INDEX_MAPPING;
 import static org.opensearch.searchrelevance.common.PluginConstants.QUERY_SET_INDEX;
@@ -64,11 +62,6 @@ public enum SearchRelevanceIndices {
      * Evaluation Result Index
      */
     EVALUATION_RESULT(EVALUATION_RESULT_INDEX, EVALUATION_RESULT_INDEX_MAPPING, false),
-
-    /**
-     * Judgment Cache Index
-     */
-    JUDGMENT_CACHE(JUDGMENT_CACHE_INDEX, JUDGMENT_CACHE_INDEX_MAPPING, false),
 
     /**
      * Experiment Variant Index

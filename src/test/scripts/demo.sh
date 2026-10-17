@@ -9,55 +9,76 @@
 # ./gradlew run --preserve-data --debug-jvm which faciliates debugging
 # 
 # It will clear out any existing indexes, except ecommerce index if you pass --skip-ecommerce as a parameter.
+#
+# Optional arguments:
+#   --skip-ecommerce          Skip deleting and re-loading the ecommerce index
+#   --opensearch_url <url>    OpenSearch base URL (default: http://localhost:9200)
+
+# Resolve the directory this script lives in so data paths work from any working directory
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+DATA_DIR="$SCRIPT_DIR/../data-esci"
 
 # Helper script
 exe() { (set -x ; "$@") | jq | tee RES; echo; }
 
-# Check for --skip-ecommerce parameter
+# Defaults
+OPENSEARCH_URL="http://localhost:9200"
 SKIP_ECOMMERCE=false
-for arg in "$@"; do
-  if [ "$arg" = "--skip-ecommerce" ]; then
-    SKIP_ECOMMERCE=true
-  fi
+
+# Parse arguments
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --skip-ecommerce)
+      SKIP_ECOMMERCE=true
+      ;;
+    --opensearch_url)
+      OPENSEARCH_URL="$2"
+      shift
+      ;;
+    --opensearch_url=*)
+      OPENSEARCH_URL="${1#--opensearch_url=}"
+      ;;
+  esac
+  shift
 done
 
 
 # Once we get remote cluster connection working, we can potentially eliminate this.
 if [ "$SKIP_ECOMMERCE" = false ]; then
   echo "Deleting ecommerce sample data"
-  (curl -s -X DELETE "http://localhost:9200/ecommerce" > /dev/null) || true
+  (curl -s -X DELETE "$OPENSEARCH_URL/ecommerce" > /dev/null) || true
 
-  ECOMMERCE_ZIP_FILE="../data-esci/esci_us_ecommerce_shrunk.ndjson.zip"
+  ECOMMERCE_ZIP_FILE="$DATA_DIR/esci_us_ecommerce_shrunk.ndjson.zip"
 
   echo "Creating ecommerce index using schema.json"
-  curl -s -X PUT "http://localhost:9200/ecommerce" \
+  curl -s -X PUT "$OPENSEARCH_URL/ecommerce" \
     -H 'Content-Type: application/json' \
-    --data-binary @../data-esci/schema.json
+    --data-binary @"$DATA_DIR/schema.json"
 
   echo ""
   echo "Populating ecommerce index"
   
   # Index all data directly from zip file
-  unzip -p "$ECOMMERCE_ZIP_FILE" | curl -s -o /dev/null -w "%{http_code}" -X POST "http://localhost:9200/ecommerce/_bulk" \
+  unzip -p "$ECOMMERCE_ZIP_FILE" | curl -s -o /dev/null -w "%{http_code}" -X POST "$OPENSEARCH_URL/ecommerce/_bulk" \
     -H 'Content-Type: application/x-ndjson' --data-binary @-
   
   echo "All data indexed successfully"
 fi
 
 echo "Deleting UBI indexes"
-(curl -s -X DELETE "http://localhost:9200/ubi_queries" > /dev/null) || true
-(curl -s -X DELETE "http://localhost:9200/ubi_events" > /dev/null) || true
+(curl -s -X DELETE "$OPENSEARCH_URL/ubi_queries" > /dev/null) || true
+(curl -s -X DELETE "$OPENSEARCH_URL/ubi_events" > /dev/null) || true
 
 echo "Creating UBI indexes using mappings"
-curl -s -X POST http://localhost:9200/_plugins/ubi/initialize
+curl -s -X POST "$OPENSEARCH_URL/_plugins/ubi/initialize"
 
 echo "Loading sample UBI data"
-curl -o /dev/null -X POST 'http://localhost:9200/index-name/_bulk?pretty' --data-binary @../data-esci/ubi_queries_events.ndjson -H "Content-Type: application/x-ndjson"
+curl -o /dev/null -X POST "$OPENSEARCH_URL/index-name/_bulk?pretty" --data-binary @"$DATA_DIR/ubi_queries_events.ndjson" -H "Content-Type: application/x-ndjson"
 
 echo "Refreshing UBI indexes to make indexed data available for query sampling"
-curl -XPOST "http://localhost:9200/ubi_queries/_refresh"
+curl -XPOST "$OPENSEARCH_URL/ubi_queries/_refresh"
 echo ""
-curl -XPOST "http://localhost:9200/ubi_events/_refresh"
+curl -XPOST "$OPENSEARCH_URL/ubi_events/_refresh"
 
 read -r -d '' QUERY_BODY << EOF
 {
@@ -68,11 +89,11 @@ read -r -d '' QUERY_BODY << EOF
 }
 EOF
 
-NUMBER_OF_QUERIES=$(curl -s -XGET "http://localhost:9200/ubi_queries/_search" \
+NUMBER_OF_QUERIES=$(curl -s -XGET "$OPENSEARCH_URL/ubi_queries/_search" \
   -H "Content-Type: application/json" \
   -d "${QUERY_BODY}" | jq -r '.hits.total.value')
 
-NUMBER_OF_EVENTS=$(curl -s -XGET "http://localhost:9200/ubi_events/_search" \
+NUMBER_OF_EVENTS=$(curl -s -XGET "$OPENSEARCH_URL/ubi_events/_search" \
   -H "Content-Type: application/json" \
   -d "${QUERY_BODY}" | jq -r '.hits.total.value')
   
@@ -81,7 +102,7 @@ echo "Indexed UBI data: $NUMBER_OF_QUERIES queries and $NUMBER_OF_EVENTS events"
 
 echo ""
 
-curl -XPUT "http://localhost:9200/_cluster/settings" -H 'Content-Type: application/json' -d'
+curl -XPUT "$OPENSEARCH_URL/_cluster/settings" -H 'Content-Type: application/json' -d'
 {
   "persistent" : {
     "plugins.search_relevance.workbench_enabled" : true
@@ -90,19 +111,19 @@ curl -XPUT "http://localhost:9200/_cluster/settings" -H 'Content-Type: applicati
 '
 
 echo "Deleting queryset, search config, judgment and experiment indexes"
-(curl -s -X DELETE "http://localhost:9200/search-relevance-search-config" > /dev/null) || true
-(curl -s -X DELETE "http://localhost:9200/search-relevance-queryset" > /dev/null) || true
-(curl -s -X DELETE "http://localhost:9200/search-relevance-judgment" > /dev/null) || true
-(curl -s -X DELETE "http://localhost:9200/.plugins-search-relevance-experiment" > /dev/null) || true
-(curl -s -X DELETE "http://localhost:9200/search-relevance-evaluation-result" > /dev/null) || true
-(curl -s -X DELETE "http://localhost:9200/search-relevance-experiment-variant" > /dev/null) || true
+(curl -s -X DELETE "$OPENSEARCH_URL/search-relevance-search-config" > /dev/null) || true
+(curl -s -X DELETE "$OPENSEARCH_URL/search-relevance-queryset" > /dev/null) || true
+(curl -s -X DELETE "$OPENSEARCH_URL/search-relevance-judgment" > /dev/null) || true
+(curl -s -X DELETE "$OPENSEARCH_URL/.plugins-search-relevance-experiment" > /dev/null) || true
+(curl -s -X DELETE "$OPENSEARCH_URL/search-relevance-evaluation-result" > /dev/null) || true
+(curl -s -X DELETE "$OPENSEARCH_URL/search-relevance-experiment-variant" > /dev/null) || true
 
 sleep 2
 echo "Create search configs"
 
 
 
-exe curl -s -X PUT "http://localhost:9200/_plugins/_search_relevance/search_configurations" \
+exe curl -s -X PUT "$OPENSEARCH_URL/_plugins/_search_relevance/search_configurations" \
 -H "Content-type: application/json" \
 -d'{
       "name": "baseline",
@@ -112,7 +133,7 @@ exe curl -s -X PUT "http://localhost:9200/_plugins/_search_relevance/search_conf
 
 SC_BASELINE=`jq -r '.search_configuration_id' < RES`
 
-exe curl -s -X PUT "http://localhost:9200/_plugins/_search_relevance/search_configurations" \
+exe curl -s -X PUT "$OPENSEARCH_URL/_plugins/_search_relevance/search_configurations" \
 -H "Content-type: application/json" \
 -d'{
       "name": "baseline with title weight",
@@ -124,7 +145,7 @@ SC_CHALLENGER=`jq -r '.search_configuration_id' < RES`
 
 echo ""
 echo "List search configurations"
-exe curl -s -X GET "http://localhost:9200/_plugins/_search_relevance/search_configurations" \
+exe curl -s -X GET "$OPENSEARCH_URL/_plugins/_search_relevance/search_configurations" \
 -H "Content-type: application/json" \
 -d'{
      "sort": {
@@ -141,7 +162,7 @@ echo "Challenger search config id: $SC_CHALLENGER"
 
 echo ""
 echo "Create Query Sets by Sampling UBI Data"
-exe curl -s -X POST "localhost:9200/_plugins/_search_relevance/query_sets" \
+exe curl -s -X POST "$OPENSEARCH_URL/_plugins/_search_relevance/query_sets" \
 -H "Content-type: application/json" \
 -d'{
    	"name": "Top 20",
@@ -157,7 +178,7 @@ sleep 2
 echo ""
 echo "Upload Manually Curated Query Set"
 
-exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/query_sets" \
+exe curl -s -X PUT "$OPENSEARCH_URL/_plugins/_search_relevance/query_sets" \
 -H "Content-type: application/json" \
 -d'{
    	"name": "TVs",
@@ -174,9 +195,9 @@ QUERY_SET_MANUAL=`jq -r '.query_set_id' < RES`
 echo ""
 echo "Upload ESCI Query Set"
 
-exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/query_sets" \
+exe curl -s -X PUT "$OPENSEARCH_URL/_plugins/_search_relevance/query_sets" \
 -H "Content-type: application/json" \
---data-binary @../data-esci/esci_us_queryset.json
+--data-binary @"$DATA_DIR/esci_us_queryset.json"
 
 
 
@@ -185,7 +206,7 @@ QUERY_SET_ESCI=`jq -r '.query_set_id' < RES`
 echo ""
 echo "List Query Sets"
 
-exe curl -s -X GET "localhost:9200/_plugins/_search_relevance/query_sets" \
+exe curl -s -X GET "$OPENSEARCH_URL/_plugins/_search_relevance/query_sets" \
 -H "Content-type: application/json" \
 -d'{
      "sort": {
@@ -198,7 +219,7 @@ exe curl -s -X GET "localhost:9200/_plugins/_search_relevance/query_sets" \
 
 echo ""
 echo "Create Implicit Judgments"
-exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/judgments" \
+exe curl -s -X PUT "$OPENSEARCH_URL/_plugins/_search_relevance/judgments" \
 -H "Content-type: application/json" \
 -d'{
    	"clickModel": "coec",
@@ -214,7 +235,7 @@ sleep 2
 
 echo ""
 echo "Import Manually Curated Judgements"
-exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/judgments" \
+exe curl -s -X PUT "$OPENSEARCH_URL/_plugins/_search_relevance/judgments" \
 -H "Content-type: application/json" \
 -d'{
     "name": "Imported Judgments",
@@ -279,9 +300,9 @@ IMPORTED_JUDGMENT_LIST_ID=`jq -r '.judgment_id' < RES`
 echo ""
 echo "Upload ESCI Judgments"
 
-exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/judgments" \
+exe curl -s -X PUT "$OPENSEARCH_URL/_plugins/_search_relevance/judgments" \
 -H "Content-type: application/json" \
---data-binary @../data-esci/esci_us_judgments.json
+--data-binary @"$DATA_DIR/esci_us_judgments.json"
 
 
 
@@ -289,7 +310,7 @@ ESCI_JUDGMENT_LIST_ID=`jq -r '.judgment_id' < RES`
 
 echo ""
 echo "Create PAIRWISE Experiment"
-exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/experiments" \
+exe curl -s -X PUT "$OPENSEARCH_URL/_plugins/_search_relevance/experiments" \
 -H "Content-type: application/json" \
 -d"{
    	\"querySetId\": \"$QUERY_SET_MANUAL\",
@@ -306,12 +327,12 @@ echo "Experiment id: $EX_PAIRWISE"
 
 echo ""
 echo "Show PAIRWISE Experiment"
-exe curl -s -X GET "localhost:9200/_plugins/_search_relevance/experiments/$EX_PAIRWISE"
+exe curl -s -X GET "$OPENSEARCH_URL/_plugins/_search_relevance/experiments/$EX_PAIRWISE"
 
 echo ""
 echo "Create POINTWISE Experiment"
 
-exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/experiments" \
+exe curl -s -X PUT "$OPENSEARCH_URL/_plugins/_search_relevance/experiments" \
 -H "Content-type: application/json" \
 -d"{
    	\"querySetId\": \"$QUERY_SET_MANUAL\",
@@ -328,11 +349,11 @@ echo "Experiment id: $EX_POINTWISE"
 
 echo ""
 echo "Show POINTWISE Experiment"
-exe curl -s -X GET "localhost:9200/_plugins/_search_relevance/experiments/$EX_POINTWISE"
+exe curl -s -X GET "$OPENSEARCH_URL/_plugins/_search_relevance/experiments/$EX_POINTWISE"
 
 echo ""
 echo "List experiments"
-exe curl -s -X GET "http://localhost:9200/_plugins/_search_relevance/experiments" \
+exe curl -s -X GET "$OPENSEARCH_URL/_plugins/_search_relevance/experiments" \
 -H "Content-type: application/json" \
 -d'{
      "sort": {
@@ -350,7 +371,7 @@ echo ""
 echo "BEGIN HYBRID OPTIMIZER DEMO"
 echo ""
 echo "Creating Hybrid Query to be Optimized"
-exe curl -s -X PUT "http://localhost:9200/_plugins/_search_relevance/search_configurations" \
+exe curl -s -X PUT "$OPENSEARCH_URL/_plugins/_search_relevance/search_configurations" \
 -H "Content-type: application/json" \
 -d'{
       "name": "hybrid_query_1",
@@ -366,7 +387,7 @@ echo "Hybrid search config id: $SC_HYBRID"
 echo ""
 echo "Create HYBRID OPTIMIZER Experiment"
 
-exe curl -s -X PUT "localhost:9200/_plugins/_search_relevance/experiments" \
+exe curl -s -X PUT "$OPENSEARCH_URL/_plugins/_search_relevance/experiments" \
 -H "Content-type: application/json" \
 -d"{
    	\"querySetId\": \"$QUERY_SET_MANUAL\",
@@ -383,4 +404,4 @@ echo "Experiment id: $EX_HO"
 
 echo ""
 echo "Show HYBRID OPTIMIZER Experiment"
-exe curl -s -X GET localhost:9200/_plugins/_search_relevance/experiments/$EX_HO
+exe curl -s -X GET "$OPENSEARCH_URL/_plugins/_search_relevance/experiments/$EX_HO"

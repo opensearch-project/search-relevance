@@ -14,9 +14,9 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Processor for handling LLM rating outputs with structured JSON parsing.
@@ -67,7 +67,7 @@ public class RatingOutputProcessor {
             }
 
             return "[]";
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             // If JSON parsing fails, try to extract JSON from unstructured text (GPT-3.5)
             return extractJsonFromUnstructuredText(response);
         }
@@ -99,7 +99,7 @@ public class RatingOutputProcessor {
                     log.debug("Successfully extracted array from code block");
                     return node.toString();
                 }
-            } catch (JsonProcessingException e) {
+            } catch (JacksonException e) {
                 log.debug("Failed to parse JSON from code block: {}", e.getMessage());
                 // Continue to next extraction method
             }
@@ -124,7 +124,7 @@ public class RatingOutputProcessor {
                     log.debug("Wrapping object in array");
                     return "[" + jsonContent + "]";
                 }
-            } catch (JsonProcessingException e) {
+            } catch (JacksonException e) {
                 log.warn("Failed to parse extracted JSON pattern. Error: {}. Extracted content: {}", e.getMessage(), jsonContent);
                 // Parsing failed, return empty array
             }

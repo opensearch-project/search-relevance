@@ -39,7 +39,6 @@ public class SearchRelevanceIndicesTests extends OpenSearchTestCase {
         Set<SearchRelevanceIndices> notProtectedIndices = Set.of(
             SearchRelevanceIndices.SEARCH_CONFIGURATION,
             SearchRelevanceIndices.JUDGMENT,
-            SearchRelevanceIndices.JUDGMENT_CACHE,
             SearchRelevanceIndices.EVALUATION_RESULT,
             SearchRelevanceIndices.EXPERIMENT_VARIANT,
             SearchRelevanceIndices.QUERY_SET,
@@ -75,6 +74,12 @@ public class SearchRelevanceIndicesTests extends OpenSearchTestCase {
                 index.getSchemaVersion()
             );
         }
+    }
+
+    public void testEvaluationResultMappingIncludesTook() {
+        assertEquals(1, SearchRelevanceIndices.EVALUATION_RESULT.getSchemaVersion());
+        String mapping = SearchRelevanceIndices.EVALUATION_RESULT.getMapping();
+        assertTrue("evaluation_result mapping should declare took", mapping.contains("\"took\""));
     }
 
 }

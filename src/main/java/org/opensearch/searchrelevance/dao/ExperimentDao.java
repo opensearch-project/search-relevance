@@ -7,9 +7,12 @@
  */
 package org.opensearch.searchrelevance.dao;
 
+import static org.opensearch.searchrelevance.common.PluginConstants.DESCRIPTION;
+import static org.opensearch.searchrelevance.common.PluginConstants.NAME;
 import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.EXPERIMENT;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -18,6 +21,7 @@ import org.apache.logging.log4j.Logger;
 import org.opensearch.action.StepListener;
 import org.opensearch.action.delete.DeleteResponse;
 import org.opensearch.action.search.SearchResponse;
+import org.opensearch.action.update.UpdateResponse;
 import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
@@ -137,6 +141,36 @@ public class ExperimentDao {
 
         SearchSourceBuilder sourceBuilder = new SearchSourceBuilder().query(QueryBuilders.termQuery(fieldName, fieldId)).size(size);
         searchRelevanceIndicesManager.listDocsBySearchRequest(sourceBuilder, EXPERIMENT, listener);
+    }
+
+    /**
+     * Patch experiment by updating only name and/or description fields.
+     * This is a partial update that preserves all other fields.
+     * Validation of inputs is handled upstream by
+     * {@link org.opensearch.searchrelevance.transport.experiment.PatchExperimentRequest#validate()}
+     * and
+     * {@link org.opensearch.searchrelevance.rest.RestPatchExperimentAction}.
+     *
+     * @param experimentId - id of the experiment to patch
+     * @param name         - new name (can be null to keep existing)
+     * @param description  - new description (can be null to keep existing)
+     * @param listener     - action listener for async operation
+     */
+    public void patchExperiment(
+        final String experimentId,
+        final String name,
+        final String description,
+        final ActionListener<UpdateResponse> listener
+    ) {
+        Map<String, Object> updates = new HashMap<>();
+        if (name != null) {
+            updates.put(NAME, name);
+        }
+        if (description != null) {
+            updates.put(DESCRIPTION, description);
+        }
+
+        searchRelevanceIndicesManager.patchDoc(experimentId, updates, EXPERIMENT, listener);
     }
 
     /**
