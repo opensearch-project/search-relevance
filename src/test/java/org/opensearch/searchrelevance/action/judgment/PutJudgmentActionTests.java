@@ -7,22 +7,47 @@
  */
 package org.opensearch.searchrelevance.action.judgment;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
+import org.junit.Before;
+import org.opensearch.Version;
+import org.opensearch.cluster.ClusterState;
+import org.opensearch.cluster.node.DiscoveryNodes;
+import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.io.stream.BytesStreamOutput;
 import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.searchrelevance.model.JudgmentType;
+import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
 import org.opensearch.searchrelevance.transport.judgment.PutImportJudgmentRequest;
 import org.opensearch.searchrelevance.transport.judgment.PutJudgmentRequest;
+import org.opensearch.searchrelevance.transport.judgment.PutLlmJudgmentRequest;
 import org.opensearch.searchrelevance.transport.judgment.PutUbiJudgmentRequest;
+import org.opensearch.searchrelevance.utils.ClusterUtil;
 import org.opensearch.test.OpenSearchTestCase;
 
 public class PutJudgmentActionTests extends OpenSearchTestCase {
 
+    @Before
+    public void setup() {
+        // PutLlmJudgmentRequest serialization gates the existingJudgments field on the cluster's
+        // minimum node version via the ClusterUtil singleton. Report a cluster on the gate version
+        // so the round-trip uses the current (list) format.
+        ClusterService clusterService = mock(ClusterService.class);
+        ClusterState clusterState = mock(ClusterState.class);
+        DiscoveryNodes discoveryNodes = mock(DiscoveryNodes.class);
+        when(clusterService.state()).thenReturn(clusterState);
+        when(clusterState.getNodes()).thenReturn(discoveryNodes);
+        when(discoveryNodes.getMinNodeVersion()).thenReturn(Version.CURRENT);
+        ClusterUtil.instance().initialize(clusterService);
+    }
+
     public void testStreams() throws IOException {
-        PutJudgmentRequest request = new PutUbiJudgmentRequest(JudgmentType.UBI_JUDGMENT, "name", "description", "coec", 20, "", "");
+        PutJudgmentRequest request = new PutUbiJudgmentRequest(JudgmentType.UBI_JUDGMENT, "name", "description", "coec", 20, "", "", null);
         BytesStreamOutput output = new BytesStreamOutput();
         request.writeTo(output);
         StreamInput in = StreamInput.wrap(output.bytes().toBytesRef().bytes);
@@ -36,7 +61,7 @@ public class PutJudgmentActionTests extends OpenSearchTestCase {
     }
 
     public void testRequestValidation() {
-        PutJudgmentRequest request = new PutUbiJudgmentRequest(JudgmentType.UBI_JUDGMENT, "name", "description", "coec", 20, "", "");
+        PutJudgmentRequest request = new PutUbiJudgmentRequest(JudgmentType.UBI_JUDGMENT, "name", "description", "coec", 20, "", "", null);
         assertNull(request.validate());
     }
 
@@ -75,5 +100,111 @@ public class PutJudgmentActionTests extends OpenSearchTestCase {
         Map<String, String> ratings = (Map<String, String>) ((List<Map<String, String>>) queryAndRatings.get("ratings")).get(0);
         assertEquals("B077ZJXCTS", ratings.get("docId"));
         assertEquals("0.700", ratings.get("rating"));
+    }
+
+    public void testLlmJudgmentRequestStreams() throws IOException {
+        PutLlmJudgmentRequest request = new PutLlmJudgmentRequest(
+            JudgmentType.LLM_JUDGMENT,
+            "test_name",
+            "test_description",
+            "test_model_id",
+            "test_query_set_id",
+            List.of("config1", "config2"),
+            10,
+            1000,
+            List.of("field1", "field2"),
+            false,
+            "test_prompt_template",
+            LLMJudgmentRatingType.SCORE0_1,
+            List.of("existing-judgment-1")
+        );
+
+        BytesStreamOutput output = new BytesStreamOutput();
+        request.writeTo(output);
+        StreamInput in = StreamInput.wrap(output.bytes().toBytesRef().bytes);
+        PutLlmJudgmentRequest serialized = new PutLlmJudgmentRequest(in);
+
+        assertEquals("test_name", serialized.getName());
+        assertEquals(JudgmentType.LLM_JUDGMENT, serialized.getType());
+        assertEquals("test_description", serialized.getDescription());
+        assertEquals("test_model_id", serialized.getModelId());
+        assertEquals("test_query_set_id", serialized.getQuerySetId());
+        assertEquals(List.of("config1", "config2"), serialized.getSearchConfigurationList());
+        assertEquals(10, serialized.getSize());
+        assertEquals(1000, serialized.getTokenLimit());
+        assertEquals(List.of("field1", "field2"), serialized.getContextFields());
+        assertEquals(false, serialized.isIgnoreFailure());
+        assertEquals("test_prompt_template", serialized.getPromptTemplate());
+        assertEquals(LLMJudgmentRatingType.SCORE0_1, serialized.getLlmJudgmentRatingType());
+        assertEquals(List.of("existing-judgment-1"), serialized.getExistingJudgments());
+    }
+
+    public void testLlmJudgmentRequestStreamsWithNullOptionalFields() throws IOException {
+        PutLlmJudgmentRequest request = new PutLlmJudgmentRequest(
+            JudgmentType.LLM_JUDGMENT,
+            "test_name",
+            "test_description",
+            "test_model_id",
+            "test_query_set_id",
+            List.of("config1"),
+            5,
+            500,
+            List.of("field1"),
+            true,
+            null,
+            null,
+            null
+        );
+
+        BytesStreamOutput output = new BytesStreamOutput();
+        request.writeTo(output);
+        StreamInput in = StreamInput.wrap(output.bytes().toBytesRef().bytes);
+        PutLlmJudgmentRequest serialized = new PutLlmJudgmentRequest(in);
+
+        assertEquals("test_name", serialized.getName());
+        assertEquals(JudgmentType.LLM_JUDGMENT, serialized.getType());
+        assertEquals("test_description", serialized.getDescription());
+        assertNull(serialized.getPromptTemplate());
+        assertNull(serialized.getLlmJudgmentRatingType());
+        assertNull(serialized.getExistingJudgments());
+    }
+
+    public void testUbiJudgmentWithCustomIndexes() throws IOException {
+        PutUbiJudgmentRequest request = new PutUbiJudgmentRequest(
+            JudgmentType.UBI_JUDGMENT,
+            "name",
+            "description",
+            "coec",
+            20,
+            "2024-01-01",
+            "2024-12-31",
+            "custom_events_index"
+        );
+        BytesStreamOutput output = new BytesStreamOutput();
+        request.writeTo(output);
+        StreamInput in = StreamInput.wrap(output.bytes().toBytesRef().bytes);
+        PutUbiJudgmentRequest serialized = new PutUbiJudgmentRequest(in);
+        assertEquals("name", serialized.getName());
+        assertEquals(JudgmentType.UBI_JUDGMENT, serialized.getType());
+        assertEquals("description", serialized.getDescription());
+        assertEquals("coec", serialized.getClickModel());
+        assertEquals(20, serialized.getMaxRank());
+        assertEquals("2024-01-01", serialized.getStartDate());
+        assertEquals("2024-12-31", serialized.getEndDate());
+        assertEquals("custom_events_index", serialized.getUbiEventsIndex());
+    }
+
+    public void testUbiJudgmentDefaultIndexesWhenNull() {
+        PutUbiJudgmentRequest request = new PutUbiJudgmentRequest(
+            JudgmentType.UBI_JUDGMENT,
+            "name",
+            "description",
+            "coec",
+            10,
+            "",
+            "",
+            null
+        );
+        assertEquals("ubi_events", request.getUbiEventsIndex());
     }
 }

@@ -7,6 +7,7 @@
  */
 package org.opensearch.searchrelevance.dao;
 
+import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_ID;
 import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.EVALUATION_RESULT;
 
 import java.io.IOException;
@@ -21,6 +22,7 @@ import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.core.xcontent.ToXContent;
 import org.opensearch.index.query.QueryBuilders;
+import org.opensearch.index.reindex.BulkByScrollResponse;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager;
@@ -36,7 +38,7 @@ public class EvaluationResultDao {
 
     /**
      * Create evaluation result index if not exists
-     * @param stepListener - step lister for async operation
+     * @param stepListener - step listener for async operation
      */
     public void createIndexIfAbsent(final StepListener<Void> stepListener) {
         searchRelevanceIndicesManager.createIndexIfAbsent(EVALUATION_RESULT, stepListener);
@@ -45,7 +47,7 @@ public class EvaluationResultDao {
     /**
      * Stores evaluation result to in the system index
      * @param evaluationResult - EvaluationResult content to be stored
-     * @param listener - action lister for async operation
+     * @param listener - action listener for async operation
      */
     public void putEvaluationResult(final EvaluationResult evaluationResult, final ActionListener listener) {
         if (evaluationResult == null) {
@@ -67,7 +69,7 @@ public class EvaluationResultDao {
     /**
      * Stores evaluation result to in the system index with efficient refresh policy (recommended for experiments)
      * @param evaluationResult - EvaluationResult content to be stored
-     * @param listener - action lister for async operation
+     * @param listener - action listener for async operation
      */
     public void putEvaluationResultEfficient(final EvaluationResult evaluationResult, final ActionListener listener) {
         if (evaluationResult == null) {
@@ -89,16 +91,25 @@ public class EvaluationResultDao {
     /**
      * Delete evaluationResult by evaluationResultId
      * @param evaluationResultId - id to be deleted
-     * @param listener - action lister for async operation
+     * @param listener - action listener for async operation
      */
     public void deleteEvaluationResult(final String evaluationResultId, final ActionListener<DeleteResponse> listener) {
         searchRelevanceIndicesManager.deleteDocByDocId(evaluationResultId, EVALUATION_RESULT, listener);
     }
 
     /**
+     * Delete evaluationResult by experimentId
+     * @param experimentId - id to be deleted
+     * @param listener - action listener for async operation
+     */
+    public void deleteEvaluationResultByExperimentId(final String experimentId, final ActionListener<BulkByScrollResponse> listener) {
+        searchRelevanceIndicesManager.deleteByQuery(experimentId, EXPERIMENT_ID, EVALUATION_RESULT, listener);
+    }
+
+    /**
      * Get evaluationResult by evaluationResultId
      * @param evaluationResultId - id to be deleted
-     * @param listener - action lister for async operation
+     * @param listener - action listener for async operation
      */
     public SearchResponse getEvaluationResult(String evaluationResultId, ActionListener<SearchResponse> listener) {
         if (evaluationResultId == null || evaluationResultId.isEmpty()) {
@@ -111,7 +122,7 @@ public class EvaluationResultDao {
     /**
      * List evaluationResult by source builder
      * @param sourceBuilder - source builder to be searched
-     * @param listener - action lister for async operation
+     * @param listener - action listener for async operation
      */
     public SearchResponse listExperiment(SearchSourceBuilder sourceBuilder, ActionListener<SearchResponse> listener) {
         // Apply default values if not set

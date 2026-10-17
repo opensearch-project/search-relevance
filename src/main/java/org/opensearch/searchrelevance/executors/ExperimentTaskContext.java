@@ -84,11 +84,9 @@ public class ExperimentTaskContext {
             }
         }
 
-        CompletableFuture.runAsync(() -> {
-            experimentVariantDao.putExperimentVariantEfficient(variant, ActionListener.wrap(response -> {
-                log.debug("write successful for variant: {}", variant.getId());
-            }, error -> { log.error("write failed for variant {}: {}", variant.getId(), error.getMessage()); }));
-        });
+        experimentVariantDao.putExperimentVariantEfficient(variant, ActionListener.wrap(response -> {
+            log.debug("write successful for variant: {}", variant.getId());
+        }, error -> { log.error("write failed for variant {}: {}", variant.getId(), error.getMessage()); }));
     }
 
     /**

@@ -9,6 +9,9 @@ package org.opensearch.searchrelevance.rest;
 
 import static java.util.Collections.singletonList;
 import static org.opensearch.rest.RestRequest.Method.PUT;
+import static org.opensearch.searchrelevance.common.MLConstants.DEFAULT_PROMPT_TEMPLATE;
+import static org.opensearch.searchrelevance.common.MLConstants.LLM_JUDGMENT_RATING_TYPE;
+import static org.opensearch.searchrelevance.common.MLConstants.PROMPT_TEMPLATE;
 import static org.opensearch.searchrelevance.common.MLConstants.validateTokenLimit;
 import static org.opensearch.searchrelevance.common.MetricsConstants.MODEL_ID;
 import static org.opensearch.searchrelevance.common.PluginConstants.CLICK_MODEL;
@@ -20,14 +23,17 @@ import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENTS_UR
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_RATINGS;
 import static org.opensearch.searchrelevance.common.PluginConstants.NAME;
 import static org.opensearch.searchrelevance.common.PluginConstants.NAX_RANK;
+import static org.opensearch.searchrelevance.common.PluginConstants.OVERWRITE_CACHE;
 import static org.opensearch.searchrelevance.common.PluginConstants.QUERYSET_ID;
 import static org.opensearch.searchrelevance.common.PluginConstants.SEARCH_CONFIGURATION_LIST;
 import static org.opensearch.searchrelevance.common.PluginConstants.SIZE;
 import static org.opensearch.searchrelevance.common.PluginConstants.START_DATE;
 import static org.opensearch.searchrelevance.common.PluginConstants.TYPE;
+import static org.opensearch.searchrelevance.common.PluginConstants.UBI_EVENTS_INDEX_PARAM;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
@@ -44,6 +50,7 @@ import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestRequest;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.model.JudgmentType;
+import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.searchrelevance.transport.judgment.PutImportJudgmentRequest;
 import org.opensearch.searchrelevance.transport.judgment.PutJudgmentAction;
@@ -126,6 +133,51 @@ public class RestPutJudgmentAction extends BaseRestHandler {
 
                 int tokenLimit = validateTokenLimit(source);
                 List<String> contextFields = ParserUtils.convertObjToList(source, CONTEXT_FIELDS);
+
+                // Prompt template - validate and use simple default if not provided
+                String promptTemplate = (String) source.get(PROMPT_TEMPLATE);
+
+                // Validate prompt template contains required {{hits}} or {{results}} placeholder
+                TextValidationUtil.ValidationResult promptValidation = TextValidationUtil.validatePromptTemplate(promptTemplate);
+                if (!promptValidation.isValid()) {
+                    throw new SearchRelevanceException(promptValidation.getErrorMessage(), RestStatus.BAD_REQUEST);
+                }
+
+                if (promptTemplate == null || promptTemplate.trim().isEmpty()) {
+                    promptTemplate = DEFAULT_PROMPT_TEMPLATE;
+                }
+
+                // Rating type - can be null, will be validated at processor level
+                String llmJudgmentRatingTypeStr = (String) source.get(LLM_JUDGMENT_RATING_TYPE);
+                LLMJudgmentRatingType llmJudgmentRatingType = null;
+                if (llmJudgmentRatingTypeStr != null) {
+                    try {
+                        llmJudgmentRatingType = LLMJudgmentRatingType.valueOf(llmJudgmentRatingTypeStr);
+                    } catch (IllegalArgumentException e) {
+                        throw new SearchRelevanceException(
+                            String.format(
+                                Locale.ROOT,
+                                "Invalid RatingType: '%s'. Valid values are: %s",
+                                llmJudgmentRatingTypeStr,
+                                LLMJudgmentRatingType.getValidValues()
+                            ),
+                            RestStatus.BAD_REQUEST
+                        );
+                    }
+                }
+                List<String> existingJudgments = ParserUtils.convertObjToList(source, "existingJudgments");
+
+                // "overwriteCache" is deprecated: the global judgment cache was removed, so this
+                // parameter no longer has any effect. We still accept it (and ignore it) so that
+                // older clients sending it do not break. Deduplication is now handled by the
+                // "existingJudgments" parameter and retries by the _retry endpoint.
+                if (source.containsKey(OVERWRITE_CACHE)) {
+                    LOGGER.warn(
+                        "The [overwriteCache] parameter is deprecated and ignored: the judgment cache has been removed. "
+                            + "Use [existingJudgments] to reuse ratings, or the _retry endpoint to re-score failed documents."
+                    );
+                }
+
                 createRequest = new PutLlmJudgmentRequest(
                     type,
                     name,
@@ -136,7 +188,10 @@ public class RestPutJudgmentAction extends BaseRestHandler {
                     size,
                     tokenLimit,
                     contextFields,
-                    ignoreFailure
+                    ignoreFailure,
+                    promptTemplate,
+                    llmJudgmentRatingType,
+                    existingJudgments
                 );
             }
             case UBI_JUDGMENT -> {
@@ -161,7 +216,9 @@ public class RestPutJudgmentAction extends BaseRestHandler {
                     );
                 }
 
-                createRequest = new PutUbiJudgmentRequest(type, name, description, clickModel, maxRank, startDate, endDate);
+                String ubiEventsIndex = (String) source.get(UBI_EVENTS_INDEX_PARAM);
+
+                createRequest = new PutUbiJudgmentRequest(type, name, description, clickModel, maxRank, startDate, endDate, ubiEventsIndex);
             }
             case IMPORT_JUDGMENT -> {
                 List<Map<String, Object>> judgmentRatings = (List<Map<String, Object>>) source.get(JUDGMENT_RATINGS);

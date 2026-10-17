@@ -12,6 +12,9 @@ import static org.mockito.Mockito.when;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_CACHE_INDEX;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT;
+import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_ENABLED;
+import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_MINIMUM_INTERVAL;
+import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_TIMEOUT;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_STATS_ENABLED;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_WORKBENCH_ENABLED;
 
@@ -31,6 +34,7 @@ import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.settings.ClusterSettings;
 import org.opensearch.common.settings.Setting;
 import org.opensearch.common.settings.Settings;
+import org.opensearch.common.unit.TimeValue;
 import org.opensearch.core.action.ActionResponse;
 import org.opensearch.core.common.io.stream.NamedWriteableRegistry;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
@@ -44,18 +48,22 @@ import org.opensearch.script.ScriptService;
 import org.opensearch.searchrelevance.dao.EvaluationResultDao;
 import org.opensearch.searchrelevance.dao.ExperimentDao;
 import org.opensearch.searchrelevance.dao.ExperimentVariantDao;
-import org.opensearch.searchrelevance.dao.JudgmentCacheDao;
 import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
+import org.opensearch.searchrelevance.dao.ScheduledExperimentHistoryDao;
+import org.opensearch.searchrelevance.dao.ScheduledJobsDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
+import org.opensearch.searchrelevance.executors.ExperimentRunningManager;
 import org.opensearch.searchrelevance.executors.ExperimentTaskManager;
 import org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager;
 import org.opensearch.searchrelevance.metrics.MetricsHelper;
 import org.opensearch.searchrelevance.ml.MLAccessor;
+import org.opensearch.searchrelevance.scheduler.SearchRelevanceJobRunner;
 import org.opensearch.searchrelevance.stats.info.InfoStatsManager;
 import org.opensearch.searchrelevance.transport.experiment.DeleteExperimentAction;
 import org.opensearch.searchrelevance.transport.experiment.GetExperimentAction;
 import org.opensearch.searchrelevance.transport.experiment.PutExperimentAction;
+import org.opensearch.searchrelevance.transport.experiment.ValidateExperimentAction;
 import org.opensearch.searchrelevance.transport.queryset.DeleteQuerySetAction;
 import org.opensearch.searchrelevance.transport.queryset.GetQuerySetAction;
 import org.opensearch.searchrelevance.transport.queryset.PostQuerySetAction;
@@ -105,11 +113,14 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
         SearchConfigurationDao.class,
         JudgmentDao.class,
         EvaluationResultDao.class,
-        JudgmentCacheDao.class,
+        ScheduledJobsDao.class,
+        ScheduledExperimentHistoryDao.class,
         MLAccessor.class,
         MetricsHelper.class,
         InfoStatsManager.class,
-        ExperimentTaskManager.class
+        ExperimentTaskManager.class,
+        SearchRelevanceJobRunner.class,
+        ExperimentRunningManager.class
     );
 
     @Override
@@ -131,7 +142,14 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
             new ClusterSettings(
                 settings,
                 new HashSet<>(
-                    Arrays.asList(SEARCH_RELEVANCE_WORKBENCH_ENABLED, SEARCH_RELEVANCE_STATS_ENABLED, SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT)
+                    Arrays.asList(
+                        SEARCH_RELEVANCE_WORKBENCH_ENABLED,
+                        SEARCH_RELEVANCE_STATS_ENABLED,
+                        SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT,
+                        SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_ENABLED,
+                        SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_TIMEOUT,
+                        SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_MINIMUM_INTERVAL
+                    )
                 )
             )
         );
@@ -182,7 +200,7 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
     }
 
     public void testTotalRestHandlers() {
-        assertEquals(15, plugin.getRestHandlers(Settings.EMPTY, null, null, null, null, null, null).size());
+        assertEquals(26, plugin.getRestHandlers(Settings.EMPTY, null, null, null, null, null, null).size());
     }
 
     public void testQuerySetTransportIsAdded() {
@@ -206,11 +224,12 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
         assertEquals(1, actions.stream().filter(actionHandler -> actionHandler.getAction() instanceof PutExperimentAction).count());
         assertEquals(1, actions.stream().filter(actionHandler -> actionHandler.getAction() instanceof GetExperimentAction).count());
         assertEquals(1, actions.stream().filter(actionHandler -> actionHandler.getAction() instanceof DeleteExperimentAction).count());
+        assertEquals(1, actions.stream().filter(actionHandler -> actionHandler.getAction() instanceof ValidateExperimentAction).count());
     }
 
     public void testGetSettings() {
         List<Setting<?>> settings = plugin.getSettings();
-        assertEquals(3, settings.size());
+        assertEquals(6, settings.size());
 
         Setting<?> setting0 = settings.get(0);
         assertEquals("plugins.search_relevance.workbench_enabled", setting0.getKey());
@@ -223,5 +242,17 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
         Setting<?> setting2 = settings.get(2);
         assertEquals("plugins.search_relevance.query_set.maximum", setting2.getKey());
         assertEquals(1000, setting2.get(Settings.EMPTY));
+
+        Setting<?> setting3 = settings.get(3);
+        assertEquals("plugins.search_relevance.scheduled_experiments_enabled", setting3.getKey());
+        assertEquals(true, setting3.get(Settings.EMPTY));
+
+        Setting<?> setting4 = settings.get(4);
+        assertEquals("plugins.search_relevance.scheduled_experiments_timeout", setting4.getKey());
+        assertEquals(TimeValue.timeValueMinutes(60), setting4.get(Settings.EMPTY));
+
+        Setting<?> setting5 = settings.get(5);
+        assertEquals("plugins.search_relevance.scheduled_experiments_minimum_interval", setting5.getKey());
+        assertEquals(TimeValue.timeValueSeconds(1), setting5.get(Settings.EMPTY));
     }
 }

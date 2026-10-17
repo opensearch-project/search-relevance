@@ -50,7 +50,7 @@ public abstract class SearchRelevanceRestTestCase extends OpenSearchTestCase {
         when(channel.newBuilder()).thenReturn(builder);
     }
 
-    public RestRequest createPutRestRequestWithContent(String content, String endpoint) throws IOException {
+    public RestRequest createPutRestRequestWithContent(String content, String endpoint) {
         Map<String, String> params = new HashMap<>(); // Create params map
         return new FakeRestRequest.Builder(NamedXContentRegistry.EMPTY).withContent(new BytesArray(content), XContentType.JSON)
             .withParams(params)
@@ -88,6 +88,18 @@ public abstract class SearchRelevanceRestTestCase extends OpenSearchTestCase {
         return new FakeRestRequest.Builder(NamedXContentRegistry.EMPTY).withMethod(RestRequest.Method.DELETE)
             .withPath("/_plugins/_search_relevance/" + endpoint)
             .withParams(params)
+            .build();
+    }
+
+    protected RestRequest createPatchRestRequestWithContent(String content, String endpoint, String documentId) {
+        Map<String, String> params = new HashMap<>();
+        if (documentId != null && !documentId.isEmpty()) {
+            params.put(DOCUMENT_ID, documentId);
+        }
+        return new FakeRestRequest.Builder(NamedXContentRegistry.EMPTY).withContent(new BytesArray(content), XContentType.JSON)
+            .withParams(params)
+            .withMethod(RestRequest.Method.PATCH)
+            .withPath("/_plugins/_search_relevance/" + endpoint + "/" + documentId)
             .build();
     }
 

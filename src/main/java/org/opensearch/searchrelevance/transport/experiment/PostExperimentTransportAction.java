@@ -100,6 +100,8 @@ public class PostExperimentTransportAction extends HandledTransportAction<PostEx
             Experiment initialExperiment = new Experiment(
                 id,
                 TimeUtils.getTimestamp(),
+                null,
+                null,
                 request.getType(),
                 AsyncStatus.PROCESSING,
                 request.getQuerySetId(),
@@ -272,30 +274,6 @@ public class PostExperimentTransportAction extends HandledTransportAction<PostEx
 
     }
 
-    private void handleAsyncFailure(String experimentId, PutExperimentRequest request, String message, Exception error) {
-        LOGGER.error(message + " for experiment: " + experimentId, error);
-
-        Experiment errorExperiment = new Experiment(
-            experimentId,
-            TimeUtils.getTimestamp(),
-            request.getType(),
-            AsyncStatus.ERROR,
-            request.getQuerySetId(),
-            request.getSearchConfigurationList(),
-            request.getJudgmentList(),
-            request.getSize(),
-            List.of(Map.of("error", error.getMessage()))
-        );
-
-        experimentDao.updateExperiment(
-            errorExperiment,
-            ActionListener.wrap(
-                response -> LOGGER.info("Updated experiment {} status to ERROR", experimentId),
-                e -> LOGGER.error("Failed to update error status for experiment: " + experimentId, e)
-            )
-        );
-    }
-
     private void updateFinalExperiment(
         String experimentId,
         PostExperimentRequest request,
@@ -309,6 +287,8 @@ public class PostExperimentTransportAction extends HandledTransportAction<PostEx
         Experiment finalExperiment = new Experiment(
             experimentId,
             TimeUtils.getTimestamp(),
+            null,
+            null,
             request.getType(),
             finalStatus,
             request.getQuerySetId(),
@@ -337,6 +317,8 @@ public class PostExperimentTransportAction extends HandledTransportAction<PostEx
         Experiment errorExperiment = new Experiment(
             experimentId,
             TimeUtils.getTimestamp(),
+            null,
+            null,
             request.getType(),
             AsyncStatus.ERROR,
             request.getQuerySetId(),

@@ -8,9 +8,6 @@
 package org.opensearch.searchrelevance.experiment;
 
 import static org.opensearch.searchrelevance.common.MetricsConstants.POINTWISE_FIELD_NAME_SEARCH_CONFIGURATION_ID;
-import static org.opensearch.searchrelevance.experiment.ExperimentOptionsForHybridSearch.EXPERIMENT_OPTION_COMBINATION_TECHNIQUE;
-import static org.opensearch.searchrelevance.experiment.ExperimentOptionsForHybridSearch.EXPERIMENT_OPTION_NORMALIZATION_TECHNIQUE;
-import static org.opensearch.searchrelevance.experiment.ExperimentOptionsForHybridSearch.EXPERIMENT_OPTION_WEIGHTS_FOR_COMBINATION;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -20,17 +17,21 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.opensearch.action.search.SearchResponse;
 import org.opensearch.core.action.ActionListener;
-import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.executors.ExperimentTaskManager;
 import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.model.ExperimentVariant;
+import org.opensearch.searchrelevance.model.QuerySetEntry;
 import org.opensearch.searchrelevance.model.SearchConfigurationDetails;
+import org.opensearch.searchrelevance.scheduler.ExperimentCancellationToken;
 import org.opensearch.searchrelevance.utils.TimeUtils;
+
+import com.google.common.annotations.VisibleForTesting;
 
 import lombok.AllArgsConstructor;
 import lombok.extern.log4j.Log4j2;
@@ -42,36 +43,40 @@ import lombok.extern.log4j.Log4j2;
 @AllArgsConstructor
 public class HybridOptimizerExperimentProcessor {
 
-    private final JudgmentDao judgmentDao;
     private final ExperimentTaskManager taskManager;
 
     /**
      * Process hybrid optimizer experiment using non-blocking async operations
      *
      * @param experimentId Experiment ID
-     * @param queryText Query text to process
+     * @param queryEntry QuerySetEntry containing query text and custom fields
      * @param searchConfigurations Map of search configuration IDs to SearchConfigurationDetails
      * @param judgmentList List of judgment IDs
+     * @param queryTextToDocIdToRatings Pre-built map of query text to doc id to rating
      * @param size Result size
-     * @param hasFailure Failure flag
+     * @param scheduledRunId id for the experiment to be scheduled
+     * @param cancellationToken token to indicate whether the task has been cancelled
+     * @param runningFutures futures set to be cancelled when the token is cancelled
      * @param listener Listener to notify when processing is complete
      */
     public void processHybridOptimizerExperiment(
         String experimentId,
-        String queryText,
+        QuerySetEntry queryEntry,
         Map<String, SearchConfigurationDetails> searchConfigurations,
         List<String> judgmentList,
+        Map<String, Map<String, String>> queryTextToDocIdToRatings,
         int size,
-        AtomicBoolean hasFailure,
+        String scheduledRunId,
+        ExperimentCancellationToken cancellationToken,
+        Map<String, List<Future<?>>> runningFutures,
         ActionListener<Map<String, Object>> listener
     ) {
-        // Create parameter combinations for hybrid search
-        Map<String, Object> defaultParametersForHybridSearch = ExperimentOptionsFactory.createDefaultExperimentParametersForHybridSearch();
-        ExperimentOptionsForHybridSearch experimentOptionForHybridSearch = (ExperimentOptionsForHybridSearch) ExperimentOptionsFactory
-            .createExperimentOptions(ExperimentOptionsFactory.HYBRID_SEARCH_EXPERIMENT_OPTIONS, defaultParametersForHybridSearch);
+        String queryText = queryEntry.queryText();
+        ExperimentOptionsForHybridSearch experimentOptionForHybridSearch = new ExperimentOptionsForHybridSearch();
 
-        List<ExperimentVariantHybridSearchDTO> experimentVariantDTOs = experimentOptionForHybridSearch.getParameterCombinations(true);
+        List<ExperimentVariantHybridSearchDTO> experimentVariantDTOs = experimentOptionForHybridSearch.getParameterCombinations();
         List<ExperimentVariant> experimentVariants = new ArrayList<>();
+        AtomicBoolean hasFailure = new AtomicBoolean(false);
 
         log.info(
             "Starting hybrid optimizer experiment {} with {} parameter combinations for query: {}",
@@ -81,16 +86,7 @@ public class HybridOptimizerExperimentProcessor {
         );
 
         for (ExperimentVariantHybridSearchDTO experimentVariantDTO : experimentVariantDTOs) {
-            Map<String, Object> parameters = new HashMap<>(
-                Map.of(
-                    EXPERIMENT_OPTION_NORMALIZATION_TECHNIQUE,
-                    experimentVariantDTO.getNormalizationTechnique(),
-                    EXPERIMENT_OPTION_COMBINATION_TECHNIQUE,
-                    experimentVariantDTO.getCombinationTechnique(),
-                    EXPERIMENT_OPTION_WEIGHTS_FOR_COMBINATION,
-                    experimentVariantDTO.getQueryWeightsForCombination()
-                )
-            );
+            Map<String, Object> parameters = new HashMap<>(experimentVariantDTO.toParameters());
             String experimentVariantId = UUID.randomUUID().toString();
 
             // Create lightweight ExperimentVariant without storing it to index
@@ -112,101 +108,52 @@ public class HybridOptimizerExperimentProcessor {
             experimentVariants.size()
         );
 
-        // Process judgments asynchronously
-        processJudgmentsAsync(queryText, judgmentList).thenAccept(docIdToScores -> {
-            log.info("Processing search configurations for query '{}' with {} document ratings", queryText, docIdToScores.size());
-
-            // Process search configurations with optimized task manager
-            processSearchConfigurationsAsync(
-                experimentId,
-                queryText,
-                searchConfigurations,
-                judgmentList,
-                size,
-                experimentVariants,
-                docIdToScores,
-                hasFailure,
-                listener
-            );
-        }).exceptionally(e -> {
-            if (hasFailure.compareAndSet(false, true)) {
-                listener.onFailure(new Exception("Failed to process judgments", e));
-            }
-            return null;
-        });
-    }
-
-    /**
-     * Process judgments asynchronously using CompletableFuture
-     */
-    private CompletableFuture<Map<String, String>> processJudgmentsAsync(String queryText, List<String> judgmentList) {
-        log.info("Processing {} judgments for query: {}", judgmentList.size(), queryText);
-
-        List<CompletableFuture<SearchResponse>> judgmentFutures = judgmentList.stream().map(judgmentId -> {
-            CompletableFuture<SearchResponse> future = new CompletableFuture<>();
-            judgmentDao.getJudgment(judgmentId, ActionListener.wrap(future::complete, future::completeExceptionally));
-            return future;
-        }).toList();
-
-        return CompletableFuture.allOf(judgmentFutures.toArray(new CompletableFuture[0])).thenApply(v -> {
-            Map<String, String> docIdToScores = new HashMap<>();
-            for (CompletableFuture<SearchResponse> future : judgmentFutures) {
-                try {
-                    SearchResponse response = future.join();
-                    extractJudgmentScores(queryText, response, docIdToScores);
-                } catch (Exception e) {
-                    log.error("Failed to process judgment response: {}", e.getMessage());
-                }
-            }
-
-            if (docIdToScores.isEmpty()) {
-                log.warn("No ratings found for query: {} in any judgment responses", queryText);
-            } else {
-                log.info("Found {} document ratings for query: {}", docIdToScores.size(), queryText);
-            }
-
-            return docIdToScores;
-        });
-    }
-
-    /**
-     * Extract judgment scores from SearchResponse
-     */
-    private void extractJudgmentScores(String queryText, SearchResponse response, Map<String, String> docIdToScores) {
-        if (response.getHits().getTotalHits().value() == 0) {
-            log.warn("No judgment found in response");
-            return;
+        Map<String, String> docIdToScores = queryTextToDocIdToRatings != null ? queryTextToDocIdToRatings.get(queryText) : null;
+        if (docIdToScores == null) {
+            docIdToScores = Collections.emptyMap();
         }
+        log.info("Processing search configurations for query '{}' with {} document ratings", queryText, docIdToScores.size());
 
-        Map<String, Object> sourceAsMap = response.getHits().getHits()[0].getSourceAsMap();
-        List<Map<String, Object>> judgmentRatings = (List<Map<String, Object>>) sourceAsMap.getOrDefault(
-            "judgmentRatings",
-            Collections.emptyList()
+        // Process search configurations with optimized task manager
+        processSearchConfigurationsAsync(
+            experimentId,
+            queryEntry,
+            searchConfigurations,
+            judgmentList,
+            size,
+            experimentVariants,
+            docIdToScores,
+            hasFailure,
+            scheduledRunId,
+            cancellationToken,
+            runningFutures,
+            listener
         );
+    }
 
-        for (Map<String, Object> rating : judgmentRatings) {
-            if (queryText.equals(rating.get("query"))) {
-                List<Map<String, String>> docScoreRatings = (List<Map<String, String>>) rating.get("ratings");
-                if (docScoreRatings != null) {
-                    docScoreRatings.forEach(docScoreRating -> docIdToScores.put(docScoreRating.get("docId"), docScoreRating.get("rating")));
-                }
-                break;
-            }
+    private boolean checkIfCancelled(ExperimentCancellationToken cancellationToken) {
+        if (cancellationToken != null && cancellationToken.isCancelled()) {
+            return true;
         }
+        return false;
     }
 
     /**
      * Process search configurations using optimized task manager
      */
-    private void processSearchConfigurationsAsync(
+    @VisibleForTesting
+    void processSearchConfigurationsAsync(
         String experimentId,
-        String queryText,
+        QuerySetEntry queryEntry,
         Map<String, SearchConfigurationDetails> searchConfigurations,
         List<String> judgmentList,
         int size,
         List<ExperimentVariant> experimentVariants,
         Map<String, String> docIdToScores,
         AtomicBoolean hasFailure,
+        String scheduledRunId,
+        ExperimentCancellationToken cancellationToken,
+        Map<String, List<Future<?>>> runningFutures,
         ActionListener<Map<String, Object>> finalListener
     ) {
         Map<String, Object> hydratedResults = new ConcurrentHashMap<>();
@@ -216,6 +163,18 @@ public class HybridOptimizerExperimentProcessor {
         List<CompletableFuture<Map<String, Object>>> configFutures = new ArrayList<>();
 
         for (Map.Entry<String, SearchConfigurationDetails> entry : searchConfigurations.entrySet()) {
+            // If the task is cancelled, we will stop scheduling more configurations, add a failed future,
+            // and signal that there has been a failure to the task scheduler.
+            if (checkIfCancelled(cancellationToken)) {
+                CompletableFuture<Map<String, Object>> futureToFail = new CompletableFuture<>();
+                configFutures.add(futureToFail);
+                futureToFail.completeExceptionally(new TimeoutException("Timed out when processing search configurations"));
+                if (hasFailure.compareAndSet(false, true)) {
+                    finalListener.onFailure(new TimeoutException("Timed out when processing search configurations"));
+                }
+                log.info("When processing search configurations in HybridOptimizerExperimentProcessor, a timeout cancellation occurred");
+                break;
+            }
             String searchConfigId = entry.getKey();
             SearchConfigurationDetails configDetails = entry.getValue();
             String index = configDetails.getIndex();
@@ -228,13 +187,16 @@ public class HybridOptimizerExperimentProcessor {
                 searchConfigId,
                 index,
                 query,
-                queryText,
+                queryEntry,
                 size,
                 experimentVariants,
                 judgmentList,
                 docIdToScores,
                 hydratedResults,
-                hasFailure
+                hasFailure,
+                scheduledRunId,
+                runningFutures,
+                cancellationToken
             );
 
             // Transform the result for this search configuration

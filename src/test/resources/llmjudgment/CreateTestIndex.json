@@ -1,0 +1,18 @@
+{
+  "mappings": {
+    "properties": {
+      "name": {
+        "type": "text"
+      },
+      "description": {
+        "type": "text"
+      },
+      "category": {
+        "type": "keyword"
+      },
+      "price": {
+        "type": "float"
+      }
+    }
+  }
+}

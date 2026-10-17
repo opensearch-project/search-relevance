@@ -8,21 +8,160 @@
 package org.opensearch.searchrelevance.model.builder;
 
 import static org.opensearch.searchrelevance.common.PluginConstants.WILDCARD_QUERY_TEXT;
+import static org.opensearch.searchrelevance.common.PluginConstants.WILDCARD_QUERY_TEXT_DEPRECATED;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.junit.Before;
 import org.opensearch.action.search.SearchRequest;
+import org.opensearch.common.settings.Settings;
+import org.opensearch.core.xcontent.NamedXContentRegistry;
+import org.opensearch.search.SearchModule;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.test.OpenSearchTestCase;
 
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
+
 public class SearchRequestBuilderTests extends OpenSearchTestCase {
+
+    @Before
+    public void setup() {
+        NamedXContentRegistry reg = new NamedXContentRegistry(
+            new SearchModule(Settings.EMPTY, java.util.Collections.emptyList()).getNamedXContents()
+        );
+        // Pass null for ScriptService since these tests only use legacy %SearchText%
+        // queries
+        SearchRequestBuilder.initialize(reg, null);
+    }
 
     private static final String TEST_INDEX = "test_index";
     private static final String TEST_QUERY_TEXT = "test_query";
     private static final String TEST_PIPELINE = "test_pipeline";
     private static final int TEST_SIZE = 10;
+    private static final String LEGACY_PLACEHOLDER_DEPRECATION_MESSAGE =
+        "The %SearchText% query template placeholder is deprecated; use %queryText% instead.";
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    private static Map<String, Object> parseJsonToMap(String json) throws Exception {
+        return MAPPER.readValue(json, new TypeReference<Map<String, Object>>() {
+        });
+    }
+
+    @SuppressWarnings("unchecked")
+    private static String extractWrappedRescoreQueryBase64(Map<String, Object> sourceMap) {
+        Object rescore = sourceMap.get("rescore");
+        if (rescore instanceof Map) {
+            Map<String, Object> rescoreMap = (Map<String, Object>) rescore;
+            Object queryObj = rescoreMap.get("query");
+            if (queryObj instanceof Map) {
+                Map<String, Object> queryMap = (Map<String, Object>) queryObj;
+                Object rescoreQuery = queryMap.get("rescore_query");
+                if (rescoreQuery instanceof Map) {
+                    Map<String, Object> rq = (Map<String, Object>) rescoreQuery;
+                    Object wrapperObj = rq.get("wrapper");
+                    if (wrapperObj instanceof Map) {
+                        return (String) ((Map<String, Object>) wrapperObj).get("query");
+                    }
+                }
+            }
+        } else if (rescore instanceof List) {
+            List<?> list = (List<?>) rescore;
+            if (list.isEmpty() == false) {
+                Object first = list.get(0);
+                if (first instanceof Map) {
+                    Map<String, Object> rescoreMap = (Map<String, Object>) first;
+                    Object queryObj = rescoreMap.get("query");
+                    if (queryObj instanceof Map) {
+                        Map<String, Object> queryMap = (Map<String, Object>) queryObj;
+                        Object rescoreQuery = queryMap.get("rescore_query");
+                        if (rescoreQuery instanceof Map) {
+                            Map<String, Object> rq = (Map<String, Object>) rescoreQuery;
+                            Object wrapperObj = rq.get("wrapper");
+                            if (wrapperObj instanceof Map) {
+                                return (String) ((Map<String, Object>) wrapperObj).get("query");
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    public void testBuildSearchRequest_preservesQueryStructure_forSearchPipeline() throws Exception {
+        String query = "{\"query\":{\"term\":{\"embedding\":{\"value\":\"" + WILDCARD_QUERY_TEXT + "\"}}}}";
+
+        SearchRequest searchRequest = SearchRequestBuilder.buildSearchRequest(TEST_INDEX, query, TEST_QUERY_TEXT, TEST_PIPELINE, TEST_SIZE);
+        assertNotNull(searchRequest);
+        assertEquals(TEST_PIPELINE, searchRequest.pipeline());
+
+        SearchSourceBuilder sourceBuilder = searchRequest.source();
+        assertNotNull(sourceBuilder);
+
+        Map<String, Object> sourceMap = parseJsonToMap(sourceBuilder.toString());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> queryMap = (Map<String, Object>) sourceMap.get("query");
+        assertNotNull(queryMap);
+        assertFalse("Query must not be encoded inside a wrapper query", queryMap.containsKey("wrapper"));
+        assertTrue("Original term query structure must be preserved", queryMap.containsKey("term"));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> termMap = (Map<String, Object>) queryMap.get("term");
+        assertTrue("Field path query.term.embedding must be resolvable", termMap.containsKey("embedding"));
+    }
+
+    public void testBuildSearchRequest_fallsBackToWrapper_forUnregisteredQueryType() throws Exception {
+        String hybridQuery = "{\"query\":{\"hybrid\":{\"queries\":[{\"match\":{\"name\":\""
+            + WILDCARD_QUERY_TEXT
+            + "\"}},{\"match\":{\"name\":\""
+            + WILDCARD_QUERY_TEXT
+            + "\"}}]}}}";
+
+        SearchRequest searchRequest = SearchRequestBuilder.buildSearchRequest(TEST_INDEX, hybridQuery, TEST_QUERY_TEXT, null, TEST_SIZE);
+        assertNotNull(searchRequest);
+
+        SearchSourceBuilder sourceBuilder = searchRequest.source();
+        assertNotNull(sourceBuilder);
+
+        Map<String, Object> sourceMap = parseJsonToMap(sourceBuilder.toString());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> queryMap = (Map<String, Object>) sourceMap.get("query");
+        assertNotNull(queryMap);
+        assertTrue("Unregistered query type should fall back to wrapper query", queryMap.containsKey("wrapper"));
+    }
+
+    public void testBuildSearchRequest_fallsBackToWrapper_whenRegistryNotInitialized() throws Exception {
+        SearchRequestBuilder.initialize(null, null);
+        String query = "{\"query\":{\"match\":{\"title\":\"" + WILDCARD_QUERY_TEXT + "\"}}}";
+
+        SearchRequest searchRequest = SearchRequestBuilder.buildSearchRequest(TEST_INDEX, query, TEST_QUERY_TEXT, null, TEST_SIZE);
+        assertNotNull(searchRequest);
+
+        SearchSourceBuilder sourceBuilder = searchRequest.source();
+        assertNotNull(sourceBuilder);
+
+        Map<String, Object> sourceMap = parseJsonToMap(sourceBuilder.toString());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> queryMap = (Map<String, Object>) sourceMap.get("query");
+        assertNotNull(queryMap);
+        assertTrue("Query should fall back to wrapper when registry is not initialized", queryMap.containsKey("wrapper"));
+    }
+
+    public void testBuildSearchRequest_whenNoTopLevelQuery_thenNoQuerySet() {
+        String query = "{\"_source\":{\"includes\":[\"title\"]}}";
+
+        SearchRequest searchRequest = SearchRequestBuilder.buildSearchRequest(TEST_INDEX, query, TEST_QUERY_TEXT, null, TEST_SIZE);
+        assertNotNull(searchRequest);
+
+        SearchSourceBuilder sourceBuilder = searchRequest.source();
+        assertNotNull(sourceBuilder);
+        assertNull("No query should be set when the source has no top-level query", sourceBuilder.query());
+        assertEquals(TEST_SIZE, sourceBuilder.size());
+    }
 
     public void testBuildSearchRequestSimpleQuery() {
         String simpleQuery = "{\"query\":{\"match\":{\"title\":\"" + WILDCARD_QUERY_TEXT + "\"}}}";
@@ -140,4 +279,285 @@ public class SearchRequestBuilderTests extends OpenSearchTestCase {
         );
         assertEquals("invalid hybrid query: expected exactly [2] sub-queries but found [1]", exception.getMessage());
     }
+
+    public void testParseRescoreQuery_whenRescoreIsObject() throws Exception {
+        String query = "{"
+            + "\"query\":{\"match\":{\"title\":\""
+            + WILDCARD_QUERY_TEXT
+            + "\"}},"
+            + "\"rescore\":{\"query\":{\"rescore_query\":{\"match\":{\"title\":\"abc\"}}}}"
+            + "}";
+
+        SearchRequest searchRequest = SearchRequestBuilder.buildSearchRequest(TEST_INDEX, query, TEST_QUERY_TEXT, null, TEST_SIZE);
+        assertNotNull(searchRequest);
+        SearchSourceBuilder sourceBuilder = searchRequest.source();
+        assertNotNull(sourceBuilder);
+
+        Map<String, Object> sourceMap = parseJsonToMap(sourceBuilder.toString());
+        Object rescoreObj = sourceMap.get("rescore");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> rescoreMap = (rescoreObj instanceof java.util.List)
+            ? (Map<String, Object>) ((java.util.List<?>) rescoreObj).get(0)
+            : (Map<String, Object>) rescoreObj;
+        assertNotNull(rescoreMap);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> queryObj = (Map<String, Object>) rescoreMap.get("query");
+        assertNotNull(queryObj);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> rescoreQuery = (Map<String, Object>) queryObj.get("rescore_query");
+        assertNotNull(rescoreQuery);
+        assertTrue(rescoreQuery.containsKey("match"));
+    }
+
+    public void testParseRescoreQuery_whenRescoreIsArrayFirstEntry() throws Exception {
+        String query = "{"
+            + "\"query\":{\"match\":{\"title\":\""
+            + WILDCARD_QUERY_TEXT
+            + "\"}},"
+            + "\"rescore\":[{\"query\":{\"rescore_query\":{\"match\":{\"title\":\"xyz\"}}}}]"
+            + "}";
+
+        SearchRequest searchRequest = SearchRequestBuilder.buildSearchRequest(TEST_INDEX, query, TEST_QUERY_TEXT, null, TEST_SIZE);
+        assertNotNull(searchRequest);
+        SearchSourceBuilder sourceBuilder = searchRequest.source();
+        assertNotNull(sourceBuilder);
+
+        Map<String, Object> sourceMap = parseJsonToMap(sourceBuilder.toString());
+        @SuppressWarnings("unchecked")
+        java.util.List<Object> rescoreList = (java.util.List<Object>) sourceMap.get("rescore");
+        assertNotNull(rescoreList);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> first = (Map<String, Object>) rescoreList.get(0);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> q = (Map<String, Object>) first.get("query");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> rq = (Map<String, Object>) q.get("rescore_query");
+        assertNotNull(rq);
+        assertTrue(rq.containsKey("match"));
+    }
+
+    public void testParseRescoreQuery_inHybridRequest() throws Exception {
+        // Minimal valid hybrid query (2 sub-queries) plus rescore with a standard query
+        String hybridQuery = "{"
+            + "\"_source\":{\"exclude\":[\"passage_embedding\"]},"
+            + "\"query\":{\"hybrid\":{\"queries\":["
+            + "{\"match\":{\"name\":\""
+            + WILDCARD_QUERY_TEXT
+            + "\"}},"
+            + "{\"match\":{\"name\":{\"query\":\""
+            + WILDCARD_QUERY_TEXT
+            + "\"}}}"
+            + "]}},"
+            + "\"rescore\":{\"query\":{\"rescore_query\":{\"match\":{\"name\":\"hyb\"}}}}"
+            + "}";
+
+        Map<String, Object> temporarySearchPipeline = Map.of(); // allowed empty
+        SearchRequest searchRequest = SearchRequestBuilder.buildRequestForHybridSearch(
+            TEST_INDEX,
+            hybridQuery,
+            temporarySearchPipeline,
+            TEST_QUERY_TEXT,
+            TEST_SIZE
+        );
+        assertNotNull(searchRequest);
+        SearchSourceBuilder sourceBuilder = searchRequest.source();
+        assertNotNull(sourceBuilder);
+
+        Map<String, Object> sourceMap = parseJsonToMap(sourceBuilder.toString());
+        Object rescoreObj = sourceMap.get("rescore");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> rescoreMap = (rescoreObj instanceof java.util.List)
+            ? (Map<String, Object>) ((java.util.List<?>) rescoreObj).get(0)
+            : (Map<String, Object>) rescoreObj;
+        assertNotNull(rescoreMap);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> queryObj = (Map<String, Object>) rescoreMap.get("query");
+        assertNotNull(queryObj);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> rescoreQuery = (Map<String, Object>) queryObj.get("rescore_query");
+        assertNotNull(rescoreQuery);
+        assertTrue(rescoreQuery.containsKey("match"));
+    }
+
+    // ==================== Mustache Template Tests ====================
+
+    /**
+     * Test that Mustache template throws error when ScriptService is null
+     * This is the critical error handling case we can test without a real
+     * ScriptService
+     */
+    public void testMustacheWithNullScriptService() {
+        // Ensure ScriptService is null (as set in @Before)
+        NamedXContentRegistry reg = new NamedXContentRegistry(
+            new SearchModule(Settings.EMPTY, java.util.Collections.emptyList()).getNamedXContents()
+        );
+        SearchRequestBuilder.initialize(reg, null);
+
+        String mustacheQuery = "{\"query\":{\"match\":{\"title\":\"{{queryText}}\"}}}";
+
+        try {
+            SearchRequestBuilder.buildSearchRequest(TEST_INDEX, mustacheQuery, TEST_QUERY_TEXT, null, TEST_SIZE);
+            fail("Should have thrown IllegalStateException when ScriptService is null");
+        } catch (IllegalStateException e) {
+            // Expected - verify error message mentions ScriptService
+            String errorMsg = e.getMessage() != null ? e.getMessage() : "";
+            String causeMsg = (e.getCause() != null && e.getCause().getMessage() != null) ? e.getCause().getMessage() : "";
+            assertTrue(
+                "Error message should mention ScriptService",
+                errorMsg.contains("ScriptService") || causeMsg.contains("ScriptService")
+            );
+        }
+    }
+
+    /**
+     * Test legacy %SearchText% still works for backward compatibility
+     * This confirms that queries without {{ use the old string replacement
+     */
+    public void testLegacyWildcardStillWorks() {
+        String legacyQuery = "{\"query\":{\"match\":{\"title\":\"" + WILDCARD_QUERY_TEXT_DEPRECATED + "\"}}}";
+
+        SearchRequest searchRequest = SearchRequestBuilder.buildSearchRequest(TEST_INDEX, legacyQuery, TEST_QUERY_TEXT, null, TEST_SIZE);
+
+        assertNotNull(searchRequest);
+        SearchSourceBuilder sourceBuilder = searchRequest.source();
+        assertNotNull(sourceBuilder);
+        String renderedSource = sourceBuilder.toString();
+        assertTrue("Query text should be substituted into the query", renderedSource.contains(TEST_QUERY_TEXT));
+        assertFalse(
+            "Legacy placeholder should not remain unsubstituted",
+            renderedSource.contains(WILDCARD_QUERY_TEXT_DEPRECATED)
+        );
+        assertWarnings(LEGACY_PLACEHOLDER_DEPRECATION_MESSAGE);
+    }
+
+    /**
+     * Test the preferred %queryText% placeholder is substituted for non-Mustache
+     * queries, matching the legacy %SearchText% behavior above.
+     */
+    public void testPreferredWildcardWorks() {
+        String preferredQuery = "{\"query\":{\"match\":{\"title\":\"" + WILDCARD_QUERY_TEXT + "\"}}}";
+
+        SearchRequest searchRequest = SearchRequestBuilder.buildSearchRequest(TEST_INDEX, preferredQuery, TEST_QUERY_TEXT, null, TEST_SIZE);
+
+        assertNotNull(searchRequest);
+        SearchSourceBuilder sourceBuilder = searchRequest.source();
+        assertNotNull(sourceBuilder);
+        String renderedSource = sourceBuilder.toString();
+        assertTrue("Query text should be substituted into the query", renderedSource.contains(TEST_QUERY_TEXT));
+        assertFalse(
+            "Preferred placeholder should not remain unsubstituted",
+            renderedSource.contains(WILDCARD_QUERY_TEXT)
+        );
+    }
+
+    /**
+     * Test a single query mixing both the legacy and preferred placeholders
+     * (e.g. one search configuration authored before the rename, one after) has
+     * both substituted correctly.
+     */
+    public void testMixedLegacyAndPreferredWildcardsBothSubstituted() {
+        String mixedQuery = "{\"query\":{\"bool\":{\"must\":[{\"match\":{\"title\":\""
+            + WILDCARD_QUERY_TEXT
+            + "\"}},{\"match\":{\"content\":\""
+            + WILDCARD_QUERY_TEXT_DEPRECATED
+            + "\"}}]}}}";
+
+        SearchRequest searchRequest = SearchRequestBuilder.buildSearchRequest(TEST_INDEX, mixedQuery, TEST_QUERY_TEXT, null, TEST_SIZE);
+
+        assertNotNull(searchRequest);
+        SearchSourceBuilder sourceBuilder = searchRequest.source();
+        assertNotNull(sourceBuilder);
+        String renderedSource = sourceBuilder.toString();
+        assertFalse("Legacy placeholder should not remain unsubstituted", renderedSource.contains(WILDCARD_QUERY_TEXT_DEPRECATED));
+        assertFalse(
+            "Preferred placeholder should not remain unsubstituted",
+            renderedSource.contains(WILDCARD_QUERY_TEXT)
+        );
+        assertWarnings(LEGACY_PLACEHOLDER_DEPRECATION_MESSAGE);
+    }
+
+    /**
+     * Test that queries without {{ use legacy replacement even if ScriptService is
+     * null
+     * This verifies the detection logic works correctly
+     */
+    public void testDetectionLogicUsesLegacyForNonMustache() {
+        SearchRequestBuilder.initialize(
+            new NamedXContentRegistry(new SearchModule(Settings.EMPTY, java.util.Collections.emptyList()).getNamedXContents()),
+            null
+        );
+
+        // Query WITHOUT {{ should use legacy replacement and not fail
+        String legacyQuery = "{\"query\":{\"match\":{\"title\":\"" + WILDCARD_QUERY_TEXT_DEPRECATED + "\"}}}";
+        SearchRequest sr = SearchRequestBuilder.buildSearchRequest(TEST_INDEX, legacyQuery, "test", null, TEST_SIZE);
+        assertNotNull("Legacy query should work without ScriptService", sr);
+
+        // Query WITH {{ should fail with null ScriptService
+        String mustacheQuery = "{\"query\":{\"match\":{\"title\":\"{{queryText}}\"}}}";
+        try {
+            SearchRequestBuilder.buildSearchRequest(TEST_INDEX, mustacheQuery, "test", null, TEST_SIZE);
+            fail("Mustache query should fail without ScriptService");
+        } catch (IllegalStateException e) {
+            // Expected
+            assertTrue(
+                "Error should mention ScriptService",
+                e.getMessage().contains("ScriptService") || e.getCause() != null && e.getCause().getMessage().contains("ScriptService")
+            );
+        }
+        assertWarnings(LEGACY_PLACEHOLDER_DEPRECATION_MESSAGE);
+    }
+
+    /**
+     * Test that buildRequestForHybridSearch also handles Mustache detection
+     */
+    public void testHybridSearchMustacheDetection() {
+        SearchRequestBuilder.initialize(
+            new NamedXContentRegistry(new SearchModule(Settings.EMPTY, java.util.Collections.emptyList()).getNamedXContents()),
+            null
+        );
+
+        // Legacy query should work in hybrid search
+        String legacyQuery = "{\"query\":{\"hybrid\":{\"queries\":["
+            + "{\"match\":{\"title\":\""
+            + WILDCARD_QUERY_TEXT_DEPRECATED
+            + "\"}},"
+            + "{\"match\":{\"description\":\""
+            + WILDCARD_QUERY_TEXT_DEPRECATED
+            + "\"}}"
+            + "]}}}";
+        Map<String, Object> temporarySearchPipeline = Map.of();
+        SearchRequest sr = SearchRequestBuilder.buildRequestForHybridSearch(
+            TEST_INDEX,
+            legacyQuery,
+            temporarySearchPipeline,
+            "test",
+            TEST_SIZE
+        );
+        assertNotNull("Legacy hybrid query should work", sr);
+        assertNotNull(sr.source());
+
+        // Mustache query should fail without ScriptService
+        String mustacheQuery = "{\"query\":{\"hybrid\":{\"queries\":["
+            + "{\"match\":{\"title\":\"{{queryText}}\"}},"
+            + "{\"match\":{\"description\":\"{{queryText}}\"}}"
+            + "]}}}";
+        try {
+            SearchRequestBuilder.buildRequestForHybridSearch(TEST_INDEX, mustacheQuery, temporarySearchPipeline, "test", TEST_SIZE);
+            fail("Mustache hybrid query should fail without ScriptService");
+        } catch (IllegalStateException e) {
+            // Expected
+        }
+        assertWarnings(LEGACY_PLACEHOLDER_DEPRECATION_MESSAGE);
+    }
+
+    /*
+     * NOTE: Tests for actual Mustache templating functionality require integration
+     * tests
+     * with a real ScriptService. These tests focus on:
+     * 1. Error handling when ScriptService is missing
+     * 2. Detection logic ({{ triggers Mustache path)
+     * 3. Backward compatibility (legacy %SearchText% still works)
+     *
+     * For full end-to-end Mustache substitution tests, see integration tests.
+     */
 }

@@ -20,10 +20,10 @@ import org.opensearch.core.common.io.stream.StreamOutput;
  * Create Request supports sampling from ubi queries.
  */
 public class PostQuerySetRequest extends ActionRequest {
-    private String name;
-    private String description;
-    private String sampling;
-    private int querySetSize;
+    private final String name;
+    private final String description;
+    private final String sampling;
+    private final int querySetSize;
 
     public PostQuerySetRequest(String name, String description, String sampling, int querySetSize) {
         this.name = Objects.requireNonNull(name, "name cannot be null.");

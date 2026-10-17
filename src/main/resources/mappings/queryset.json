@@ -1,4 +1,7 @@
 {
+  "_meta": {
+    "schema_version": 1
+  },
   "properties": {
     "id": { "type": "keyword" },
     "timestamp": { "type": "date", "format": "strict_date_time" },
@@ -7,7 +10,11 @@
     "querySetQueries": {
       "type": "nested",
       "properties": {
-        "queryText": { "type": "text" }
+        "queryText": { "type": "text" },
+        "customFields": {
+          "type": "object",
+          "dynamic": true
+        }
       }
     },
     "sampling": { "type": "keyword" }

@@ -1,0 +1,4 @@
+{
+  "experimentId": "{{experiment_id}}",
+  "cronExpression": "* * * * *"
+}

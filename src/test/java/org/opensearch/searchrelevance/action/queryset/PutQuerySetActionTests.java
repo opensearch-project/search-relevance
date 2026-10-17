@@ -9,6 +9,7 @@ package org.opensearch.searchrelevance.action.queryset;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 import org.opensearch.common.io.stream.BytesStreamOutput;
@@ -38,8 +39,8 @@ public class PutQuerySetActionTests extends OpenSearchTestCase {
 
     private List<QueryWithReference> getQuerySetQueries() {
         List<QueryWithReference> querySetQueries = new ArrayList<>();
-        querySetQueries.add(new QueryWithReference("apple", ""));
-        querySetQueries.add(new QueryWithReference("banana", ""));
+        querySetQueries.add(new QueryWithReference("apple", new HashMap<>()));
+        querySetQueries.add(new QueryWithReference("banana", new HashMap<>()));
         return querySetQueries;
     }
 }

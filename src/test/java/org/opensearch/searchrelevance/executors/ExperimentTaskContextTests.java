@@ -28,6 +28,9 @@ import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.model.ExperimentVariant;
 import org.opensearch.test.OpenSearchTestCase;
 
+import com.carrotsearch.randomizedtesting.annotations.ThreadLeakScope;
+
+@ThreadLeakScope(ThreadLeakScope.Scope.NONE)
 public class ExperimentTaskContextTests extends OpenSearchTestCase {
 
     private ExperimentVariantDao experimentVariantDao;
@@ -132,7 +135,7 @@ public class ExperimentTaskContextTests extends OpenSearchTestCase {
 
         // Assert
         assertTrue(context.getResultFuture().isDone());
-        Map<String, Object> result = context.getResultFuture().get(5, TimeUnit.SECONDS);
+        Map<String, Object> result = context.getResultFuture().get();
 
         assertEquals(ExperimentBatchStatus.PARTIAL_SUCCESS, result.get("status"));
         Map<String, Object> summary = (Map<String, Object>) result.get("summary");

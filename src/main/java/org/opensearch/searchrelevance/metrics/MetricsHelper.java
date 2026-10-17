@@ -13,6 +13,7 @@ import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FI
 import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_DOC_IDS;
 import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_SEARCH_CONFIGURATION_ID;
 import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_SNAPSHOTS;
+import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_TOOK;
 import static org.opensearch.searchrelevance.common.MetricsConstants.POINTWISE_FIELD_NAME_EVALUATION_ID;
 import static org.opensearch.searchrelevance.common.MetricsConstants.POINTWISE_FIELD_NAME_EVALUATION_RESULTS;
 import static org.opensearch.searchrelevance.common.MetricsConstants.POINTWISE_FIELD_NAME_EXPERIMENT_VARIANT_ID;
@@ -44,12 +45,13 @@ import org.opensearch.core.action.ActionListener;
 import org.opensearch.search.SearchHit;
 import org.opensearch.searchrelevance.dao.EvaluationResultDao;
 import org.opensearch.searchrelevance.dao.ExperimentVariantDao;
-import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.EvaluationResult;
 import org.opensearch.searchrelevance.model.ExperimentVariant;
+import org.opensearch.searchrelevance.model.QuerySetEntry;
 import org.opensearch.searchrelevance.model.SearchConfigurationDetails;
 import org.opensearch.searchrelevance.model.builder.SearchRequestBuilder;
+import org.opensearch.searchrelevance.utils.SearchTook;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.transport.client.Client;
 
@@ -62,7 +64,6 @@ import reactor.util.annotation.NonNull;
  */
 public class MetricsHelper {
     private final Client client;
-    private final JudgmentDao judgmentDao;
     private final EvaluationResultDao evaluationResultDao;
     private final ExperimentVariantDao experimentVariantDao;
 
@@ -70,12 +71,10 @@ public class MetricsHelper {
     public MetricsHelper(
         @NonNull ClusterService clusterService,
         @NonNull Client client,
-        @NonNull JudgmentDao judgmentDao,
         @NonNull EvaluationResultDao evaluationResultDao,
         @NonNull ExperimentVariantDao experimentVariantDao
     ) {
         this.client = client;
-        this.judgmentDao = judgmentDao;
         this.evaluationResultDao = evaluationResultDao;
         this.experimentVariantDao = experimentVariantDao;
     }
@@ -86,12 +85,12 @@ public class MetricsHelper {
      * Pairwise comparison will not create evaluation results
      */
     public void processPairwiseMetrics(
-        String queryText,
+        QuerySetEntry queryEntry,
         Map<String, SearchConfigurationDetails> searchConfigurations,
         int size,
         ActionListener<Map<String, Object>> listener
     ) {
-        Map<String, List<String>> searchConfigToDocIds = Collections.synchronizedMap(new HashMap<>());
+        Map<String, PairwiseConfigSnapshot> searchConfigToSnapshot = Collections.synchronizedMap(new HashMap<>());
         AtomicBoolean hasFailure = new AtomicBoolean(false);
         AtomicInteger pendingSearches = new AtomicInteger(searchConfigurations.size());
 
@@ -102,7 +101,7 @@ public class MetricsHelper {
             SearchRequest searchRequest = buildSearchRequest(
                 configDetails.getIndex(),
                 configDetails.getQuery(),
-                queryText,
+                queryEntry,
                 configDetails.getPipeline(),
                 size
             );
@@ -118,9 +117,9 @@ public class MetricsHelper {
                             .distinct()
                             .collect(Collectors.toList());
 
-                        searchConfigToDocIds.put(searchConfigId, docIds);
+                        searchConfigToSnapshot.put(searchConfigId, new PairwiseConfigSnapshot(docIds, SearchTook.from(response)));
                         if (pendingSearches.decrementAndGet() == 0) {
-                            createPairwiseResults(searchConfigToDocIds, listener);
+                            createPairwiseResults(searchConfigToSnapshot, listener);
                         }
                     } catch (Exception e) {
                         handleFailure(e, hasFailure, listener);
@@ -135,32 +134,39 @@ public class MetricsHelper {
         }
     }
 
-    private void createPairwiseResults(Map<String, List<String>> searchConfigToDocIds, ActionListener<Map<String, Object>> listener) {
+    private void createPairwiseResults(
+        Map<String, PairwiseConfigSnapshot> searchConfigToSnapshot,
+        ActionListener<Map<String, Object>> listener
+    ) {
         try {
             Map<String, Object> results = new HashMap<>();
 
-            if (searchConfigToDocIds == null || searchConfigToDocIds.isEmpty()) {
+            if (searchConfigToSnapshot == null || searchConfigToSnapshot.isEmpty()) {
                 results.put(METRICS_PAIRWISE_COMPARISON_FIELD_NAME, Collections.emptyMap());
                 listener.onResponse(results);
                 return;
             }
-            // Add doc IDs for each search configuration
+            // Add doc IDs and cluster latency for each search configuration
             List<Map<String, Object>> snapShots = new ArrayList<>();
-            searchConfigToDocIds.forEach((configId, docIds) -> {
+            searchConfigToSnapshot.forEach((configId, configSnapshot) -> {
                 Map<String, Object> snapshot = new HashMap<>();
                 snapshot.put(PAIRWISE_FIELD_NAME_SEARCH_CONFIGURATION_ID, configId);
+                List<String> docIds = configSnapshot != null ? configSnapshot.docIds : null;
                 snapshot.put(PAIRWISE_FIELD_NAME_DOC_IDS, docIds != null ? docIds : Collections.emptyList());
+                if (configSnapshot != null && configSnapshot.took != null) {
+                    snapshot.put(PAIRWISE_FIELD_NAME_TOOK, configSnapshot.took);
+                }
                 snapShots.add(snapshot);
             });
             results.put(PAIRWISE_FIELD_NAME_SNAPSHOTS, snapShots);
 
             // Prepare input for pairwise calculation
             Map<String, List<String>> pairwiseInput = new HashMap<>();
-            List<String> configIds = new ArrayList<>(searchConfigToDocIds.keySet());
+            List<String> configIds = new ArrayList<>(searchConfigToSnapshot.keySet());
 
             if (configIds.size() >= 2) {
-                pairwiseInput.put(PAIRWISE_FIELD_NAME_A, searchConfigToDocIds.get(configIds.get(0)));
-                pairwiseInput.put(PAIRWISE_FIELD_NAME_B, searchConfigToDocIds.get(configIds.get(1)));
+                pairwiseInput.put(PAIRWISE_FIELD_NAME_A, docIdsOf(searchConfigToSnapshot.get(configIds.get(0))));
+                pairwiseInput.put(PAIRWISE_FIELD_NAME_B, docIdsOf(searchConfigToSnapshot.get(configIds.get(1))));
             }
 
             // Calculate and add pairwise metrics
@@ -183,6 +189,7 @@ public class MetricsHelper {
         Map<String, List<String>> indexAndQueries,
         int size,
         List<String> judgmentIds,
+        Map<String, Map<String, String>> queryTextToDocIdToRatings,
         ActionListener<Map<String, Object>> listener,
         List<ExperimentVariant> experimentVariants
     ) {
@@ -193,79 +200,25 @@ public class MetricsHelper {
 
         try {
             Map<String, Object> configToEvalIds = Collections.synchronizedMap(new HashMap<>());
-            Map<String, String> docIdToRatings = new HashMap<>();
-            AtomicInteger completedJudgments = new AtomicInteger(0);
-
-            for (String judgmentId : judgmentIds) {
-                judgmentDao.getJudgment(judgmentId, new ActionListener<>() {
-                    @Override
-                    public void onResponse(SearchResponse judgmentResponse) {
-                        try {
-                            if (judgmentResponse.getHits().getTotalHits().value() == 0) {
-                                log.warn("No judgment found for ID: {}", judgmentId);
-                            } else {
-                                Map<String, Object> sourceAsMap = judgmentResponse.getHits().getHits()[0].getSourceAsMap();
-                                List<Map<String, Object>> judgmentRatings = (List<Map<String, Object>>) sourceAsMap.getOrDefault(
-                                    "judgmentRatings",
-                                    Collections.emptyList()
-                                );
-                                // TODO change this to more efficient approach, this is O(n) because we need to scan all list to find query
-                                for (Map<String, Object> rating : judgmentRatings) {
-                                    if (queryText.equals(rating.get("query"))) {
-                                        List<Map<String, String>> docScoreRatings = (List<Map<String, String>>) rating.get("ratings");
-                                        docScoreRatings.forEach(
-                                            docScoreRating -> docIdToRatings.put(docScoreRating.get("docId"), docScoreRating.get("rating"))
-                                        );
-                                        break;
-                                    }
-                                }
-                            }
-
-                            // Check if all judgments have been processed
-                            if (completedJudgments.incrementAndGet() == judgmentIds.size()) {
-                                if (docIdToRatings.isEmpty()) {
-                                    log.warn("No ratings found for query: {} in any judgments", queryText);
-                                }
-
-                                processSearchConfigurations(
-                                    queryText,
-                                    indexAndQueries,
-                                    size,
-                                    judgmentIds,
-                                    docIdToRatings,
-                                    configToEvalIds,
-                                    listener,
-                                    experimentVariants
-                                );
-                            }
-                        } catch (Exception e) {
-                            listener.onFailure(e);
-                        }
-                    }
-
-                    @Override
-                    public void onFailure(Exception e) {
-                        log.error("Failed to fetch judgment {}: {}", judgmentId, e);
-                        if (completedJudgments.incrementAndGet() == judgmentIds.size()) {
-                            if (docIdToRatings.isEmpty()) {
-                                listener.onFailure(new IllegalStateException("Failed to fetch any valid judgments"));
-                            } else {
-                                // Proceed with the judgments we were able to fetch
-                                processSearchConfigurations(
-                                    queryText,
-                                    indexAndQueries,
-                                    size,
-                                    judgmentIds,
-                                    docIdToRatings,
-                                    configToEvalIds,
-                                    listener,
-                                    experimentVariants
-                                );
-                            }
-                        }
-                    }
-                });
+            Map<String, String> docIdToRatings = queryTextToDocIdToRatings != null ? queryTextToDocIdToRatings.get(queryText) : null;
+            if (docIdToRatings == null) {
+                docIdToRatings = new HashMap<>();
             }
+
+            if (docIdToRatings.isEmpty()) {
+                log.warn("No ratings found for query: {} in any judgments", queryText);
+            }
+
+            processSearchConfigurations(
+                queryText,
+                indexAndQueries,
+                size,
+                judgmentIds,
+                docIdToRatings,
+                configToEvalIds,
+                listener,
+                experimentVariants
+            );
         } catch (Exception e) {
             log.error("Unexpected error in evaluateQueryTextAsync: {}", e.getMessage());
             listener.onFailure(e);
@@ -396,7 +349,12 @@ public class MetricsHelper {
                         queryText,
                         judgmentIds,
                         docIds,
-                        metrics
+                        metrics,
+                        null,
+                        null,
+                        null,
+                        null,
+                        SearchTook.from(response)
                     );
 
                     evaluationResultDao.putEvaluationResult(evaluationResult, ActionListener.wrap(success -> {
@@ -488,7 +446,12 @@ public class MetricsHelper {
                             queryText,
                             judgmentIds,
                             docIds,
-                            metrics
+                            metrics,
+                            null,
+                            null,
+                            null,
+                            null,
+                            SearchTook.from(response)
                         );
 
                         evaluationResultDao.putEvaluationResult(evaluationResult, ActionListener.wrap(success -> {
@@ -560,6 +523,26 @@ public class MetricsHelper {
                     listener.onFailure(e);
                 }
             });
+        }
+    }
+
+    private static List<String> docIdsOf(PairwiseConfigSnapshot snapshot) {
+        if (snapshot == null || snapshot.docIds == null) {
+            return Collections.emptyList();
+        }
+        return snapshot.docIds;
+    }
+
+    /**
+     * Per-config search snapshot used while pairwise results are assembled.
+     */
+    private static final class PairwiseConfigSnapshot {
+        private final List<String> docIds;
+        private final Long took;
+
+        private PairwiseConfigSnapshot(List<String> docIds, Long took) {
+            this.docIds = docIds;
+            this.took = took;
         }
     }
 }

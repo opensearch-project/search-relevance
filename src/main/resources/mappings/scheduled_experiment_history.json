@@ -1,0 +1,15 @@
+{
+  "_meta": {
+    "schema_version": 0
+  },
+  "properties": {
+    "id": { "type": "keyword" },
+    "experimentId": { "type": "keyword" },
+    "timestamp": {
+      "type": "date",
+      "format": "strict_date_time"
+    },
+    "status": { "type": "keyword" },
+    "results": { "type": "object"}
+  }
+}

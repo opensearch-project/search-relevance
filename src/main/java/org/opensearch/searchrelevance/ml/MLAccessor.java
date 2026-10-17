@@ -9,12 +9,13 @@ package org.opensearch.searchrelevance.ml;
 
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.ml.client.MachineLearningNodeClient;
+import org.opensearch.ml.common.dataset.remote.RemoteInferenceInputDataSet;
 import org.opensearch.ml.common.input.MLInput;
+import org.opensearch.searchrelevance.model.LLMJudgmentRatingType;
+import org.opensearch.searchrelevance.utils.RatingOutputProcessor;
 
 import lombok.extern.log4j.Log4j2;
 
@@ -26,9 +27,6 @@ public class MLAccessor {
     private final MachineLearningNodeClient mlClient;
     private final MLInputOutputTransformer transformer;
 
-    private static final int MAX_RETRY_NUMBER = 3;
-    private static final long RETRY_DELAY_MS = 1000;
-
     public MLAccessor(MachineLearningNodeClient mlClient) {
         this.mlClient = mlClient;
         this.transformer = new MLInputOutputTransformer();
@@ -38,12 +36,22 @@ public class MLAccessor {
         String modelId,
         int tokenLimit,
         String searchText,
-        String reference,
+        Map<String, String> referenceData,
         Map<String, String> hits,
+        String promptTemplate,
+        LLMJudgmentRatingType ratingType,
         ActionListener<ChunkResult> progressListener
     ) {
-        List<MLInput> mlInputs = transformer.createMLInputs(tokenLimit, searchText, reference, hits);
+        log.debug(
+            "DEBUG: MLAccessor.predict called with modelId: {}, searchText: {}, hits count: {}, ratingType: {}",
+            modelId,
+            searchText,
+            hits.size(),
+            ratingType
+        );
+        List<MLInput> mlInputs = transformer.createMLInputs(tokenLimit, searchText, referenceData, hits, promptTemplate, ratingType);
         log.info("Number of chunks: {}", mlInputs.size());
+        log.debug("DEBUG: Created {} MLInput chunks", mlInputs.size());
 
         ChunkProcessingContext context = new ChunkProcessingContext(mlInputs.size(), progressListener);
 
@@ -53,57 +61,37 @@ public class MLAccessor {
     }
 
     private void processChunk(String modelId, MLInput mlInput, int chunkIndex, ChunkProcessingContext context) {
-        predictSingleChunkWithRetry(modelId, mlInput, chunkIndex, 0, ActionListener.wrap(response -> {
+        // Transient-error retries (throttling, 5xx, timeouts) are handled by the ml-commons connector's client_config.
+        predictSingleChunk(modelId, mlInput, ActionListener.wrap(response -> {
             log.info("Chunk {} processed successfully", chunkIndex);
-            String processedResponse = cleanResponse(response);
-            context.handleSuccess(chunkIndex, processedResponse);
+            context.handleSuccess(chunkIndex, cleanResponse(response));
         }, e -> {
-            log.error("Chunk {} failed after all retries", chunkIndex, e);
+            log.error("Chunk {} failed", chunkIndex, e);
             context.handleFailure(chunkIndex, e);
         }));
     }
 
     private String cleanResponse(String response) {
-        return response.substring(1, response.length() - 1); // remove brackets
-    }
-
-    private void predictSingleChunkWithRetry(
-        String modelId,
-        MLInput mlInput,
-        int chunkIndex,
-        int retryCount,
-        ActionListener<String> chunkListener
-    ) {
-        predictSingleChunk(modelId, mlInput, new ActionListener<String>() {
-            @Override
-            public void onResponse(String response) {
-                chunkListener.onResponse(response);
-            }
-
-            @Override
-            public void onFailure(Exception e) {
-                if (retryCount < MAX_RETRY_NUMBER) {
-                    log.warn("Chunk {} failed, attempt {}/{}. Retrying...", chunkIndex, retryCount + 1, MAX_RETRY_NUMBER);
-
-                    long delay = RETRY_DELAY_MS * (long) Math.pow(2, retryCount);
-                    scheduleRetry(() -> predictSingleChunkWithRetry(modelId, mlInput, chunkIndex, retryCount + 1, chunkListener), delay);
-                } else {
-                    chunkListener.onFailure(e);
-                }
-            }
-        });
-    }
-
-    private void scheduleRetry(Runnable runnable, long delayMs) {
-        CompletableFuture.delayedExecutor(delayMs, TimeUnit.MILLISECONDS).execute(runnable);
+        // Handle both structured (with response_format) and unstructured responses
+        return RatingOutputProcessor.sanitizeLLMResponse(response);
     }
 
     public void predictSingleChunk(String modelId, MLInput mlInput, ActionListener<String> listener) {
-        mlClient.predict(
-            modelId,
-            mlInput,
-            ActionListener.wrap(mlOutput -> listener.onResponse(transformer.extractResponseContent(mlOutput)), listener::onFailure)
+        log.debug("DEBUG: predictSingleChunk called with modelId: {}", modelId);
+        RemoteInferenceInputDataSet dataset = (RemoteInferenceInputDataSet) mlInput.getInputDataset();
+        Map<String, String> params = dataset.getParameters();
+        log.debug(
+            "DEBUG: MLInput parameters - has response_format: {}, has messages: {}",
+            params.containsKey("response_format"),
+            params.containsKey("messages")
         );
+        mlClient.predict(modelId, mlInput, ActionListener.wrap(mlOutput -> {
+            log.debug("DEBUG: ML prediction succeeded, extracting response content");
+            listener.onResponse(transformer.extractResponseContent(mlOutput));
+        }, e -> {
+            log.debug("DEBUG: ML prediction failed with error: {}", e.getMessage());
+            listener.onFailure(e);
+        }));
     }
 
 }

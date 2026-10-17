@@ -46,18 +46,6 @@ public class RestPutSearchConfigurationActionTests extends SearchRelevanceRestTe
         + "\"query\": \"{\\\"match_all\\\": {}}\""
         + "}";
 
-    private static final String INVALID_INDEX_TEST_CONTENT = "{"
-        + "\"name\": \"test_name\","
-        + "\"index\": \"test_index\\\"\","
-        + "\"query\": \"{\\\"match_all\\\": {}}\""
-        + "}";
-
-    private static final String INVALID_QUERY_TEST_CONTENT = "{"
-        + "\"name\": \"test_name\","
-        + "\"index\": \"test_index\","
-        + "\"query\": \"{\\\"match_all\\\": {}}\\\"\""
-        + "}";
-
     @Override
     public void setUp() throws Exception {
         super.setUp();

@@ -1,0 +1,34 @@
+{
+  "_meta": {
+    "schema_version": 0
+  },
+  "properties": {
+    "id": { "type": "keyword" },
+    "enabled": {
+      "type": "boolean"
+    },
+    "enabledTime": {
+      "type": "long"
+    },
+    "lastUpdateTime": {
+      "type": "long"
+    },
+    "schedule": {
+      "properties": {
+        "cron": {
+          "properties": {
+            "expression": {
+              "type": "keyword"
+            },
+            "timezone": {
+              "type": "keyword"
+            }
+          }
+        }
+      }
+    },
+    "timestamp": {
+      "type": "keyword"
+    }
+  }
+}

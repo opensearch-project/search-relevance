@@ -7,10 +7,19 @@
  */
 package org.opensearch.searchrelevance.indices;
 
+import static org.opensearch.searchrelevance.common.PluginConstants.BATCH_SIZE_FOR_DELETE_BY_QUERY;
+import static org.opensearch.searchrelevance.common.PluginConstants.PROCEED;
+
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.BiConsumer;
 
 import org.opensearch.ResourceAlreadyExistsException;
@@ -19,19 +28,27 @@ import org.opensearch.action.DocWriteRequest.OpType;
 import org.opensearch.action.StepListener;
 import org.opensearch.action.admin.indices.create.CreateIndexRequest;
 import org.opensearch.action.admin.indices.create.CreateIndexResponse;
+import org.opensearch.action.admin.indices.mapping.put.PutMappingRequest;
 import org.opensearch.action.delete.DeleteResponse;
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.search.ShardSearchFailure;
 import org.opensearch.action.support.WriteRequest;
+import org.opensearch.action.update.UpdateRequest;
+import org.opensearch.action.update.UpdateResponse;
+import org.opensearch.cluster.metadata.MappingMetadata;
 import org.opensearch.cluster.service.ClusterService;
 import org.opensearch.common.io.Streams;
+import org.opensearch.common.util.concurrent.ThreadContext;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.core.xcontent.XContentBuilder;
 import org.opensearch.index.IndexNotFoundException;
 import org.opensearch.index.query.QueryBuilders;
+import org.opensearch.index.reindex.BulkByScrollResponse;
+import org.opensearch.index.reindex.DeleteByQueryAction;
+import org.opensearch.index.reindex.DeleteByQueryRequest;
 import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.search.internal.InternalSearchResponse;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
@@ -57,22 +74,50 @@ public class SearchRelevanceIndicesManager {
         this.client = client;
     }
 
+    private static final int MAX_MAPPING_UPDATE_RETRIES = 3;
+
+    /** Upper bound for awaiting putMapping acknowledgement; accommodates slow cluster-state publication on busy clusters. */
+    private static final int MAPPING_UPDATE_ACK_TIMEOUT_SECONDS = 120;
+
     /**
-     * Create a search relevance index if not exists
-     * @param index - index to be created
-     * @param stepListener - step lister
+     * Create a search relevance index if not exists, or update mapping if index exists but has older schema version.
+     * @param index - index to be created or updated
+     * @param stepListener - step listener
      */
     public void createIndexIfAbsent(final SearchRelevanceIndices index, final StepListener<Void> stepListener) {
         String indexName = index.getIndexName();
         String mapping = index.getMapping();
 
         if (clusterService.state().metadata().hasIndex(indexName)) {
-            log.debug("Index [{}] already exists, skipping creation", indexName);
-            stepListener.onResponse(null);
+            // Index exists - check if we need to update the mapping
+            try {
+                int existingVersion = getExistingSchemaVersion(indexName);
+                int currentVersion = index.getSchemaVersion();
+
+                if (existingVersion >= currentVersion) {
+                    log.debug("Index [{}] already exists with schema version [{}], skipping update", indexName, existingVersion);
+                    stepListener.onResponse(null);
+                    return;
+                }
+
+                // Existing version is older - update mapping with retry
+                log.info("Updating index [{}] mapping from schema version [{}] to [{}]", indexName, existingVersion, currentVersion);
+                updateMappingWithRetry(index, MAX_MAPPING_UPDATE_RETRIES, stepListener);
+            } catch (Exception e) {
+                log.error("Failed to check schema version for index [{}]: {}", indexName, e.getMessage());
+                stepListener.onFailure(
+                    new SearchRelevanceException(
+                        String.format(Locale.ROOT, "Failed to check schema version for index [%s]", indexName),
+                        e,
+                        RestStatus.INTERNAL_SERVER_ERROR
+                    )
+                );
+            }
             return;
         }
 
-        final CreateIndexRequest createIndexRequest = new CreateIndexRequest(indexName).mapping(mapping);
+        final CreateIndexRequest createIndexRequest = new CreateIndexRequest(indexName).mapping(mapping)
+            .settings(org.opensearch.common.settings.Settings.builder().put("index.auto_expand_replicas", "0-1").build());
         StashedThreadContext.run(client, () -> client.admin().indices().create(createIndexRequest, new ActionListener<>() {
             @Override
             public void onResponse(final CreateIndexResponse createIndexResponse) {
@@ -94,24 +139,194 @@ public class SearchRelevanceIndicesManager {
     }
 
     /**
-     * Create a search relevance index if not exists, using synchronize calls
-     * @param index
+     * Create a search relevance index if not exists, or update mapping if index exists but has older schema version.
+     * Uses synchronous calls.
+     * @param index the index to create or update
      */
     private void createIndexIfAbsentSync(final SearchRelevanceIndices index) {
         String indexName = index.getIndexName();
         String mapping = index.getMapping();
 
-        if (clusterService.state().metadata().hasIndex(indexName)) {
-            log.debug("Index [{}] already exists, skipping creation", indexName);
+        if (!clusterService.state().metadata().hasIndex(indexName)) {
+            // Index does not exist - create new index
+            log.info("Creating new index [{}] with schema version [{}]", indexName, index.getSchemaVersion());
+            final CreateIndexRequest createIndexRequest = new CreateIndexRequest(indexName).mapping(mapping)
+                .settings(org.opensearch.common.settings.Settings.builder().put("index.auto_expand_replicas", "0-1").build());
+            StashedThreadContext.run(client, () -> client.admin().indices().create(createIndexRequest));
             return;
         }
-        final CreateIndexRequest createIndexRequest = new CreateIndexRequest(indexName).mapping(mapping);
-        StashedThreadContext.run(client, () -> client.admin().indices().create(createIndexRequest));
+
+        // Index exists - check schema version
+        int existingVersion = getExistingSchemaVersion(indexName);
+        int currentVersion = index.getSchemaVersion();
+
+        // Skip update if already up-to-date
+        if (existingVersion >= currentVersion) {
+            return;
+        }
+
+        // Existing version is older - update mapping (best-effort)
+        // If the update fails or times out (e.g., during rolling upgrade cluster transitions),
+        // log a warning and continue. Reads work fine with the old mapping, and the next
+        // write operation will retry the update.
+        try {
+            log.info("Updating index [{}] mapping from schema version [{}] to [{}]", indexName, existingVersion, currentVersion);
+            updateMappingSync(index);
+        } catch (Exception e) {
+            log.warn(
+                "Failed to update mapping for index [{}] from version [{}] to [{}]: {}. " + "Will retry on next operation.",
+                indexName,
+                existingVersion,
+                currentVersion,
+                e.getMessage()
+            );
+        }
+    }
+
+    /**
+     * Get the schema version from an existing index's _meta field.
+     * Returns 0 for legacy indices without _meta.schema_version OR initial version.
+     * Throws exception if there was an error reading the mapping.
+     * @param indexName the name of the index
+     * @return the schema version (0 for legacy or initial)
+     * @throws SearchRelevanceException if mapping cannot be read
+     */
+    private int getExistingSchemaVersion(final String indexName) {
+        try {
+            MappingMetadata mappingMetadata = clusterService.state().metadata().index(indexName).mapping();
+            if (mappingMetadata == null) {
+                throw new SearchRelevanceException(
+                    String.format(Locale.ROOT, "Index [%s] exists but has no mapping", indexName),
+                    RestStatus.INTERNAL_SERVER_ERROR
+                );
+            }
+
+            Map<String, Object> mappingSource = mappingMetadata.sourceAsMap();
+            if (mappingSource == null) {
+                throw new SearchRelevanceException(
+                    String.format(Locale.ROOT, "Index [%s] exists but mapping source is null", indexName),
+                    RestStatus.INTERNAL_SERVER_ERROR
+                );
+            }
+
+            Object metaObj = mappingSource.get("_meta");
+            if (!(metaObj instanceof Map<?, ?>)) {
+                return 0; // Legacy index - no _meta field
+            }
+
+            Map<?, ?> meta = (Map<?, ?>) metaObj;
+            Object versionObj = meta.get(SearchRelevanceIndices.META_SCHEMA_VERSION_KEY);
+            if (versionObj instanceof Number) {
+                return ((Number) versionObj).intValue();
+            }
+            return 0; // Legacy index - no schema_version in _meta
+        } catch (Exception e) {
+            throw new SearchRelevanceException(
+                String.format(Locale.ROOT, "Failed to get schema version for index [%s]", indexName),
+                e,
+                RestStatus.INTERNAL_SERVER_ERROR
+            );
+        }
+    }
+
+    /**
+     * Update the mapping for an existing index synchronously.
+     * Uses a CompletableFuture to wait for the async putMapping to complete,
+     * ensuring the mapping is fully applied before any document write occurs.
+     * Note: CompletableFuture.get() is used instead of ActionFuture.actionGet()
+     * because actionGet() is forbidden on transport threads.
+     * @param index the index whose mapping should be updated
+     * @throws SearchRelevanceException if the mapping update fails or times out
+     */
+    private void updateMappingSync(final SearchRelevanceIndices index) {
+        final PutMappingRequest putMappingRequest = new PutMappingRequest(index.getIndexName()).source(
+            index.getMapping(),
+            org.opensearch.common.xcontent.XContentType.JSON
+        );
+        final CompletableFuture<Void> future = new CompletableFuture<>();
+        try (ThreadContext.StoredContext context = client.threadPool().getThreadContext().stashContext()) {
+            client.admin().indices().putMapping(putMappingRequest, new ActionListener<>() {
+                @Override
+                public void onResponse(org.opensearch.action.support.clustermanager.AcknowledgedResponse response) {
+                    future.complete(null);
+                }
+
+                @Override
+                public void onFailure(Exception e) {
+                    future.completeExceptionally(e);
+                }
+            });
+            future.get(MAPPING_UPDATE_ACK_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            throw new SearchRelevanceException(
+                String.format(Locale.ROOT, "Timeout waiting for mapping update on index [%s]", index.getIndexName()),
+                RestStatus.INTERNAL_SERVER_ERROR
+            );
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new SearchRelevanceException(
+                String.format(Locale.ROOT, "Interrupted waiting for mapping update on index [%s]", index.getIndexName()),
+                e,
+                RestStatus.INTERNAL_SERVER_ERROR
+            );
+        } catch (ExecutionException e) {
+            throw new SearchRelevanceException(
+                String.format(Locale.ROOT, "Failed to update mapping for index [%s]", index.getIndexName()),
+                e.getCause(),
+                RestStatus.INTERNAL_SERVER_ERROR
+            );
+        }
+    }
+
+    /**
+     * Update the mapping for an existing index with retry logic.
+     * Retries up to maxRetries times before failing.
+     * @param index the index whose mapping should be updated
+     * @param maxRetries maximum number of retry attempts
+     * @param stepListener listener to notify on success or failure
+     */
+    private void updateMappingWithRetry(final SearchRelevanceIndices index, final int maxRetries, final StepListener<Void> stepListener) {
+        String indexName = index.getIndexName();
+        Exception lastException = null;
+
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                updateMappingSync(index);
+                log.info("Successfully updated mapping for index [{}] on attempt {}", indexName, attempt);
+                stepListener.onResponse(null);
+                return;
+            } catch (Exception e) {
+                lastException = e;
+                log.warn("Failed to update mapping for index [{}] on attempt {}/{}: {}", indexName, attempt, maxRetries, e.getMessage());
+                if (attempt < maxRetries) {
+                    try {
+                        Thread.sleep(1000L * attempt); // Exponential backoff: 1s, 2s, 3s
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
+            }
+        }
+
+        // All retries exhausted - fail the service
+        log.error("Failed to update mapping for index [{}] after {} attempts", indexName, maxRetries);
+        stepListener.onFailure(
+            new SearchRelevanceException(
+                String.format(Locale.ROOT, "Failed to update mapping for index [%s] after %d attempts", indexName, maxRetries),
+                lastException,
+                RestStatus.INTERNAL_SERVER_ERROR
+            )
+        );
     }
 
     public SearchResponse getDocByDocIdSync(final String docId, final SearchRelevanceIndices index) {
         SearchRequest searchRequest = new SearchRequest(index.getIndexName());
-        SearchSourceBuilder sourceBuilder = new SearchSourceBuilder().query(QueryBuilders.termQuery("_id", docId)).size(1);
+        // Request _seq_no and _primary_term so callers can use optimistic concurrency control on a
+        // subsequent update. This is harmless for callers that don't need them.
+        SearchSourceBuilder sourceBuilder = new SearchSourceBuilder().query(QueryBuilders.termQuery("_id", docId))
+            .size(1)
+            .seqNoAndPrimaryTerm(true);
         searchRequest.source(sourceBuilder);
 
         return client.search(searchRequest).actionGet();
@@ -122,7 +337,7 @@ public class SearchRelevanceIndicesManager {
      * @param docId - document id need to be executed
      * @param xContentBuilder - content need to be executed
      * @param index - system index
-     * @param listener - action lister for async action
+     * @param listener - action listener for async action
      */
     public void putDoc(
         final String docId,
@@ -138,7 +353,7 @@ public class SearchRelevanceIndicesManager {
      * @param docId - document id need to be executed
      * @param xContentBuilder - content need to be executed
      * @param index - system index
-     * @param listener - action lister for async action
+     * @param listener - action listener for async action
      */
     public void putDocEfficient(
         final String docId,
@@ -155,7 +370,7 @@ public class SearchRelevanceIndicesManager {
      * @param xContentBuilder - content need to be executed
      * @param index - system index
      * @param refreshPolicy - refresh policy to use
-     * @param listener - action lister for async action
+     * @param listener - action listener for async action
      */
     public void putDocWithRefreshPolicy(
         final String docId,
@@ -191,7 +406,7 @@ public class SearchRelevanceIndicesManager {
      * @param docId - document id need to be executed
      * @param xContentBuilder - content need to be executed
      * @param index - system index
-     * @param listener - action lister for async action
+     * @param listener - action listener for async action
      */
     public void updateDoc(
         final String docId,
@@ -207,7 +422,7 @@ public class SearchRelevanceIndicesManager {
      * @param docId - document id need to be executed
      * @param xContentBuilder - content need to be executed
      * @param index - system index
-     * @param listener - action lister for async action
+     * @param listener - action listener for async action
      */
     public void updateDocEfficient(
         final String docId,
@@ -224,7 +439,7 @@ public class SearchRelevanceIndicesManager {
      * @param xContentBuilder - content need to be executed
      * @param index - system index
      * @param refreshPolicy - refresh policy to use
-     * @param listener - action lister for async action
+     * @param listener - action listener for async action
      */
     public void updateDocWithRefreshPolicy(
         final String docId,
@@ -255,10 +470,56 @@ public class SearchRelevanceIndicesManager {
     }
 
     /**
+     * Update a doc using optimistic concurrency control. The write only succeeds if the document's
+     * current sequence number and primary term still match the supplied values; otherwise the write
+     * fails with a version conflict. This lets callers guard a read-then-write transition (e.g. a
+     * status change) against concurrent updates.
+     *
+     * @param docId - document id to update
+     * @param xContentBuilder - content to write
+     * @param index - system index
+     * @param seqNo - the sequence number the caller last read for this doc
+     * @param primaryTerm - the primary term the caller last read for this doc
+     * @param listener - action listener; receives a version-conflict failure if the doc changed
+     */
+    public void updateDocWithSeqNoAndPrimaryTerm(
+        final String docId,
+        final XContentBuilder xContentBuilder,
+        final SearchRelevanceIndices index,
+        final long seqNo,
+        final long primaryTerm,
+        final ActionListener listener
+    ) {
+        SearchOperationContext searchOperationContext = SearchOperationContext.builder()
+            .index(index)
+            .xContentBuilder(xContentBuilder)
+            .documentId(docId)
+            .build();
+        BiConsumer<SearchOperationContext, ActionListener<?>> action = (searchOperationContext1, actionListener) -> StashedThreadContext
+            .run(client, () -> {
+                try {
+                    client.prepareIndex(searchOperationContext1.getIndex().getIndexName())
+                        .setId(searchOperationContext1.getDocumentId())
+                        .setOpType(OpType.INDEX)
+                        .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)
+                        .setIfSeqNo(seqNo)
+                        .setIfPrimaryTerm(primaryTerm)
+                        .setSource(searchOperationContext1.getXContentBuilder())
+                        .execute((ActionListener) actionListener);
+                } catch (Exception e) {
+                    // Notify the listener rather than throwing, so the caller is always informed
+                    // (a thrown exception here would be lost on the executing thread).
+                    actionListener.onFailure(new SearchRelevanceException("Failed to store doc", e, RestStatus.INTERNAL_SERVER_ERROR));
+                }
+            });
+        executeAction(listener, searchOperationContext, action);
+    }
+
+    /**
      * Delete a doc by doc id
      * @param docId - document id need to be executed
      * @param index - system index
-     * @param listener - action lister for async action
+     * @param listener - action listener for async action
      */
     public void deleteDocByDocId(final String docId, final SearchRelevanceIndices index, final ActionListener<DeleteResponse> listener) {
         SearchOperationContext searchOperationContext = SearchOperationContext.builder().index(index).documentId(docId).build();
@@ -293,7 +554,7 @@ public class SearchRelevanceIndicesManager {
      * Get a doc by doc id
      * @param docId - document id need to be executed
      * @param index - system index
-     * @param listener - action lister for async action
+     * @param listener - action listener for async action
      */
     public SearchResponse getDocByDocId(final String docId, final SearchRelevanceIndices index, final ActionListener<?> listener) {
         SearchOperationContext searchOperationContext = SearchOperationContext.builder().index(index).documentId(docId).build();
@@ -345,7 +606,7 @@ public class SearchRelevanceIndicesManager {
      * List docs by search request
      * @param searchSourceBuilder - search source builder to be executed
      * @param index - index to be executed
-     * @param listener - action lister for async action
+     * @param listener - action listener for async action
      */
     public SearchResponse listDocsBySearchRequest(
         final SearchSourceBuilder searchSourceBuilder,
@@ -399,6 +660,84 @@ public class SearchRelevanceIndicesManager {
         };
         executeAction(listener, searchOperationContext, action);
         return null;
+    }
+
+    /**
+     * Patch (partially update) a document in the system index.
+     * Only updates the specified fields, leaving other fields unchanged.
+     *
+     * @param docId - document id to be updated
+     * @param updates - map of field names to new values
+     * @param index - system index
+     * @param listener - action listener for async action
+     */
+    public void patchDoc(
+        final String docId,
+        final Map<String, Object> updates,
+        final SearchRelevanceIndices index,
+        final ActionListener<UpdateResponse> listener
+    ) {
+        if (docId == null || docId.isEmpty()) {
+            listener.onFailure(new SearchRelevanceException("Document ID cannot be null or empty", RestStatus.BAD_REQUEST));
+            return;
+        }
+        if (updates == null || updates.isEmpty()) {
+            listener.onFailure(new SearchRelevanceException("Updates map cannot be null or empty", RestStatus.BAD_REQUEST));
+            return;
+        }
+        if (index == null) {
+            listener.onFailure(new SearchRelevanceException("Index cannot be null", RestStatus.BAD_REQUEST));
+            return;
+        }
+
+        SearchOperationContext searchOperationContext = SearchOperationContext.builder().index(index).documentId(docId).build();
+        BiConsumer<SearchOperationContext, ActionListener<?>> action = (context, actionListener) -> StashedThreadContext.run(client, () -> {
+            try {
+                @SuppressWarnings("unchecked")
+                ActionListener<UpdateResponse> typedListener = (ActionListener<UpdateResponse>) actionListener;
+                UpdateRequest updateRequest = new UpdateRequest(context.getIndex().getIndexName(), context.getDocumentId()).doc(updates)
+                    .setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
+
+                client.update(updateRequest, new ActionListener<>() {
+                    @Override
+                    public void onResponse(UpdateResponse updateResponse) {
+                        log.info("Successfully patched doc id [{}]", context.getDocumentId());
+                        typedListener.onResponse(updateResponse);
+                    }
+
+                    @Override
+                    public void onFailure(Exception e) {
+                        typedListener.onFailure(
+                            new SearchRelevanceException("Failed to patch document", e, RestStatus.INTERNAL_SERVER_ERROR)
+                        );
+                    }
+                });
+            } catch (Exception e) {
+                actionListener.onFailure(new SearchRelevanceException("Failed to patch doc", e, RestStatus.INTERNAL_SERVER_ERROR));
+            }
+        });
+        executeAction(listener, searchOperationContext, action);
+    }
+
+    /**
+     * Delete by query
+     * @param fieldId - field id need to be deleted
+     * @param fieldName - field name need to be deleted
+     * @param index - index on which delete operation has to be performed
+     * @param listener - action listener for async action
+     */
+    public void deleteByQuery(
+        final String fieldId,
+        final String fieldName,
+        final SearchRelevanceIndices index,
+        final ActionListener<BulkByScrollResponse> listener
+    ) {
+        DeleteByQueryRequest deleteByQueryRequest = new DeleteByQueryRequest(index.getIndexName());
+        deleteByQueryRequest.setConflicts(PROCEED);
+        deleteByQueryRequest.setBatchSize(BATCH_SIZE_FOR_DELETE_BY_QUERY);
+        deleteByQueryRequest.setQuery(QueryBuilders.termQuery(fieldName, fieldId));
+
+        client.execute(DeleteByQueryAction.INSTANCE, deleteByQueryRequest, listener);
     }
 
     /**
@@ -476,9 +815,7 @@ public class SearchRelevanceIndicesManager {
     ) {
         StepListener<Void> createIndexStep = new StepListener<>();
         createIndexIfAbsent(context.getIndex(), createIndexStep);
-        createIndexStep.whenComplete(v -> action.accept(context, listener), e -> {
-            throw e instanceof RuntimeException ? (RuntimeException) e : new IllegalStateException(e);
-        });
+        createIndexStep.whenComplete(v -> action.accept(context, listener), e -> listener.onFailure(e));
     }
 
     /**

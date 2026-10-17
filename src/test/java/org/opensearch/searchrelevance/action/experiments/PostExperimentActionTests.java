@@ -77,6 +77,9 @@ public class PostExperimentActionTests extends OpenSearchTestCase {
     public void testRequestValidation() {
         PutExperimentRequest request = new PutExperimentRequest(
             ExperimentType.PAIRWISE_COMPARISON,
+            null,
+            null,
+            null,
             "1234",
             List.of("5678", "0000"),
             List.of("5678", "0000"),

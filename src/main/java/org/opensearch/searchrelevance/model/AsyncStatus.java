@@ -10,5 +10,9 @@ package org.opensearch.searchrelevance.model;
 public enum AsyncStatus {
     PROCESSING,
     COMPLETED,
-    ERROR
+    TIMEOUT,
+    ERROR,
+    // A retry of a previously completed judgment is running. Distinct from PROCESSING (initial
+    // generation) so that a died initial generation is never retried with an incomplete doc list.
+    RETRYING
 }

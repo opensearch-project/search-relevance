@@ -26,6 +26,8 @@ public class PluginConstants {
     public static final String JUDGMENTS_URL = SEARCH_RELEVANCE_BASE_URI + "/judgments";
     /** The URI for this plugin's search configurations rest actions */
     public static final String SEARCH_CONFIGURATIONS_URL = SEARCH_RELEVANCE_BASE_URI + "/search_configurations";
+    /** The URI for this plugin's scheduled experiments rest actions */
+    public static final String SCHEDULED_EXPERIMENT_URL = EXPERIMENTS_URI + "/schedule";
     /** The URI for initializing the UBI indices */
     public static final String INITIALIZE_URL = "/_plugins/ubi/initialize";
 
@@ -33,8 +35,18 @@ public class PluginConstants {
     public static final String DOCUMENT_ID = "id";
     public static final String QUERY_TEXT = "query_text";
 
-    /** Use %SearchText% to represent wildcard in queryBody and also refer to the text in the search bar */
-    public static final String WILDCARD_QUERY_TEXT = "%SearchText%";
+    /**
+     * Legacy wildcard placeholder for queryBody and the search bar text.
+     *
+     * @deprecated Use {@link #WILDCARD_QUERY_TEXT} ({@code %queryText%}) instead, which
+     *     aligns with the {@code queryText} field name used by Query Set entries. Kept only for
+     *     backward compatibility with existing search configurations and deep links.
+     */
+    @Deprecated
+    public static final String WILDCARD_QUERY_TEXT_DEPRECATED = "%SearchText%";
+
+    /** Preferred wildcard placeholder, aligned with the queryText field name used by Query Set entries. */
+    public static final String WILDCARD_QUERY_TEXT = "%queryText%";
 
     /**
      * Indices constants
@@ -47,12 +59,22 @@ public class PluginConstants {
     public static final String EXPERIMENT_INDEX_MAPPING = "mappings/experiment.json";
     public static final String JUDGMENT_INDEX = "search-relevance-judgment";
     public static final String JUDGMENT_INDEX_MAPPING = "mappings/judgment.json";
+    /**
+     * Deprecated: the global judgment cache was removed. This index is no longer created or written
+     * to, but is still registered as a system index so that any data left over on clusters upgraded
+     * from an older version stays protected (hidden from users, guarded from accidental changes)
+     * until it is manually deleted.
+     */
+    @Deprecated
+    public static final String JUDGMENT_CACHE_INDEX = ".plugins-search-relevance-judgment-cache";
     public static final String EVALUATION_RESULT_INDEX = "search-relevance-evaluation-result";
     public static final String EVALUATION_RESULT_INDEX_MAPPING = "mappings/evaluation_result.json";
-    public static final String JUDGMENT_CACHE_INDEX = ".plugins-search-relevance-judgment-cache";
-    public static final String JUDGMENT_CACHE_INDEX_MAPPING = "mappings/judgment_cache.json";
     public static final String EXPERIMENT_VARIANT_INDEX = "search-relevance-experiment-variant";
     public static final String EXPERIMENT_VARIANT_INDEX_MAPPING = "mappings/experiment_variant.json";
+    public static final String SCHEDULED_JOBS_INDEX = ".search-relevance-scheduled-experiment-jobs";
+    public static final String SCHEDULED_JOBS_INDEX_MAPPING = "mappings/scheduled_job.json";
+    public static final String SCHEDULED_EXPERIMENT_HISTORY_INDEX = ".search-relevance-scheduled-experiment-history";
+    public static final String SCHEDULED_EXPERIMENT_HISTORY_INDEX_MAPPING = "mappings/scheduled_experiment_history.json";
 
     /**
      * UBI
@@ -65,6 +87,9 @@ public class PluginConstants {
     public static final String NAX_RANK = "maxRank";
     public static final String START_DATE = "startDate";
     public static final String END_DATE = "endDate";
+    /* The customized UBI index names */
+    public static final String UBI_QUERIES_INDEX_PARAM = "ubiQueriesIndex";
+    public static final String UBI_EVENTS_INDEX_PARAM = "ubiEventsIndex";
 
     /**
      * Rest Input Field Names
@@ -80,15 +105,22 @@ public class PluginConstants {
     public static final String SEARCH_PIPELINE = "searchPipeline";
     public static final String SIZE = "size";
     public static final String QUERYSET_ID = "querySetId";
+    public static final String EXPERIMENT_ID = "experimentId";
     public static final String SEARCH_CONFIGURATION_LIST = "searchConfigurationList";
     public static final String JUDGMENT_LIST = "judgmentList";
     public static final String EVALUATION_RESULT_LIST = "evaluationResultList";
     public static final String RESULTS = "results";
+    public static final String CRON_EXPRESSION = "cronExpression";
 
     public static final String JUDGMENT_RATINGS = "judgmentRatings";
     public static final String CONTEXT_FIELDS = "contextFields";
     public static final String IGNORE_FAILURE = "ignoreFailure";
+    // Deprecated: the judgment cache was removed. Accepted but ignored for backward compatibility.
+    public static final String OVERWRITE_CACHE = "overwriteCache";
 
     public static final int DEFAULTED_QUERY_SET_SIZE = 10;
     public static final String MANUAL = "manual";
+    public static final String PROCEED = "proceed";
+    public static final String ABORT = "abort";
+    public static final int BATCH_SIZE_FOR_DELETE_BY_QUERY = 1000;
 }

@@ -3,20 +3,24 @@
         - [Fork OpenSearch search-relevance Repo](#fork-opensearch-search-relevance-repo)
         - [Install Prerequisites](#install-prerequisites)
             - [JDK 21](#jdk-21)
-            - [Environment](#Environment)
     - [Use an Editor](#use-an-editor)
         - [IntelliJ IDEA](#intellij-idea)
+    - [Java Language Formatting Guidelines](#java-language-formatting-guidelines)
     - [Build](#build)
     - [Run OpenSearch search-relevance](#run-opensearch-search-relevance)
         - [Run Single-node Cluster Locally](#run-single-node-cluster-locally)
         - [Run SRW in Demo Mode](#run-srw-in-demo-mode)
-        - [Run remote cluster](#run-remote-clusters-with-search-relevance)
+        - [Run SRW in Hybrid Search Optimizer Demo Mode](#run-srw-in-hybrid-search-optimizer-demo-mode)
+        - [Run remote clusters with search-relevance](#run-remote-clusters-with-search-relevance)
     - [Debugging](#debugging)
+    - [Design Documentation](#design-documentation)
+        - [SRW Indices Layout](#srw-indices-layout)
+    - [Explanation on Scheduled Experiment Indices](#explanation-on-scheduled-experiment-indices)
 
 # Developer Guide
 
 ## Getting Started
-Please define the OpenSearch version in `build.gradle`. By default, we're developing with `3.1.0-SNAPSHOT`
+Please define the OpenSearch version in `build.gradle`.
 
 ### Fork OpenSearch search-relevance Repo
 
@@ -272,10 +276,18 @@ To debug code running in an integration test (which exercises the server from a 
 
 The test runner JVM will connect to a debugger attached to `localhost:8000` before running the tests.
 
+```
+./gradlew test -Dtest.debug=1
+```
+
+This starts the unit test JVM with a JDWP debugger listening on `localhost:8000`, suspending execution until a debugger is attached.
+
 Additionally, it is possible to attach one debugger to the cluster JVM and another debugger to the test runner. First, make sure one debugger is listening on port `5005` and the other is listening on port `8000`. Then, run:
 ```
 ./gradlew :integTest -Dtest.debug=1 -Dcluster.debug=1
 ```
+
+When running integration tests, it is assumed that the [UBI Plugin](https://github.com/opensearch-project/user-behavior-insights) is installed. If the cluster does not have that plugin, use the flag `-Dubi.available=false` when running `./gradlew :integTest`.
 
 ## Design Documentation
 
@@ -294,3 +306,194 @@ The template is particularly valuable for:
 - Changes affecting security or backward compatibility
 
 Refer to the [design documentation guide](docs/README.md) for detailed instructions, examples, and best practices on using the template effectively.
+
+### SRW Indices Layout
+
+SRW is unusual that it has a large number of indices that it uses to maintain the state of the information.  It's reasonable to think of them like you would database tables, but without the full capablities of a relational database of course!
+
+| Index | System | Purpose |
+|-------|--------|---------|
+| `.plugins-search-relevance-experiment` | Yes | Core experiment metadata and status |
+| `search-relevance-search-config` | No | Search configuration to be evaluated |
+| `search-relevance-queryset` | No | Query sets for evaluation |
+| `search-relevance-judgment` | No | Relevance judgments (manual/LLM/UBI) |
+| `.plugins-search-relevance-judgment-cache` | Yes | Working table for LLM as a Judge |
+| `search-relevance-experiment-variant` | No | Track variants generated from a single experiment |
+| `.search-relevance-scheduled-experiment-jobs` | Yes | Specify an experiment to be run periodically |
+| `.search-relevance-scheduled-experiment-history` | Yes | Track experiment results run periodically |
+| `search-relevance-evaluation-result` | No | Flattened table of Experiment results suitable for dashboarding |
+
+> [!NOTE]
+> Authoritative schema definitions are in `src/main/resources/mappings/`
+
+#### Core SRW Indices
+
+```mermaid
+erDiagram
+    direction TB
+
+    ".plugins-search-relevance-experiment" {
+        keyword id PK
+        date timestamp
+        text name
+        text description
+        keyword type
+        keyword status
+        keyword querySetId FK
+        list[keyword] searchConfigurationList FK
+        list[keyword] judgmentList FK
+        keyword size
+        keyword scheduledExperimentJobId FK
+        keyword isScheduled
+        object[] results
+    }
+    search-relevance-evaluation-result {
+        keyword id PK
+        date timestamp
+        keyword searchConfigurationId FK
+        keyword experimentId FK
+        keyword experimentVariantId FK
+        keyword experimentVariantParameters
+        keyword scheduledRunId FK
+        keyword searchText
+        keyword judgmentList FK
+        keyword documentIds
+        nested metrics
+    }
+    search-relevance-judgment {
+      keyword id PK
+      date timestamp
+      keyword name
+      keyword type
+      object metadata
+      nested judgmentRatings
+    }
+    ".plugins-search-relevance-judgment-cache" {
+      keyword id PK
+      date timestamp
+      keyword querySet
+      keyword documentId
+      keyword contextFieldsStr
+      keyword rating
+    }
+    search-relevance-search-config {
+      keyword id PK
+      date timestamp
+      keyword name
+      keyword index
+      text queryBody
+      keyword searchPipeline
+    }
+    search-relevance-queryset {
+      keyword id PK
+      date timestamp
+      keyword name
+      text description
+      nested querySetQueries
+      keyword sampling
+    }
+    search-relevance-experiment-variant {
+      keyword id PK
+      date timestamp
+      keyword type
+      keyword status
+      keyword experimentId FK
+      object parameters
+      nested results
+    }
+    ".search-relevance-scheduled-experiment-jobs" {
+      keyword id PK
+      boolean enabled
+      long enabledTime
+      long lastUpdateTime
+      keyword timestamp
+      keyword schedule
+    }
+    ".search-relevance-scheduled-experiment-history" {
+      keyword id PK
+      keyword experimentId FK
+      date timestamp
+      keyword status
+      object results
+    }
+
+    ".plugins-search-relevance-experiment" ||--o{ search-relevance-evaluation-result : "has zero to many"
+    ".plugins-search-relevance-experiment" ||--o{ search-relevance-queryset : "has zero to many"
+    ".plugins-search-relevance-experiment" ||--|{ search-relevance-search-config : "has one to many"
+    ".plugins-search-relevance-experiment" ||--o{ search-relevance-judgment : "has zero to many"
+    search-relevance-search-config ||--o{ search-relevance-evaluation-result : "referenced by"
+    ".plugins-search-relevance-experiment" ||--o{ search-relevance-experiment-variant : "hybrid optimizer only"
+    search-relevance-experiment-variant ||--o{ search-relevance-evaluation-result : "referenced by"
+    ".search-relevance-scheduled-experiment-history" ||--o{ search-relevance-evaluation-result : "referenced by"
+    search-relevance-evaluation-result }o--o{ search-relevance-judgment : includes
+    ".plugins-search-relevance-experiment" }o--|| ".search-relevance-scheduled-experiment-jobs" : "schedule opt link"
+    ".plugins-search-relevance-experiment" ||--o{ ".search-relevance-scheduled-experiment-history" : "has histories"
+
+```
+
+#### UBI Plugin provided Indices
+
+UBI provides two indices that may be used in conjunction with SRW.  There are no direct links.
+
+```mermaid
+erDiagram
+
+    ubi_events {
+      keyword application
+      keyword action_name
+      keyword client_id
+      keyword query_id FK
+      keyword message
+      keyword message_type
+      keyword user_query
+      date timestamp
+      object event_attributes
+    }
+    ubi_queries {
+      keyword query_id PK
+      date timestamp
+      text query
+      keyword query_response_id
+      keyword query_response_hit_ids
+      keyword user_query
+      flat_object query_attributes
+      keyword client_id
+      keyword application
+    }
+
+    ubi_queries ||--o{ ubi_events : "referenced by"
+
+```
+
+## Explanation on Scheduled Experiment Indices
+
+When running a scheduled experiment, the data is stored a little bit differently compared to running an individual experiment. The information of the job that runs the experiment is stored in a separate index called, `.search-relevance-scheduled-experiment-jobs`. The information stored is the schedule (in the cron job format) and whether the job is actually running or not.
+
+The diagram below shows how the scheduled experiment API interacts with the `.search-relevance-scheduled-experiment-jobs` index.
+
+```mermaid
+sequenceDiagram
+    PostScheduledExperimentTransportAction->>+.search-relevance-scheduled-experiment-jobs: puts schedule and experiment_id and other metadata into index
+    .search-relevance-scheduled-experiment-jobs->>+IndexOperationListener:The index operation listener activates the scheduler in the job scheduler plugin which submits the experiment to the job runner
+```
+
+The results of these runs are also stored in its own index called `.search-relevance-scheduled-experiment-history`. This helps track the status of the experiment, the results, and the id of the experiment that the scheduled run is based on.
+
+The diagram below shows the code flow behind how the data is stored into this index.
+
+```mermaid
+sequenceDiagram
+    SearchRelevanceJobRunner->>+ThreadPoolExecutor: Submits a scheduled experiment to be run into the threadpool executor
+    ThreadPoolExecutor->>+ScheduledExperimentRunnerManager:Runs the tasks which will invoke ScheduledExperimentRunnerManager to run the experiment
+    ScheduledExperimentRunnerManager->>+.search-relevance-scheduled-experiment-history: Submits result of that scheduled experiment
+```
+
+The evaluation results index `search-relevance-evaluation-result` will also be updated for viewing the scheduled experiment results in Search Relevance Dashboards. One nuance is that there will be an additional marker to indicate that the evaluation result was based on a scheduled experiment.
+
+Below is a diagram to show how evaluation results are submitted.
+
+```mermaid
+sequenceDiagram
+    PutExperimentTransportAction/ScheduledExperimentRunnerManager->>+Hybrid/Pointwise ExperimentProcessor: Starts running a pointwise or hybrid search experiment
+    Hybrid/Pointwise ExperimentProcessor->>+search-relevance-evaluation-result: Submits evaluation_result
+```

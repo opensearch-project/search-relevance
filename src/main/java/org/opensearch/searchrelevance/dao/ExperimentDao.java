@@ -7,9 +7,12 @@
  */
 package org.opensearch.searchrelevance.dao;
 
+import static org.opensearch.searchrelevance.common.PluginConstants.DESCRIPTION;
+import static org.opensearch.searchrelevance.common.PluginConstants.NAME;
 import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.EXPERIMENT;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -18,6 +21,7 @@ import org.apache.logging.log4j.Logger;
 import org.opensearch.action.StepListener;
 import org.opensearch.action.delete.DeleteResponse;
 import org.opensearch.action.search.SearchResponse;
+import org.opensearch.action.update.UpdateResponse;
 import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
@@ -49,7 +53,7 @@ public class ExperimentDao {
 
     /**
      * Create experiment index if not exists
-     * @param stepListener - step lister for async operation
+     * @param stepListener - step listener for async operation
      */
     public void createIndexIfAbsent(final StepListener<Void> stepListener) {
         searchRelevanceIndicesManager.createIndexIfAbsent(EXPERIMENT, stepListener);
@@ -58,7 +62,7 @@ public class ExperimentDao {
     /**
      * Stores experiment to in the system index
      * @param experiment - Experiment content to be stored
-     * @param listener - action lister for async operation
+     * @param listener - action listener for async operation
      */
     public void putExperiment(final Experiment experiment, final ActionListener listener) {
         if (experiment == null) {
@@ -99,7 +103,7 @@ public class ExperimentDao {
     /**
      * Delete experiment by experimentId
      * @param experimentId - id to be deleted
-     * @param listener - action lister for async operation
+     * @param listener - action listener for async operation
      */
     public void deleteExperiment(final String experimentId, final ActionListener<DeleteResponse> listener) {
         searchRelevanceIndicesManager.deleteDocByDocId(experimentId, EXPERIMENT, listener);
@@ -108,7 +112,7 @@ public class ExperimentDao {
     /**
      * Get experiment by experimentId
      * @param experimentId - id to be deleted
-     * @param listener - action lister for async operation
+     * @param listener - action listener for async operation
      */
     public SearchResponse getExperiment(String experimentId, ActionListener<SearchResponse> listener) {
         if (experimentId == null || experimentId.isEmpty()) {
@@ -119,9 +123,60 @@ public class ExperimentDao {
     }
 
     /**
+     * Get experiment by fieldId (async version)
+     * @param fieldId - id on which experiment is to be retrieved
+     * @param fieldName - field on which experiment is to be retrieved
+     * @param listener - action listener for async operation
+     */
+    public void getExperimentByFieldId(String fieldId, String fieldName, int size, ActionListener<SearchResponse> listener) {
+        if (fieldId == null || fieldId.isEmpty()) {
+            listener.onFailure(new SearchRelevanceException("fieldId cannot be null or empty", RestStatus.BAD_REQUEST));
+            return;
+        }
+
+        if (fieldName == null || fieldName.isEmpty()) {
+            listener.onFailure(new SearchRelevanceException("fieldName cannot be null or empty", RestStatus.BAD_REQUEST));
+            return;
+        }
+
+        SearchSourceBuilder sourceBuilder = new SearchSourceBuilder().query(QueryBuilders.termQuery(fieldName, fieldId)).size(size);
+        searchRelevanceIndicesManager.listDocsBySearchRequest(sourceBuilder, EXPERIMENT, listener);
+    }
+
+    /**
+     * Patch experiment by updating only name and/or description fields.
+     * This is a partial update that preserves all other fields.
+     * Validation of inputs is handled upstream by
+     * {@link org.opensearch.searchrelevance.transport.experiment.PatchExperimentRequest#validate()}
+     * and
+     * {@link org.opensearch.searchrelevance.rest.RestPatchExperimentAction}.
+     *
+     * @param experimentId - id of the experiment to patch
+     * @param name         - new name (can be null to keep existing)
+     * @param description  - new description (can be null to keep existing)
+     * @param listener     - action listener for async operation
+     */
+    public void patchExperiment(
+        final String experimentId,
+        final String name,
+        final String description,
+        final ActionListener<UpdateResponse> listener
+    ) {
+        Map<String, Object> updates = new HashMap<>();
+        if (name != null) {
+            updates.put(NAME, name);
+        }
+        if (description != null) {
+            updates.put(DESCRIPTION, description);
+        }
+
+        searchRelevanceIndicesManager.patchDoc(experimentId, updates, EXPERIMENT, listener);
+    }
+
+    /**
      * List experiment by source builder
      * @param sourceBuilder - source builder to be searched
-     * @param listener - action lister for async operation
+     * @param listener - action listener for async operation
      */
     public SearchResponse listExperiment(SearchSourceBuilder sourceBuilder, ActionListener<SearchResponse> listener) {
         // Apply default values if not set
