@@ -11,6 +11,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_CACHE_INDEX;
+import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_EXPERIMENT_IMPORT_MAX_QUERIES;
+import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_EXPERIMENT_IMPORT_MAX_RESULTS_PER_QUERY;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_ENABLED;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_MINIMUM_INTERVAL;
@@ -146,6 +148,8 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
                         SEARCH_RELEVANCE_WORKBENCH_ENABLED,
                         SEARCH_RELEVANCE_STATS_ENABLED,
                         SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT,
+                        SEARCH_RELEVANCE_EXPERIMENT_IMPORT_MAX_QUERIES,
+                        SEARCH_RELEVANCE_EXPERIMENT_IMPORT_MAX_RESULTS_PER_QUERY,
                         SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_ENABLED,
                         SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_TIMEOUT,
                         SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_MINIMUM_INTERVAL
@@ -229,7 +233,7 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
 
     public void testGetSettings() {
         List<Setting<?>> settings = plugin.getSettings();
-        assertEquals(6, settings.size());
+        assertEquals(8, settings.size());
 
         Setting<?> setting0 = settings.get(0);
         assertEquals("plugins.search_relevance.workbench_enabled", setting0.getKey());
@@ -244,15 +248,23 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
         assertEquals(1000, setting2.get(Settings.EMPTY));
 
         Setting<?> setting3 = settings.get(3);
-        assertEquals("plugins.search_relevance.scheduled_experiments_enabled", setting3.getKey());
-        assertEquals(true, setting3.get(Settings.EMPTY));
+        assertEquals("plugins.search_relevance.experiment_import.max_queries", setting3.getKey());
+        assertEquals(1000, setting3.get(Settings.EMPTY));
 
         Setting<?> setting4 = settings.get(4);
-        assertEquals("plugins.search_relevance.scheduled_experiments_timeout", setting4.getKey());
-        assertEquals(TimeValue.timeValueMinutes(60), setting4.get(Settings.EMPTY));
+        assertEquals("plugins.search_relevance.experiment_import.max_results_per_query", setting4.getKey());
+        assertEquals(1000, setting4.get(Settings.EMPTY));
 
         Setting<?> setting5 = settings.get(5);
-        assertEquals("plugins.search_relevance.scheduled_experiments_minimum_interval", setting5.getKey());
-        assertEquals(TimeValue.timeValueSeconds(1), setting5.get(Settings.EMPTY));
+        assertEquals("plugins.search_relevance.scheduled_experiments_enabled", setting5.getKey());
+        assertEquals(true, setting5.get(Settings.EMPTY));
+
+        Setting<?> setting6 = settings.get(6);
+        assertEquals("plugins.search_relevance.scheduled_experiments_timeout", setting6.getKey());
+        assertEquals(TimeValue.timeValueMinutes(60), setting6.get(Settings.EMPTY));
+
+        Setting<?> setting7 = settings.get(7);
+        assertEquals("plugins.search_relevance.scheduled_experiments_minimum_interval", setting7.getKey());
+        assertEquals(TimeValue.timeValueSeconds(1), setting7.get(Settings.EMPTY));
     }
 }

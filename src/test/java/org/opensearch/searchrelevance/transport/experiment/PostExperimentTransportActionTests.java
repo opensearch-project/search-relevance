@@ -42,7 +42,6 @@ import org.opensearch.searchrelevance.model.EvaluationResult;
 import org.opensearch.searchrelevance.model.Experiment;
 import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.model.SearchConfiguration;
-import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.test.OpenSearchTestCase;
 import org.opensearch.transport.TransportService;
 
@@ -75,9 +74,6 @@ public class PostExperimentTransportActionTests extends OpenSearchTestCase {
     @Mock
     private MetricsHelper metricsHelper;
 
-    @Mock
-    private SearchRelevanceSettingsAccessor settingsAccessor;
-
     private PostExperimentTransportAction transportAction;
 
     @Before
@@ -92,8 +88,7 @@ public class PostExperimentTransportActionTests extends OpenSearchTestCase {
             querySetDao,
             searchConfigurationDao,
             evaluationResultDao,
-            metricsHelper,
-            settingsAccessor
+            metricsHelper
         );
     }
 
@@ -217,22 +212,22 @@ public class PostExperimentTransportActionTests extends OpenSearchTestCase {
         verify(evaluationResultDao, times(2)).putEvaluationResult(any(EvaluationResult.class), any(ActionListener.class));
     }
 
-    public void testMaxLimitEnforcement() throws InterruptedException {
-        // Setup test data with more results than the limit
+    /**
+     * The transport action no longer limits or truncates the imported result list itself -
+     * that's enforced as a reject-with-4xx check at the REST layer (RestPostExperimentAction),
+     * before an oversized payload is even fully parsed. This verifies the transport action
+     * processes every entry it's given, trusting that upstream validation already happened.
+     */
+    public void testAllEvaluationResultsProcessedRegardlessOfCount() throws InterruptedException {
         List<Map<String, Object>> evaluationResults = createTestEvaluationResults(5);
         PostExperimentRequest request = createTestRequest(evaluationResults);
 
-        // Mock dependencies with a limit of 3
         setupMockDependencies();
-        when(settingsAccessor.getMaxQuerySetAllowed()).thenReturn(3);
-
-        // Mock all evaluation results to succeed
         mockEvaluationResultDaoSuccess();
 
         CountDownLatch latch = new CountDownLatch(1);
         AtomicReference<Experiment> finalExperiment = new AtomicReference<>();
 
-        // Mock experiment update to capture the final experiment
         doAnswer(invocation -> {
             Experiment experiment = invocation.getArgument(0);
             finalExperiment.set(experiment);
@@ -242,20 +237,16 @@ public class PostExperimentTransportActionTests extends OpenSearchTestCase {
             return null;
         }).when(experimentDao).updateExperiment(any(Experiment.class), any(ActionListener.class));
 
-        // Execute
         ActionListener<IndexResponse> listener = createMockListener();
         transportAction.doExecute(null, request, listener);
 
-        // Wait for async processing
         assertTrue("Test timed out", latch.await(5, TimeUnit.SECONDS));
 
-        // Verify only 3 evaluation results were processed (due to limit)
-        verify(evaluationResultDao, times(3)).putEvaluationResult(any(EvaluationResult.class), any(ActionListener.class));
+        verify(evaluationResultDao, times(5)).putEvaluationResult(any(EvaluationResult.class), any(ActionListener.class));
 
-        // Verify final experiment has COMPLETED status with 3 results
         assertNotNull(finalExperiment.get());
         assertEquals(AsyncStatus.COMPLETED, finalExperiment.get().status());
-        assertEquals(3, finalExperiment.get().results().size());
+        assertEquals(5, finalExperiment.get().results().size());
     }
 
     public void testNullRequest() {
@@ -302,9 +293,6 @@ public class PostExperimentTransportActionTests extends OpenSearchTestCase {
         SearchConfiguration searchConfig = mock(SearchConfiguration.class);
         when(searchConfig.id()).thenReturn("test-search-config-id");
         when(searchConfigurationDao.getSearchConfigurationSync("test-search-config-id")).thenReturn(searchConfig);
-
-        // Mock settings
-        when(settingsAccessor.getMaxQuerySetAllowed()).thenReturn(100);
 
         // Mock initial experiment creation
         doAnswer(invocation -> {

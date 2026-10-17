@@ -42,7 +42,6 @@ import org.opensearch.searchrelevance.model.EvaluationResult;
 import org.opensearch.searchrelevance.model.Experiment;
 import org.opensearch.searchrelevance.model.ExperimentType;
 import org.opensearch.searchrelevance.model.SearchConfiguration;
-import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.tasks.Task;
 import org.opensearch.transport.TransportService;
@@ -59,7 +58,6 @@ public class PostExperimentTransportAction extends HandledTransportAction<PostEx
     private final QuerySetDao querySetDao;
     private final SearchConfigurationDao searchConfigurationDao;
     private final MetricsHelper metricsHelper;
-    private final SearchRelevanceSettingsAccessor settingsAccessor;
 
     private static final Logger LOGGER = LogManager.getLogger(PostExperimentTransportAction.class);
 
@@ -73,8 +71,7 @@ public class PostExperimentTransportAction extends HandledTransportAction<PostEx
         QuerySetDao querySetDao,
         SearchConfigurationDao searchConfigurationDao,
         EvaluationResultDao evaluationResultDao,
-        MetricsHelper metricsHelper,
-        SearchRelevanceSettingsAccessor settingsAccessor
+        MetricsHelper metricsHelper
     ) {
         super(PostExperimentAction.NAME, transportService, actionFilters, PostExperimentRequest::new);
         this.clusterService = clusterService;
@@ -84,7 +81,6 @@ public class PostExperimentTransportAction extends HandledTransportAction<PostEx
         this.searchConfigurationDao = searchConfigurationDao;
         this.evaluationResultDao = evaluationResultDao;
         this.metricsHelper = metricsHelper;
-        this.settingsAccessor = settingsAccessor;
     }
 
     @Override
@@ -172,8 +168,7 @@ public class PostExperimentTransportAction extends HandledTransportAction<PostEx
 
         List judgmentList = request.getJudgmentList();
         List<Map<String, Object>> evaluationResultList = request.getEvaluationResultList();
-        int maxLimit = settingsAccessor.getMaxQuerySetAllowed();
-        int processCount = Math.min(evaluationResultList.size(), maxLimit);
+        int processCount = evaluationResultList.size();
 
         // Track both completed operations (success + failure) to know when all processing is done
         AtomicInteger completedOperations = new AtomicInteger(0);
@@ -219,18 +214,6 @@ public class PostExperimentTransportAction extends HandledTransportAction<PostEx
                 }
             }));
         }
-
-        // Log if we had to limit the results
-        if (evaluationResultList.size() > maxLimit) {
-            LOGGER.warn(
-                "Experiment {} limited to {} evaluation results (requested: {}, max allowed: {})",
-                experimentId,
-                processCount,
-                evaluationResultList.size(),
-                maxLimit
-            );
-        }
-
     }
 
     /**
@@ -248,30 +231,11 @@ public class PostExperimentTransportAction extends HandledTransportAction<PostEx
         List judgmentList = List.of();
         List<Map<String, Object>> results = request.getResults();
 
-        int maxLimit = settingsAccessor.getMaxQuerySetAllowed();
-        int processCount = Math.min(results.size(), maxLimit);
-
-        // Track both completed operations (success + failure) to know when all processing is done
-        AtomicInteger completedOperations = new AtomicInteger(0);
-
-        for (int i = 0; i < processCount; i++) {
-            Map<String, Object> resultMap = results.get(i);
+        for (Map<String, Object> resultMap : results) {
             finalResults.add(resultMap);
         }
 
         updateFinalExperiment(experimentId, request, finalResults, judgmentList, hasFailure.get());
-
-        // Log if we had to limit the results
-        if (results.size() > maxLimit) {
-            LOGGER.warn(
-                "Experiment {} limited to {} results stored (requested: {}, max allowed: {})",
-                experimentId,
-                processCount,
-                results.size(),
-                maxLimit
-            );
-        }
-
     }
 
     private void updateFinalExperiment(

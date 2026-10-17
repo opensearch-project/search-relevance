@@ -9,6 +9,9 @@ package org.opensearch.searchrelevance.rest;
 
 import static java.util.Collections.singletonList;
 import static org.opensearch.rest.RestRequest.Method.POST;
+import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_DOC_IDS;
+import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_SNAPSHOTS;
+import static org.opensearch.searchrelevance.common.MetricsConstants.QUERY_TEXT;
 import static org.opensearch.searchrelevance.common.PluginConstants.EVALUATION_RESULT_LIST;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENTS_URI;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_LIST;
@@ -35,6 +38,7 @@ import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.searchrelevance.transport.experiment.PostExperimentAction;
 import org.opensearch.searchrelevance.transport.experiment.PostExperimentRequest;
 import org.opensearch.searchrelevance.utils.ParserUtils;
+import org.opensearch.searchrelevance.utils.TextValidationUtil;
 import org.opensearch.transport.client.node.NodeClient;
 
 import lombok.AllArgsConstructor;
@@ -93,6 +97,15 @@ public class RestPostExperimentAction extends BaseRestHandler {
 
             List<Map<String, Object>> evaluationResultList = ParserUtils.convertObjToListOfMaps(source, EVALUATION_RESULT_LIST);
 
+            BytesRestResponse limitError = validateQueryCount(evaluationResultList);
+            if (limitError != null) {
+                return channel -> channel.sendResponse(limitError);
+            }
+            BytesRestResponse fieldError = validatePointwiseEntries(evaluationResultList);
+            if (fieldError != null) {
+                return channel -> channel.sendResponse(fieldError);
+            }
+
             createRequest = new PostExperimentRequest(
                 type,
                 querySetId,
@@ -112,6 +125,15 @@ public class RestPostExperimentAction extends BaseRestHandler {
             int size = sizeObj != null ? sizeObj.intValue() : 10; // Default size to 10 if not provided
 
             List<Map<String, Object>> results = ParserUtils.convertObjToListOfMaps(source, RESULTS);
+
+            BytesRestResponse limitError = validateQueryCount(results);
+            if (limitError != null) {
+                return channel -> channel.sendResponse(limitError);
+            }
+            BytesRestResponse fieldError = validatePairwiseEntries(results);
+            if (fieldError != null) {
+                return channel -> channel.sendResponse(fieldError);
+            }
 
             createRequest = new PostExperimentRequest(type, querySetId, searchConfigurationList, List.of(), size, null, results);
         } else {
@@ -143,5 +165,82 @@ public class RestPostExperimentAction extends BaseRestHandler {
                 }
             }
         });
+    }
+
+    /**
+     * Rejects the import if it carries more per-query result entries than
+     * {@link SearchRelevanceSettingsAccessor#getMaxExperimentImportQueriesAllowed()} allows.
+     * Checked before any per-entry parsing/validation, so an oversized import is rejected
+     * as cheaply as possible.
+     */
+    private BytesRestResponse validateQueryCount(List<Map<String, Object>> entries) {
+        int maxQueries = settingsAccessor.getMaxExperimentImportQueriesAllowed();
+        if (entries != null && entries.size() > maxQueries) {
+            return new BytesRestResponse(
+                RestStatus.FORBIDDEN,
+                "Experiment Import Query Limit Exceeded. Maximum allowed: " + maxQueries
+            );
+        }
+        return null;
+    }
+
+    /**
+     * Validates each POINTWISE_EVALUATION entry's query text and document ID count.
+     */
+    private BytesRestResponse validatePointwiseEntries(List<Map<String, Object>> entries) {
+        for (Map<String, Object> entry : entries) {
+            Object searchText = entry.get("searchText") != null ? entry.get("searchText") : entry.get("queryText");
+            TextValidationUtil.ValidationResult textResult = TextValidationUtil.validateText(
+                searchText != null ? searchText.toString() : null
+            );
+            if (!textResult.isValid()) {
+                return new BytesRestResponse(RestStatus.BAD_REQUEST, "Invalid searchText: " + textResult.getErrorMessage());
+            }
+
+            BytesRestResponse resultSizeError = validateResultsPerQuery((List<?>) entry.get("documentIds"));
+            if (resultSizeError != null) {
+                return resultSizeError;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Validates each PAIRWISE_COMPARISON entry's query text and, for every snapshot, its
+     * document ID count.
+     */
+    @SuppressWarnings("unchecked")
+    private BytesRestResponse validatePairwiseEntries(List<Map<String, Object>> entries) {
+        for (Map<String, Object> entry : entries) {
+            Object queryText = entry.get(QUERY_TEXT) != null ? entry.get(QUERY_TEXT) : entry.get("searchText");
+            TextValidationUtil.ValidationResult textResult = TextValidationUtil.validateText(
+                queryText != null ? queryText.toString() : null
+            );
+            if (!textResult.isValid()) {
+                return new BytesRestResponse(RestStatus.BAD_REQUEST, "Invalid queryText: " + textResult.getErrorMessage());
+            }
+
+            List<Map<String, Object>> snapshots = (List<Map<String, Object>>) entry.get(PAIRWISE_FIELD_NAME_SNAPSHOTS);
+            if (snapshots != null) {
+                for (Map<String, Object> snapshot : snapshots) {
+                    BytesRestResponse resultSizeError = validateResultsPerQuery((List<?>) snapshot.get(PAIRWISE_FIELD_NAME_DOC_IDS));
+                    if (resultSizeError != null) {
+                        return resultSizeError;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    private BytesRestResponse validateResultsPerQuery(List<?> documentIds) {
+        int maxResultsPerQuery = settingsAccessor.getMaxExperimentImportResultsPerQueryAllowed();
+        if (documentIds != null && documentIds.size() > maxResultsPerQuery) {
+            return new BytesRestResponse(
+                RestStatus.FORBIDDEN,
+                "Experiment Import Results Per Query Limit Exceeded. Maximum allowed: " + maxResultsPerQuery
+            );
+        }
+        return null;
     }
 }

@@ -58,6 +58,10 @@ public class RestPostExperimentActionTests extends SearchRelevanceRestTestCase {
         // Setup channel mock
         when(channel.newBuilder()).thenReturn(JsonXContent.contentBuilder());
         when(channel.newErrorBuilder()).thenReturn(JsonXContent.contentBuilder());
+        // Default both import limits high enough that existing fixtures pass; individual
+        // tests override these to exercise the reject paths.
+        when(settingsAccessor.getMaxExperimentImportQueriesAllowed()).thenReturn(1000);
+        when(settingsAccessor.getMaxExperimentImportResultsPerQueryAllowed()).thenReturn(1000);
     }
 
     public void testPrepareRequest_WorkbenchDisabled() throws Exception {
@@ -113,6 +117,81 @@ public class RestPostExperimentActionTests extends SearchRelevanceRestTestCase {
             () -> restPostExperimentAction.handleRequest(request, channel, client)
         );
         assertTrue(exception.getMessage().contains("Invalid or missing experiment type"));
+    }
+
+    public void testPostExperiment_QueryCountLimitExceeded() throws Exception {
+        // Setup: two entries in evaluationResultList, but the limit only allows one
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        when(settingsAccessor.getMaxExperimentImportQueriesAllowed()).thenReturn(1);
+        String content = "{"
+            + "\"type\": \"POINTWISE_EVALUATION\","
+            + "\"querySetId\": \"test_query_set_id\","
+            + "\"searchConfigurationList\": [\"abcd-searchConfiguration-defg\"],"
+            + "\"judgmentList\": [\"hjkl-judgements-id-asdf\"],"
+            + "\"evaluationResultList\": ["
+            + "  {\"searchText\": \"query one\", \"documentIds\": [\"d1\"]},"
+            + "  {\"searchText\": \"query two\", \"documentIds\": [\"d1\"]}"
+            + "]"
+            + "}";
+        RestRequest request = createPostRestRequestWithContent(content, "experiments");
+        when(channel.request()).thenReturn(request);
+
+        // Execute
+        restPostExperimentAction.handleRequest(request, channel, client);
+
+        // Verify
+        ArgumentCaptor<BytesRestResponse> responseCaptor = ArgumentCaptor.forClass(BytesRestResponse.class);
+        verify(channel).sendResponse(responseCaptor.capture());
+        assertEquals(RestStatus.FORBIDDEN, responseCaptor.getValue().status());
+    }
+
+    public void testPostExperiment_ResultsPerQueryLimitExceeded() throws Exception {
+        // Setup: one entry with two documentIds, but the per-query limit only allows one
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        when(settingsAccessor.getMaxExperimentImportResultsPerQueryAllowed()).thenReturn(1);
+        String content = "{"
+            + "\"type\": \"POINTWISE_EVALUATION\","
+            + "\"querySetId\": \"test_query_set_id\","
+            + "\"searchConfigurationList\": [\"abcd-searchConfiguration-defg\"],"
+            + "\"judgmentList\": [\"hjkl-judgements-id-asdf\"],"
+            + "\"evaluationResultList\": ["
+            + "  {\"searchText\": \"test query\", \"documentIds\": [\"d1\", \"d2\"]}"
+            + "]"
+            + "}";
+        RestRequest request = createPostRestRequestWithContent(content, "experiments");
+        when(channel.request()).thenReturn(request);
+
+        // Execute
+        restPostExperimentAction.handleRequest(request, channel, client);
+
+        // Verify
+        ArgumentCaptor<BytesRestResponse> responseCaptor = ArgumentCaptor.forClass(BytesRestResponse.class);
+        verify(channel).sendResponse(responseCaptor.capture());
+        assertEquals(RestStatus.FORBIDDEN, responseCaptor.getValue().status());
+    }
+
+    public void testPostExperiment_InvalidSearchText() throws Exception {
+        // Setup: searchText containing a disallowed character
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        String content = "{"
+            + "\"type\": \"POINTWISE_EVALUATION\","
+            + "\"querySetId\": \"test_query_set_id\","
+            + "\"searchConfigurationList\": [\"abcd-searchConfiguration-defg\"],"
+            + "\"judgmentList\": [\"hjkl-judgements-id-asdf\"],"
+            + "\"evaluationResultList\": ["
+            + "  {\"searchText\": \"<script>\", \"documentIds\": [\"d1\"]}"
+            + "]"
+            + "}";
+        RestRequest request = createPostRestRequestWithContent(content, "experiments");
+        when(channel.request()).thenReturn(request);
+
+        // Execute
+        restPostExperimentAction.handleRequest(request, channel, client);
+
+        // Verify
+        ArgumentCaptor<BytesRestResponse> responseCaptor = ArgumentCaptor.forClass(BytesRestResponse.class);
+        verify(channel).sendResponse(responseCaptor.capture());
+        assertEquals(RestStatus.BAD_REQUEST, responseCaptor.getValue().status());
     }
 
     public void testPostExperiment_Failure() throws Exception {
