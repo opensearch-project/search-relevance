@@ -100,6 +100,7 @@ public class SearchRelevanceSettings {
     public static final Setting<Integer> SEARCH_RELEVANCE_JUDGMENT_IMPORT_MAX_QUERIES = Setting.intSetting(
         SEARCH_RELEVANCE_JUDGMENT_IMPORT_MAX_QUERIES_KEY,
         1000,
+        1,
         Setting.Property.NodeScope,
         Setting.Property.Dynamic
     );
@@ -113,6 +114,7 @@ public class SearchRelevanceSettings {
     public static final Setting<Integer> SEARCH_RELEVANCE_JUDGMENT_IMPORT_MAX_RATINGS_PER_QUERY = Setting.intSetting(
         SEARCH_RELEVANCE_JUDGMENT_IMPORT_MAX_RATINGS_PER_QUERY_KEY,
         1000,
+        1,
         Setting.Property.NodeScope,
         Setting.Property.Dynamic
     );

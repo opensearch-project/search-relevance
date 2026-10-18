@@ -26,6 +26,7 @@ import static org.opensearch.searchrelevance.common.PluginConstants.NAX_RANK;
 import static org.opensearch.searchrelevance.common.PluginConstants.OVERWRITE_CACHE;
 import static org.opensearch.searchrelevance.common.PluginConstants.QUERY;
 import static org.opensearch.searchrelevance.common.PluginConstants.QUERYSET_ID;
+import static org.opensearch.searchrelevance.common.PluginConstants.RATINGS;
 import static org.opensearch.searchrelevance.common.PluginConstants.SEARCH_CONFIGURATION_LIST;
 import static org.opensearch.searchrelevance.common.PluginConstants.SIZE;
 import static org.opensearch.searchrelevance.common.PluginConstants.START_DATE;
@@ -277,7 +278,7 @@ public class RestPutJudgmentAction extends BaseRestHandler {
                 return new BytesRestResponse(RestStatus.BAD_REQUEST, "Invalid query: " + queryValidation.getErrorMessage());
             }
 
-            Object ratingsObj = entry.get("ratings");
+            Object ratingsObj = entry.get(RATINGS);
             if (!(ratingsObj instanceof List)) {
                 return new BytesRestResponse(RestStatus.BAD_REQUEST, "Invalid query " + query + ": ratings must be a list");
             }
