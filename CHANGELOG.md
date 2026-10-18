@@ -13,6 +13,7 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ### Bug Fixes
 * Validate manual judgment rating edits on the server ([#601](https://github.com/opensearch-project/search-relevance/pull/601))
+* Tolerate incompatible field type mapping conflicts (e.g. legacy `isScheduled` boolean vs. current keyword) instead of failing experiment index writes after upgrade ([#600](https://github.com/opensearch-project/search-relevance/issues/600))
 
 ### Infrastructure
 
