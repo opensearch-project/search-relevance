@@ -235,8 +235,10 @@ public class SearchRelevanceIndicesManager {
      * ensuring the mapping is fully applied before any document write occurs.
      * Note: CompletableFuture.get() is used instead of ActionFuture.actionGet()
      * because actionGet() is forbidden on transport threads.
+     * Returns normally (without updating the index's schema_version) if the only failure is an
+     * incompatible field type change - see {@link #isIncompatibleFieldTypeConflict}.
      * @param index the index whose mapping should be updated
-     * @throws SearchRelevanceException if the mapping update fails or times out
+     * @throws SearchRelevanceException if the mapping update fails for any other reason, or times out
      */
     private void updateMappingSync(final SearchRelevanceIndices index) {
         final PutMappingRequest putMappingRequest = new PutMappingRequest(index.getIndexName()).source(
@@ -270,12 +272,45 @@ public class SearchRelevanceIndicesManager {
                 RestStatus.INTERNAL_SERVER_ERROR
             );
         } catch (ExecutionException e) {
+            if (isIncompatibleFieldTypeConflict(e.getCause())) {
+                // OpenSearch never allows an existing field's type to be changed via putMapping, regardless of
+                // whether the old and new types are otherwise compatible at the document level. Retrying this
+                // exact request will fail identically every time, so there is nothing to gain by treating it as
+                // transient. The index keeps serving reads/writes fine under its current (older) field type, so
+                // we log and move on rather than blocking the caller - this mirrors the best-effort mapping
+                // update behavior already used for non-protected indices (see createIndexIfAbsentSync below).
+                log.warn(
+                    "Skipping mapping update for index [{}]: {}. An existing field's type cannot be changed in "
+                        + "place; the index will keep operating under its current field type for that field.",
+                    index.getIndexName(),
+                    e.getCause().getMessage()
+                );
+                return;
+            }
             throw new SearchRelevanceException(
                 String.format(Locale.ROOT, "Failed to update mapping for index [%s]", index.getIndexName()),
                 e.getCause(),
                 RestStatus.INTERNAL_SERVER_ERROR
             );
         }
+    }
+
+    /**
+     * Detects OpenSearch's blanket rejection of in-place field type changes (e.g. "mapper [foo] cannot be
+     * changed from type [boolean] to [keyword]"). This is a permanent, non-retryable condition - it is not
+     * specific to any one field or type pair, and will never succeed no matter how many times it is retried.
+     * @param t the throwable to inspect, walking the full cause chain
+     * @return true if the throwable chain contains this specific mapping conflict
+     */
+    private static boolean isIncompatibleFieldTypeConflict(final Throwable t) {
+        for (Throwable current = t; current != null; current = current.getCause()) {
+            if (current instanceof IllegalArgumentException
+                && current.getMessage() != null
+                && current.getMessage().contains("cannot be changed from type")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

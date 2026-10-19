@@ -846,6 +846,46 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
     }
 
     /**
+     * Test that an incompatible field type change (e.g. upgrading a legacy index whose field was
+     * mapped as boolean against a current mapping that declares it as keyword) is tolerated rather
+     * than failing the operation: OpenSearch never allows this kind of change via putMapping no
+     * matter how many times it's retried, so it should be detected and skipped on the first attempt
+     * instead of burning through all retries and then failing.
+     */
+    public void testCreateIndexIfAbsent_IncompatibleFieldTypeConflict_ToleratedAsSuccess() {
+        // Setup: index exists with older schema version
+        when(metadata.hasIndex(QUERY_SET.getIndexName())).thenReturn(true);
+
+        IndexMetadata indexMetadata = mock(IndexMetadata.class);
+        MappingMetadata mappingMetadata = mock(MappingMetadata.class);
+        when(metadata.index(QUERY_SET.getIndexName())).thenReturn(indexMetadata);
+        when(indexMetadata.mapping()).thenReturn(mappingMetadata);
+
+        // Set explicit schema_version = -1 (older than current version 0)
+        Map<String, Object> metaMap = new HashMap<>();
+        metaMap.put(SearchRelevanceIndices.META_SCHEMA_VERSION_KEY, -1);
+        Map<String, Object> mappingSource = new HashMap<>();
+        mappingSource.put("_meta", metaMap);
+        when(mappingMetadata.sourceAsMap()).thenReturn(mappingSource);
+
+        // Mock putMapping to fail with OpenSearch's blanket field-type-change rejection
+        doAnswer(invocation -> {
+            ActionListener<org.opensearch.action.support.clustermanager.AcknowledgedResponse> putListener = invocation.getArgument(1);
+            putListener.onFailure(new IllegalArgumentException("mapper [isScheduled] cannot be changed from type [boolean] to [keyword]"));
+            return null;
+        }).when(indicesAdminClient).putMapping(any(PutMappingRequest.class), any(ActionListener.class));
+
+        StepListener<Void> stepListener = new StepListener<>();
+        indicesManager.createIndexIfAbsent(QUERY_SET, stepListener);
+
+        // Verify: putMapping was attempted only once - no point retrying a permanent conflict
+        verify(indicesAdminClient).putMapping(any(PutMappingRequest.class), any(ActionListener.class));
+
+        // Verify: stepListener succeeded despite the conflict (no exception)
+        assertNull(stepListener.result());
+    }
+
+    /**
      * Test that when schema version check fails, stepListener.onFailure is called.
      */
     public void testCreateIndexIfAbsent_SchemaVersionCheckFails_ServiceFails() {
