@@ -6,6 +6,10 @@
 # job-scheduler. The plugin subject therefore needs them granted explicitly, since it would otherwise
 # hold no privileges on them at all.
 #
+# Index, update and delete requests run on the shard as indices:data/write/bulk[s], which is checked
+# against these indices in addition to the per-item action, so it is granted alongside them. Only
+# literal action names and wildcards take effect here; action-group names match no action.
+#
 # The cluster_permissions key must be present even when empty, because the security plugin appends
 # the bulk action to whatever list is parsed here, and an absent key leaves an immutable empty one.
 cluster_permissions: []
@@ -26,3 +30,4 @@ index_permissions:
       - "indices:data/write/index"
       - "indices:data/write/update"
       - "indices:data/write/delete"
+      - "indices:data/write/bulk*"
