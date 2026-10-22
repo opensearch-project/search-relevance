@@ -8,10 +8,12 @@
 package org.opensearch.searchrelevance.indices;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.RETURNS_SELF;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.QUERY_SET;
 
@@ -42,8 +44,6 @@ import org.opensearch.cluster.metadata.IndexMetadata;
 import org.opensearch.cluster.metadata.MappingMetadata;
 import org.opensearch.cluster.metadata.Metadata;
 import org.opensearch.cluster.service.ClusterService;
-import org.opensearch.common.settings.Settings;
-import org.opensearch.common.util.concurrent.ThreadContext;
 import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.bytes.BytesReference;
@@ -59,7 +59,6 @@ import org.opensearch.search.sort.SortOrder;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.model.QuerySet;
 import org.opensearch.test.OpenSearchTestCase;
-import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.client.AdminClient;
 import org.opensearch.transport.client.Client;
 import org.opensearch.transport.client.IndicesAdminClient;
@@ -79,26 +78,17 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
     @Mock
     private AdminClient adminClient;
     @Mock
-    private ThreadPool threadPool;
-    @Mock
     private IndicesAdminClient indicesAdminClient;
 
     private AutoCloseable openMocks;
     private SearchRelevanceIndicesManager indicesManager;
-    private ThreadContext threadContext;
 
     @Override
     public void setUp() throws Exception {
         super.setUp();
         openMocks = MockitoAnnotations.openMocks(this);
 
-        // Setup ThreadContext
-        Settings settings = Settings.builder().build();
-        threadContext = new ThreadContext(settings);
-
         // Setup mock chain
-        when(client.threadPool()).thenReturn(threadPool);
-        when(threadPool.getThreadContext()).thenReturn(threadContext);
         when(clusterService.state()).thenReturn(clusterState);
         when(clusterState.metadata()).thenReturn(metadata);
         when(pluginClient.admin()).thenReturn(adminClient);
@@ -109,6 +99,8 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
 
     @Override
     public void tearDown() throws Exception {
+        // Every operation these tests drive must run as the plugin subject, never on the caller's client.
+        verifyNoInteractions(client);
         super.tearDown();
         openMocks.close();
     }
@@ -201,6 +193,31 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         verify(indexRequestBuilder).setOpType(DocWriteRequest.OpType.CREATE);
         verify(indexRequestBuilder).setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
         verify(indexRequestBuilder).setSource(xContentBuilder);
+    }
+
+    public void testUpdateDocRunsOnThePluginClient() throws IOException {
+        XContentBuilder xContentBuilder = XContentFactory.jsonBuilder().startObject().field("name", "test_name").endObject();
+        IndexRequestBuilder indexRequestBuilder = mock(IndexRequestBuilder.class, RETURNS_SELF);
+        when(pluginClient.prepareIndex(QUERY_SET.getIndexName())).thenReturn(indexRequestBuilder);
+
+        indicesManager.updateDoc("test_id", xContentBuilder, QUERY_SET, mock(ActionListener.class));
+
+        verify(indexRequestBuilder).setId("test_id");
+        verify(indexRequestBuilder).setOpType(DocWriteRequest.OpType.INDEX);
+        verify(indexRequestBuilder).setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
+        verify(indexRequestBuilder).execute(any(ActionListener.class));
+    }
+
+    public void testUpdateDocWithSeqNoAndPrimaryTermRunsOnThePluginClient() throws IOException {
+        XContentBuilder xContentBuilder = XContentFactory.jsonBuilder().startObject().field("name", "test_name").endObject();
+        IndexRequestBuilder indexRequestBuilder = mock(IndexRequestBuilder.class, RETURNS_SELF);
+        when(pluginClient.prepareIndex(QUERY_SET.getIndexName())).thenReturn(indexRequestBuilder);
+
+        indicesManager.updateDocWithSeqNoAndPrimaryTerm("test_id", xContentBuilder, QUERY_SET, 5L, 2L, mock(ActionListener.class));
+
+        verify(indexRequestBuilder).setIfSeqNo(5L);
+        verify(indexRequestBuilder).setIfPrimaryTerm(2L);
+        verify(indexRequestBuilder).execute(any(ActionListener.class));
     }
 
     public void testPutDocWhenFailed() throws IOException {

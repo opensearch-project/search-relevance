@@ -198,13 +198,17 @@ public class PluginClientTests extends OpenSearchTestCase {
             () -> pluginClient.execute(DUMMY_ACTION, new DummyRequest(), ActionListener.wrap(r -> {}, ex -> {}))
         );
         assertTrue(e.getMessage().contains("subject"));
+        assertNull("the delegate must not be called without a subject", capturedListener);
     }
 
     public void testAcceptsTheSameSubjectTwiceButRejectsADifferentOne() {
         RecordingSubject first = assignSubject();
         pluginClient.setSubject(first);
 
-        expectThrows(IllegalStateException.class, () -> pluginClient.setSubject(new RecordingSubject(threadContext)));
+        expectThrows(IllegalStateException.class, () -> pluginClient.setSubject(new RecordingSubject(threadContext, "set-by-other")));
+
+        pluginClient.execute(DUMMY_ACTION, new DummyRequest(), ActionListener.wrap(r -> {}, e -> {}));
+        assertEquals("the first subject must stay in effect", "set-by-subject", subjectSeenByDelegate);
     }
 
     public void testRejectsANullSubject() {
@@ -236,7 +240,7 @@ public class PluginClientTests extends OpenSearchTestCase {
     }
 
     private RecordingSubject assignSubject() {
-        RecordingSubject subject = new RecordingSubject(threadContext);
+        RecordingSubject subject = new RecordingSubject(threadContext, "set-by-subject");
         pluginClient.setSubject(subject);
         return subject;
     }
@@ -256,9 +260,11 @@ public class PluginClientTests extends OpenSearchTestCase {
     private static class RecordingSubject implements PluginSubject {
 
         private final ThreadContext threadContext;
+        private final String marker;
 
-        RecordingSubject(ThreadContext threadContext) {
+        RecordingSubject(ThreadContext threadContext, String marker) {
             this.threadContext = threadContext;
+            this.marker = marker;
         }
 
         @Override
@@ -269,7 +275,7 @@ public class PluginClientTests extends OpenSearchTestCase {
         @Override
         public <E extends Exception> void runAs(CheckedRunnable<E> runnable) throws E {
             try (ThreadContext.StoredContext ignored = threadContext.stashContext()) {
-                threadContext.putTransient(SUBJECT_TRANSIENT, "set-by-subject");
+                threadContext.putTransient(SUBJECT_TRANSIENT, marker);
                 runnable.run();
             }
         }
