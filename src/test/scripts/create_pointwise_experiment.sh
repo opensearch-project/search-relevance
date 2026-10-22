@@ -1,5 +1,8 @@
-# Copyright OpenSearch Contributors
 # SPDX-License-Identifier: Apache-2.0
+#
+# The OpenSearch Contributors require contributions made to
+# this file be licensed under the Apache-2.0 license or a
+# compatible open source license.
 
 query_set_id=9ac2d25a-d4df-444d-8008-9aeadfe70927
 search_configuration_id=161c9023-bb0e-44c9-b347-3aa5a1bf66af
