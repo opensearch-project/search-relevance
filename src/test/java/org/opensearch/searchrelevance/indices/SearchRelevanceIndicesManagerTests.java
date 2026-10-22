@@ -8,10 +8,12 @@
 package org.opensearch.searchrelevance.indices;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.RETURNS_SELF;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.QUERY_SET;
 
@@ -42,8 +44,6 @@ import org.opensearch.cluster.metadata.IndexMetadata;
 import org.opensearch.cluster.metadata.MappingMetadata;
 import org.opensearch.cluster.metadata.Metadata;
 import org.opensearch.cluster.service.ClusterService;
-import org.opensearch.common.settings.Settings;
-import org.opensearch.common.util.concurrent.ThreadContext;
 import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.bytes.BytesReference;
@@ -59,7 +59,6 @@ import org.opensearch.search.sort.SortOrder;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.model.QuerySet;
 import org.opensearch.test.OpenSearchTestCase;
-import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.client.AdminClient;
 import org.opensearch.transport.client.Client;
 import org.opensearch.transport.client.IndicesAdminClient;
@@ -67,6 +66,8 @@ import org.opensearch.transport.client.IndicesAdminClient;
 public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
     @Mock
     private Client client;
+    @Mock
+    private Client pluginClient;
     @Mock
     private ClusterService clusterService;
 
@@ -77,36 +78,29 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
     @Mock
     private AdminClient adminClient;
     @Mock
-    private ThreadPool threadPool;
-    @Mock
     private IndicesAdminClient indicesAdminClient;
 
     private AutoCloseable openMocks;
     private SearchRelevanceIndicesManager indicesManager;
-    private ThreadContext threadContext;
 
     @Override
     public void setUp() throws Exception {
         super.setUp();
         openMocks = MockitoAnnotations.openMocks(this);
 
-        // Setup ThreadContext
-        Settings settings = Settings.builder().build();
-        threadContext = new ThreadContext(settings);
-
         // Setup mock chain
-        when(client.threadPool()).thenReturn(threadPool);
-        when(threadPool.getThreadContext()).thenReturn(threadContext);
         when(clusterService.state()).thenReturn(clusterState);
         when(clusterState.metadata()).thenReturn(metadata);
-        when(client.admin()).thenReturn(adminClient);
+        when(pluginClient.admin()).thenReturn(adminClient);
         when(adminClient.indices()).thenReturn(indicesAdminClient);
 
-        indicesManager = new SearchRelevanceIndicesManager(clusterService, client);
+        indicesManager = new SearchRelevanceIndicesManager(clusterService, client, pluginClient);
     }
 
     @Override
     public void tearDown() throws Exception {
+        // Every operation these tests drive must run as the plugin subject, never on the caller's client.
+        verifyNoInteractions(client);
         super.tearDown();
         openMocks.close();
     }
@@ -184,7 +178,7 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         XContentBuilder xContentBuilder = querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
 
         IndexRequestBuilder indexRequestBuilder = mock(IndexRequestBuilder.class);
-        when(client.prepareIndex(QUERY_SET.getIndexName())).thenReturn(indexRequestBuilder);
+        when(pluginClient.prepareIndex(QUERY_SET.getIndexName())).thenReturn(indexRequestBuilder);
         when(indexRequestBuilder.setId("test_id")).thenReturn(indexRequestBuilder);
         when(indexRequestBuilder.setOpType(DocWriteRequest.OpType.CREATE)).thenReturn(indexRequestBuilder);
         when(indexRequestBuilder.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)).thenReturn(indexRequestBuilder);
@@ -201,11 +195,36 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         verify(indexRequestBuilder).setSource(xContentBuilder);
     }
 
+    public void testUpdateDoc() throws IOException {
+        XContentBuilder xContentBuilder = XContentFactory.jsonBuilder().startObject().field("name", "test_name").endObject();
+        IndexRequestBuilder indexRequestBuilder = mock(IndexRequestBuilder.class, RETURNS_SELF);
+        when(pluginClient.prepareIndex(QUERY_SET.getIndexName())).thenReturn(indexRequestBuilder);
+
+        indicesManager.updateDoc("test_id", xContentBuilder, QUERY_SET, mock(ActionListener.class));
+
+        verify(indexRequestBuilder).setId("test_id");
+        verify(indexRequestBuilder).setOpType(DocWriteRequest.OpType.INDEX);
+        verify(indexRequestBuilder).setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
+        verify(indexRequestBuilder).execute(any(ActionListener.class));
+    }
+
+    public void testUpdateDocWithSeqNoAndPrimaryTerm() throws IOException {
+        XContentBuilder xContentBuilder = XContentFactory.jsonBuilder().startObject().field("name", "test_name").endObject();
+        IndexRequestBuilder indexRequestBuilder = mock(IndexRequestBuilder.class, RETURNS_SELF);
+        when(pluginClient.prepareIndex(QUERY_SET.getIndexName())).thenReturn(indexRequestBuilder);
+
+        indicesManager.updateDocWithSeqNoAndPrimaryTerm("test_id", xContentBuilder, QUERY_SET, 5L, 2L, mock(ActionListener.class));
+
+        verify(indexRequestBuilder).setIfSeqNo(5L);
+        verify(indexRequestBuilder).setIfPrimaryTerm(2L);
+        verify(indexRequestBuilder).execute(any(ActionListener.class));
+    }
+
     public void testPutDocWhenFailed() throws IOException {
         QuerySet querySet = new QuerySet("test_id", "test_name", "test_description", "test_timestamp", "test_sampling", List.of());
         XContentBuilder xContentBuilder = querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
 
-        when(client.prepareIndex(QUERY_SET.getIndexName())).thenThrow(
+        when(pluginClient.prepareIndex(QUERY_SET.getIndexName())).thenThrow(
             new SearchRelevanceException("No such index", RestStatus.INTERNAL_SERVER_ERROR)
         );
 
@@ -239,14 +258,14 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
             ActionListener<SearchResponse> listener = invocation.getArgument(1);
             listener.onResponse(searchResponse);
             return null;
-        }).when(client).search(any(SearchRequest.class), any(ActionListener.class));
+        }).when(pluginClient).search(any(SearchRequest.class), any(ActionListener.class));
 
         @SuppressWarnings("unchecked")
         ActionListener<SearchResponse> listener = mock(ActionListener.class);
         indicesManager.getDocByDocId(docId, QUERY_SET, listener);
 
         ArgumentCaptor<SearchRequest> requestCaptor = ArgumentCaptor.forClass(SearchRequest.class);
-        verify(client).search(requestCaptor.capture(), any(ActionListener.class));
+        verify(pluginClient).search(requestCaptor.capture(), any(ActionListener.class));
 
         SearchRequest capturedRequest = requestCaptor.getValue();
         assertEquals(QUERY_SET.getIndexName(), capturedRequest.indices()[0]);
@@ -272,7 +291,7 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
             ActionListener<SearchResponse> listener = invocation.getArgument(1);
             listener.onResponse(emptyResponse);
             return null;
-        }).when(client).search(any(SearchRequest.class), any(ActionListener.class));
+        }).when(pluginClient).search(any(SearchRequest.class), any(ActionListener.class));
 
         @SuppressWarnings("unchecked")
         ActionListener<SearchResponse> listener = mock(ActionListener.class);
@@ -311,14 +330,14 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
             ActionListener<SearchResponse> listener = invocation.getArgument(1);
             listener.onResponse(searchResponse);
             return null;
-        }).when(client).search(any(SearchRequest.class), any(ActionListener.class));
+        }).when(pluginClient).search(any(SearchRequest.class), any(ActionListener.class));
 
         @SuppressWarnings("unchecked")
         ActionListener<SearchResponse> listener = mock(ActionListener.class);
         indicesManager.listDocsBySearchRequest(searchSourceBuilder, QUERY_SET, listener);
 
         ArgumentCaptor<SearchRequest> requestCaptor = ArgumentCaptor.forClass(SearchRequest.class);
-        verify(client).search(requestCaptor.capture(), any(ActionListener.class));
+        verify(pluginClient).search(requestCaptor.capture(), any(ActionListener.class));
 
         SearchRequest capturedRequest = requestCaptor.getValue();
         assertEquals(QUERY_SET.getIndexName(), capturedRequest.indices()[0]);
@@ -339,7 +358,7 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
             ActionListener<SearchResponse> listener = invocation.getArgument(1);
             listener.onFailure(new RuntimeException("Search operation failed"));
             return null;
-        }).when(client).search(any(SearchRequest.class), any(ActionListener.class));
+        }).when(pluginClient).search(any(SearchRequest.class), any(ActionListener.class));
 
         @SuppressWarnings("unchecked")
         ActionListener<SearchResponse> listener = mock(ActionListener.class);
@@ -358,7 +377,7 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         String docId = "test_id";
 
         DeleteRequestBuilder deleteRequestBuilder = mock(DeleteRequestBuilder.class);
-        when(client.prepareDelete(QUERY_SET.getIndexName(), docId)).thenReturn(deleteRequestBuilder);
+        when(pluginClient.prepareDelete(QUERY_SET.getIndexName(), docId)).thenReturn(deleteRequestBuilder);
         when(deleteRequestBuilder.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)).thenReturn(deleteRequestBuilder);
 
         DeleteResponse deleteResponse = new DeleteResponse(new ShardId(QUERY_SET.getIndexName(), "_na_", 0), docId, 1L, 1L, 1L, true);
@@ -388,7 +407,7 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         String docId = "non_existent_id";
 
         DeleteRequestBuilder deleteRequestBuilder = mock(DeleteRequestBuilder.class);
-        when(client.prepareDelete(QUERY_SET.getIndexName(), docId)).thenReturn(deleteRequestBuilder);
+        when(pluginClient.prepareDelete(QUERY_SET.getIndexName(), docId)).thenReturn(deleteRequestBuilder);
         when(deleteRequestBuilder.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)).thenReturn(deleteRequestBuilder);
 
         DeleteResponse deleteResponse = new DeleteResponse(new ShardId(QUERY_SET.getIndexName(), "_na_", 0), docId, -1L, 1L, 1L, false);
@@ -415,7 +434,7 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         String docId = "test_id";
 
         DeleteRequestBuilder deleteRequestBuilder = mock(DeleteRequestBuilder.class);
-        when(client.prepareDelete(QUERY_SET.getIndexName(), docId)).thenReturn(deleteRequestBuilder);
+        when(pluginClient.prepareDelete(QUERY_SET.getIndexName(), docId)).thenReturn(deleteRequestBuilder);
         when(deleteRequestBuilder.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)).thenReturn(deleteRequestBuilder);
 
         doAnswer(invocation -> {
@@ -457,7 +476,7 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         XContentBuilder xContentBuilder = querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
 
         IndexRequestBuilder indexRequestBuilder = mock(IndexRequestBuilder.class);
-        when(client.prepareIndex(QUERY_SET.getIndexName())).thenReturn(indexRequestBuilder);
+        when(pluginClient.prepareIndex(QUERY_SET.getIndexName())).thenReturn(indexRequestBuilder);
         when(indexRequestBuilder.setId("test_id")).thenReturn(indexRequestBuilder);
         when(indexRequestBuilder.setOpType(DocWriteRequest.OpType.CREATE)).thenReturn(indexRequestBuilder);
         when(indexRequestBuilder.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)).thenReturn(indexRequestBuilder);
@@ -497,7 +516,7 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         XContentBuilder xContentBuilder = querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
 
         IndexRequestBuilder indexRequestBuilder = mock(IndexRequestBuilder.class);
-        when(client.prepareIndex(QUERY_SET.getIndexName())).thenReturn(indexRequestBuilder);
+        when(pluginClient.prepareIndex(QUERY_SET.getIndexName())).thenReturn(indexRequestBuilder);
         when(indexRequestBuilder.setId("test_id")).thenReturn(indexRequestBuilder);
         when(indexRequestBuilder.setOpType(DocWriteRequest.OpType.CREATE)).thenReturn(indexRequestBuilder);
         when(indexRequestBuilder.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)).thenReturn(indexRequestBuilder);
@@ -537,7 +556,7 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         XContentBuilder xContentBuilder = querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
 
         IndexRequestBuilder indexRequestBuilder = mock(IndexRequestBuilder.class);
-        when(client.prepareIndex(QUERY_SET.getIndexName())).thenReturn(indexRequestBuilder);
+        when(pluginClient.prepareIndex(QUERY_SET.getIndexName())).thenReturn(indexRequestBuilder);
         when(indexRequestBuilder.setId("test_id")).thenReturn(indexRequestBuilder);
         when(indexRequestBuilder.setOpType(DocWriteRequest.OpType.CREATE)).thenReturn(indexRequestBuilder);
         when(indexRequestBuilder.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)).thenReturn(indexRequestBuilder);
@@ -569,7 +588,7 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         XContentBuilder xContentBuilder = querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
 
         IndexRequestBuilder indexRequestBuilder = mock(IndexRequestBuilder.class);
-        when(client.prepareIndex(QUERY_SET.getIndexName())).thenReturn(indexRequestBuilder);
+        when(pluginClient.prepareIndex(QUERY_SET.getIndexName())).thenReturn(indexRequestBuilder);
         when(indexRequestBuilder.setId("test_id")).thenReturn(indexRequestBuilder);
         when(indexRequestBuilder.setOpType(DocWriteRequest.OpType.CREATE)).thenReturn(indexRequestBuilder);
         when(indexRequestBuilder.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)).thenReturn(indexRequestBuilder);
@@ -612,7 +631,7 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         XContentBuilder xContentBuilder = querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
 
         IndexRequestBuilder indexRequestBuilder = mock(IndexRequestBuilder.class);
-        when(client.prepareIndex(QUERY_SET.getIndexName())).thenReturn(indexRequestBuilder);
+        when(pluginClient.prepareIndex(QUERY_SET.getIndexName())).thenReturn(indexRequestBuilder);
         when(indexRequestBuilder.setId("test_id")).thenReturn(indexRequestBuilder);
         when(indexRequestBuilder.setOpType(DocWriteRequest.OpType.CREATE)).thenReturn(indexRequestBuilder);
         when(indexRequestBuilder.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)).thenReturn(indexRequestBuilder);
@@ -653,7 +672,7 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         XContentBuilder xContentBuilder = querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
 
         IndexRequestBuilder indexRequestBuilder = mock(IndexRequestBuilder.class);
-        when(client.prepareIndex(QUERY_SET.getIndexName())).thenReturn(indexRequestBuilder);
+        when(pluginClient.prepareIndex(QUERY_SET.getIndexName())).thenReturn(indexRequestBuilder);
         when(indexRequestBuilder.setId("test_id")).thenReturn(indexRequestBuilder);
         when(indexRequestBuilder.setOpType(DocWriteRequest.OpType.CREATE)).thenReturn(indexRequestBuilder);
         when(indexRequestBuilder.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)).thenReturn(indexRequestBuilder);
@@ -704,7 +723,7 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         XContentBuilder xContentBuilder = querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
 
         IndexRequestBuilder indexRequestBuilder = mock(IndexRequestBuilder.class);
-        when(client.prepareIndex(QUERY_SET.getIndexName())).thenReturn(indexRequestBuilder);
+        when(pluginClient.prepareIndex(QUERY_SET.getIndexName())).thenReturn(indexRequestBuilder);
         when(indexRequestBuilder.setId("test_id")).thenReturn(indexRequestBuilder);
         when(indexRequestBuilder.setOpType(DocWriteRequest.OpType.CREATE)).thenReturn(indexRequestBuilder);
         when(indexRequestBuilder.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)).thenReturn(indexRequestBuilder);
@@ -748,7 +767,7 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         XContentBuilder xContentBuilder = querySet.toXContent(XContentFactory.jsonBuilder(), ToXContent.EMPTY_PARAMS);
 
         IndexRequestBuilder indexRequestBuilder = mock(IndexRequestBuilder.class);
-        when(client.prepareIndex(QUERY_SET.getIndexName())).thenReturn(indexRequestBuilder);
+        when(pluginClient.prepareIndex(QUERY_SET.getIndexName())).thenReturn(indexRequestBuilder);
         when(indexRequestBuilder.setId("test_id")).thenReturn(indexRequestBuilder);
         when(indexRequestBuilder.setOpType(DocWriteRequest.OpType.CREATE)).thenReturn(indexRequestBuilder);
         when(indexRequestBuilder.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE)).thenReturn(indexRequestBuilder);
@@ -913,13 +932,13 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
             when(updateResponse.getId()).thenReturn(docId);
             listener.onResponse(updateResponse);
             return null;
-        }).when(client).update(any(org.opensearch.action.update.UpdateRequest.class), any(ActionListener.class));
+        }).when(pluginClient).update(any(org.opensearch.action.update.UpdateRequest.class), any(ActionListener.class));
 
         @SuppressWarnings("unchecked")
         ActionListener<org.opensearch.action.update.UpdateResponse> listener = mock(ActionListener.class);
         indicesManager.patchDoc(docId, updates, QUERY_SET, listener);
 
-        verify(client).update(any(org.opensearch.action.update.UpdateRequest.class), any(ActionListener.class));
+        verify(pluginClient).update(any(org.opensearch.action.update.UpdateRequest.class), any(ActionListener.class));
     }
 
     public void testPatchDocWithNullDocId() {

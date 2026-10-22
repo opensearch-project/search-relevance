@@ -16,6 +16,7 @@ import java.util.concurrent.CountDownLatch;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.opensearch.common.annotation.ExperimentalApi;
+import org.opensearch.common.util.concurrent.ThreadContext;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.jobscheduler.spi.JobExecutionContext;
 import org.opensearch.jobscheduler.spi.ScheduledJobParameter;
@@ -146,7 +147,12 @@ public enum SearchRelevanceJobRunner implements ScheduledJobRunner {
         };
         // The logic of the experiment run should not block this calling thread, so it will be scheduled
         // into a threadpool.
-        threadPool.generic().execute(timeoutJobWithCleanup);
+        // job-scheduler runs a job in the thread context of whatever scheduled it. When that is the write of the job
+        // document, the context is this plugin's subject, which cannot search the experiment's target indices. The
+        // job therefore starts from an empty context, as it does when job-scheduler finds it in a periodic sweep.
+        try (ThreadContext.StoredContext ignored = threadPool.getThreadContext().stashContext()) {
+            threadPool.generic().execute(timeoutJobWithCleanup);
+        }
     }
 
     private void checkComponents() {
