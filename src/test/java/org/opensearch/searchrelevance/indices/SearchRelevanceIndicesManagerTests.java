@@ -195,7 +195,7 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         verify(indexRequestBuilder).setSource(xContentBuilder);
     }
 
-    public void testUpdateDocRunsOnThePluginClient() throws IOException {
+    public void testUpdateDoc() throws IOException {
         XContentBuilder xContentBuilder = XContentFactory.jsonBuilder().startObject().field("name", "test_name").endObject();
         IndexRequestBuilder indexRequestBuilder = mock(IndexRequestBuilder.class, RETURNS_SELF);
         when(pluginClient.prepareIndex(QUERY_SET.getIndexName())).thenReturn(indexRequestBuilder);
@@ -208,7 +208,7 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         verify(indexRequestBuilder).execute(any(ActionListener.class));
     }
 
-    public void testUpdateDocWithSeqNoAndPrimaryTermRunsOnThePluginClient() throws IOException {
+    public void testUpdateDocWithSeqNoAndPrimaryTerm() throws IOException {
         XContentBuilder xContentBuilder = XContentFactory.jsonBuilder().startObject().field("name", "test_name").endObject();
         IndexRequestBuilder indexRequestBuilder = mock(IndexRequestBuilder.class, RETURNS_SELF);
         when(pluginClient.prepareIndex(QUERY_SET.getIndexName())).thenReturn(indexRequestBuilder);

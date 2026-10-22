@@ -16,10 +16,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.opensearch.common.settings.Settings;
+import org.opensearch.common.xcontent.XContentHelper;
 import org.opensearch.common.xcontent.yaml.YamlXContent;
-import org.opensearch.core.xcontent.DeprecationHandler;
-import org.opensearch.core.xcontent.NamedXContentRegistry;
-import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.indices.SystemIndexDescriptor;
 import org.opensearch.searchrelevance.indices.SearchRelevanceIndices;
 import org.opensearch.test.OpenSearchTestCase;
@@ -27,34 +25,13 @@ import org.opensearch.test.OpenSearchTestCase;
 /** Tests the shape of the permissions the security plugin grants to this plugin's subject. */
 public class PluginAdditionalPermissionsTests extends OpenSearchTestCase {
 
-    private static final String WRITE_PREFIX = "indices:data/write/";
-    private static final String BULK_GRANT = "indices:data/write/bulk*";
-
     public void testClusterPermissionsKeyIsPresent() throws Exception {
         assertTrue("an absent key leaves an immutable list", load().get("cluster_permissions") instanceof List);
     }
 
-    public void testEveryActionIsALiteralNameOrWildcard() throws Exception {
-        for (Map<String, Object> grant : indexPermissions()) {
-            for (String action : allowedActions(grant)) {
-                // Action-group names such as "read" or "write" have no colon and match no action.
-                assertTrue("not an action name: " + action, action.startsWith("indices:") || action.startsWith("cluster:"));
-            }
-        }
-    }
-
-    public void testEveryWriteGrantAlsoGrantsTheShardBulkAction() throws Exception {
-        for (Map<String, Object> grant : indexPermissions()) {
-            List<String> actions = allowedActions(grant);
-            if (actions.stream().anyMatch(a -> a.startsWith(WRITE_PREFIX) && !a.equals(BULK_GRANT))) {
-                // Index, update and delete run on the shard as indices:data/write/bulk[s] against the same indices.
-                assertTrue("write grant without " + BULK_GRANT + ": " + grant, actions.contains(BULK_GRANT));
-            }
-        }
-    }
-
+    @SuppressWarnings("unchecked")
     public void testGrantsExactlyTheActionsThePluginClientSends() throws Exception {
-        // Create index, put mapping, search, and the index, update and delete writes with their shard bulk action.
+        // Index, update and delete also run on the shard as indices:data/write/bulk[s].
         Set<String> expected = Set.of(
             "indices:admin/create",
             "indices:admin/mapping/put",
@@ -62,10 +39,10 @@ public class PluginAdditionalPermissionsTests extends OpenSearchTestCase {
             "indices:data/write/index",
             "indices:data/write/update",
             "indices:data/write/delete",
-            BULK_GRANT
+            "indices:data/write/bulk*"
         );
         for (Map<String, Object> grant : indexPermissions()) {
-            assertEquals(expected, new HashSet<>(allowedActions(grant)));
+            assertEquals(expected, new HashSet<>((List<String>) grant.get("allowed_actions")));
         }
     }
 
@@ -95,22 +72,12 @@ public class PluginAdditionalPermissionsTests extends OpenSearchTestCase {
         return grants;
     }
 
-    @SuppressWarnings("unchecked")
-    private static List<String> allowedActions(Map<String, Object> grant) {
-        return (List<String>) grant.get("allowed_actions");
-    }
-
     private static Map<String, Object> load() throws Exception {
         try (
             InputStream in = PluginAdditionalPermissionsTests.class.getClassLoader()
-                .getResourceAsStream("plugin-additional-permissions.yml");
-            XContentParser parser = YamlXContent.yamlXContent.createParser(
-                NamedXContentRegistry.EMPTY,
-                DeprecationHandler.THROW_UNSUPPORTED_OPERATION,
-                in
-            )
+                .getResourceAsStream("plugin-additional-permissions.yml")
         ) {
-            return parser.map();
+            return XContentHelper.convertToMap(YamlXContent.yamlXContent, in, false);
         }
     }
 }
