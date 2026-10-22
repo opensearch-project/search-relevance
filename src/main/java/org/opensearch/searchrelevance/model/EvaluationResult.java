@@ -30,6 +30,11 @@ public class EvaluationResult implements ToXContentObject {
     public static final String EXPERIMENT_VARIANT_ID = "experimentVariantId";
     public static final String EXPERIMENT_VARIANT_PARAMETERS = "experimentVariantParameters";
     public static final String SCHEDULED_RUN_ID = "scheduledRunId";
+    /**
+     * OpenSearch cluster query time in milliseconds ({@code SearchResponse.getTook()}).
+     * This is not plugin queue time, judgment scoring, or Dashboards round-trip.
+     */
+    public static final String TOOK = "took";
 
     /**
      * Identifier of the system index
@@ -45,6 +50,40 @@ public class EvaluationResult implements ToXContentObject {
     private final String experimentVariantId;
     private final String experimentVariantParameters;
     private final String scheduledRunId;
+    /**
+     * OpenSearch cluster query time in milliseconds ({@code SearchResponse.getTook()}),
+     * not plugin queue time, judgment scoring, or Dashboards round-trip.
+     * Null on documents written before this field existed, and on failed searches with no SearchResponse.
+     */
+    private final Long took;
+
+    public EvaluationResult(
+        String id,
+        String timestamp,
+        String searchConfigurationId,
+        String searchText,
+        List<String> judgmentIds,
+        List<String> documentIds,
+        List<Map<String, Object>> metrics,
+        String experimentId,
+        String experimentVariantId,
+        String experimentVariantParameters,
+        String scheduledRunId,
+        Long took
+    ) {
+        this.id = id;
+        this.timestamp = timestamp;
+        this.searchConfigurationId = searchConfigurationId;
+        this.searchText = searchText;
+        this.judgmentIds = judgmentIds;
+        this.documentIds = documentIds;
+        this.metrics = metrics;
+        this.experimentId = experimentId;
+        this.experimentVariantId = experimentVariantId;
+        this.experimentVariantParameters = experimentVariantParameters;
+        this.scheduledRunId = scheduledRunId;
+        this.took = took;
+    }
 
     public EvaluationResult(
         String id,
@@ -59,17 +98,20 @@ public class EvaluationResult implements ToXContentObject {
         String experimentVariantParameters,
         String scheduledRunId
     ) {
-        this.id = id;
-        this.timestamp = timestamp;
-        this.searchConfigurationId = searchConfigurationId;
-        this.searchText = searchText;
-        this.judgmentIds = judgmentIds;
-        this.documentIds = documentIds;
-        this.metrics = metrics;
-        this.experimentId = experimentId;
-        this.experimentVariantId = experimentVariantId;
-        this.experimentVariantParameters = experimentVariantParameters;
-        this.scheduledRunId = scheduledRunId;
+        this(
+            id,
+            timestamp,
+            searchConfigurationId,
+            searchText,
+            judgmentIds,
+            documentIds,
+            metrics,
+            experimentId,
+            experimentVariantId,
+            experimentVariantParameters,
+            scheduledRunId,
+            null
+        );
     }
 
     public EvaluationResult(
@@ -146,6 +188,9 @@ public class EvaluationResult implements ToXContentObject {
         if (this.scheduledRunId != null) {
             xContentBuilder.field(SCHEDULED_RUN_ID, this.scheduledRunId);
         }
+        if (this.took != null) {
+            xContentBuilder.field(TOOK, this.took);
+        }
         return xContentBuilder.endObject();
     }
 
@@ -191,5 +236,9 @@ public class EvaluationResult implements ToXContentObject {
 
     public String scheduledRunId() {
         return scheduledRunId;
+    }
+
+    public Long took() {
+        return took;
     }
 }

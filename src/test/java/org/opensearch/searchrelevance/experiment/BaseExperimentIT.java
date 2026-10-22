@@ -358,6 +358,24 @@ public abstract class BaseExperimentIT extends BaseSearchRelevanceIT {
         assertArrayEquals(sortedExpected.toArray(new String[0]), sortedActual.toArray(new String[0]));
     }
 
+    /**
+     * New evaluation documents persist OpenSearch cluster query time as a first-class {@code took}
+     * field (milliseconds from {@code SearchResponse.getTook()}), not as a nested relevance metric.
+     */
+    protected void assertTookPresentAndNonNegative(Map<String, Object> source) {
+        assertNotNull("took should be present on new evaluation results", source.get("took"));
+        long took = ((Number) source.get("took")).longValue();
+        assertTrue("took should be >= 0 but was " + took, took >= 0);
+        Object metrics = source.get("metrics");
+        if (metrics instanceof List<?>) {
+            for (Object metric : (List<?>) metrics) {
+                if (metric instanceof Map<?, ?> metricMap) {
+                    assertFalse("took must not be stored as a nested metric", "took".equals(metricMap.get("metric")));
+                }
+            }
+        }
+    }
+
     protected void assertCommonExperimentFields(
         Map<String, Object> source,
         String judgmentId,
