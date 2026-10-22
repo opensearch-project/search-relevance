@@ -69,6 +69,9 @@ public class SearchRelevanceIndicesManager {
     private final Client pluginClient;
 
     /**
+     * Creates the manager for the search relevance indices.
+     *
+     * @param clusterService reads index metadata from the cluster state
      * @param client runs as the caller, so it is evaluated against the caller's own privileges
      * @param pluginClient runs as the plugin subject, which is what grants access to the indices this plugin owns
      */
