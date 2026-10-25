@@ -15,6 +15,7 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 * Validate manual judgment rating edits on the server ([#601](https://github.com/opensearch-project/search-relevance/pull/601))
 
 ### Infrastructure
+- Suppress javadoc missing-comment warnings for internal classes ([#628](https://github.com/opensearch-project/search-relevance/pull/628))
 
 ### Documentation
 - Fix the broken search relevance documentation link in the README ([#603](https://github.com/opensearch-project/search-relevance/pull/603))
