@@ -18,6 +18,7 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ### Documentation
 - Fix the broken search relevance documentation link in the README ([#603](https://github.com/opensearch-project/search-relevance/pull/603))
+- Document repo best practices and PR review standards contributors should follow (`AGENTS.md`, `docs/REVIEW_STANDARDS.md`) ([#621](https://github.com/opensearch-project/search-relevance/pull/621))
 
 ### Maintenance
 
