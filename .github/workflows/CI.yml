@@ -15,6 +15,8 @@ jobs:
   Check-search-relevance-linux:
     needs: Get-CI-Image-Tag
     strategy:
+      # Run sequentially to limit concurrent pulls of the shared CI container image.
+      max-parallel: 1
       matrix:
         java: [21, 25]
         os: [ubuntu-latest]
@@ -76,6 +78,8 @@ jobs:
   Precommit-search-relevance-linux:
     needs: Get-CI-Image-Tag
     strategy:
+      # Run sequentially to limit concurrent pulls of the shared CI container image.
+      max-parallel: 1
       matrix:
         java: [21, 25]
         os: [ubuntu-latest]
