@@ -131,6 +131,14 @@ allprojects {
             targetCompatibility = JavaVersion.VERSION_21
         }
     }
+
+    // Test classpaths additionally pull in org.opensearch.client:opensearch-rest-client (test
+    // framework), which depends on a newer slf4j-api than the 1.7.36 pinned above for production
+    // runtime (to match OpenSearch core's own runtime classpath). slf4j-api's facade is API
+    // compatible across 1.x/2.x, so forcing the newer version for test configurations only is safe.
+    configurations.matching { it.name.contains('test') }.configureEach {
+        resolutionStrategy.force 'org.slf4j:slf4j-api:2.0.17'
+    }
 }
 
 publishing {
