@@ -40,6 +40,7 @@ import org.opensearch.searchrelevance.metrics.MetricsHelper;
 import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.Experiment;
 import org.opensearch.searchrelevance.model.ExperimentType;
+import org.opensearch.searchrelevance.model.QuerySet;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.test.OpenSearchTestCase;
 import org.opensearch.threadpool.ThreadPool;
@@ -134,6 +135,17 @@ public class PutExperimentTransportActionTests extends OpenSearchTestCase {
             listener.onResponse(mockQuerySetResponse);
             return null;
         }).when(querySetDao).getQuerySet(eq("test-queryset-id"), any(ActionListener.class));
+
+        when(querySetDao.convertToQuerySet(mockQuerySetResponse)).thenReturn(
+            QuerySet.builder()
+                .id("test-queryset-id")
+                .name("test-queryset")
+                .description("test description")
+                .timestamp("2023-01-01T00:00:00Z")
+                .sampling("random")
+                .querySetQueries(List.of())
+                .build()
+        );
 
         ActionListener<IndexResponse> responseListener = mock(ActionListener.class);
         transportAction.doExecute(null, request, responseListener);

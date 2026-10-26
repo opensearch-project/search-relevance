@@ -159,7 +159,10 @@ public class LlmJudgmentsProcessor implements BaseJudgmentsProcessor {
         boolean overwriteCache,
         ActionListener<List<Map<String, Object>>> listener
     ) {
-        List<String> queryTextsWithCustomInput = querySet.querySetQueries().stream().map(e -> e.queryText()).collect(Collectors.toList());
+        List<String> queryTextsWithCustomInput = querySet.getQuerySetQueries()
+            .stream()
+            .map(e -> e.queryText())
+            .collect(Collectors.toList());
         int totalQueries = queryTextsWithCustomInput.size();
 
         log.info("Starting LLM judgment generation for {} total queries", totalQueries);

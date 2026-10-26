@@ -143,8 +143,8 @@ public class ExperimentRunningManager {
         // First, get QuerySet asynchronously
         querySetDao.getQuerySet(request.getQuerySetId(), ActionListener.wrap(querySetResponse -> {
             try {
-                QuerySet querySet = convertToQuerySet(querySetResponse);
-                List<String> queryTextWithReferences = querySet.querySetQueries()
+                QuerySet querySet = querySetDao.convertToQuerySet(querySetResponse);
+                List<String> queryTextWithReferences = querySet.getQuerySetQueries()
                     .stream()
                     .map(e -> e.queryText())
                     .collect(Collectors.toList());
@@ -288,37 +288,6 @@ public class ExperimentRunningManager {
             }
         }));
         return future;
-    }
-
-    private QuerySet convertToQuerySet(SearchResponse response) {
-        if (response.getHits().getTotalHits().value() == 0) {
-            throw new SearchRelevanceException("QuerySet not found", RestStatus.NOT_FOUND);
-        }
-
-        Map<String, Object> sourceMap = response.getHits().getHits()[0].getSourceAsMap();
-
-        // Convert querySetQueries from list of maps to List<QuerySetEntry>
-        List<org.opensearch.searchrelevance.model.QuerySetEntry> querySetEntries = new ArrayList<>();
-        Object querySetQueriesObj = sourceMap.get("querySetQueries");
-        if (querySetQueriesObj instanceof List) {
-            List<Map<String, Object>> querySetQueriesList = (List<Map<String, Object>>) querySetQueriesObj;
-            querySetEntries = querySetQueriesList.stream()
-                .map(
-                    entryMap -> org.opensearch.searchrelevance.model.QuerySetEntry.Builder.builder()
-                        .queryText((String) entryMap.get("queryText"))
-                        .build()
-                )
-                .collect(Collectors.toList());
-        }
-
-        return org.opensearch.searchrelevance.model.QuerySet.Builder.builder()
-            .id((String) sourceMap.get("id"))
-            .name((String) sourceMap.get("name"))
-            .description((String) sourceMap.get("description"))
-            .timestamp((String) sourceMap.get("timestamp"))
-            .sampling((String) sourceMap.get("sampling"))
-            .querySetQueries(querySetEntries)
-            .build();
     }
 
     private SearchConfiguration convertToSearchConfiguration(SearchResponse response) {

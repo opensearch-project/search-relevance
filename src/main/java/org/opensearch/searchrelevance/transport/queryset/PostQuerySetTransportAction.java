@@ -25,8 +25,10 @@ import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.searchrelevance.dao.QuerySetDao;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
+import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.QuerySet;
 import org.opensearch.searchrelevance.model.QuerySetEntry;
+import org.opensearch.searchrelevance.model.QuerySetType;
 import org.opensearch.searchrelevance.ubi.QuerySampler;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.tasks.Task;
@@ -98,7 +100,17 @@ public class PostQuerySetTransportAction extends HandledTransportAction<PostQuer
             .map(entry -> QuerySetEntry.Builder.builder().queryText(entry.getKey()).build())
             .collect(Collectors.toList());
 
-        QuerySet querySet = new QuerySet(id, name, description, timestamp, sampling, querySetEntries);
+        QuerySet querySet = QuerySet.builder()
+            .id(id)
+            .name(name)
+            .description(description)
+            .timestamp(timestamp)
+            .sampling(sampling)
+            .status(AsyncStatus.COMPLETED)
+            .type(QuerySetType.UBI_QUERY_SET)
+            .numberOfQueryTerms(querySetEntries.size())
+            .querySetQueries(querySetEntries)
+            .build();
         querySetDao.putQuerySet(querySet, listener);
     }
 }

@@ -22,8 +22,8 @@ import static org.opensearch.searchrelevance.common.PluginConstants.END_DATE;
 import static org.opensearch.searchrelevance.common.PluginConstants.IGNORE_FAILURE;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENTS_URL;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_RATINGS;
+import static org.opensearch.searchrelevance.common.PluginConstants.MAX_RANK;
 import static org.opensearch.searchrelevance.common.PluginConstants.NAME;
-import static org.opensearch.searchrelevance.common.PluginConstants.NAX_RANK;
 import static org.opensearch.searchrelevance.common.PluginConstants.QUERYSET_ID;
 import static org.opensearch.searchrelevance.common.PluginConstants.SEARCH_CONFIGURATION_LIST;
 import static org.opensearch.searchrelevance.common.PluginConstants.SIZE;
@@ -185,7 +185,7 @@ public class RestPutJudgmentAction extends BaseRestHandler {
             }
             case UBI_JUDGMENT -> {
                 String clickModel = (String) source.get(CLICK_MODEL);
-                int maxRank = (int) source.get(NAX_RANK);
+                int maxRank = (int) source.get(MAX_RANK);
 
                 String startDate = (String) source.getOrDefault(START_DATE, "");
                 String endDate = (String) source.getOrDefault(END_DATE, "");
