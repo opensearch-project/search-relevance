@@ -15,6 +15,7 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 * Validate manual judgment rating edits on the server ([#601](https://github.com/opensearch-project/search-relevance/pull/601))
 
 ### Infrastructure
+- Simplify model-group registration in demo_hybrid_optimizer.sh to use a fixed custom id with idempotent 409 handling, now that ml-commons#5140 is fixed ([#629](https://github.com/opensearch-project/search-relevance/pull/629))
 
 ### Documentation
 - Fix the broken search relevance documentation link in the README ([#603](https://github.com/opensearch-project/search-relevance/pull/603))
