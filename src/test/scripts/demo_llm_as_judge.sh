@@ -104,6 +104,9 @@ if [ -n "$OLLAMA_MODEL" ]; then
       \"credential\": {
           \"placeholder\": \"not_required_for_local_ollama\"
       },
+      \"client_config\": {
+          \"read_timeout\": 300
+      },
       \"actions\": [
           {
               \"action_type\": \"predict\",
@@ -139,6 +142,9 @@ else
       },
       \"credential\": {
           \"openAI_key\": \"$OPENAI_API_KEY\"
+      },
+      \"client_config\": {
+          \"read_timeout\": 300
       },
       \"actions\": [
           {
@@ -195,16 +201,21 @@ MODEL_ID=`jq -r '.model_id' < RES`
 echo -e "${MAJOR}Waiting for the model to be registered.${RESET}"
 max_attempts=10
 attempts=0
+STATE="UNKNOWN"
 
-# Wait for task to be COMPLETED
-while [[ "$(curl -s "$OPENSEARCH_URL/_plugins/_ml/tasks/$TASK_ID" | jq -r '.state')" != "COMPLETED" && $attempts -lt $max_attempts ]]; do
+# Poll until the task reaches a terminal state (COMPLETED or FAILED), not just until attempts run out
+while [[ $attempts -lt $max_attempts ]]; do
+    STATE=$(curl -s "$OPENSEARCH_URL/_plugins/_ml/tasks/$TASK_ID" | jq -r '.state')
+    if [[ "$STATE" == "COMPLETED" || "$STATE" == "FAILED" ]]; then
+        break
+    fi
     echo "Waiting for task to complete... attempt $((attempts + 1))/$max_attempts"
     sleep 5
     attempts=$((attempts + 1))
 done
 
-if [[ $attempts -ge $max_attempts ]]; then
-    echo "Limit of attempts reached. Something went wrong with registering the model. Check OpenSearch logs."
+if [[ "$STATE" != "COMPLETED" ]]; then
+    echo "Model registration did not complete successfully (state: $STATE). Check OpenSearch logs."
     exit 1
 else
     response=$(curl -s "$OPENSEARCH_URL/_plugins/_ml/tasks/$TASK_ID")
@@ -285,7 +296,7 @@ exe curl -s -X PUT "$OPENSEARCH_URL/_plugins/_search_relevance/judgments" -H 'Co
   "contextFields": ["title", "description"],
   "ignoreFailure": false,
   "llmJudgmentRatingType": "SCORE0_1",
-  "promptTemplate": "Given the query: {{queryText}}\nCategory: {{category}}\nTarget audience: {{targetAudience}}\nReference: {{referenceAnswer}}\n\nDocuments: {{hits}}Rate the relevance of this document on a scale of 0.0 to 1.0, where 0.0 is completely irrelevant and 1.0 is perfectly relevant."
+  "promptTemplate": "Given the query: {{queryText}}\nCategory: {{category}}\nTarget audience: {{targetAudience}}\nReference: {{referenceAnswer}}\n\nDocuments: {{hits}}\nRate the relevance of these documents on a scale of 0.0 to 1.0, where 0.0 is completely irrelevant and 1.0 is perfectly relevant."
 }'
 
 LLM_JUDGMENT_ID=`jq -r '.judgment_id' < RES`
