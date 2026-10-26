@@ -163,31 +163,22 @@ if [ -z "$CONNECTOR_ID" ] || [ "$CONNECTOR_ID" = "null" ]; then
   exit 1
 fi
 
-# Reuse an existing "remote_model_group" if one already exists (e.g. from a
-# prior run of this script), rather than failing on a duplicate name.
-response=$(curl -s -XPOST "$OPENSEARCH_URL/_plugins/_ml/model_groups/_search" \
-  -H 'Content-Type: application/json' \
-  --data-binary '{"query": {"term": {"name.keyword": "remote_model_group"}}}')
+# Register with a fixed custom id so re-running this script is idempotent;
+# a prior run's "already exists" (409) is treated as success. This relies on
+# https://github.com/opensearch-project/ml-commons/issues/5140, fixed in 3.10.
+MODEL_GROUP_ID="search-relevance-llm-judge-model-group"
+http_status=$(curl -s -o RES -w '%{http_code}' -XPOST "$OPENSEARCH_URL/_plugins/_ml/model_groups/_register" -H 'Content-Type: application/json' -d"{
+  \"model_group_id\": \"$MODEL_GROUP_ID\",
+  \"name\": \"remote_model_group\",
+  \"description\": \"A model group for external models\"
+}")
+cat RES | jq
 
-MODEL_GROUP_ID=$(echo "$response" | jq -r '.hits.hits[0]._id')
-
-if [ -z "$MODEL_GROUP_ID" ] || [ "$MODEL_GROUP_ID" = "null" ]; then
-  exe curl -s -XPOST "$OPENSEARCH_URL/_plugins/_ml/model_groups/_register" -H 'Content-Type: application/json' -d'
-{
-  "name": "remote_model_group",
-  "description": "A model group for external models"
-}
-'
-
-  MODEL_GROUP_ID=`jq -r '.model_group_id' < RES`
-else
-  echo "Using existing model group with id: $MODEL_GROUP_ID"
-fi
-
-if [ -z "$MODEL_GROUP_ID" ] || [ "$MODEL_GROUP_ID" = "null" ]; then
-  echo "Error: failed to create or find a model group, see response above."
+if [ "$http_status" != "200" ] && [ "$http_status" != "409" ]; then
+  echo "Error: failed to create model group (HTTP $http_status), see response above."
   exit 1
 fi
+echo "Using model group with id: $MODEL_GROUP_ID"
 
 exe curl -s -XPOST "$OPENSEARCH_URL/_plugins/_ml/models/_register" -H 'Content-Type: application/json' -d"{
     \"name\": \"$MODEL_NAME\",
