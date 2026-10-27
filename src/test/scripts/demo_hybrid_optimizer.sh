@@ -4,7 +4,7 @@
 # * An "ecommerce" style sample data
 # You can now exercise all the capabilities of Hybrid Optimizer!
 #
-# Prerequisites: OpenSearch 3.1 or newer with SRW and UBI plugins installed
+# Prerequisites: OpenSearch 3.10 or newer with SRW and UBI plugins installed
 #
 # Optional arguments:
 #   --skip-ecommerce          Skip deleting and re-loading the ecommerce index
