@@ -59,10 +59,12 @@ Currently, there is not a clean way to rerun search evaluations, given that the 
 
 ## Current State
 
-Currently, the Search Relevance Workbench currently has a feature to submit `POINTWISE_EVALUATION`, `PAIRWISE_COMPARISON`, `HYBRID_OPTIMIZER` experiments through the `PutExperimentAction` api. 
+> **Update:** This feature has since been implemented. The sections below originally described the proposed design; they're now annotated with how the shipped implementation differs.
 
-**Components that need to change**
-- `SearchRelevancePlugin` we need to implement the extension point of the `job-scheduler` plugin, and also register the new actions and rest handlers for adding, getting, and deleting jobs.
+Prior to this feature, the Search Relevance Workbench only had a feature to submit `POINTWISE_EVALUATION`, `PAIRWISE_COMPARISON`, `HYBRID_OPTIMIZER` experiments through the `PutExperimentAction` api.
+
+**Components that changed**
+- `SearchRelevancePlugin` implements the extension point of the `job-scheduler` plugin, and registers the new actions and rest handlers for adding, getting, and deleting jobs.
 
 ## Solution Overview
 
@@ -96,11 +98,6 @@ There should be 3 new APIS, GET, POST, DELETE. Additionally, the job runner and 
 - **Decision**: Rejected in favor of creating a new API
 
 ### Key Design Decisions
-
-**TODO**: Summarize critical decisions:
-- Technology choices and rationale
-- Trade-offs made
-- Impact on existing functionality
 
 **Technology choices and rationale**
 - Extended an already existing `job-scheduler` plugin to schedule jobs because it already set up the index listeners, scheduling formats, and concurrency management frameworks. 
@@ -206,6 +203,8 @@ private String experimentId;
 
 ### API Specification
 
+> **Update:** All three endpoints require two cluster settings to be enabled, or they return `403 Forbidden`: `plugins.search_relevance.workbench_enabled` and `plugins.search_relevance.scheduled_experiments_enabled`. Neither was anticipated in the original design below.
+
 ```http
 POST /_plugins/_search_relevance/experiments/schedule
 {
@@ -213,7 +212,6 @@ POST /_plugins/_search_relevance/experiments/schedule
     "cronExpression": "* * * * *"
 }
 ```
-{% include copy-curl.html %}
 
 **Response:**
 ```json
@@ -227,7 +225,38 @@ POST /_plugins/_search_relevance/experiments/schedule
 GET /_plugins/_search_relevance/experiments/schedule/2bb07ecb-082a-4bab-b9c0-dc225e5c35ae
 ```
 
-**Response:**
+> **Update:** The response shown below was the original proposal and does not match what's implemented. The endpoint returns the raw OpenSearch `SearchResponse` envelope around the stored `ScheduledJob` document (camelCase field names, matching the rest of this plugin's API), not a flattened object:
+> ```json
+> {
+>   "took": 1,
+>   "timed_out": false,
+>   "_shards": { "total": 1, "successful": 1, "skipped": 0, "failed": 0 },
+>   "hits": {
+>     "total": { "value": 1, "relation": "eq" },
+>     "max_score": 1.0,
+>     "hits": [
+>       {
+>         "_index": ".search-relevance-scheduled-experiment-jobs",
+>         "_id": "2bb07ecb-082a-4bab-b9c0-dc225e5c35ae",
+>         "_score": 1.0,
+>         "_source": {
+>           "id": "2bb07ecb-082a-4bab-b9c0-dc225e5c35ae",
+>           "enabled": true,
+>           "enabledTime": 1755642736969,
+>           "lastUpdateTime": 1755642737029,
+>           "schedule": { "cron": { "expression": "* 1 * * *", "timezone": "UTC" } },
+>           "timestamp": "2025-08-19T20:12:16Z"
+>         }
+>       }
+>     ]
+>   }
+> }
+> ```
+> Note the stored `ScheduledJob` document has no `experimentId`, `indexNameToWatch`, or `lockDurationSeconds` fields — those only exist on the separate `SearchRelevanceJobParameters` object the `job-scheduler` plugin stores internally. As implemented, this GET response can't tell you which experiment a schedule is tied to. Worth confirming whether that's intentional or a gap to close.
+>
+> `GET /_plugins/_search_relevance/experiments/schedule` (no id) is also supported and returns a paginated list of all scheduled jobs in the same `SearchResponse` shape — not covered in the original proposal below.
+
+**Response (as originally proposed, kept for history):**
 ```json
 {
   "id": "2bb07ecb-082a-4bab-b9c0-dc225e5c35ae",
@@ -250,7 +279,6 @@ GET /_plugins/_search_relevance/experiments/schedule/2bb07ecb-082a-4bab-b9c0-dc2
 ```http
 DELETE /_plugins/_search_relevance/experiments/schedule/2bb07ecb-082a-4bab-b9c0-dc225e5c35ae
 ```
-{% include copy-curl.html %}
 
 **Response**
 ```json
