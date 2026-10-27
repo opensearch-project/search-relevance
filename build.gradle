@@ -283,6 +283,11 @@ test {
     }
 }
 
+tasks.named('javadoc').configure {
+    // Internal classes aren't documented as public API; only flag real doclint errors (e.g. broken @link, bad HTML).
+    options.addStringOption('Xdoclint:all,-missing', '-quiet')
+}
+
 jacocoTestReport {
     dependsOn test
     reports {
