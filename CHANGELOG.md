@@ -13,7 +13,7 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ### Bug Fixes
 * Validate manual judgment rating edits on the server ([#601](https://github.com/opensearch-project/search-relevance/pull/601))
-* Add missing `slf4j-api` runtime dependency so LLM_JUDGMENT no longer crashes the node with `NoClassDefFoundError` on the first completed remote-model predict call
+* Add missing `slf4j-api` runtime dependency so LLM_JUDGMENT no longer crashes the node with `NoClassDefFoundError` on the first completed remote-model predict call ([#322](https://github.com/opensearch-project/search-relevance/pull/322))
 
 ### Infrastructure
 
