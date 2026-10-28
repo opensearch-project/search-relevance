@@ -260,7 +260,7 @@ public class RestPutJudgmentAction extends BaseRestHandler {
         });
     }
 
-    private BytesRestResponse validateImportJudgmentRatings(List<Map<String, Object>> judgmentRatings) {
+    private BytesRestResponse validateImportJudgmentRatings(List<?> judgmentRatings) {
         if (judgmentRatings == null) {
             return new BytesRestResponse(RestStatus.BAD_REQUEST, "judgmentRatings is required for IMPORT_JUDGMENT");
         }
@@ -271,7 +271,12 @@ public class RestPutJudgmentAction extends BaseRestHandler {
         }
 
         int maxRatingsPerQuery = settingsAccessor.getMaxJudgmentImportRatingsPerQueryAllowed();
-        for (Map<String, Object> entry : judgmentRatings) {
+        for (Object rawEntry : judgmentRatings) {
+            if (!(rawEntry instanceof Map)) {
+                return new BytesRestResponse(RestStatus.BAD_REQUEST, "Each entry in judgmentRatings must be an object");
+            }
+            Map<?, ?> entry = (Map<?, ?>) rawEntry;
+
             Object query = entry.get(QUERY);
             TextValidationUtil.ValidationResult queryValidation = TextValidationUtil.validateText(query != null ? query.toString() : null);
             if (!queryValidation.isValid()) {
@@ -289,7 +294,47 @@ public class RestPutJudgmentAction extends BaseRestHandler {
                     "Judgment Import Ratings Per Query Limit Exceeded. Maximum allowed: " + maxRatingsPerQuery
                 );
             }
+
+            for (Object rawRating : ratings) {
+                if (!(rawRating instanceof Map)) {
+                    return new BytesRestResponse(RestStatus.BAD_REQUEST, "Invalid query " + query + ": each rating must be an object");
+                }
+                Map<?, ?> rating = (Map<?, ?>) rawRating;
+
+                Object docId = rating.get("docId");
+                if (!(docId instanceof String) || ((String) docId).isEmpty()) {
+                    return new BytesRestResponse(
+                        RestStatus.BAD_REQUEST,
+                        "Invalid query " + query + ": each rating must have a non-empty docId"
+                    );
+                }
+                TextValidationUtil.ValidationResult docIdValidation = TextValidationUtil.validateText((String) docId);
+                if (!docIdValidation.isValid()) {
+                    return new BytesRestResponse(
+                        RestStatus.BAD_REQUEST,
+                        "Invalid docId '" + docId + "' for query " + query + ": " + docIdValidation.getErrorMessage()
+                    );
+                }
+
+                Object ratingValue = rating.get("rating");
+                if (ratingValue == null || !isFiniteRating(ratingValue.toString())) {
+                    return new BytesRestResponse(
+                        RestStatus.BAD_REQUEST,
+                        "Invalid rating '" + ratingValue + "' for docId " + docId + " in query " + query + ": must be a valid finite float"
+                    );
+                }
+            }
         }
         return null;
+    }
+
+    // Mirrors the finite-float check ImportJudgmentsProcessor applies downstream; checked here too so
+    // malformed input fails fast with a clean 400 instead of surfacing later in the async pipeline.
+    private static boolean isFiniteRating(String rating) {
+        try {
+            return Float.isFinite(Float.parseFloat(rating));
+        } catch (NumberFormatException e) {
+            return false;
+        }
     }
 }
