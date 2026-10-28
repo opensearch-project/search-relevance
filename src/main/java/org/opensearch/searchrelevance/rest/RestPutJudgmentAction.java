@@ -223,12 +223,19 @@ public class RestPutJudgmentAction extends BaseRestHandler {
                 createRequest = new PutUbiJudgmentRequest(type, name, description, clickModel, maxRank, startDate, endDate, ubiEventsIndex);
             }
             case IMPORT_JUDGMENT -> {
-                List<Map<String, Object>> judgmentRatings = (List<Map<String, Object>>) source.get(JUDGMENT_RATINGS);
+                Object judgmentRatingsRaw = source.get(JUDGMENT_RATINGS);
+                if (judgmentRatingsRaw != null && !(judgmentRatingsRaw instanceof List)) {
+                    return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.BAD_REQUEST, "judgmentRatings must be a list"));
+                }
+                List<?> judgmentRatings = (List<?>) judgmentRatingsRaw;
                 BytesRestResponse validationError = validateImportJudgmentRatings(judgmentRatings);
                 if (validationError != null) {
                     return channel -> channel.sendResponse(validationError);
                 }
-                createRequest = new PutImportJudgmentRequest(type, name, description, judgmentRatings);
+                // Safe: validateImportJudgmentRatings already confirmed every element is a Map.
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> validatedJudgmentRatings = (List<Map<String, Object>>) (List<?>) judgmentRatings;
+                createRequest = new PutImportJudgmentRequest(type, name, description, validatedJudgmentRatings);
             }
             default -> {
                 throw new SearchRelevanceException("Unsupported experiment type: " + type, RestStatus.BAD_REQUEST);
@@ -278,7 +285,11 @@ public class RestPutJudgmentAction extends BaseRestHandler {
             Map<?, ?> entry = (Map<?, ?>) rawEntry;
 
             Object query = entry.get(QUERY);
-            TextValidationUtil.ValidationResult queryValidation = TextValidationUtil.validateText(query != null ? query.toString() : null);
+            // Use the same validation query sets use, so an imported query can never fail to match a
+            // query set entry due to the two paths accepting different characters (e.g. newlines).
+            TextValidationUtil.ValidationResult queryValidation = TextValidationUtil.validateQuerySetValue(
+                query != null ? query.toString() : null
+            );
             if (!queryValidation.isValid()) {
                 return new BytesRestResponse(RestStatus.BAD_REQUEST, "Invalid query: " + queryValidation.getErrorMessage());
             }

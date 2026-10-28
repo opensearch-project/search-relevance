@@ -307,6 +307,63 @@ public class RestPutJudgmentActionTests extends SearchRelevanceRestTestCase {
         assertEquals(RestStatus.BAD_REQUEST, responseCaptor.getValue().status());
     }
 
+    public void testPutImportJudgment_JudgmentRatingsNotAList() throws Exception {
+        // Setup: judgmentRatings itself being a JSON object (not an array) previously crashed with an
+        // uncaught ClassCastException at the unchecked cast in prepareRequest, before validation ran.
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        String content = """
+            {
+              "name": "test_name",
+              "description": "test_description",
+              "type": "IMPORT_JUDGMENT",
+              "judgmentRatings": {"query": "x"}
+            }""";
+        RestRequest request = createPutRestRequestWithContent(content, "judgment");
+        when(channel.request()).thenReturn(request);
+
+        // Execute
+        restPutJudgmentAction.handleRequest(request, channel, client);
+
+        // Verify
+        ArgumentCaptor<BytesRestResponse> responseCaptor = ArgumentCaptor.forClass(BytesRestResponse.class);
+        verify(channel).sendResponse(responseCaptor.capture());
+        assertEquals(RestStatus.BAD_REQUEST, responseCaptor.getValue().status());
+    }
+
+    public void testPutImportJudgment_QueryWithNewlineRejected() throws Exception {
+        // Setup: query validation now uses validateQuerySetValue (same as query sets), which rejects
+        // newlines -- closing off sequences like "foo\n<script>" and keeping import/query-set query
+        // validation identical so imported queries can't silently fail to match query set entries.
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        String content = """
+            {
+              "name": "test_name",
+              "description": "test_description",
+              "type": "IMPORT_JUDGMENT",
+              "judgmentRatings": [
+                {
+                  "query": "red shoes\\nmore",
+                  "ratings": [
+                    {
+                      "docId": "B077ZJXCTS",
+                      "rating": "0.5"
+                    }
+                  ]
+                }
+              ]
+            }""";
+        RestRequest request = createPutRestRequestWithContent(content, "judgment");
+        when(channel.request()).thenReturn(request);
+
+        // Execute
+        restPutJudgmentAction.handleRequest(request, channel, client);
+
+        // Verify
+        ArgumentCaptor<BytesRestResponse> responseCaptor = ArgumentCaptor.forClass(BytesRestResponse.class);
+        verify(channel).sendResponse(responseCaptor.capture());
+        assertEquals(RestStatus.BAD_REQUEST, responseCaptor.getValue().status());
+    }
+
     public void testPutImportJudgment_NonObjectEntryInJudgmentRatings() throws Exception {
         // Setup: a bare string instead of a query/ratings object previously caused an uncaught
         // ClassCastException (surfaced as 500) instead of a clean 400.
