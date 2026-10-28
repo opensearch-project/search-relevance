@@ -13,7 +13,7 @@ exception.
 
 ## 1. Backward compatibility (BWC) is the single most enforced standard
 
-All three maintainers raise this, repeatedly and independently. **Any change
+Multiple maintainers raise this, repeatedly and independently. **Any change
 to an index mapping, stored-document format, or REST request/response schema
 needs real proof that a cluster mid-upgrade keeps working.**
 
