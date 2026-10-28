@@ -131,6 +131,14 @@ allprojects {
             targetCompatibility = JavaVersion.VERSION_21
         }
     }
+
+    // Test classpaths additionally pull in org.opensearch.client:opensearch-rest-client (test
+    // framework), which depends on a newer slf4j-api than the 1.7.36 pinned above for production
+    // runtime (to match OpenSearch core's own runtime classpath). slf4j-api's facade is API
+    // compatible across 1.x/2.x, so forcing the newer version for test configurations only is safe.
+    configurations.matching { it.name.contains('test') }.configureEach {
+        resolutionStrategy.force 'org.slf4j:slf4j-api:2.0.17'
+    }
 }
 
 publishing {
@@ -232,6 +240,12 @@ dependencies {
     // https://github.com/opensearch-project/ml-commons/commit/464bfe34c66d7a729a00dd457f03587ea4e504d9
     // TODO: Remove following three lines of dependencies if ml-common include them in their jar
     runtimeOnly group: 'org.reflections', name: 'reflections', version: '0.10.2'  // Note the version change
+    // reflections declares slf4j-api as an optional dependency, so it is not pulled in
+    // transitively; without it, Reflections' static initializer throws NoClassDefFoundError
+    // the first time it runs inside this plugin's isolated classloader (e.g. the first
+    // completed LLM_JUDGMENT remote-model predict call), which OpenSearch treats as fatal.
+    // OpenSearch core uses slf4j 1.7.36, so we match that version here.
+    runtimeOnly group: 'org.slf4j', name: 'slf4j-api', version: '1.7.36'
     runtimeOnly group: 'org.javassist', name: 'javassist', version: '3.33.0-GA'
     runtimeOnly group: 'org.opensearch', name: 'common-utils', version: "${opensearch_build}"
     runtimeOnly group: 'org.apache.commons', name: 'commons-text', version: '1.15.0'
