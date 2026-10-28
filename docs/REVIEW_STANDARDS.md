@@ -275,7 +275,7 @@ removing one is a breaking change — don't add fields speculatively:
 > "Adding them now is a one-way door. Once included, we can't remove them
 > without a breaking change. If we leave them out, we can always add them
 > later when needed."
-> — heemin32, [PR #511](https://github.com/opensearch-project/search-relevance/pull/511#issuecomment-4860653541)
+> — heemin32, [PR #511](https://github.com/opensearch-project/search-relevance/pull/511#issuecomment-4861626953)
 
 **Don't offer two options that mean the same thing**, and don't store the
 same data in two places/indices if you can avoid it:
@@ -358,8 +358,7 @@ something nothing depends on just adds noise:
 > "Remove the code instead of commenting it out."
 > — fen-qin, [PR #364](https://github.com/opensearch-project/search-relevance/pull/364#discussion_r2722590707)
 
-> "Can we just remove this method instead of marking it as deprecated? Why
-> are you adding `@Deprecated`?"
+> "Can we just remove this method instead of marking it as deprecated?"
 > — heemin32, [PR #264](https://github.com/opensearch-project/search-relevance/pull/264#discussion_r2446215916)
 
 The exception is **public-facing request parameters** being retired — keep
@@ -381,7 +380,7 @@ opt-out once it's proven safe:
 
 > "I think we should put this behind a feature flag so it doesn't get
 > released partially."
-> — heemin32 / martin-gaievski, [PR #498](https://github.com/opensearch-project/search-relevance/pull/498#issuecomment-4733517211)
+> — heemin32 [PR #498](https://github.com/opensearch-project/search-relevance/pull/498#issuecomment-4733517211)
 
 > "In 3.1 all features were behind the feature flag with 'opt in' mode,
 > partially because of in-process security review... It has been flipped to
@@ -426,8 +425,8 @@ computing it once:
 
 **Every PR gets exactly one CHANGELOG.md entry**, in the right category
 (Features / Enhancements / Bug Fixes / Infrastructure / Documentation /
-Maintenance) — this is one of the most frequently repeated review comments
-from both heemin32 and martin-gaievski:
+Maintenance / Refactoring) — this is one of the most frequently repeated
+review comments from both heemin32 and martin-gaievski:
 
 > "You need to record a single item per PR."
 > — heemin32, [PR #542](https://github.com/opensearch-project/search-relevance/pull/542#discussion_r3677213417)
@@ -435,9 +434,6 @@ from both heemin32 and martin-gaievski:
 > "Thanks for looking into this issue, the change looks good. Please fix the
 > category in CHANGELOG."
 > — martin-gaievski, [PR #307](https://github.com/opensearch-project/search-relevance/pull/307#pullrequestreview-3454506816)
-
-Auto-generated release notes don't substitute for a hand-maintained
-CHANGELOG.md entry (fen-qin, [PR #378](https://github.com/opensearch-project/search-relevance/pull/378#issuecomment-3843854419)).
 
 **New or changed public APIs need user-facing documentation**, expected as
 part of the PR or a prompt follow-up, not left for later:

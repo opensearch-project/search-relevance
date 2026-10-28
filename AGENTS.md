@@ -10,8 +10,23 @@ below, see [docs/REVIEW_STANDARDS.md](docs/REVIEW_STANDARDS.md).
 This is an OpenSearch plugin (Java) that adds search-quality evaluation and
 experimentation tooling: judgments, query sets, search configurations, and
 experiments (pointwise, pairwise, hybrid-optimizer) measured with IR metrics.
-It ships as a cluster plugin plus Dashboards UI, and maintains BWC across
-rolling and full-cluster-restart upgrades.
+It ships as a cluster plugin, and maintains BWC across rolling and
+full-cluster-restart upgrades. The corresponding Dashboards UI
+plugin is a separate repository:
+https://github.com/opensearch-project/dashboards-search-relevance/.
+
+## Repository structure
+
+- `src/main/java/org/opensearch/searchrelevance/` — plugin source, organized
+  by concern: `rest` (REST handlers), `transport` (actions/requests),
+  `dao`/`indices` (system index access), `model`, `judgments`, `metrics`,
+  `scheduler` (job-scheduler integration), `settings`, `ubi`, `utils`.
+- `src/test/java/` — unit tests, mirroring the main package layout.
+- `qa/` — backward-compatibility test modules, each a separate Gradle
+  project: `qa/rolling-upgrade` and `qa/restart-upgrade`. See "Test commands"
+  below — these do **not** run as part of `./gradlew build`.
+- `docs/` — design docs (`docs/feature-design/`) and
+  [docs/REVIEW_STANDARDS.md](docs/REVIEW_STANDARDS.md).
 
 ## Setup commands
 
@@ -27,12 +42,18 @@ rolling and full-cluster-restart upgrades.
 - Rolling-upgrade BWC tests: `./gradlew :qa:rolling-upgrade:testRollingUpgrade`
 - Restart-upgrade BWC tests: `./gradlew :qa:restart-upgrade:testRestartUpgrade`
 - `./gradlew build` runs `check`, which includes unit tests, integ tests, and
-  Jacoco coverage — run it before opening a PR.
+  Jacoco coverage — run it before opening a PR. It does **not** run the `qa`
+  module's BWC tests; run those two commands above explicitly for any change
+  touching index mappings, stored-document format, or REST request/response
+  schema.
 
 ## Code style
 
 - Formatting is enforced by Spotless: `./gradlew spotlessApply` to fix,
   `./gradlew spotlessCheck` to verify (also runs as part of `build`/`check`).
+  Note `compileJava` depends on `spotlessApply`, so running `build` or `test`
+  can rewrite source files in place — check `git status` after a build if
+  you need to know whether anything changed.
 - Per-class imports, not wildcard imports (OpenSearch-wide convention).
 - American spelling in identifiers (`Judgment`, not `Judgement`), matching
   existing code.
@@ -41,7 +62,7 @@ rolling and full-cluster-restart upgrades.
 
 ## Engineering checklist (see docs/REVIEW_STANDARDS.md for full detail)
 
-These are the standards maintainers consistently enforce in review. 
+These are the standards maintainers consistently enforce in review.
 Each is backed by real PR comments — see the linked doc for quotes and context.
 
 - **Backward compatibility is non-negotiable.** Any change to an index
@@ -91,7 +112,8 @@ Each is backed by real PR comments — see the linked doc for quotes and context
   hot paths.
 - **Update CHANGELOG.md**: exactly one entry per PR, correct category
   (Features / Enhancements / Bug Fixes / Infrastructure / Documentation /
-  Maintenance). New/changed public APIs need user-facing documentation too.
+  Maintenance / Refactoring). New/changed public APIs need user-facing
+  documentation too.
 - **Clean commit history and DCO sign-off.** Squash noisy "wip"/"retry"
   commits before merge.
 
