@@ -175,6 +175,7 @@ public class PointwiseExperimentIT extends BaseExperimentIT {
 
         // Assert common experiment fields
         assertCommonExperimentFields(source, judgmentId, searchConfigurationId, querySetId, "POINTWISE_EVALUATION");
+        assertExperimentLevelMetricsPresent(source);
 
         List<Map<String, Object>> results = (List<Map<String, Object>>) source.get("results");
         assertNotNull(results);

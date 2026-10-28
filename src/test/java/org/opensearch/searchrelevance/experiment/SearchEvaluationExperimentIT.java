@@ -133,6 +133,7 @@ public class SearchEvaluationExperimentIT extends BaseExperimentIT {
 
         // Assert experiment status
         assertEquals("COMPLETED", source.get("status"));
+        assertExperimentLevelMetricsPresent(source);
 
         // Assert results structure
         List<Map<String, Object>> results = (List<Map<String, Object>>) source.get("results");
@@ -145,6 +146,7 @@ public class SearchEvaluationExperimentIT extends BaseExperimentIT {
             assertEquals("searchConfigurationId should match", searchConfigurationId, result.get("searchConfigurationId"));
             assertNotNull("queryText should be present", result.get("queryText"));
             assertTrue("queryText should be one of the expected terms", EXPECTED_QUERY_TERMS.contains(result.get("queryText")));
+            assertTrue("per-query metrics should be present for aggregation", result.get("metrics") instanceof List);
         }
 
         // Assert size field if present
