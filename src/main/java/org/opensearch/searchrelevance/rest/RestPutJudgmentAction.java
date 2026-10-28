@@ -24,7 +24,9 @@ import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_RAT
 import static org.opensearch.searchrelevance.common.PluginConstants.NAME;
 import static org.opensearch.searchrelevance.common.PluginConstants.NAX_RANK;
 import static org.opensearch.searchrelevance.common.PluginConstants.OVERWRITE_CACHE;
+import static org.opensearch.searchrelevance.common.PluginConstants.QUERY;
 import static org.opensearch.searchrelevance.common.PluginConstants.QUERYSET_ID;
+import static org.opensearch.searchrelevance.common.PluginConstants.RATINGS;
 import static org.opensearch.searchrelevance.common.PluginConstants.SEARCH_CONFIGURATION_LIST;
 import static org.opensearch.searchrelevance.common.PluginConstants.SIZE;
 import static org.opensearch.searchrelevance.common.PluginConstants.START_DATE;
@@ -221,8 +223,19 @@ public class RestPutJudgmentAction extends BaseRestHandler {
                 createRequest = new PutUbiJudgmentRequest(type, name, description, clickModel, maxRank, startDate, endDate, ubiEventsIndex);
             }
             case IMPORT_JUDGMENT -> {
-                List<Map<String, Object>> judgmentRatings = (List<Map<String, Object>>) source.get(JUDGMENT_RATINGS);
-                createRequest = new PutImportJudgmentRequest(type, name, description, judgmentRatings);
+                Object judgmentRatingsRaw = source.get(JUDGMENT_RATINGS);
+                if (judgmentRatingsRaw != null && !(judgmentRatingsRaw instanceof List)) {
+                    return channel -> channel.sendResponse(new BytesRestResponse(RestStatus.BAD_REQUEST, "judgmentRatings must be a list"));
+                }
+                List<?> judgmentRatings = (List<?>) judgmentRatingsRaw;
+                BytesRestResponse validationError = validateImportJudgmentRatings(judgmentRatings);
+                if (validationError != null) {
+                    return channel -> channel.sendResponse(validationError);
+                }
+                // Safe: validateImportJudgmentRatings already confirmed every element is a Map.
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> validatedJudgmentRatings = (List<Map<String, Object>>) (List<?>) judgmentRatings;
+                createRequest = new PutImportJudgmentRequest(type, name, description, validatedJudgmentRatings);
             }
             default -> {
                 throw new SearchRelevanceException("Unsupported experiment type: " + type, RestStatus.BAD_REQUEST);
@@ -252,5 +265,87 @@ public class RestPutJudgmentAction extends BaseRestHandler {
                 }
             }
         });
+    }
+
+    private BytesRestResponse validateImportJudgmentRatings(List<?> judgmentRatings) {
+        if (judgmentRatings == null) {
+            return new BytesRestResponse(RestStatus.BAD_REQUEST, "judgmentRatings is required for IMPORT_JUDGMENT");
+        }
+
+        int maxQueries = settingsAccessor.getMaxJudgmentImportQueriesAllowed();
+        if (judgmentRatings.size() > maxQueries) {
+            return new BytesRestResponse(RestStatus.FORBIDDEN, "Judgment Import Query Limit Exceeded. Maximum allowed: " + maxQueries);
+        }
+
+        int maxRatingsPerQuery = settingsAccessor.getMaxJudgmentImportRatingsPerQueryAllowed();
+        for (Object rawEntry : judgmentRatings) {
+            if (!(rawEntry instanceof Map)) {
+                return new BytesRestResponse(RestStatus.BAD_REQUEST, "Each entry in judgmentRatings must be an object");
+            }
+            Map<?, ?> entry = (Map<?, ?>) rawEntry;
+
+            Object query = entry.get(QUERY);
+            // Use the same validation query sets use, so an imported query can never fail to match a
+            // query set entry due to the two paths accepting different characters (e.g. newlines).
+            TextValidationUtil.ValidationResult queryValidation = TextValidationUtil.validateQuerySetValue(
+                query != null ? query.toString() : null
+            );
+            if (!queryValidation.isValid()) {
+                return new BytesRestResponse(RestStatus.BAD_REQUEST, "Invalid query: " + queryValidation.getErrorMessage());
+            }
+
+            Object ratingsObj = entry.get(RATINGS);
+            if (!(ratingsObj instanceof List)) {
+                return new BytesRestResponse(RestStatus.BAD_REQUEST, "Invalid query " + query + ": ratings must be a list");
+            }
+            List<?> ratings = (List<?>) ratingsObj;
+            if (ratings.size() > maxRatingsPerQuery) {
+                return new BytesRestResponse(
+                    RestStatus.FORBIDDEN,
+                    "Judgment Import Ratings Per Query Limit Exceeded. Maximum allowed: " + maxRatingsPerQuery
+                );
+            }
+
+            for (Object rawRating : ratings) {
+                if (!(rawRating instanceof Map)) {
+                    return new BytesRestResponse(RestStatus.BAD_REQUEST, "Invalid query " + query + ": each rating must be an object");
+                }
+                Map<?, ?> rating = (Map<?, ?>) rawRating;
+
+                Object docId = rating.get("docId");
+                if (!(docId instanceof String) || ((String) docId).isEmpty()) {
+                    return new BytesRestResponse(
+                        RestStatus.BAD_REQUEST,
+                        "Invalid query " + query + ": each rating must have a non-empty docId"
+                    );
+                }
+                TextValidationUtil.ValidationResult docIdValidation = TextValidationUtil.validateText((String) docId);
+                if (!docIdValidation.isValid()) {
+                    return new BytesRestResponse(
+                        RestStatus.BAD_REQUEST,
+                        "Invalid docId '" + docId + "' for query " + query + ": " + docIdValidation.getErrorMessage()
+                    );
+                }
+
+                Object ratingValue = rating.get("rating");
+                if (ratingValue == null || !isFiniteRating(ratingValue.toString())) {
+                    return new BytesRestResponse(
+                        RestStatus.BAD_REQUEST,
+                        "Invalid rating '" + ratingValue + "' for docId " + docId + " in query " + query + ": must be a valid finite float"
+                    );
+                }
+            }
+        }
+        return null;
+    }
+
+    // Mirrors the finite-float check ImportJudgmentsProcessor applies downstream; checked here too so
+    // malformed input fails fast with a clean 400 instead of surfacing later in the async pipeline.
+    private static boolean isFiniteRating(String rating) {
+        try {
+            return Float.isFinite(Float.parseFloat(rating));
+        } catch (NumberFormatException e) {
+            return false;
+        }
     }
 }

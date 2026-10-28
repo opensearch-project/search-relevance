@@ -31,6 +31,10 @@ public class SearchRelevanceSettingsAccessor {
     private volatile TimeValue scheduledExperimentsTimeout;
     @Getter
     private volatile TimeValue scheduledExperimentsMinimumInterval;
+    @Getter
+    private volatile int maxJudgmentImportQueriesAllowed;
+    @Getter
+    private volatile int maxJudgmentImportRatingsPerQueryAllowed;
 
     /**
      * Constructor, registers callbacks to update settings
@@ -45,6 +49,10 @@ public class SearchRelevanceSettingsAccessor {
         isScheduledExperimentsEnabled = SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_ENABLED.get(settings);
         scheduledExperimentsTimeout = SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_TIMEOUT.get(settings);
         scheduledExperimentsMinimumInterval = SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_MINIMUM_INTERVAL.get(settings);
+        maxJudgmentImportQueriesAllowed = SearchRelevanceSettings.SEARCH_RELEVANCE_JUDGMENT_IMPORT_MAX_QUERIES.get(settings);
+        maxJudgmentImportRatingsPerQueryAllowed = SearchRelevanceSettings.SEARCH_RELEVANCE_JUDGMENT_IMPORT_MAX_RATINGS_PER_QUERY.get(
+            settings
+        );
         registerSettingsCallbacks(clusterService);
     }
 
@@ -79,6 +87,16 @@ public class SearchRelevanceSettingsAccessor {
         clusterService.getClusterSettings()
             .addSettingsUpdateConsumer(SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_MINIMUM_INTERVAL, value -> {
                 scheduledExperimentsMinimumInterval = value;
+            });
+
+        clusterService.getClusterSettings()
+            .addSettingsUpdateConsumer(SearchRelevanceSettings.SEARCH_RELEVANCE_JUDGMENT_IMPORT_MAX_QUERIES, value -> {
+                maxJudgmentImportQueriesAllowed = value;
+            });
+
+        clusterService.getClusterSettings()
+            .addSettingsUpdateConsumer(SearchRelevanceSettings.SEARCH_RELEVANCE_JUDGMENT_IMPORT_MAX_RATINGS_PER_QUERY, value -> {
+                maxJudgmentImportRatingsPerQueryAllowed = value;
             });
     }
 }
