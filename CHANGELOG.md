@@ -21,6 +21,7 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ### Documentation
 - Fix the broken search relevance documentation link in the README ([#603](https://github.com/opensearch-project/search-relevance/pull/603))
+- Fix a GitHub Pages build failure by removing references to the missing `copy-curl.html` Jekyll include ([#633](https://github.com/opensearch-project/search-relevance/pull/633))
 - Add `demo_llm_as_judge.sh`, a demo script for the LLM-as-a-judge feature supporting OpenAI or a local Ollama model ([#322](https://github.com/opensearch-project/search-relevance/pull/322))
 
 ### Maintenance
