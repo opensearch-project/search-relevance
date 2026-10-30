@@ -151,6 +151,10 @@ public class PointwiseExperimentProcessor {
                         result.put("evaluationId", evalResult.get("evaluationId"));
                         result.put("searchConfigurationId", searchConfigId);
                         result.put("queryText", queryText);
+                        Object metrics = evalResult.get("metrics");
+                        if (metrics instanceof List<?>) {
+                            result.put("metrics", metrics);
+                        }
                         allResults.add(result);
                     }
                 } else {

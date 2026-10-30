@@ -7,6 +7,10 @@
  */
 package org.opensearch.searchrelevance.executors;
 
+import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_FIELD_NAME;
+import static org.opensearch.searchrelevance.common.MetricsConstants.POINTWISE_FIELD_NAME_EVALUATION_ID;
+import static org.opensearch.searchrelevance.common.MetricsConstants.POINTWISE_FIELD_NAME_EXPERIMENT_VARIANT_ID;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -72,15 +76,20 @@ public class ExperimentTaskContext {
         log.info("TaskContext initialized for experiment {} with {} variants", experimentId, totalVariants);
     }
 
-    /**
-     * Non-blocking variant write
-     */
     public void scheduleVariantWrite(ExperimentVariant variant, String evaluationId, boolean isSuccess) {
-        // Store evaluationId immediately for successful variants before async write
+        scheduleVariantWrite(variant, evaluationId, null, isSuccess);
+    }
+
+    public void scheduleVariantWrite(ExperimentVariant variant, String evaluationId, List<Map<String, Object>> metrics, boolean isSuccess) {
         if (isSuccess) {
             ConcurrentHashMap<String, Object> map = (ConcurrentHashMap<String, Object>) configToExperimentVariants.get(searchConfigId);
             if (map != null) {
-                map.put(variant.getId(), evaluationId);
+                Map<String, Object> variantResult = new HashMap<>();
+                variantResult.put(POINTWISE_FIELD_NAME_EVALUATION_ID, evaluationId);
+                if (metrics != null) {
+                    variantResult.put(METRICS_FIELD_NAME, metrics);
+                }
+                map.put(variant.getId(), variantResult);
             }
         }
 
@@ -170,9 +179,9 @@ public class ExperimentTaskContext {
         if (experimentType == ExperimentType.POINTWISE_EVALUATION) {
             // Pointwise format: individual entries with evaluationId, searchConfigurationId, queryText
             if (configMap != null && !configMap.isEmpty()) {
-                configMap.forEach((variantId, evalId) -> {
+                configMap.forEach((variantId, variantValue) -> {
                     Map<String, Object> result = new HashMap<>();
-                    result.put("evaluationId", evalId);
+                    putEvaluationFields(result, variantValue);
                     result.put("searchConfigurationId", searchConfigId);
                     result.put("queryText", queryText);
                     results.add(result);
@@ -186,23 +195,39 @@ public class ExperimentTaskContext {
         } else if (experimentType == ExperimentType.HYBRID_OPTIMIZER) {
             // Hybrid optimizer format: evaluationId and experimentVariantId
             if (configMap != null) {
-                configMap.forEach((variantId, evalId) -> {
+                configMap.forEach((variantId, variantValue) -> {
                     Map<String, Object> result = new HashMap<>();
-                    result.put("evaluationId", evalId);
-                    result.put("experimentVariantId", variantId);
+                    putEvaluationFields(result, variantValue);
+                    result.put(POINTWISE_FIELD_NAME_EXPERIMENT_VARIANT_ID, variantId);
                     results.add(result);
                 });
             }
         } else {
             if (configMap != null && !configMap.isEmpty()) {
-                configMap.forEach((variantId, evalId) -> {
+                configMap.forEach((variantId, variantValue) -> {
                     Map<String, Object> result = new HashMap<>();
-                    result.put("evaluationId", evalId);
-                    result.put("experimentVariantId", variantId);
+                    putEvaluationFields(result, variantValue);
+                    result.put(POINTWISE_FIELD_NAME_EXPERIMENT_VARIANT_ID, variantId);
                     results.add(result);
                 });
             }
         }
         return results;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void putEvaluationFields(Map<String, Object> result, Object variantValue) {
+        if (variantValue instanceof Map<?, ?> variantResult) {
+            Object evaluationId = variantResult.get(POINTWISE_FIELD_NAME_EVALUATION_ID);
+            if (evaluationId != null) {
+                result.put(POINTWISE_FIELD_NAME_EVALUATION_ID, evaluationId);
+            }
+            Object metrics = variantResult.get(METRICS_FIELD_NAME);
+            if (metrics instanceof List<?>) {
+                result.put(METRICS_FIELD_NAME, metrics);
+            }
+        } else if (variantValue != null) {
+            result.put(POINTWISE_FIELD_NAME_EVALUATION_ID, variantValue);
+        }
     }
 }

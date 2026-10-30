@@ -38,6 +38,7 @@ import org.opensearch.searchrelevance.experiment.HybridOptimizerExperimentProces
 import org.opensearch.searchrelevance.experiment.JudgmentRatingsMapper;
 import org.opensearch.searchrelevance.experiment.PointwiseExperimentProcessor;
 import org.opensearch.searchrelevance.experiment.signature.ExperimentInputSignatureComputer;
+import org.opensearch.searchrelevance.metrics.ExperimentLevelMetrics;
 import org.opensearch.searchrelevance.metrics.MetricsHelper;
 import org.opensearch.searchrelevance.model.AsyncStatus;
 import org.opensearch.searchrelevance.model.Experiment;
@@ -650,6 +651,7 @@ public class ExperimentRunningManager {
     ) {
         String experimentId = context.getExperimentId();
         PutExperimentRequest request = context.getRequest();
+        List<Map<String, Object>> experimentMetrics = ExperimentLevelMetrics.fromExperimentResults(finalResults);
 
         if (request.getScheduledExperimentResultId() != null) {
             ScheduledExperimentResult finalExperiment = new ScheduledExperimentResult(
@@ -657,7 +659,8 @@ public class ExperimentRunningManager {
                 experimentId,
                 TimeUtils.getTimestamp(),
                 AsyncStatus.COMPLETED,
-                finalResults
+                finalResults,
+                experimentMetrics
             );
 
             scheduledExperimentHistoryDao.updateScheduledExperimentResult(
@@ -682,7 +685,8 @@ public class ExperimentRunningManager {
             judgmentList,
             request.getSize(),
             finalResults,
-            context.getInputSignature()
+            context.getInputSignature(),
+            experimentMetrics
         );
 
         experimentDao.updateExperiment(

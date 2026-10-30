@@ -105,6 +105,13 @@ public class IndexMappingVersionIT extends BaseSearchRelevanceIT {
         assertTrue(mapping.contains("\"schema_version\""));
     }
 
+    public void testExperimentMappingDeclaresMetrics() {
+        assertEquals(2, SearchRelevanceIndices.EXPERIMENT.getSchemaVersion());
+        String mapping = SearchRelevanceIndices.EXPERIMENT.getMapping();
+        assertTrue(mapping.contains("\"metrics\""));
+        assertTrue(mapping.contains("\"schema_version\""));
+    }
+
     /**
      * Test that all SearchRelevanceIndices have valid schema versions defined.
      * This validates that the enum correctly parses schema_version from JSON mapping files.

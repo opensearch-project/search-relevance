@@ -6,6 +6,7 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ### Features
 
+* Persist experiment-level metrics on completed experiments (and scheduled experiment history). Per-query metrics are aggregated at completion: DCG is summed and other metrics are averaged, stored in the same `[{metric, value}, ...]` shape as per-query metrics ([#245](https://github.com/opensearch-project/search-relevance/issues/245))
 * Persist per-query OpenSearch search latency (`took`) on experiment evaluation results and pairwise snapshots. `took` is cluster query time (`SearchResponse.getTook()`), not plugin queue time, judgment scoring, or Dashboards round-trip ([#581](https://github.com/opensearch-project/search-relevance/issues/581))
 
 ### Enhancements

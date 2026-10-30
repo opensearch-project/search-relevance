@@ -13,6 +13,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -202,7 +203,48 @@ public class ExperimentTaskContextTests extends OpenSearchTestCase {
 
         // Wait a bit for async map update
         Thread.sleep(100);
-        assertEquals(evaluationId, searchConfigMap.get(variant.getId()));
+        Object stored = searchConfigMap.get(variant.getId());
+        assertTrue(stored instanceof Map);
+        Map<String, Object> storedMap = (Map<String, Object>) stored;
+        assertEquals(evaluationId, storedMap.get("evaluationId"));
+    }
+
+    public void testScheduleVariantWriteStoresMetricsForAggregation() throws Exception {
+        CountDownLatch latch = new CountDownLatch(1);
+        ExperimentTaskContext context = new ExperimentTaskContext(
+            "test-experiment",
+            "test-search-config",
+            "test query",
+            1,
+            new ConcurrentHashMap<>(),
+            new CompletableFuture<>(),
+            new AtomicBoolean(false),
+            experimentVariantDao,
+            ExperimentType.POINTWISE_EVALUATION
+        );
+        ExperimentVariant variant = createTestVariant("variant-1");
+        List<Map<String, Object>> metrics = List.of(Map.of("metric", "NDCG@10", "value", 0.8));
+
+        doAnswer(invocation -> {
+            ActionListener<Object> listener = invocation.getArgument(1);
+            listener.onResponse(null);
+            latch.countDown();
+            return null;
+        }).when(experimentVariantDao).putExperimentVariantEfficient(any(), any());
+
+        ConcurrentHashMap<String, Object> searchConfigMap = new ConcurrentHashMap<>();
+        context.getConfigToExperimentVariants().put(context.getSearchConfigId(), searchConfigMap);
+
+        context.scheduleVariantWrite(variant, "eval-1", metrics, true);
+        context.completeVariantSuccess();
+
+        assertTrue(latch.await(5, TimeUnit.SECONDS));
+        assertTrue(context.getResultFuture().isDone());
+        Map<String, Object> result = context.getResultFuture().get(5, TimeUnit.SECONDS);
+        List<Map<String, Object>> evaluationResults = (List<Map<String, Object>>) result.get("evaluationResults");
+        assertEquals(1, evaluationResults.size());
+        assertEquals("eval-1", evaluationResults.get(0).get("evaluationId"));
+        assertEquals(metrics, evaluationResults.get(0).get("metrics"));
     }
 
     public void testScheduleVariantWriteFailure() throws Exception {
