@@ -4,7 +4,7 @@
 # * An "ecommerce" style sample data
 # You can now exercise all the capabilities of Hybrid Optimizer!
 #
-# Prerequisites: OpenSearch 3.1 or newer with SRW and UBI plugins installed
+# Prerequisites: OpenSearch 3.10 or newer with SRW and UBI plugins installed
 #
 # Optional arguments:
 #   --skip-ecommerce          Skip deleting and re-loading the ecommerce index
@@ -54,44 +54,25 @@ curl -s -X PUT "$OPENSEARCH_URL/_cluster/settings" -H 'Content-Type: application
 }'
 
 echo
-echo -e "${MAJOR}Lookup or Register a model group.${RESET}"
-response=$(curl -s -X POST "$OPENSEARCH_URL/_plugins/_ml/model_groups/_search" \
+echo -e "${MAJOR}Register a model group.${RESET}"
+# Register with a fixed custom id so re-running this script is idempotent;
+# a prior run's "already exists" (409) is treated as success. This relies on
+# https://github.com/opensearch-project/ml-commons/issues/5140, fixed in 3.10.
+model_group_id="search-relevance-hybrid-optimizer-model-group"
+http_status=$(curl -s -o RES -w '%{http_code}' -X POST "$OPENSEARCH_URL/_plugins/_ml/model_groups/_register" \
   -H 'Content-Type: application/json' \
-  --data-binary '{
-    "query": {
-      "bool": {
-        "must": [
-          {
-            "terms": {
-              "name": [
-                "neural_search_model_group"
-              ]
-            }
-          }
-        ]
-      }
-    }
-  }')
+  --data-binary "{
+    \"model_group_id\": \"$model_group_id\",
+    \"name\": \"neural_search_model_group\",
+    \"description\": \"A model group for neural search models\"
+  }")
+cat RES | jq
 
-# Extract the model_group_id from the JSON response
-model_group_id=$(echo "$response" | jq -r '.hits.hits[0]._id')
-
-# Check if model_group_id is blank or "null"
-if [ -z "$model_group_id" ] || [ "$model_group_id" = "null" ]; then
-  echo "No existing model group found, creating a new one..."
-  response=$(curl -s -X POST "$OPENSEARCH_URL/_plugins/_ml/model_groups/_register" \
-    -H 'Content-Type: application/json' \
-    --data-binary '{
-      "name": "neural_search_model_group",
-      "description": "A model group for neural search models"
-    }')
-
-  # Extract the model_group_id from the JSON response
-  model_group_id=$(echo "$response" | jq -r '.model_group_id')
-  echo "Created Model Group with id: $model_group_id"
-else
-  echo "Using existing Model Group with id: $model_group_id"
+if [ "$http_status" != "200" ] && [ "$http_status" != "409" ]; then
+  echo "Error: failed to create model group (HTTP $http_status), see response above."
+  exit 1
 fi
+echo "Using model group with id: $model_group_id"
 
 echo -e "${MAJOR}Registering a model in the model group.${RESET}"
 response=$(curl -s -X POST "$OPENSEARCH_URL/_plugins/_ml/models/_register" \

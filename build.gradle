@@ -51,7 +51,7 @@ buildscript {
         classpath "org.opensearch.gradle:build-tools:${opensearch_version}"
         classpath "com.diffplug.spotless:spotless-plugin-gradle:8.10.4"
         classpath "com.github.form-com.diff-coverage-gradle:diff-coverage:0.9.5"
-        classpath "io.freefair.gradle:lombok-plugin:9.8.0"
+        classpath "io.freefair.gradle:lombok-plugin:9.8.2"
         classpath "de.thetaphi:forbiddenapis:3.11" // Upgrade for JDK 25 support
     }
 }
@@ -131,6 +131,14 @@ allprojects {
             targetCompatibility = JavaVersion.VERSION_21
         }
     }
+
+    // Test classpaths additionally pull in org.opensearch.client:opensearch-rest-client (test
+    // framework), which depends on a newer slf4j-api than the 1.7.36 pinned above for production
+    // runtime (to match OpenSearch core's own runtime classpath). slf4j-api's facade is API
+    // compatible across 1.x/2.x, so forcing the newer version for test configurations only is safe.
+    configurations.matching { it.name.contains('test') }.configureEach {
+        resolutionStrategy.force 'org.slf4j:slf4j-api:2.0.17'
+    }
 }
 
 publishing {
@@ -209,7 +217,7 @@ configurations {
 configurations.all {
     resolutionStrategy {
         force("com.google.guava:guava:33.7.2-jre") // CVE for 31.1
-        force("com.google.errorprone:error_prone_annotations:2.50.0") // Fix version conflict
+        force("com.google.errorprone:error_prone_annotations:2.51.0") // Fix version conflict
         force("org.jspecify:jspecify:1.0.1") // Fix version conflict between guava and opensearch core
     }
     exclude group: 'org.slf4j', module: 'slf4j-log4j12'
@@ -232,6 +240,12 @@ dependencies {
     // https://github.com/opensearch-project/ml-commons/commit/464bfe34c66d7a729a00dd457f03587ea4e504d9
     // TODO: Remove following three lines of dependencies if ml-common include them in their jar
     runtimeOnly group: 'org.reflections', name: 'reflections', version: '0.10.2'  // Note the version change
+    // reflections declares slf4j-api as an optional dependency, so it is not pulled in
+    // transitively; without it, Reflections' static initializer throws NoClassDefFoundError
+    // the first time it runs inside this plugin's isolated classloader (e.g. the first
+    // completed LLM_JUDGMENT remote-model predict call), which OpenSearch treats as fatal.
+    // OpenSearch core uses slf4j 1.7.36, so we match that version here.
+    runtimeOnly group: 'org.slf4j', name: 'slf4j-api', version: '1.7.36'
     runtimeOnly group: 'org.javassist', name: 'javassist', version: '3.33.0-GA'
     runtimeOnly group: 'org.opensearch', name: 'common-utils', version: "${opensearch_build}"
     runtimeOnly group: 'org.apache.commons', name: 'commons-text', version: '1.15.0'
@@ -281,6 +295,11 @@ test {
         maxParallelForks = 1
         jvmArgs '-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:8000'
     }
+}
+
+tasks.named('javadoc').configure {
+    // Internal classes aren't documented as public API; only flag real doclint errors (e.g. broken @link, bad HTML).
+    options.addStringOption('Xdoclint:all,-missing', '-quiet')
 }
 
 jacocoTestReport {
