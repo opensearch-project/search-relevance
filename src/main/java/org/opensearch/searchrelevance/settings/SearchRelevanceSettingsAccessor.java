@@ -26,6 +26,10 @@ public class SearchRelevanceSettingsAccessor {
     @Getter
     private volatile int maxQuerySetAllowed;
     @Getter
+    private volatile int maxExperimentImportQueriesAllowed;
+    @Getter
+    private volatile int maxExperimentImportResultsPerQueryAllowed;
+    @Getter
     private volatile boolean isScheduledExperimentsEnabled;
     @Getter
     private volatile TimeValue scheduledExperimentsTimeout;
@@ -42,6 +46,10 @@ public class SearchRelevanceSettingsAccessor {
         isWorkbenchEnabled = SearchRelevanceSettings.SEARCH_RELEVANCE_WORKBENCH_ENABLED.get(settings);
         isStatsEnabled = SearchRelevanceSettings.SEARCH_RELEVANCE_STATS_ENABLED.get(settings);
         maxQuerySetAllowed = SearchRelevanceSettings.SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT.get(settings);
+        maxExperimentImportQueriesAllowed = SearchRelevanceSettings.SEARCH_RELEVANCE_EXPERIMENT_IMPORT_MAX_QUERIES.get(settings);
+        maxExperimentImportResultsPerQueryAllowed = SearchRelevanceSettings.SEARCH_RELEVANCE_EXPERIMENT_IMPORT_MAX_RESULTS_PER_QUERY.get(
+            settings
+        );
         isScheduledExperimentsEnabled = SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_ENABLED.get(settings);
         scheduledExperimentsTimeout = SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_TIMEOUT.get(settings);
         scheduledExperimentsMinimumInterval = SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_MINIMUM_INTERVAL.get(settings);
@@ -64,6 +72,16 @@ public class SearchRelevanceSettingsAccessor {
         clusterService.getClusterSettings()
             .addSettingsUpdateConsumer(SearchRelevanceSettings.SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT, value -> {
                 maxQuerySetAllowed = value;
+            });
+
+        clusterService.getClusterSettings()
+            .addSettingsUpdateConsumer(SearchRelevanceSettings.SEARCH_RELEVANCE_EXPERIMENT_IMPORT_MAX_QUERIES, value -> {
+                maxExperimentImportQueriesAllowed = value;
+            });
+
+        clusterService.getClusterSettings()
+            .addSettingsUpdateConsumer(SearchRelevanceSettings.SEARCH_RELEVANCE_EXPERIMENT_IMPORT_MAX_RESULTS_PER_QUERY, value -> {
+                maxExperimentImportResultsPerQueryAllowed = value;
             });
 
         clusterService.getClusterSettings()

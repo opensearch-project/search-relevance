@@ -10,6 +10,8 @@ package org.opensearch.searchrelevance.plugin;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_CACHE_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_JOBS_INDEX;
+import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_EXPERIMENT_IMPORT_MAX_QUERIES;
+import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_EXPERIMENT_IMPORT_MAX_RESULTS_PER_QUERY;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_ENABLED;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_MINIMUM_INTERVAL;
@@ -84,6 +86,7 @@ import org.opensearch.searchrelevance.rest.RestGetQuerySetAction;
 import org.opensearch.searchrelevance.rest.RestGetScheduledExperimentAction;
 import org.opensearch.searchrelevance.rest.RestGetSearchConfigurationAction;
 import org.opensearch.searchrelevance.rest.RestPatchExperimentAction;
+import org.opensearch.searchrelevance.rest.RestPostExperimentAction;
 import org.opensearch.searchrelevance.rest.RestPostScheduledExperimentAction;
 import org.opensearch.searchrelevance.rest.RestPutExperimentAction;
 import org.opensearch.searchrelevance.rest.RestPutJudgmentAction;
@@ -109,6 +112,8 @@ import org.opensearch.searchrelevance.transport.experiment.GetExperimentAction;
 import org.opensearch.searchrelevance.transport.experiment.GetExperimentTransportAction;
 import org.opensearch.searchrelevance.transport.experiment.PatchExperimentAction;
 import org.opensearch.searchrelevance.transport.experiment.PatchExperimentTransportAction;
+import org.opensearch.searchrelevance.transport.experiment.PostExperimentAction;
+import org.opensearch.searchrelevance.transport.experiment.PostExperimentTransportAction;
 import org.opensearch.searchrelevance.transport.experiment.PutExperimentAction;
 import org.opensearch.searchrelevance.transport.experiment.PutExperimentTransportAction;
 import org.opensearch.searchrelevance.transport.experiment.SearchExperimentAction;
@@ -313,6 +318,7 @@ public class SearchRelevancePlugin extends Plugin
             new RestDeleteSearchConfigurationAction(settingsAccessor),
             new RestGetSearchConfigurationAction(settingsAccessor),
             new RestSearchSearchConfigurationAction(settingsAccessor),
+            new RestPostExperimentAction(settingsAccessor),
             new RestPutExperimentAction(settingsAccessor),
             new RestPatchExperimentAction(settingsAccessor),
             new RestGetExperimentAction(settingsAccessor),
@@ -344,6 +350,7 @@ public class SearchRelevancePlugin extends Plugin
             new ActionHandler<>(DeleteSearchConfigurationAction.INSTANCE, DeleteSearchConfigurationTransportAction.class),
             new ActionHandler<>(GetSearchConfigurationAction.INSTANCE, GetSearchConfigurationTransportAction.class),
             new ActionHandler<>(SearchSearchConfigurationAction.INSTANCE, SearchSearchConfigurationTransportAction.class),
+            new ActionHandler<>(PostExperimentAction.INSTANCE, PostExperimentTransportAction.class),
             new ActionHandler<>(PutExperimentAction.INSTANCE, PutExperimentTransportAction.class),
             new ActionHandler<>(PatchExperimentAction.INSTANCE, PatchExperimentTransportAction.class),
             new ActionHandler<>(DeleteExperimentAction.INSTANCE, DeleteExperimentTransportAction.class),
@@ -428,6 +435,8 @@ public class SearchRelevancePlugin extends Plugin
             SEARCH_RELEVANCE_WORKBENCH_ENABLED,
             SEARCH_RELEVANCE_STATS_ENABLED,
             SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT,
+            SEARCH_RELEVANCE_EXPERIMENT_IMPORT_MAX_QUERIES,
+            SEARCH_RELEVANCE_EXPERIMENT_IMPORT_MAX_RESULTS_PER_QUERY,
             SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_ENABLED,
             SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_TIMEOUT,
             SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_MINIMUM_INTERVAL

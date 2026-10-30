@@ -156,6 +156,19 @@ public class EvaluationResult implements ToXContentObject {
     public EvaluationResult(
         String id,
         String timestamp,
+        String experimentId,
+        String searchConfigurationId,
+        String searchText,
+        List<String> judgmentIds,
+        List<String> documentIds,
+        List<Map<String, Object>> metrics
+    ) {
+        this(id, timestamp, searchConfigurationId, searchText, judgmentIds, documentIds, metrics, experimentId, null, null);
+    }
+
+    public EvaluationResult(
+        String id,
+        String timestamp,
         String searchConfigurationId,
         String searchText,
         List<String> judgmentIds,
