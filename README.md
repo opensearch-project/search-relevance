@@ -27,6 +27,7 @@ For tutorials on how to leverage these tools, see [here](https://docs.opensearch
 * [Contributing to OpenSearch](CONTRIBUTING.md)
 * [Maintainer Responsibilities](MAINTAINERS.md)
 * [Release Management](RELEASING.md)
+* [Known Issues](KNOWN_ISSUES.md)
 * [Security](SECURITY.md)
 * [Code of Conduct](#code-of-conduct)
 * [License](#license)

@@ -22,6 +22,7 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 ### Documentation
 - Fix the broken search relevance documentation link in the README ([#603](https://github.com/opensearch-project/search-relevance/pull/603))
 - Add `demo_llm_as_judge.sh`, a demo script for the LLM-as-a-judge feature supporting OpenAI or a local Ollama model ([#322](https://github.com/opensearch-project/search-relevance/pull/322))
+- Add `KNOWN_ISSUES.md` with a workaround for the experiment index `isScheduled` mapping conflict after upgrading from 3.3 via 3.4 or 3.5 ([#600](https://github.com/opensearch-project/search-relevance/issues/600))
 
 ### Maintenance
 
