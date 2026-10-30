@@ -7,7 +7,11 @@
  */
 package org.opensearch.searchrelevance.plugin;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_CACHE_INDEX;
@@ -29,22 +33,30 @@ import java.util.function.Supplier;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.opensearch.action.ActionRequest;
+import org.opensearch.action.ActionType;
+import org.opensearch.cluster.ClusterState;
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver;
+import org.opensearch.cluster.metadata.Metadata;
 import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.common.CheckedRunnable;
 import org.opensearch.common.settings.ClusterSettings;
 import org.opensearch.common.settings.Setting;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.unit.TimeValue;
+import org.opensearch.common.util.concurrent.ThreadContext;
+import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.action.ActionResponse;
 import org.opensearch.core.common.io.stream.NamedWriteableRegistry;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.env.Environment;
 import org.opensearch.env.NodeEnvironment;
+import org.opensearch.identity.PluginSubject;
 import org.opensearch.indices.SystemIndexDescriptor;
 import org.opensearch.plugins.ActionPlugin;
 import org.opensearch.plugins.SystemIndexPlugin;
 import org.opensearch.repositories.RepositoriesService;
 import org.opensearch.script.ScriptService;
+import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.searchrelevance.dao.EvaluationResultDao;
 import org.opensearch.searchrelevance.dao.ExperimentDao;
 import org.opensearch.searchrelevance.dao.ExperimentVariantDao;
@@ -55,6 +67,7 @@ import org.opensearch.searchrelevance.dao.ScheduledJobsDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
 import org.opensearch.searchrelevance.executors.ExperimentRunningManager;
 import org.opensearch.searchrelevance.executors.ExperimentTaskManager;
+import org.opensearch.searchrelevance.indices.SearchRelevanceIndices;
 import org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager;
 import org.opensearch.searchrelevance.metrics.MetricsHelper;
 import org.opensearch.searchrelevance.ml.MLAccessor;
@@ -189,6 +202,44 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
             registeredComponents.add(component.getClass());
         }
         assertEquals(SUPPORTED_COMPONENTS, registeredComponents);
+    }
+
+    public void testIndexManagerRunsAsTheAssignedSubject() {
+        when(client.threadPool()).thenReturn(threadPool);
+        when(threadPool.getThreadContext()).thenReturn(new ThreadContext(Settings.EMPTY));
+        ClusterState clusterState = mock(ClusterState.class);
+        when(clusterService.state()).thenReturn(clusterState);
+        when(clusterState.metadata()).thenReturn(mock(Metadata.class));
+        SearchRelevanceIndicesManager indicesManager = plugin.createComponents(
+            client,
+            clusterService,
+            threadPool,
+            resourceWatcherService,
+            scriptService,
+            xContentRegistry,
+            environment,
+            nodeEnvironment,
+            namedWriteableRegistry,
+            indexNameExpressionResolver,
+            repositoriesServiceSupplier
+        )
+            .stream()
+            .filter(SearchRelevanceIndicesManager.class::isInstance)
+            .map(SearchRelevanceIndicesManager.class::cast)
+            .findFirst()
+            .orElseThrow();
+        PluginSubject subject = mock(PluginSubject.class);
+        plugin.assignSubject(subject);
+
+        indicesManager.listDocsBySearchRequest(
+            new SearchSourceBuilder(),
+            SearchRelevanceIndices.QUERY_SET,
+            ActionListener.wrap(r -> {}, e -> {})
+        );
+
+        // The mocked subject does not run its body, so nothing may reach the node client outside runAs.
+        verify(subject, atLeastOnce()).runAs(any(CheckedRunnable.class));
+        verify(client, never()).execute(any(ActionType.class), any(), any());
     }
 
     public void testIsAnActionPlugin() {
