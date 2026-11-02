@@ -137,7 +137,7 @@ allprojects {
     // runtime (to match OpenSearch core's own runtime classpath). slf4j-api's facade is API
     // compatible across 1.x/2.x, so forcing the newer version for test configurations only is safe.
     configurations.matching { it.name.contains('test') }.configureEach {
-        resolutionStrategy.force 'org.slf4j:slf4j-api:2.0.17'
+        resolutionStrategy.force 'org.slf4j:slf4j-api:2.0.20'
     }
 }
 
@@ -245,7 +245,7 @@ dependencies {
     // the first time it runs inside this plugin's isolated classloader (e.g. the first
     // completed LLM_JUDGMENT remote-model predict call), which OpenSearch treats as fatal.
     // OpenSearch core uses slf4j 1.7.36, so we match that version here.
-    runtimeOnly group: 'org.slf4j', name: 'slf4j-api', version: '1.7.36'
+    runtimeOnly group: 'org.slf4j', name: 'slf4j-api', version: '2.0.20'
     runtimeOnly group: 'org.javassist', name: 'javassist', version: '3.33.0-GA'
     runtimeOnly group: 'org.opensearch', name: 'common-utils', version: "${opensearch_build}"
     runtimeOnly group: 'org.apache.commons', name: 'commons-text', version: '1.15.0'
