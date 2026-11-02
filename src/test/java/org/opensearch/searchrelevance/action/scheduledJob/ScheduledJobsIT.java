@@ -161,10 +161,12 @@ public class ScheduledJobsIT extends BaseExperimentIT {
             assertEquals(results.size(), resultsMap.size());
         }, TimeValue.timeValueMillis(SCHEDULED_RESULT_COMPLETION_MS), TimeValue.timeValueMillis(SCHEDULED_RESULT_POLL_INTERVAL_MS));
 
+        // The jobs index is a system index, so the job is deleted through the plugin's API rather than the index.
+        String deleteScheduledExperimentUrl = String.join("/", SCHEDULED_EXPERIMENT_URL, scheduledExperimentId);
         Response deleteScheduledExperimentResponse = makeRequest(
             client(),
             RestRequest.Method.DELETE.name(),
-            getScheduledExperimentByIdUrl,
+            deleteScheduledExperimentUrl,
             null,
             null,
             ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
@@ -173,7 +175,7 @@ public class ScheduledJobsIT extends BaseExperimentIT {
         assertNotNull(deleteScheduledExperimentResultJson);
         assertEquals("deleted", deleteScheduledExperimentResultJson.get("result").toString());
 
-        expectThrows(
+        ResponseException deletedJobException = expectThrows(
             ResponseException.class,
             () -> makeRequest(
                 client(),
@@ -184,6 +186,7 @@ public class ScheduledJobsIT extends BaseExperimentIT {
                 ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
             )
         );
+        assertEquals(404, deletedJobException.getResponse().getStatusLine().getStatusCode());
     }
 
     @SneakyThrows
