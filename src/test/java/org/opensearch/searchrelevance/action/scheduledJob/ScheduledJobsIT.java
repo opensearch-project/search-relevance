@@ -69,10 +69,11 @@ public class ScheduledJobsIT extends BaseExperimentIT {
 
         // Read the experiment that should be updated after putting the schedule.
         String getSingleExperimentByIdUrl = String.join("/", EXPERIMENT_INDEX, "_doc", experimentId);
-        // Read the scheduled experiment that was created
+        // Read the scheduled experiment that was created. The jobs index is a system index, so direct reads use the
+        // admin certificate client; for other users a get there is not realtime and misses an unrefreshed job.
         String getScheduledExperimentByIdUrl = String.join("/", SCHEDULED_JOBS_INDEX, "_doc", scheduledExperimentId);
         Response getScheduledExperimentResponse = makeRequest(
-            client(),
+            adminClient(),
             RestRequest.Method.GET.name(),
             getScheduledExperimentByIdUrl,
             null,
@@ -96,7 +97,7 @@ public class ScheduledJobsIT extends BaseExperimentIT {
             Response getScheduledExperimentJobRunResponse;
             try {
                 getScheduledExperimentJobRunResponse = makeRequest(
-                    client(),
+                    adminClient(),
                     RestRequest.Method.GET.name(),
                     getScheduledExperimentJobRunByIdUrl,
                     null,
@@ -119,12 +120,13 @@ public class ScheduledJobsIT extends BaseExperimentIT {
 
         String getScheduledExperimentResultsUrl = String.join("/", SCHEDULED_EXPERIMENT_HISTORY_INDEX, "_search");
 
-        // Wait until the scheduled experiment result completes.
+        // Wait until the scheduled experiment result completes. The history index is a system index too, so the
+        // search uses the admin certificate client; for other users it returns no hits.
         assertBusyWithFixedSleepTime(() -> {
             Response getScheduledExperimentResultsResponse;
             try {
                 getScheduledExperimentResultsResponse = makeRequest(
-                    client(),
+                    adminClient(),
                     RestRequest.Method.POST.name(),
                     getScheduledExperimentResultsUrl,
                     null,
@@ -178,7 +180,7 @@ public class ScheduledJobsIT extends BaseExperimentIT {
         ResponseException deletedJobException = expectThrows(
             ResponseException.class,
             () -> makeRequest(
-                client(),
+                adminClient(),
                 RestRequest.Method.GET.name(),
                 getScheduledExperimentByIdUrl,
                 null,
