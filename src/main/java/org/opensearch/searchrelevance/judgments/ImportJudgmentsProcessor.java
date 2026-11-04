@@ -25,6 +25,18 @@ import org.opensearch.transport.client.Client;
 
 public class ImportJudgmentsProcessor implements BaseJudgmentsProcessor {
     private static final Logger LOGGER = LogManager.getLogger(ImportJudgmentsProcessor.class);
+
+    /** Smallest rating accepted on import; gain-based metrics assume non-negative relevance. */
+    static final float MIN_RATING = 0.0f;
+
+    /**
+     * Largest rating accepted on import. DCG/NDCG use exponential gain ({@code 2^rating - 1}), and a DCG
+     * value has to stay below {@code Long.MAX_VALUE / 100} to be rounded to two decimals. With up to
+     * 10,000 results (the default {@code index.max_result_window}) that holds for ratings up to 46;
+     * 40 leaves a margin. Graded scales such as 0-3 or 0-4 are the recommended choice.
+     */
+    static final float MAX_RATING = 40.0f;
+
     private final Client client;
 
     @Inject
@@ -87,15 +99,34 @@ public class ImportJudgmentsProcessor implements BaseJudgmentsProcessor {
                 }
 
                 String rating = String.valueOf(ratingObj);
+                float ratingValue;
                 try {
+                    ratingValue = Float.parseFloat(rating);
                     // parseFloat accepts "NaN" and "Infinity"; reject them so they cannot fail evaluation later.
-                    if (!Float.isFinite(Float.parseFloat(rating))) {
+                    if (!Float.isFinite(ratingValue)) {
                         throw new NumberFormatException("non-finite rating: " + rating);
                     }
                 } catch (NumberFormatException e) {
                     listener.onFailure(
                         new SearchRelevanceException(
                             "rating '" + rating + "' for queryText " + queryText + " must be a valid float",
+                            RestStatus.BAD_REQUEST
+                        )
+                    );
+                    return;
+                }
+                if (ratingValue < MIN_RATING || ratingValue > MAX_RATING) {
+                    listener.onFailure(
+                        new SearchRelevanceException(
+                            "rating '"
+                                + rating
+                                + "' for queryText "
+                                + queryText
+                                + " must be between "
+                                + (int) MIN_RATING
+                                + " and "
+                                + (int) MAX_RATING
+                                + "; gain-based metrics such as DCG cannot evaluate ratings outside this range",
                             RestStatus.BAD_REQUEST
                         )
                     );

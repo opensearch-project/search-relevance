@@ -22,6 +22,7 @@ import org.junit.Before;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.core.rest.RestStatus;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.model.JudgmentType;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
@@ -279,6 +280,60 @@ public class ImportJudgmentsProcessorTests extends OpenSearchTestCase {
             assertTrue("rating '" + rating + "' must be rejected", exceptionRef.get() instanceof SearchRelevanceException);
             assertTrue(exceptionRef.get().getMessage().contains("rating '" + rating + "' for queryText test query must be a valid float"));
         }
+    }
+
+    public void testGenerateJudgmentRatingWithOutOfRangeRating() throws Exception {
+        // Finite ratings outside [0, 40] would overflow DCG (2^rating - 1) or give negative gain; reject at import.
+        for (String rating : List.of("-0.5", "-1", "40.5", "100", "100.000")) {
+            Exception e = runWithSingleRating(rating).failure;
+            assertTrue("rating '" + rating + "' must be rejected", e instanceof SearchRelevanceException);
+            assertEquals(RestStatus.BAD_REQUEST, ((SearchRelevanceException) e).status());
+            assertTrue(
+                e.getMessage(),
+                e.getMessage().contains("rating '" + rating + "' for queryText test query must be between 0 and 40")
+            );
+        }
+    }
+
+    public void testGenerateJudgmentRatingAcceptsRangeBoundaries() throws Exception {
+        for (String rating : List.of("0", "0.0", "3", "40", "40.0")) {
+            SingleRatingResult result = runWithSingleRating(rating);
+            assertNull("rating '" + rating + "' must be accepted", result.failure);
+            @SuppressWarnings("unchecked")
+            List<Map<String, String>> ratings = (List<Map<String, String>>) result.response.get(0).get("ratings");
+            assertEquals(rating, ratings.get(0).get("rating"));
+        }
+    }
+
+    private static final class SingleRatingResult {
+        private List<Map<String, Object>> response;
+        private Exception failure;
+    }
+
+    private SingleRatingResult runWithSingleRating(String rating) throws Exception {
+        Map<String, Object> queryJudgment = new HashMap<>();
+        queryJudgment.put("query", "test query");
+        queryJudgment.put("ratings", List.of(Map.of("docId", "doc1", "rating", rating)));
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("judgmentRatings", List.of(queryJudgment));
+
+        SingleRatingResult result = new SingleRatingResult();
+        CountDownLatch latch = new CountDownLatch(1);
+        processor.generateJudgmentRating(metadata, new ActionListener<>() {
+            @Override
+            public void onResponse(List<Map<String, Object>> response) {
+                result.response = response;
+                latch.countDown();
+            }
+
+            @Override
+            public void onFailure(Exception e) {
+                result.failure = e;
+                latch.countDown();
+            }
+        });
+        assertTrue(latch.await(5, TimeUnit.SECONDS));
+        return result;
     }
 
     public void testGenerateJudgmentRatingWithInvalidRatingsType() throws Exception {
