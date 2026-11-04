@@ -3,6 +3,9 @@ This directory contains:
 1) Queries and events in the UBI format sourced from the ESCI data set in `ubi_queries_events.ndjson`. Created using https://github.com/opensearch-project/user-behavior-insights/tree/main/ubi-data-generator.
 
 2) Queries (`esci_us_queryset.json`) and matching Judgments (`esci_us_judgments.json`) sourced from the ESCI data set.
+   ESCI labels are mapped to a graded 0–3 rating scale: Exact = 3, Substitute = 2, Complement = 1, Irrelevant = 0.
+   Keep ratings on a small graded scale: DCG/NDCG use exponential gain (`2^rating - 1`), so large ratings
+   (such as 100) overflow DCG and the affected queries fail to evaluate.
 
 3) ESCI source ecommerce data (`esci_us_ecommerce_shrunk.ndjson.zip`) which is a subset of ESCI dataset that has images and overlap with the judgments in `esci_us_judgments.json`.
 
