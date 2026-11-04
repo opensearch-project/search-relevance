@@ -370,13 +370,36 @@ echo ""
 echo ""
 echo "BEGIN HYBRID OPTIMIZER DEMO"
 echo ""
+# A hybrid query without a normalization processor returns raw, unnormalized
+# sub-query results (including repeated hits), which makes metrics like NDCG
+# meaningless when the search configuration is used outside the hybrid optimizer.
+echo "Creating Search Pipeline for Hybrid Query Normalization"
+curl -s -X PUT "$OPENSEARCH_URL/_search/pipeline/normalization-pipeline" \
+-H "Content-Type: application/json" \
+-d'{
+    "description": "Post processor for hybrid search",
+    "phase_results_processors": [
+        {
+            "normalization-processor": {
+                "normalization": {
+                    "technique": "min_max"
+                },
+                "combination": {
+                    "technique": "arithmetic_mean"
+                }
+            }
+        }
+    ]
+}'
+echo ""
 echo "Creating Hybrid Query to be Optimized"
 exe curl -s -X PUT "$OPENSEARCH_URL/_plugins/_search_relevance/search_configurations" \
 -H "Content-type: application/json" \
 -d'{
       "name": "hybrid_query_1",
       "query": "{\"query\":{\"hybrid\":{\"queries\":[{\"match\":{\"title\":\"%SearchText%\"}},{\"match\":{\"category\":\"%SearchText%\"}}]}}}",
-      "index": "ecommerce"
+      "index": "ecommerce",
+      "searchPipeline": "normalization-pipeline"
 }'
 
 SC_HYBRID=`jq -r '.search_configuration_id' < RES`
