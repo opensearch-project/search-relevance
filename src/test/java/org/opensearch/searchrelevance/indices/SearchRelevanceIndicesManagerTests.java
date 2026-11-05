@@ -9,6 +9,7 @@ package org.opensearch.searchrelevance.indices;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.RETURNS_SELF;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -22,9 +23,14 @@ import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.QUER
 import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.SCHEDULED_EXPERIMENT_HISTORY;
 
 import java.io.IOException;
+import java.security.Principal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.lucene.search.TotalHits;
@@ -49,6 +55,9 @@ import org.opensearch.cluster.metadata.IndexMetadata;
 import org.opensearch.cluster.metadata.MappingMetadata;
 import org.opensearch.cluster.metadata.Metadata;
 import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.common.CheckedRunnable;
+import org.opensearch.common.settings.Settings;
+import org.opensearch.common.util.concurrent.ThreadContext;
 import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.common.bytes.BytesReference;
@@ -56,6 +65,7 @@ import org.opensearch.core.index.shard.ShardId;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.core.xcontent.ToXContent;
 import org.opensearch.core.xcontent.XContentBuilder;
+import org.opensearch.identity.PluginSubject;
 import org.opensearch.index.query.QueryBuilders;
 import org.opensearch.index.reindex.BulkByScrollResponse;
 import org.opensearch.index.reindex.DeleteByQueryAction;
@@ -66,7 +76,9 @@ import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.search.sort.SortOrder;
 import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.model.QuerySet;
+import org.opensearch.searchrelevance.shared.PluginClient;
 import org.opensearch.test.OpenSearchTestCase;
+import org.opensearch.threadpool.ThreadPool;
 import org.opensearch.transport.client.AdminClient;
 import org.opensearch.transport.client.Client;
 import org.opensearch.transport.client.IndicesAdminClient;
@@ -986,56 +998,89 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         assertTrue(exceptionCaptor.getValue().getMessage().contains("Index cannot be null"));
     }
 
-    public void testDeleteByQueryRunsInPluginContextOnlyOnSystemIndices() {
+    public void testDeleteByQueryRunsAsThePluginSubjectOnlyOnSystemIndices() {
         assertTrue(SCHEDULED_EXPERIMENT_HISTORY.isSystemIndex());
         assertFalse(EVALUATION_RESULT.isSystemIndex());
         assertFalse(EXPERIMENT_VARIANT.isSystemIndex());
         for (SearchRelevanceIndices index : SearchRelevanceIndices.values()) {
-            String expected = index.isSystemIndex() ? null : "caller";
-            assertEquals(index.getIndexName(), expected, callerHeaderSeenByDeleteByQuery(index));
+            Client caller = mock(Client.class);
+            Client plugin = mock(Client.class);
+            SearchRelevanceIndicesManager manager = new SearchRelevanceIndicesManager(clusterService, caller, plugin);
+            @SuppressWarnings("unchecked")
+            ActionListener<BulkByScrollResponse> listener = mock(ActionListener.class);
+
+            manager.deleteByQuery("experiment-id", "experimentId", index, listener);
+
+            Client expected = index.isSystemIndex() ? plugin : caller;
+            ArgumentCaptor<DeleteByQueryRequest> request = ArgumentCaptor.forClass(DeleteByQueryRequest.class);
+            verify(expected).execute(eq(DeleteByQueryAction.INSTANCE), request.capture(), same(listener));
+            assertArrayEquals(index.getIndexName(), new String[] { index.getIndexName() }, request.getValue().indices());
+            assertEquals(QueryBuilders.termQuery("experimentId", "experiment-id"), request.getValue().getSearchRequest().source().query());
+            verifyNoInteractions(index.isSystemIndex() ? caller : plugin);
         }
     }
 
-    /**
-     * Runs a delete by query on the index from a context that carries a caller header.
-     *
-     * @param index the index to delete from
-     * @return the caller header as the client saw it, or null when the context was stashed
-     */
-    private String callerHeaderSeenByDeleteByQuery(SearchRelevanceIndices index) {
-        AtomicReference<String> seenHeader = new AtomicReference<>();
-        AtomicReference<DeleteByQueryRequest> seenRequest = new AtomicReference<>();
+    public void testDeleteByQueryOnSystemIndexRunsOutsideTheCallerContextAndAnswersInIt() throws Exception {
+        ThreadContext threadContext = new ThreadContext(Settings.EMPTY);
+        ThreadPool threadPool = mock(ThreadPool.class);
+        when(threadPool.getThreadContext()).thenReturn(threadContext);
+        Client nodeClient = mock(Client.class);
+        when(nodeClient.settings()).thenReturn(Settings.EMPTY);
+        when(nodeClient.threadPool()).thenReturn(threadPool);
+        AtomicReference<String> callerSeenByDelete = new AtomicReference<>("not called");
         AtomicReference<ActionListener<BulkByScrollResponse>> sentListener = new AtomicReference<>();
         doAnswer(invocation -> {
-            seenHeader.set(threadContext.getHeader("caller"));
-            seenRequest.set(invocation.getArgument(1));
+            callerSeenByDelete.set(threadContext.getHeader("caller"));
             sentListener.set(invocation.getArgument(2));
             return null;
-        }).when(client).execute(eq(DeleteByQueryAction.INSTANCE), any(DeleteByQueryRequest.class), any());
+        }).when(nodeClient).execute(eq(DeleteByQueryAction.INSTANCE), any(DeleteByQueryRequest.class), any());
+        PluginClient plugin = new PluginClient(nodeClient);
+        plugin.setSubject(new StashingSubject(threadContext));
+        SearchRelevanceIndicesManager manager = new SearchRelevanceIndicesManager(clusterService, client, plugin);
 
-        AtomicReference<String> headerInListener = new AtomicReference<>();
+        CompletableFuture<String> callerSeenByListener = new CompletableFuture<>();
         ActionListener<BulkByScrollResponse> listener = ActionListener.wrap(
-            response -> headerInListener.set(threadContext.getHeader("caller")),
-            e -> fail(e.getMessage())
+            response -> callerSeenByListener.complete(threadContext.getHeader("caller")),
+            callerSeenByListener::completeExceptionally
         );
         try (ThreadContext.StoredContext ignored = threadContext.stashContext()) {
             threadContext.putHeader("caller", "caller");
-            indicesManager.deleteByQuery("experiment-id", "experimentId", index, listener);
+            manager.deleteByQuery("experiment-id", "experimentId", SCHEDULED_EXPERIMENT_HISTORY, listener);
+            assertEquals("the caller's context is back after the call", "caller", threadContext.getHeader("caller"));
+        }
+        assertNotNull("the delete was sent to the node client", sentListener.get());
+        assertNull("the delete must not run in the caller's context", callerSeenByDelete.get());
 
-            assertNotNull("delete by query was not sent", seenRequest.get());
-            assertArrayEquals(new String[] { index.getIndexName() }, seenRequest.get().indices());
-            assertEquals("the caller's context is restored afterwards", "caller", threadContext.getHeader("caller"));
+        // Answer from a thread whose context does not carry the caller header, as a responding thread would.
+        ExecutorService responder = Executors.newSingleThreadExecutor();
+        try {
+            responder.execute(() -> sentListener.get().onResponse(mock(BulkByScrollResponse.class)));
+            assertEquals("the listener runs in the caller's context", "caller", callerSeenByListener.get(10, TimeUnit.SECONDS));
+        } finally {
+            responder.shutdownNow();
+            responder.awaitTermination(10, TimeUnit.SECONDS);
         }
-        if (index.isSystemIndex()) {
-            // Complete the request from a context without the caller header, as a responding thread would.
-            try (ThreadContext.StoredContext ignored = threadContext.stashContext()) {
-                sentListener.get().onResponse(mock(BulkByScrollResponse.class));
-                assertEquals(index.getIndexName() + ": listener runs in the caller's context", "caller", headerInListener.get());
-            }
-        } else {
-            assertSame("the caller's listener is passed through unchanged", listener, sentListener.get());
-        }
-        return seenHeader.get();
     }
 
+    /** Stands in for the plugin subject, stashing and restoring the context around its body as the real subjects do. */
+    private static final class StashingSubject implements PluginSubject {
+
+        private final ThreadContext threadContext;
+
+        StashingSubject(ThreadContext threadContext) {
+            this.threadContext = threadContext;
+        }
+
+        @Override
+        public Principal getPrincipal() {
+            return () -> "plugin:test";
+        }
+
+        @Override
+        public <E extends Exception> void runAs(CheckedRunnable<E> runnable) throws E {
+            try (ThreadContext.StoredContext ignored = threadContext.stashContext()) {
+                runnable.run();
+            }
+        }
+    }
 }

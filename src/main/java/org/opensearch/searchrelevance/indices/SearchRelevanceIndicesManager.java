@@ -34,7 +34,6 @@ import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.search.SearchRequest;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.search.ShardSearchFailure;
-import org.opensearch.action.support.ContextPreservingActionListener;
 import org.opensearch.action.support.WriteRequest;
 import org.opensearch.action.update.UpdateRequest;
 import org.opensearch.action.update.UpdateResponse;
@@ -721,12 +720,12 @@ public class SearchRelevanceIndicesManager {
     }
 
     /**
-     * Deletes the documents whose field equals the given value. On a system index the request runs in the
-     * plugin's context, because the caller has no direct write access there; elsewhere it runs as the caller.
-     * @param fieldId - field id need to be deleted
-     * @param fieldName - field name need to be deleted
-     * @param index - index on which delete operation has to be performed
-     * @param listener - action listener for async action
+     * Deletes the documents whose field equals the given value. On a system index the request runs as the
+     * plugin subject, because the caller has no direct write access there; elsewhere it runs as the caller.
+     * @param fieldId the value the field must equal
+     * @param fieldName the field to match
+     * @param index the index to delete from
+     * @param listener notified with the delete by query result
      */
     public void deleteByQuery(
         final String fieldId,
@@ -739,16 +738,8 @@ public class SearchRelevanceIndicesManager {
         deleteByQueryRequest.setBatchSize(BATCH_SIZE_FOR_DELETE_BY_QUERY);
         deleteByQueryRequest.setQuery(QueryBuilders.termQuery(fieldName, fieldId));
 
-        if (index.isSystemIndex()) {
-            // The listener gets the caller's context back rather than the stashed one.
-            ActionListener<BulkByScrollResponse> callerListener = ContextPreservingActionListener.wrapPreservingContext(
-                listener,
-                client.threadPool().getThreadContext()
-            );
-            StashedThreadContext.run(client, () -> client.execute(DeleteByQueryAction.INSTANCE, deleteByQueryRequest, callerListener));
-        } else {
-            client.execute(DeleteByQueryAction.INSTANCE, deleteByQueryRequest, listener);
-        }
+        Client deleteClient = index.isSystemIndex() ? pluginClient : client;
+        deleteClient.execute(DeleteByQueryAction.INSTANCE, deleteByQueryRequest, listener);
     }
 
     /**
