@@ -2,9 +2,9 @@
 # system indices it registers through getSystemIndexDescriptors.
 #
 # The indices listed here are deliberately not system indices: users are expected to be able to read
-# query sets, judgments and evaluation results directly, and the scheduled job index is also read by
-# job-scheduler. The plugin subject therefore needs them granted explicitly, since it would otherwise
-# hold no privileges on them at all.
+# query sets, search configurations, judgments, evaluation results and experiment variants directly. The
+# plugin subject therefore needs them granted explicitly, since it would otherwise hold no privileges on
+# them at all.
 #
 # Index, update and delete requests run on the shard as indices:data/write/bulk[s], which is checked
 # against these indices in addition to the per-item action, so it is granted alongside them. Only
@@ -21,8 +21,6 @@ index_permissions:
       - "search-relevance-judgment"
       - "search-relevance-evaluation-result"
       - "search-relevance-experiment-variant"
-      - ".search-relevance-scheduled-experiment-jobs"
-      - ".search-relevance-scheduled-experiment-history"
     allowed_actions:
       - "indices:admin/create"
       - "indices:admin/mapping/put"

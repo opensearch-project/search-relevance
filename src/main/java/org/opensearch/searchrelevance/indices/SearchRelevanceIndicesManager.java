@@ -720,11 +720,12 @@ public class SearchRelevanceIndicesManager {
     }
 
     /**
-     * Delete by query
-     * @param fieldId - field id need to be deleted
-     * @param fieldName - field name need to be deleted
-     * @param index - index on which delete operation has to be performed
-     * @param listener - action listener for async action
+     * Deletes the documents whose field equals the given value. On a system index the request runs as the
+     * plugin subject, because the caller has no direct write access there; elsewhere it runs as the caller.
+     * @param fieldId the value the field must equal
+     * @param fieldName the field to match
+     * @param index the index to delete from
+     * @param listener notified with the delete by query result
      */
     public void deleteByQuery(
         final String fieldId,
@@ -737,7 +738,8 @@ public class SearchRelevanceIndicesManager {
         deleteByQueryRequest.setBatchSize(BATCH_SIZE_FOR_DELETE_BY_QUERY);
         deleteByQueryRequest.setQuery(QueryBuilders.termQuery(fieldName, fieldId));
 
-        client.execute(DeleteByQueryAction.INSTANCE, deleteByQueryRequest, listener);
+        Client deleteClient = index.isSystemIndex() ? pluginClient : client;
+        deleteClient.execute(DeleteByQueryAction.INSTANCE, deleteByQueryRequest, listener);
     }
 
     /**

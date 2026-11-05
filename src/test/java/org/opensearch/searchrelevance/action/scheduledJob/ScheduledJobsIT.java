@@ -18,6 +18,7 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.hc.core5.http.message.BasicHeader;
@@ -69,10 +70,11 @@ public class ScheduledJobsIT extends BaseExperimentIT {
 
         // Read the experiment that should be updated after putting the schedule.
         String getSingleExperimentByIdUrl = String.join("/", EXPERIMENT_INDEX, "_doc", experimentId);
-        // Read the scheduled experiment that was created
+        // Read the scheduled experiment that was created. The jobs index is a system index, so direct reads use the
+        // admin certificate client; for other users a get there is not realtime and misses an unrefreshed job.
         String getScheduledExperimentByIdUrl = String.join("/", SCHEDULED_JOBS_INDEX, "_doc", scheduledExperimentId);
         Response getScheduledExperimentResponse = makeRequest(
-            client(),
+            adminClient(),
             RestRequest.Method.GET.name(),
             getScheduledExperimentByIdUrl,
             null,
@@ -96,7 +98,7 @@ public class ScheduledJobsIT extends BaseExperimentIT {
             Response getScheduledExperimentJobRunResponse;
             try {
                 getScheduledExperimentJobRunResponse = makeRequest(
-                    client(),
+                    adminClient(),
                     RestRequest.Method.GET.name(),
                     getScheduledExperimentJobRunByIdUrl,
                     null,
@@ -119,12 +121,13 @@ public class ScheduledJobsIT extends BaseExperimentIT {
 
         String getScheduledExperimentResultsUrl = String.join("/", SCHEDULED_EXPERIMENT_HISTORY_INDEX, "_search");
 
-        // Wait until the scheduled experiment result completes.
+        // Wait until the scheduled experiment result completes. The history index is a system index too, so the
+        // search uses the admin certificate client; for other users it returns no hits.
         assertBusyWithFixedSleepTime(() -> {
             Response getScheduledExperimentResultsResponse;
             try {
                 getScheduledExperimentResultsResponse = makeRequest(
-                    client(),
+                    adminClient(),
                     RestRequest.Method.POST.name(),
                     getScheduledExperimentResultsUrl,
                     null,
@@ -161,10 +164,12 @@ public class ScheduledJobsIT extends BaseExperimentIT {
             assertEquals(results.size(), resultsMap.size());
         }, TimeValue.timeValueMillis(SCHEDULED_RESULT_COMPLETION_MS), TimeValue.timeValueMillis(SCHEDULED_RESULT_POLL_INTERVAL_MS));
 
+        // The jobs index is a system index, so the job is deleted through the plugin's API rather than the index.
+        String deleteScheduledExperimentUrl = String.join("/", SCHEDULED_EXPERIMENT_URL, scheduledExperimentId);
         Response deleteScheduledExperimentResponse = makeRequest(
             client(),
             RestRequest.Method.DELETE.name(),
-            getScheduledExperimentByIdUrl,
+            deleteScheduledExperimentUrl,
             null,
             null,
             ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
@@ -173,10 +178,10 @@ public class ScheduledJobsIT extends BaseExperimentIT {
         assertNotNull(deleteScheduledExperimentResultJson);
         assertEquals("deleted", deleteScheduledExperimentResultJson.get("result").toString());
 
-        expectThrows(
+        ResponseException deletedJobException = expectThrows(
             ResponseException.class,
             () -> makeRequest(
-                client(),
+                adminClient(),
                 RestRequest.Method.GET.name(),
                 getScheduledExperimentByIdUrl,
                 null,
@@ -184,6 +189,45 @@ public class ScheduledJobsIT extends BaseExperimentIT {
                 ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
             )
         );
+        assertEquals(404, deletedJobException.getResponse().getStatusLine().getStatusCode());
+
+        // Deleting the experiment removes its run history with a delete by query on the history system index. A run
+        // that started before the job was deleted can still write history, so wait for every run to finish first.
+        assertBusyWithFixedSleepTime(() -> {
+            List<Object> statuses = historyStatusesOfExperiment();
+            assertFalse("the experiment has run history before it is deleted", statuses.isEmpty());
+            assertFalse("no run of the deleted job is still in progress", statuses.contains("PROCESSING"));
+        }, TimeValue.timeValueMillis(CRON_JOB_COMPLETION_MS), TimeValue.timeValueMillis(SCHEDULED_RESULT_POLL_INTERVAL_MS));
+        Response deleteExperimentResponse = makeRequest(
+            client(),
+            RestRequest.Method.DELETE.name(),
+            String.join("/", EXPERIMENTS_URI, experimentId),
+            null,
+            null,
+            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
+        );
+        assertEquals("deleted", entityAsMap(deleteExperimentResponse).get("result").toString());
+        assertBusyWithFixedSleepTime(
+            () -> assertEquals("the run history of a deleted experiment is removed", List.of(), historyStatusesOfExperiment()),
+            TimeValue.timeValueMillis(SCHEDULED_RESULT_COMPLETION_MS),
+            TimeValue.timeValueMillis(SCHEDULED_RESULT_POLL_INTERVAL_MS)
+        );
+    }
+
+    /** Returns the status of each history document of this test's experiment, read with the admin certificate client. */
+    @SneakyThrows
+    private List<Object> historyStatusesOfExperiment() {
+        String query = "{\"size\": 100, \"query\": {\"term\": {\"experimentId\": \"" + experimentId + "\"}}}";
+        Response response = makeRequest(
+            adminClient(),
+            RestRequest.Method.POST.name(),
+            String.join("/", SCHEDULED_EXPERIMENT_HISTORY_INDEX, "_search"),
+            null,
+            toHttpEntity(query),
+            ImmutableList.of(new BasicHeader(HttpHeaders.USER_AGENT, DEFAULT_USER_AGENT))
+        );
+        List<?> hits = (List<?>) ((Map<?, ?>) entityAsMap(response).get("hits")).get("hits");
+        return hits.stream().map(hit -> ((Map<?, ?>) ((Map<?, ?>) hit).get("_source")).get("status")).collect(Collectors.toList());
     }
 
     @SneakyThrows
