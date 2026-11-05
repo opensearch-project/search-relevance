@@ -66,6 +66,9 @@ public class HybridOptimizerExperimentIT extends BaseExperimentIT {
             assertNotNull("Experiment should exist", experimentSource);
             assertEquals("HYBRID_OPTIMIZER", experimentSource.get("type"));
             assertEquals(querySetId, experimentSource.get("querySetId"));
+            if ("COMPLETED".equals(experimentSource.get("status"))) {
+                assertExperimentLevelMetricsPresent(experimentSource);
+            }
 
             assertExperimentResults(experimentId);
             int countOfExperimentVariantBeforeDeletion = findExperimentResultCount(EXPERIMENT_VARIANT_INDEX, experimentId);

@@ -92,7 +92,7 @@ public class SearchResponseProcessor {
             evaluationResultDao.putEvaluationResultEfficient(
                 evaluationResult,
                 ActionListener.wrap(
-                    success -> updateExperimentVariant(experimentVariant, experimentId, searchConfigId, evaluationId, taskContext),
+                    success -> updateExperimentVariant(experimentVariant, experimentId, searchConfigId, evaluationId, metrics, taskContext),
                     error -> handleTaskFailure(experimentVariant, error, taskContext)
                 )
             );
@@ -139,6 +139,7 @@ public class SearchResponseProcessor {
         String experimentId,
         String searchConfigId,
         String evaluationId,
+        List<Map<String, Object>> metrics,
         ExperimentTaskContext taskContext
     ) {
         // Create variant directly with COMPLETED status
@@ -152,7 +153,7 @@ public class SearchResponseProcessor {
             Map.of("evaluationResultId", evaluationId)
         );
 
-        taskContext.scheduleVariantWrite(completedVariant, evaluationId, true);
+        taskContext.scheduleVariantWrite(completedVariant, evaluationId, metrics, true);
 
         log.debug("Scheduled write for completed experiment variant: {}", experimentVariant.getId());
         taskContext.completeVariantSuccess();

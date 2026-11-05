@@ -44,6 +44,20 @@ public class ExperimentDocumentParserTests extends OpenSearchTestCase {
         assertEquals(25, e.size());
     }
 
+    public void testParsesExperimentLevelMetrics() {
+        Map<String, Object> source = baseSource();
+        source.put(Experiment.METRICS, List.of(Map.of("metric", "jaccard", "value", 0.55)));
+        Experiment e = ExperimentDocumentParser.fromSourceMap(source);
+        assertNotNull(e.metrics());
+        assertEquals(1, e.metrics().size());
+        assertEquals("jaccard", e.metrics().get(0).get("metric"));
+    }
+
+    public void testParsesLegacyDocumentWithoutMetrics() {
+        Experiment e = ExperimentDocumentParser.fromSourceMap(baseSource());
+        assertNull(e.metrics());
+    }
+
     private static Map<String, Object> baseSource() {
         Map<String, Object> source = new HashMap<>();
         source.put(Experiment.ID, "e1");

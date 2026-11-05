@@ -59,6 +59,7 @@ public class PairwiseComparisonExperimentIT extends BaseExperimentIT {
 
         Map<String, Object> source = (Map<String, Object>) hits.get(0).get("_source");
         assertEquals("PAIRWISE_COMPARISON", source.get("type"));
+        assertExperimentLevelMetricsPresent(source);
         List<Map<String, Object>> results = (List<Map<String, Object>>) source.get("results");
         assertNotNull(results);
         assertFalse(results.isEmpty());

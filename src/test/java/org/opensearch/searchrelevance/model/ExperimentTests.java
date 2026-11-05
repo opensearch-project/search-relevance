@@ -10,6 +10,7 @@ package org.opensearch.searchrelevance.model;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.opensearch.common.xcontent.XContentFactory;
 import org.opensearch.core.xcontent.ToXContent;
@@ -174,5 +175,74 @@ public class ExperimentTests extends OpenSearchTestCase {
         assertEquals("isScheduled", Experiment.IS_SCHEDULED);
         assertEquals("scheduledExperimentJobId", Experiment.SCHEDULED_EXPERIMENT_JOB_ID);
         assertEquals("results", Experiment.RESULTS);
+        assertEquals("metrics", Experiment.METRICS);
+    }
+
+    public void testToXContentWritesMetricsWhenPresent() throws IOException {
+        List<Map<String, Object>> metrics = List.of(Map.of("metric", "jaccard", "value", 0.6));
+        Experiment experiment = new Experiment(
+            "test-id",
+            "2024-01-01T00:00:00Z",
+            "n",
+            "d",
+            ExperimentType.PAIRWISE_COMPARISON,
+            AsyncStatus.COMPLETED,
+            "queryset-id",
+            List.of("c1"),
+            List.of("j1"),
+            10,
+            new ArrayList<>(),
+            null,
+            metrics
+        );
+
+        XContentBuilder builder = XContentFactory.jsonBuilder();
+        experiment.toXContent(builder, ToXContent.EMPTY_PARAMS);
+        String json = builder.toString();
+        assertTrue(json.contains("\"metrics\""));
+        assertTrue(json.contains("\"jaccard\""));
+    }
+
+    public void testToXContentOmitsMetricsWhenNull() throws IOException {
+        Experiment experiment = new Experiment(
+            "test-id",
+            "2024-01-01T00:00:00Z",
+            null,
+            null,
+            ExperimentType.PAIRWISE_COMPARISON,
+            AsyncStatus.COMPLETED,
+            "queryset-id",
+            List.of("c1"),
+            List.of("j1"),
+            10,
+            new ArrayList<>()
+        );
+
+        XContentBuilder builder = XContentFactory.jsonBuilder();
+        experiment.toXContent(builder, ToXContent.EMPTY_PARAMS);
+        String json = builder.toString();
+        assertFalse(json.contains("\"metrics\""));
+    }
+
+    public void testCopyConstructorPreservesMetrics() {
+        List<Map<String, Object>> metrics = List.of(Map.of("metric", "DCG@10", "value", 3.5));
+        Experiment original = new Experiment(
+            "test-id",
+            "2024-01-01T00:00:00Z",
+            "Original Name",
+            "Original Description",
+            ExperimentType.POINTWISE_EVALUATION,
+            AsyncStatus.COMPLETED,
+            "queryset-id",
+            List.of("config1"),
+            List.of("judgment1"),
+            10,
+            new ArrayList<>(),
+            null,
+            metrics
+        );
+
+        Experiment copy = new Experiment(original, true, "scheduled-job-id");
+        assertEquals(original.metrics(), copy.metrics());
     }
 }

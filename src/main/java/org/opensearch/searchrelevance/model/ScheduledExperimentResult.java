@@ -25,12 +25,24 @@ public class ScheduledExperimentResult implements ToXContentObject {
     public static final String TIMESTAMP_FIELD = "timestamp";
     public static final String STATUS = "status";
     public static final String RESULTS_FIELD = "results";
+    public static final String METRICS_FIELD = "metrics";
 
     private final String id;
     private final String experimentId;
     private final String timestamp;
     private final AsyncStatus status;
     private final List<Map<String, Object>> results;
+    private final List<Map<String, Object>> metrics;
+
+    public ScheduledExperimentResult(
+        String id,
+        String experimentId,
+        String timestamp,
+        AsyncStatus status,
+        List<Map<String, Object>> results
+    ) {
+        this(id, experimentId, timestamp, status, results, null);
+    }
 
     @Override
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
@@ -40,6 +52,9 @@ public class ScheduledExperimentResult implements ToXContentObject {
             .field(TIMESTAMP_FIELD, this.timestamp)
             .field(STATUS, this.status.name())
             .field(RESULTS_FIELD, this.results);
+        if (this.metrics != null) {
+            builder.field(METRICS_FIELD, this.metrics);
+        }
         builder.endObject();
         return builder;
     }

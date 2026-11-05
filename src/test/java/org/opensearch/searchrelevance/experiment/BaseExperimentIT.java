@@ -400,6 +400,20 @@ public abstract class BaseExperimentIT extends BaseSearchRelevanceIT {
         assertEquals(querySetId, source.get("querySetId"));
     }
 
+    protected void assertExperimentLevelMetricsPresent(Map<String, Object> source) {
+        Object metricsObj = source.get("metrics");
+        assertNotNull("Completed experiments should persist experiment-level metrics", metricsObj);
+        assertTrue("metrics should be a list", metricsObj instanceof List);
+        List<?> metrics = (List<?>) metricsObj;
+        assertFalse("experiment-level metrics should not be empty for a successful run", metrics.isEmpty());
+        for (Object metric : metrics) {
+            assertTrue(metric instanceof Map);
+            Map<?, ?> metricMap = (Map<?, ?>) metric;
+            assertNotNull(metricMap.get("metric"));
+            assertNotNull(metricMap.get("value"));
+        }
+    }
+
     /**
      * Returns the assertion tolerance for a given metric. Position-sensitive metrics
      * (DCG, MRR) use a wider tolerance because BM25 per-shard IDF variation in

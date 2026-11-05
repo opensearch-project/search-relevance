@@ -1,0 +1,12 @@
+{
+  "id": "test-experiment-bwc",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "type": "PAIRWISE_COMPARISON",
+  "status": "COMPLETED",
+  "querySetId": "legacy-queryset",
+  "searchConfigurationList": ["c1", "c2"],
+  "judgmentList": [],
+  "size": "10",
+  "isScheduled": "false",
+  "results": []
+}

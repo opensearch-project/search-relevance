@@ -37,6 +37,7 @@ public class Experiment implements ToXContentObject {
     public static final String IS_SCHEDULED = "isScheduled";
     public static final String SCHEDULED_EXPERIMENT_JOB_ID = "scheduledExperimentJobId";
     public static final String RESULTS = "results";
+    public static final String METRICS = "metrics";
     private static final int DEFAULTED_SIZE = 10;
 
     /**
@@ -56,6 +57,7 @@ public class Experiment implements ToXContentObject {
     private final String scheduledExperimentJobId;
     private final List<Map<String, Object>> results;
     private final ExperimentInputSignature inputSignature;
+    private final List<Map<String, Object>> metrics;
 
     public Experiment(
         String id,
@@ -70,7 +72,7 @@ public class Experiment implements ToXContentObject {
         int size,
         List<Map<String, Object>> results
     ) {
-        this(id, timestamp, name, description, type, status, querySetId, searchConfigurationList, judgmentList, size, results, null);
+        this(id, timestamp, name, description, type, status, querySetId, searchConfigurationList, judgmentList, size, results, null, null);
     }
 
     public Experiment(
@@ -87,6 +89,38 @@ public class Experiment implements ToXContentObject {
         List<Map<String, Object>> results,
         ExperimentInputSignature inputSignature
     ) {
+        this(
+            id,
+            timestamp,
+            name,
+            description,
+            type,
+            status,
+            querySetId,
+            searchConfigurationList,
+            judgmentList,
+            size,
+            results,
+            inputSignature,
+            null
+        );
+    }
+
+    public Experiment(
+        String id,
+        String timestamp,
+        String name,
+        String description,
+        ExperimentType type,
+        AsyncStatus status,
+        String querySetId,
+        List<String> searchConfigurationList,
+        List<String> judgmentList,
+        int size,
+        List<Map<String, Object>> results,
+        ExperimentInputSignature inputSignature,
+        List<Map<String, Object>> metrics
+    ) {
         this.id = Objects.requireNonNull(id, "Experiment ID cannot be null");
         this.timestamp = Objects.requireNonNull(timestamp, "Timestamp cannot be null");
         this.name = name; // Optional field, can be null
@@ -101,6 +135,7 @@ public class Experiment implements ToXContentObject {
         this.scheduledExperimentJobId = null;
         this.results = results;
         this.inputSignature = inputSignature;
+        this.metrics = metrics;
     }
 
     public Experiment(Experiment previousExperiment, boolean isScheduled, String scheduledExperimentJobId) {
@@ -119,6 +154,7 @@ public class Experiment implements ToXContentObject {
         this.scheduledExperimentJobId = scheduledExperimentJobId;
         this.results = previousExperiment.results();
         this.inputSignature = previousExperiment.inputSignature();
+        this.metrics = previousExperiment.metrics();
     }
 
     @Override
@@ -144,6 +180,9 @@ public class Experiment implements ToXContentObject {
         xContentBuilder.field(IS_SCHEDULED, isScheduled);
         xContentBuilder.field(SCHEDULED_EXPERIMENT_JOB_ID, scheduledExperimentJobId);
         xContentBuilder.field(RESULTS, this.results);
+        if (this.metrics != null) {
+            xContentBuilder.field(METRICS, this.metrics);
+        }
         if (this.inputSignature != null) {
             xContentBuilder.startObject(ExperimentInputSignature.FIELD);
             xContentBuilder.field(ExperimentInputSignature.QUERY_SET, this.inputSignature.querySetSha256());
@@ -211,6 +250,10 @@ public class Experiment implements ToXContentObject {
      */
     public ExperimentInputSignature inputSignature() {
         return inputSignature;
+    }
+
+    public List<Map<String, Object>> metrics() {
+        return metrics;
     }
 
 }

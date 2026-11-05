@@ -44,6 +44,17 @@ public final class ExperimentDocumentParser {
             signature = ExperimentInputSignature.fromStoredMap((Map<String, ?>) sigMap);
         }
 
+        List<Map<String, Object>> metrics = null;
+        Object metricsObj = source.get(Experiment.METRICS);
+        if (metricsObj instanceof List<?> metricsList) {
+            metrics = new ArrayList<>();
+            for (Object o : metricsList) {
+                if (o instanceof Map<?, ?> m) {
+                    metrics.add((Map<String, Object>) m);
+                }
+            }
+        }
+
         String timestamp = timestampOverride != null ? timestampOverride : stringOrEmpty(source.get(Experiment.TIME_STAMP));
 
         return new Experiment(
@@ -58,7 +69,8 @@ public final class ExperimentDocumentParser {
             stringList(source.get(Experiment.JUDGMENT_LIST)),
             parseSize(source.get(Experiment.SIZE)),
             results,
-            signature
+            signature,
+            metrics
         );
     }
 
