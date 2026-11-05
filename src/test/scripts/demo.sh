@@ -3,11 +3,11 @@
 # This script quickly sets up a local Search Relevance Workbench from scratch with:
 # * User Behavior Insights sample data
 # * An "ecommerce" style sample data
-# You can now exercise the Single Query comparison, Query Set Comparison and Search Evaluation experiments of SRW!  
-# 
-# This assumes you started OpenSearch from the root via 
+# You can now exercise the Single Query comparison, Query Set Comparison and Search Evaluation experiments of SRW!
+#
+# This assumes you started OpenSearch from the root via
 # ./gradlew run --preserve-data --debug-jvm which faciliates debugging
-# 
+#
 # It will clear out any existing indexes, except ecommerce index if you pass --skip-ecommerce as a parameter.
 #
 # Optional arguments:
@@ -61,7 +61,7 @@ if [ "$SKIP_ECOMMERCE" = false ]; then
   # Index all data directly from zip file
   unzip -p "$ECOMMERCE_ZIP_FILE" | curl -s -o /dev/null -w "%{http_code}" -X POST "$OPENSEARCH_URL/ecommerce/_bulk" \
     -H 'Content-Type: application/x-ndjson' --data-binary @-
-  
+
   echo "All data indexed successfully"
 fi
 
@@ -96,7 +96,7 @@ NUMBER_OF_QUERIES=$(curl -s -XGET "$OPENSEARCH_URL/ubi_queries/_search" \
 NUMBER_OF_EVENTS=$(curl -s -XGET "$OPENSEARCH_URL/ubi_events/_search" \
   -H "Content-Type: application/json" \
   -d "${QUERY_BODY}" | jq -r '.hits.total.value')
-  
+
 echo ""
 echo "Indexed UBI data: $NUMBER_OF_QUERIES queries and $NUMBER_OF_EVENTS events"
 
@@ -227,7 +227,7 @@ exe curl -s -X PUT "$OPENSEARCH_URL/_plugins/_search_relevance/judgments" \
    	"name": "Implicit Judgements",
    	"type": "UBI_JUDGMENT"
   }'
-  
+
 UBI_JUDGMENT_LIST_ID=`jq -r '.judgment_id' < RES`
 
 # wait for judgments to be created in the background
@@ -318,7 +318,7 @@ exe curl -s -X PUT "$OPENSEARCH_URL/_plugins/_search_relevance/experiments" \
    	\"size\": 10,
    	\"type\": \"PAIRWISE_COMPARISON\"
    }"
-   
+
 
 EX_PAIRWISE=`jq -r '.experiment_id' < RES`
 
@@ -364,7 +364,7 @@ exe curl -s -X GET "$OPENSEARCH_URL/_plugins/_search_relevance/experiments" \
      "size": 3
    }'
 
-   
+
 ## BEGIN HYBRID OPTIMIZER DEMO ##
 echo ""
 echo ""

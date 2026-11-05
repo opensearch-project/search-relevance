@@ -56,6 +56,35 @@ public class SearchRelevanceSettings {
     );
 
     /**
+     * Gates the maximum number of per-query result entries allowed in a single imported
+     * experiment (the POINTWISE_EVALUATION evaluationResultList, or the PAIRWISE_COMPARISON
+     * results list). Protects against unbounded resource use when importing externally
+     * computed experiment results. The default value is 1,000.
+     */
+    public static final String SEARCH_RELEVANCE_EXPERIMENT_IMPORT_MAX_QUERIES_KEY =
+        "plugins.search_relevance.experiment_import.max_queries";
+    public static final Setting<Integer> SEARCH_RELEVANCE_EXPERIMENT_IMPORT_MAX_QUERIES = Setting.intSetting(
+        SEARCH_RELEVANCE_EXPERIMENT_IMPORT_MAX_QUERIES_KEY,
+        1000,
+        Setting.Property.NodeScope,
+        Setting.Property.Dynamic
+    );
+
+    /**
+     * Gates the maximum number of individual results (e.g. document IDs) allowed per query
+     * entry in an imported experiment. Protects against a single entry in an imported
+     * experiment carrying an unbounded amount of data. The default value is 1,000.
+     */
+    public static final String SEARCH_RELEVANCE_EXPERIMENT_IMPORT_MAX_RESULTS_PER_QUERY_KEY =
+        "plugins.search_relevance.experiment_import.max_results_per_query";
+    public static final Setting<Integer> SEARCH_RELEVANCE_EXPERIMENT_IMPORT_MAX_RESULTS_PER_QUERY = Setting.intSetting(
+        SEARCH_RELEVANCE_EXPERIMENT_IMPORT_MAX_RESULTS_PER_QUERY_KEY,
+        1000,
+        Setting.Property.NodeScope,
+        Setting.Property.Dynamic
+    );
+
+    /**
      * Enables or disables the scheduled experiment feature. When disabled,
      * Any experiments that were already scheduled will still run, but any
      * updates to the scheduled experiments or any new scheduled experiment requests

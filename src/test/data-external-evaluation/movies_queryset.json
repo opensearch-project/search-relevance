@@ -1,0 +1,12 @@
+{
+  "name": "Movie Search Queries",
+  "description": "Sample movie search queries from the OSC Demo case",
+  "sampling": "manual",
+  "querySetQueries": [
+    { "queryText": "Willis" },
+    { "queryText": "star wars" },
+    { "queryText": "Ice Age" },
+    { "queryText": "Wizard of Oz" },
+    { "queryText": "Titanic" }
+  ]
+}

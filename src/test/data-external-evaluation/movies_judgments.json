@@ -1,0 +1,404 @@
+{
+  "name": "Movie Search Judgments",
+  "description": "Judgments sourced from Quepid Movie Search Case",
+  "type": "IMPORT_JUDGMENT",
+  "judgmentRatings": [
+    {
+      "query": "Willis",
+      "ratings": [
+        {
+          "docId": "1634",
+          "rating": "0"
+        },
+        {
+          "docId": "252",
+          "rating": "0"
+        },
+        {
+          "docId": "338964",
+          "rating": "0"
+        },
+        {
+          "docId": "298",
+          "rating": "0"
+        },
+        {
+          "docId": "53729",
+          "rating": "1"
+        },
+        {
+          "docId": "17908",
+          "rating": "0"
+        },
+        {
+          "docId": "42807",
+          "rating": "0"
+        },
+        {
+          "docId": "3172",
+          "rating": "3"
+        },
+        {
+          "docId": "2026",
+          "rating": "3"
+        },
+        {
+          "docId": "307081",
+          "rating": "0"
+        },
+        {
+          "docId": "18925",
+          "rating": "1"
+        },
+        {
+          "docId": "9760",
+          "rating": "0"
+        },
+        {
+          "docId": "345934",
+          "rating": "3"
+        },
+        {
+          "docId": "474377",
+          "rating": "0"
+        },
+        {
+          "docId": "84305",
+          "rating": "3"
+        },
+        {
+          "docId": "384737",
+          "rating": "3"
+        },
+        {
+          "docId": "13159",
+          "rating": "1"
+        },
+        {
+          "docId": "16553",
+          "rating": "0"
+        },
+        {
+          "docId": "75736",
+          "rating": "3"
+        },
+        {
+          "docId": "2122",
+          "rating": "3"
+        }
+      ]
+    },
+    {
+      "query": "star wars",
+      "ratings": [
+        {
+          "docId": "12180",
+          "rating": "2"
+        },
+        {
+          "docId": "602",
+          "rating": "0"
+        },
+        {
+          "docId": "28029",
+          "rating": "0"
+        },
+        {
+          "docId": "11596",
+          "rating": "0"
+        },
+        {
+          "docId": "455980",
+          "rating": "0"
+        },
+        {
+          "docId": "116741",
+          "rating": "0"
+        },
+        {
+          "docId": "559",
+          "rating": "0"
+        },
+        {
+          "docId": "354287",
+          "rating": "0"
+        },
+        {
+          "docId": "322506",
+          "rating": "1"
+        },
+        {
+          "docId": "181812",
+          "rating": "2"
+        },
+        {
+          "docId": "348350",
+          "rating": "2"
+        },
+        {
+          "docId": "181808",
+          "rating": "2"
+        }
+      ]
+    },
+    {
+      "query": "Ice Age",
+      "ratings": [
+        {
+          "docId": "10436",
+          "rating": "0"
+        },
+        {
+          "docId": "99861",
+          "rating": "3"
+        },
+        {
+          "docId": "91314",
+          "rating": "3"
+        },
+        {
+          "docId": "201132",
+          "rating": "0"
+        },
+        {
+          "docId": "293863",
+          "rating": "3"
+        },
+        {
+          "docId": "425",
+          "rating": "3"
+        },
+        {
+          "docId": "950",
+          "rating": "3"
+        },
+        {
+          "docId": "278154",
+          "rating": "3"
+        },
+        {
+          "docId": "57800",
+          "rating": "3"
+        },
+        {
+          "docId": "8355",
+          "rating": "3"
+        },
+        {
+          "docId": "80585",
+          "rating": "3"
+        },
+        {
+          "docId": "59883",
+          "rating": "3"
+        },
+        {
+          "docId": "17306",
+          "rating": "3"
+        },
+        {
+          "docId": "13374",
+          "rating": "3"
+        },
+        {
+          "docId": "607776",
+          "rating": "0"
+        },
+        {
+          "docId": "71440",
+          "rating": "0"
+        },
+        {
+          "docId": "22004",
+          "rating": "0"
+        },
+        {
+          "docId": "25186",
+          "rating": "0"
+        },
+        {
+          "docId": "13950",
+          "rating": "0"
+        },
+        {
+          "docId": "11637",
+          "rating": "0"
+        },
+        {
+          "docId": "9360",
+          "rating": "0"
+        },
+        {
+          "docId": "10426",
+          "rating": "0"
+        },
+        {
+          "docId": "10611",
+          "rating": "0"
+        },
+        {
+          "docId": "17585",
+          "rating": "0"
+        },
+        {
+          "docId": "75622",
+          "rating": "0"
+        },
+        {
+          "docId": "454458",
+          "rating": "0"
+        }
+      ]
+    },
+    {
+      "query": "Wizard of Oz",
+      "ratings": [
+        {
+          "docId": "15515",
+          "rating": "0"
+        },
+        {
+          "docId": "68728",
+          "rating": "2"
+        },
+        {
+          "docId": "183",
+          "rating": "0"
+        },
+        {
+          "docId": "630",
+          "rating": "3"
+        },
+        {
+          "docId": "16220",
+          "rating": "0"
+        },
+        {
+          "docId": "456375",
+          "rating": "3"
+        },
+        {
+          "docId": "13155",
+          "rating": "2"
+        },
+        {
+          "docId": "59981",
+          "rating": "2"
+        },
+        {
+          "docId": "23506",
+          "rating": "0"
+        },
+        {
+          "docId": "338952",
+          "rating": "0"
+        },
+        {
+          "docId": "259138",
+          "rating": "0"
+        },
+        {
+          "docId": "11013",
+          "rating": "0"
+        },
+        {
+          "docId": "6795",
+          "rating": "0"
+        },
+        {
+          "docId": "331588",
+          "rating": "0"
+        },
+        {
+          "docId": "10208",
+          "rating": "0"
+        },
+        {
+          "docId": "11568",
+          "rating": "0"
+        },
+        {
+          "docId": "10576",
+          "rating": "0"
+        },
+        {
+          "docId": "11639",
+          "rating": "0"
+        },
+        {
+          "docId": "10437",
+          "rating": "0"
+        },
+        {
+          "docId": "8835",
+          "rating": "0"
+        },
+        {
+          "docId": "407451",
+          "rating": "0"
+        },
+        {
+          "docId": "546554",
+          "rating": "0"
+        }
+      ]
+    },
+    {
+      "query": "Titanic",
+      "ratings": [
+        {
+          "docId": "57165",
+          "rating": "0"
+        },
+        {
+          "docId": "597",
+          "rating": "3"
+        },
+        {
+          "docId": "18823",
+          "rating": "0"
+        },
+        {
+          "docId": "7450",
+          "rating": "0"
+        },
+        {
+          "docId": "10637",
+          "rating": "0"
+        },
+        {
+          "docId": "474395",
+          "rating": "0"
+        },
+        {
+          "docId": "10323",
+          "rating": "0"
+        },
+        {
+          "docId": "24575",
+          "rating": "3"
+        },
+        {
+          "docId": "86938",
+          "rating": "1"
+        },
+        {
+          "docId": "16535",
+          "rating": "3"
+        },
+        {
+          "docId": "323676",
+          "rating": "0"
+        },
+        {
+          "docId": "299534",
+          "rating": "0"
+        },
+        {
+          "docId": "24982",
+          "rating": "0"
+        }
+      ]
+    }
+  ]
+}
