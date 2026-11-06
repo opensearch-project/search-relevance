@@ -30,3 +30,4 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ### Refactoring
 * Run search relevance index operations as the plugin subject instead of stashing the thread context ([#612](https://github.com/opensearch-project/search-relevance/pull/612))
+* Stop clearing the thread context in the scheduled experiment job runner, as job-scheduler now runs every job in a clean context ([#TBD](https://github.com/opensearch-project/search-relevance/pull/TBD))
