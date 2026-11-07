@@ -22,8 +22,11 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
+import org.opensearch.common.settings.Settings;
 import org.opensearch.common.unit.TimeValue;
+import org.opensearch.common.util.concurrent.ThreadContext;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.jobscheduler.spi.JobExecutionContext;
 import org.opensearch.jobscheduler.spi.LockModel;
@@ -54,6 +57,7 @@ public class SearchRelevanceJobRunnerTests extends OpenSearchTestCase {
     private SearchRelevanceJobParameters jobParameters;
     private JobExecutionContext jobExecutionContext;
     private LockService lockService;
+    private ThreadContext threadContext;
 
     @Override
     public void setUp() throws Exception {
@@ -104,6 +108,8 @@ public class SearchRelevanceJobRunnerTests extends OpenSearchTestCase {
         // Setup thread pool mocks
         when(threadPool.generic()).thenReturn(immediateExecutor);
         when(threadPool.scheduler()).thenReturn(scheduledExecutor);
+        threadContext = new ThreadContext(Settings.EMPTY);
+        when(threadPool.getThreadContext()).thenReturn(threadContext);
         doAnswer(invocation -> {
             // We do not have to worry about cancellation being scheduled for this general case or timeout.
             return null;
@@ -205,5 +211,39 @@ public class SearchRelevanceJobRunnerTests extends OpenSearchTestCase {
 
         // Verify that the cleanup stage was actually reached.
         verify(manager, times(1)).cleanupResources(any(String.class), any(String.class), any(ExperimentCancellationToken.class));
+    }
+
+    public void testJobRunsWithoutTheThreadContextThatScheduledIt() {
+        // Stands in for the plugin subject's context, which the job inherits when its own document write scheduled it.
+        threadContext.putTransient("scheduler.marker", "set-by-scheduler");
+        AtomicReference<Object> seenByExperiment = new AtomicReference<>("experiment did not run");
+        AtomicReference<Object> seenByCleanup = new AtomicReference<>("cleanup did not run");
+        doAnswer(invocation -> {
+            seenByExperiment.set(threadContext.getTransient("scheduler.marker"));
+            CountDownLatch actuallyFinished = invocation.getArgument(3);
+            actuallyFinished.countDown();
+            return null;
+        }).when(manager)
+            .runScheduledExperiment(
+                any(SearchRelevanceJobParameters.class),
+                any(String.class),
+                any(ExperimentCancellationToken.class),
+                any(CountDownLatch.class)
+            );
+        doAnswer(invocation -> {
+            seenByCleanup.set(threadContext.getTransient("scheduler.marker"));
+            return null;
+        }).when(manager).cleanupResources(any(String.class), any(String.class), any(ExperimentCancellationToken.class));
+        doAnswer(invocation -> {
+            ActionListener<LockModel> actionListener = invocation.getArgument(2);
+            actionListener.onResponse(new LockModel("experiment-run", "DEFAULT_LINE_DOCS_FILE", Instant.now(), 30L, false));
+            return null;
+        }).when(lockService).acquireLock(any(ScheduledJobParameter.class), any(JobExecutionContext.class), any(ActionListener.class));
+
+        searchRelevanceJobRunner.runJob(jobParameters, jobExecutionContext);
+
+        assertNull("the experiment must not run in the scheduling thread's context", seenByExperiment.get());
+        assertNull("the cleanup must not run in the scheduling thread's context", seenByCleanup.get());
+        assertEquals("the scheduling thread's context must come back", "set-by-scheduler", threadContext.getTransient("scheduler.marker"));
     }
 }

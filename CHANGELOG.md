@@ -17,6 +17,7 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ### Infrastructure
 - Attach a normalization search pipeline to the `hybrid_query_1` search configuration in `demo.sh` so evaluations using it no longer produce NDCG values above 1 from repeated unnormalized hybrid hits ([#639](https://github.com/opensearch-project/search-relevance/pull/639))
+- Rescale the ESCI demo judgments (`esci_us_judgments.json`) from 0/1/10/100 to a graded 0–3 scale so DCG@K no longer overflows and demo experiments evaluate every query ([#640](https://github.com/opensearch-project/search-relevance/pull/640))
 - Simplify model-group registration in demo_hybrid_optimizer.sh to use a fixed custom id with idempotent 409 handling, now that ml-commons#5140 is fixed ([#629](https://github.com/opensearch-project/search-relevance/pull/629))
 - Suppress javadoc missing-comment warnings for internal classes ([#628](https://github.com/opensearch-project/search-relevance/pull/628))
 
@@ -30,3 +31,4 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 ### Maintenance
 
 ### Refactoring
+* Run search relevance index operations as the plugin subject instead of stashing the thread context ([#612](https://github.com/opensearch-project/search-relevance/pull/612))
