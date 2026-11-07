@@ -41,42 +41,42 @@ public enum SearchRelevanceIndices {
     /**
      * Query Set Index
      */
-    QUERY_SET(QUERY_SET_INDEX, QUERY_SET_INDEX_MAPPING, false),
+    QUERY_SET(QUERY_SET_INDEX, QUERY_SET_INDEX_MAPPING, false, false),
 
     /**
      * Experiment Index
      */
-    EXPERIMENT(EXPERIMENT_INDEX, EXPERIMENT_INDEX_MAPPING, true),
+    EXPERIMENT(EXPERIMENT_INDEX, EXPERIMENT_INDEX_MAPPING, true, true),
 
     /**
      * Search Configuration Index
      */
-    SEARCH_CONFIGURATION(SEARCH_CONFIGURATION_INDEX, SEARCH_CONFIGURATION_INDEX_MAPPING, false),
+    SEARCH_CONFIGURATION(SEARCH_CONFIGURATION_INDEX, SEARCH_CONFIGURATION_INDEX_MAPPING, false, false),
 
     /**
      * Judgment Index
      */
-    JUDGMENT(JUDGMENT_INDEX, JUDGMENT_INDEX_MAPPING, false),
+    JUDGMENT(JUDGMENT_INDEX, JUDGMENT_INDEX_MAPPING, false, false),
 
     /**
      * Evaluation Result Index
      */
-    EVALUATION_RESULT(EVALUATION_RESULT_INDEX, EVALUATION_RESULT_INDEX_MAPPING, false),
+    EVALUATION_RESULT(EVALUATION_RESULT_INDEX, EVALUATION_RESULT_INDEX_MAPPING, false, false),
 
     /**
      * Experiment Variant Index
      */
-    EXPERIMENT_VARIANT(EXPERIMENT_VARIANT_INDEX, EXPERIMENT_VARIANT_INDEX_MAPPING, false),
+    EXPERIMENT_VARIANT(EXPERIMENT_VARIANT_INDEX, EXPERIMENT_VARIANT_INDEX_MAPPING, false, false),
 
     /**
      * Scheduled Jobs Index
      */
-    SCHEDULED_JOBS(SCHEDULED_JOBS_INDEX, SCHEDULED_JOBS_INDEX_MAPPING, false),
+    SCHEDULED_JOBS(SCHEDULED_JOBS_INDEX, SCHEDULED_JOBS_INDEX_MAPPING, false, true),
 
     /**
      * Scheduled Experiment History Index
      */
-    SCHEDULED_EXPERIMENT_HISTORY(SCHEDULED_EXPERIMENT_HISTORY_INDEX, SCHEDULED_EXPERIMENT_HISTORY_INDEX_MAPPING, false);
+    SCHEDULED_EXPERIMENT_HISTORY(SCHEDULED_EXPERIMENT_HISTORY_INDEX, SCHEDULED_EXPERIMENT_HISTORY_INDEX_MAPPING, false, true);
 
     /**
      * Key for schema_version in the _meta section of index mappings
@@ -86,12 +86,17 @@ public enum SearchRelevanceIndices {
     private final String indexName;
     private final String mapping;
     private final boolean isProtected;
+    /**
+     * Whether the plugin registers this index as a system index.
+     */
+    private final boolean isSystemIndex;
     private final int schemaVersion;
 
-    SearchRelevanceIndices(String indexName, String mappingPath, boolean isProtected) {
+    SearchRelevanceIndices(String indexName, String mappingPath, boolean isProtected, boolean isSystemIndex) {
         this.indexName = Objects.requireNonNull(indexName, "Index name cannot be null.");
         this.mapping = loadMapping(mappingPath);
         this.isProtected = isProtected;
+        this.isSystemIndex = isSystemIndex;
         this.schemaVersion = parseSchemaVersionFromMapping(this.mapping);
     }
 

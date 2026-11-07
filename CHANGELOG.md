@@ -10,6 +10,7 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ### Enhancements
 - Make queryText the default placeholder, deprecate SearchText but preserve fallback, and log deprecation of SearchText. ([#613](https://github.com/opensearch-project/search-relevance/pull/613))
+- Register the scheduled experiment jobs and history indices as system indices. ([#638](https://github.com/opensearch-project/search-relevance/pull/638))
 
 ### Bug Fixes
 * Validate manual judgment rating edits on the server ([#601](https://github.com/opensearch-project/search-relevance/pull/601))
@@ -17,6 +18,8 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ### Infrastructure
 - Add SPDX license header checker and missing headers ([#574](https://github.com/opensearch-project/search-relevance/pull/574))
+- Attach a normalization search pipeline to the `hybrid_query_1` search configuration in `demo.sh` so evaluations using it no longer produce NDCG values above 1 from repeated unnormalized hybrid hits ([#639](https://github.com/opensearch-project/search-relevance/pull/639))
+- Rescale the ESCI demo judgments (`esci_us_judgments.json`) from 0/1/10/100 to a graded 0–3 scale so DCG@K no longer overflows and demo experiments evaluate every query ([#640](https://github.com/opensearch-project/search-relevance/pull/640))
 - Simplify model-group registration in demo_hybrid_optimizer.sh to use a fixed custom id with idempotent 409 handling, now that ml-commons#5140 is fixed ([#629](https://github.com/opensearch-project/search-relevance/pull/629))
 - Suppress javadoc missing-comment warnings for internal classes ([#628](https://github.com/opensearch-project/search-relevance/pull/628))
 
@@ -31,3 +34,4 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ### Refactoring
 * Run search relevance index operations as the plugin subject instead of stashing the thread context ([#612](https://github.com/opensearch-project/search-relevance/pull/612))
+* Stop clearing the thread context in the scheduled experiment job runner, as job-scheduler now runs every job in a clean context ([#643](https://github.com/opensearch-project/search-relevance/pull/643))
