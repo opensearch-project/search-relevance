@@ -7,10 +7,16 @@
  */
 package org.opensearch.searchrelevance.plugin;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_CACHE_INDEX;
+import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_EXPERIMENT_HISTORY_INDEX;
+import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_JOBS_INDEX;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_JUDGMENT_IMPORT_MAX_QUERIES;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_JUDGMENT_IMPORT_MAX_RATINGS_PER_QUERY;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT;
@@ -31,22 +37,30 @@ import java.util.function.Supplier;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.opensearch.action.ActionRequest;
+import org.opensearch.action.ActionType;
+import org.opensearch.cluster.ClusterState;
 import org.opensearch.cluster.metadata.IndexNameExpressionResolver;
+import org.opensearch.cluster.metadata.Metadata;
 import org.opensearch.cluster.service.ClusterService;
+import org.opensearch.common.CheckedRunnable;
 import org.opensearch.common.settings.ClusterSettings;
 import org.opensearch.common.settings.Setting;
 import org.opensearch.common.settings.Settings;
 import org.opensearch.common.unit.TimeValue;
+import org.opensearch.common.util.concurrent.ThreadContext;
+import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.action.ActionResponse;
 import org.opensearch.core.common.io.stream.NamedWriteableRegistry;
 import org.opensearch.core.xcontent.NamedXContentRegistry;
 import org.opensearch.env.Environment;
 import org.opensearch.env.NodeEnvironment;
+import org.opensearch.identity.PluginSubject;
 import org.opensearch.indices.SystemIndexDescriptor;
 import org.opensearch.plugins.ActionPlugin;
 import org.opensearch.plugins.SystemIndexPlugin;
 import org.opensearch.repositories.RepositoriesService;
 import org.opensearch.script.ScriptService;
+import org.opensearch.search.builder.SearchSourceBuilder;
 import org.opensearch.searchrelevance.dao.EvaluationResultDao;
 import org.opensearch.searchrelevance.dao.ExperimentDao;
 import org.opensearch.searchrelevance.dao.ExperimentVariantDao;
@@ -57,6 +71,7 @@ import org.opensearch.searchrelevance.dao.ScheduledJobsDao;
 import org.opensearch.searchrelevance.dao.SearchConfigurationDao;
 import org.opensearch.searchrelevance.executors.ExperimentRunningManager;
 import org.opensearch.searchrelevance.executors.ExperimentTaskManager;
+import org.opensearch.searchrelevance.indices.SearchRelevanceIndices;
 import org.opensearch.searchrelevance.indices.SearchRelevanceIndicesManager;
 import org.opensearch.searchrelevance.metrics.MetricsHelper;
 import org.opensearch.searchrelevance.ml.MLAccessor;
@@ -105,7 +120,12 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
     private NodeEnvironment nodeEnvironment;
     private SearchRelevancePlugin plugin;
 
-    public static final Set<String> SUPPORTED_SYSTEM_INDEX_PATTERN = Set.of(EXPERIMENT_INDEX, JUDGMENT_CACHE_INDEX);
+    public static final Set<String> SUPPORTED_SYSTEM_INDEX_PATTERN = Set.of(
+        EXPERIMENT_INDEX,
+        JUDGMENT_CACHE_INDEX,
+        SCHEDULED_JOBS_INDEX,
+        SCHEDULED_EXPERIMENT_HISTORY_INDEX
+    );
 
     private final Set<Class> SUPPORTED_COMPONENTS = Set.of(
         SearchRelevanceIndicesManager.class,
@@ -174,6 +194,14 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
         assertEquals(SUPPORTED_SYSTEM_INDEX_PATTERN, registeredSystemIndexPatterns);
     }
 
+    public void testSystemIndexFlagMatchesDescriptors() {
+        Collection<SystemIndexDescriptor> descriptors = plugin.getSystemIndexDescriptors(Settings.EMPTY);
+        for (SearchRelevanceIndices index : SearchRelevanceIndices.values()) {
+            boolean registered = descriptors.stream().anyMatch(d -> d.matchesIndexPattern(index.getIndexName()));
+            assertEquals(index.getIndexName(), registered, index.isSystemIndex());
+        }
+    }
+
     public void testCreateComponents() {
         Set<Class> registeredComponents = new HashSet<>();
         Collection<Object> components = plugin.createComponents(
@@ -193,6 +221,44 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
             registeredComponents.add(component.getClass());
         }
         assertEquals(SUPPORTED_COMPONENTS, registeredComponents);
+    }
+
+    public void testIndexManagerRunsAsTheAssignedSubject() {
+        when(client.threadPool()).thenReturn(threadPool);
+        when(threadPool.getThreadContext()).thenReturn(new ThreadContext(Settings.EMPTY));
+        ClusterState clusterState = mock(ClusterState.class);
+        when(clusterService.state()).thenReturn(clusterState);
+        when(clusterState.metadata()).thenReturn(mock(Metadata.class));
+        SearchRelevanceIndicesManager indicesManager = plugin.createComponents(
+            client,
+            clusterService,
+            threadPool,
+            resourceWatcherService,
+            scriptService,
+            xContentRegistry,
+            environment,
+            nodeEnvironment,
+            namedWriteableRegistry,
+            indexNameExpressionResolver,
+            repositoriesServiceSupplier
+        )
+            .stream()
+            .filter(SearchRelevanceIndicesManager.class::isInstance)
+            .map(SearchRelevanceIndicesManager.class::cast)
+            .findFirst()
+            .orElseThrow();
+        PluginSubject subject = mock(PluginSubject.class);
+        plugin.assignSubject(subject);
+
+        indicesManager.listDocsBySearchRequest(
+            new SearchSourceBuilder(),
+            SearchRelevanceIndices.QUERY_SET,
+            ActionListener.wrap(r -> {}, e -> {})
+        );
+
+        // The mocked subject does not run its body, so nothing may reach the node client outside runAs.
+        verify(subject, atLeastOnce()).runAs(any(CheckedRunnable.class));
+        verify(client, never()).execute(any(ActionType.class), any(), any());
     }
 
     public void testIsAnActionPlugin() {

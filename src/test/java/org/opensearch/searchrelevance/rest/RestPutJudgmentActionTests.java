@@ -267,7 +267,11 @@ public class RestPutJudgmentActionTests extends SearchRelevanceRestTestCase {
     public void testPutImportJudgment_MissingJudgmentRatings() throws Exception {
         // Setup
         when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
-        String content = "{" + "\"name\": \"test_name\"," + "\"description\": \"test_description\"," + "\"type\": \"IMPORT_JUDGMENT\"" + "}";
+        String content = "{"
+            + "\"name\": \"test_name\","
+            + "\"description\": \"test_description\","
+            + "\"type\": \"IMPORT_JUDGMENT\""
+            + "}";
         RestRequest request = createPutRestRequestWithContent(content, "judgment");
         when(channel.request()).thenReturn(request);
 

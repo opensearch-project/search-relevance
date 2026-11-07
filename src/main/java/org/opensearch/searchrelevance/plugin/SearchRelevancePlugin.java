@@ -9,6 +9,7 @@ package org.opensearch.searchrelevance.plugin;
 
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_CACHE_INDEX;
+import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_EXPERIMENT_HISTORY_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_JOBS_INDEX;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_JUDGMENT_IMPORT_MAX_QUERIES;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_JUDGMENT_IMPORT_MAX_RATINGS_PER_QUERY;
@@ -41,6 +42,7 @@ import org.opensearch.core.xcontent.XContentParser;
 import org.opensearch.core.xcontent.XContentParserUtils;
 import org.opensearch.env.Environment;
 import org.opensearch.env.NodeEnvironment;
+import org.opensearch.identity.PluginSubject;
 import org.opensearch.indices.SystemIndexDescriptor;
 import org.opensearch.jobscheduler.spi.JobSchedulerExtension;
 import org.opensearch.jobscheduler.spi.ScheduledJobParser;
@@ -50,6 +52,7 @@ import org.opensearch.ml.client.MachineLearningNodeClient;
 import org.opensearch.plugins.ActionPlugin;
 import org.opensearch.plugins.ClusterPlugin;
 import org.opensearch.plugins.ExtensiblePlugin;
+import org.opensearch.plugins.IdentityAwarePlugin;
 import org.opensearch.plugins.Plugin;
 import org.opensearch.plugins.SystemIndexPlugin;
 import org.opensearch.repositories.RepositoriesService;
@@ -103,6 +106,7 @@ import org.opensearch.searchrelevance.scheduler.ScheduledExperimentRunnerManager
 import org.opensearch.searchrelevance.scheduler.SearchRelevanceJobParameters;
 import org.opensearch.searchrelevance.scheduler.SearchRelevanceJobRunner;
 import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
+import org.opensearch.searchrelevance.shared.PluginClient;
 import org.opensearch.searchrelevance.stats.events.EventStatsManager;
 import org.opensearch.searchrelevance.stats.info.InfoStatsManager;
 import org.opensearch.searchrelevance.transport.experiment.DeleteExperimentAction;
@@ -171,8 +175,10 @@ public class SearchRelevancePlugin extends Plugin
         SystemIndexPlugin,
         ClusterPlugin,
         ExtensiblePlugin,
+        IdentityAwarePlugin,
         JobSchedulerExtension {
     private Client client;
+    private PluginClient pluginClient;
     private ClusterService clusterService;
     private SearchRelevanceIndicesManager searchRelevanceIndicesManager;
     private QuerySetDao querySetDao;
@@ -198,8 +204,16 @@ public class SearchRelevancePlugin extends Plugin
             // Deprecated: the global judgment cache was removed and this index is no longer created
             // or written to. It stays registered so that leftover cache data on clusters upgraded
             // from an older version remains protected (hidden and guarded) until manually deleted.
-            new SystemIndexDescriptor(JUDGMENT_CACHE_INDEX, "Deprecated system index previously used for judgment cache data")
+            new SystemIndexDescriptor(JUDGMENT_CACHE_INDEX, "Deprecated system index previously used for judgment cache data"),
+            new SystemIndexDescriptor(SCHEDULED_JOBS_INDEX, "System index used for scheduled experiment jobs"),
+            new SystemIndexDescriptor(SCHEDULED_EXPERIMENT_HISTORY_INDEX, "System index used for scheduled experiment run history")
         );
+    }
+
+    @Override
+    public void assignSubject(PluginSubject pluginSubject) {
+        // Core assigns the subject after createComponents has run, so the client already exists here.
+        pluginClient.setSubject(pluginSubject);
     }
 
     @Override
@@ -217,9 +231,10 @@ public class SearchRelevancePlugin extends Plugin
         Supplier<RepositoriesService> repositoriesServiceSupplier
     ) {
         this.client = client;
+        this.pluginClient = new PluginClient(client);
         this.clusterService = clusterService;
         this.scriptService = scriptService;
-        this.searchRelevanceIndicesManager = new SearchRelevanceIndicesManager(clusterService, client);
+        this.searchRelevanceIndicesManager = new SearchRelevanceIndicesManager(clusterService, client, pluginClient);
         this.experimentDao = new ExperimentDao(searchRelevanceIndicesManager);
         this.experimentVariantDao = new ExperimentVariantDao(searchRelevanceIndicesManager);
         this.querySetDao = new QuerySetDao(searchRelevanceIndicesManager);

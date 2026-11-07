@@ -213,7 +213,6 @@ POST /_plugins/_search_relevance/experiments/schedule
     "cronExpression": "* * * * *"
 }
 ```
-{% include copy-curl.html %}
 
 **Response:**
 ```json
@@ -250,7 +249,6 @@ GET /_plugins/_search_relevance/experiments/schedule/2bb07ecb-082a-4bab-b9c0-dc2
 ```http
 DELETE /_plugins/_search_relevance/experiments/schedule/2bb07ecb-082a-4bab-b9c0-dc225e5c35ae
 ```
-{% include copy-curl.html %}
 
 **Response**
 ```json
