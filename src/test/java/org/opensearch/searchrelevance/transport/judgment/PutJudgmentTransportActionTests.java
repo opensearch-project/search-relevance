@@ -109,6 +109,28 @@ public class PutJudgmentTransportActionTests extends OpenSearchTestCase {
         org.mockito.Mockito.verifyNoInteractions(judgmentDao, judgmentsProcessorFactory);
     }
 
+    public void testNullOrMissingImportRatingIsRejectedBeforeWriting() {
+        for (boolean explicitNull : List.of(false, true)) {
+            Map<String, Object> rating = new java.util.HashMap<>();
+            rating.put("docId", "doc1");
+            if (explicitNull) {
+                rating.put("rating", null);
+            }
+            PutImportJudgmentRequest request = new PutImportJudgmentRequest(
+                JudgmentType.IMPORT_JUDGMENT, "import", "description",
+                List.of(Map.of("query", "test query", "ratings", List.of(rating)))
+            );
+            ActionListener<IndexResponse> listener = mock(ActionListener.class);
+            action.execute(null, request, listener);
+            ArgumentCaptor<Exception> error = ArgumentCaptor.forClass(Exception.class);
+            verify(listener).onFailure(error.capture());
+            assertEquals(RestStatus.BAD_REQUEST, org.opensearch.ExceptionsHelper.status(error.getValue()));
+            assertTrue(error.getValue().getMessage().contains("rating for queryText test query must not be null"));
+            verify(listener, org.mockito.Mockito.never()).onResponse(any());
+        }
+        org.mockito.Mockito.verifyNoInteractions(judgmentDao, judgmentsProcessorFactory);
+    }
+
     // --- Helpers for the existing-judgment reuse index-consistency validation ---
 
     /** Stub QuerySet existence to pass. */

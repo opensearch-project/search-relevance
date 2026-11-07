@@ -32,6 +32,9 @@ public final class ImportJudgmentRatingValidator {
      * @throws SearchRelevanceException if the rating is not finite or outside [0, 40]
      */
     public static void validate(Object rating, String queryText) {
+        if (rating == null) {
+            throw new SearchRelevanceException("rating for queryText " + queryText + " must not be null", RestStatus.BAD_REQUEST);
+        }
         double value;
         try {
             value = Double.parseDouble(String.valueOf(rating));
