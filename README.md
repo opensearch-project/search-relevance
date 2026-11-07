@@ -16,6 +16,13 @@ Exposing these powerful features through a simple UI is done through the  [Dashb
 
 For tutorials on how to leverage these tools, see [here](https://docs.opensearch.org/latest/search-plugins/search-relevance/).
 
+Judgment document IDs (`docId`) must be nonempty strings of at most 512 UTF-8 bytes,
+matching OpenSearch document ID limits. Imports, LLM judgments (including retries),
+UBI judgments, and manual rating edits preserve IDs exactly, including whitespace
+and special characters. Escape quotes and backslashes using normal JSON escaping;
+do not trim or sanitize IDs. Manual edits must reference a document already present
+in the judgment's ratings or failures.
+
 
 ## Project Resources
 

@@ -24,6 +24,7 @@ import org.opensearch.searchrelevance.judgments.clickmodel.coec.CoecClickModelPa
 import org.opensearch.searchrelevance.model.JudgmentType;
 import org.opensearch.searchrelevance.stats.events.EventStatName;
 import org.opensearch.searchrelevance.stats.events.EventStatsManager;
+import org.opensearch.searchrelevance.utils.TextValidationUtil;
 import org.opensearch.transport.client.Client;
 
 public class UbiJudgmentsProcessor implements BaseJudgmentsProcessor {
@@ -92,11 +93,11 @@ public class UbiJudgmentsProcessor implements BaseJudgmentsProcessor {
                                 String docId = entry.getKey(); // The key is the docId
                                 Object ratingObject = entry.getValue(); // The value is the rating
 
-                                if (docId == null || docId.isEmpty()) {
-                                    // This case is unlikely if the keys of the map are docIds, but good for defensive coding
+                                TextValidationUtil.ValidationResult docIdValidation = TextValidationUtil.validateDocumentId(docId);
+                                if (!docIdValidation.isValid()) {
                                     listener.onFailure(
                                         new SearchRelevanceException(
-                                            "docId (map key) for queryText " + queryText + " must not be null or empty",
+                                            "docId (map key) for queryText " + queryText + " " + docIdValidation.getErrorMessage(),
                                             RestStatus.BAD_REQUEST
                                         )
                                     );

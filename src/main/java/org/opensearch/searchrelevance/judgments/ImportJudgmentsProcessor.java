@@ -21,6 +21,7 @@ import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.model.JudgmentType;
 import org.opensearch.searchrelevance.stats.events.EventStatName;
 import org.opensearch.searchrelevance.stats.events.EventStatsManager;
+import org.opensearch.searchrelevance.utils.TextValidationUtil;
 import org.opensearch.transport.client.Client;
 
 public class ImportJudgmentsProcessor implements BaseJudgmentsProcessor {
@@ -67,13 +68,14 @@ public class ImportJudgmentsProcessor implements BaseJudgmentsProcessor {
 
             // Process each document's rating
             for (Map<String, Object> ratingInfo : ratingsList) {
-                String docId = (String) ratingInfo.get("docId");
+                Object docId = ratingInfo.get("docId");
                 Object ratingObj = ratingInfo.get("rating");
 
-                if (docId == null || docId.isEmpty()) {
+                TextValidationUtil.ValidationResult docIdValidation = TextValidationUtil.validateDocumentId(docId);
+                if (!docIdValidation.isValid()) {
                     listener.onFailure(
                         new SearchRelevanceException(
-                            "docId for queryText " + queryText + " must not be null or empty",
+                            "docId for queryText " + queryText + " " + docIdValidation.getErrorMessage(),
                             RestStatus.BAD_REQUEST
                         )
                     );
@@ -103,7 +105,7 @@ public class ImportJudgmentsProcessor implements BaseJudgmentsProcessor {
                 }
 
                 // Add the rating directly to the list in the original order
-                docIdRatings.add(Map.of("docId", docId, "rating", rating));
+                docIdRatings.add(Map.of("docId", (String) docId, "rating", rating));
             }
 
             // Add the formatted ratings for this query

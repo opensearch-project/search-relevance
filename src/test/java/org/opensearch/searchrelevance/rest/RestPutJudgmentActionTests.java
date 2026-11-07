@@ -12,11 +12,14 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.Map;
 
 import org.mockito.ArgumentCaptor;
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.common.xcontent.json.JsonXContent;
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.core.common.bytes.BytesReference;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestRequest;
@@ -198,6 +201,38 @@ public class RestPutJudgmentActionTests extends SearchRelevanceRestTestCase {
         ArgumentCaptor<BytesRestResponse> responseCaptor = ArgumentCaptor.forClass(BytesRestResponse.class);
         verify(channel).sendResponse(responseCaptor.capture());
         assertEquals(RestStatus.OK, responseCaptor.getValue().status());
+    }
+
+    public void testPutImportJudgment_PreservesSpecialCharactersInDocumentId() throws Exception {
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        String docId = "sku\"<red>\\part";
+        String content = BytesReference.bytes(JsonXContent.contentBuilder().startObject()
+            .field("name", "test_name").field("type", "IMPORT_JUDGMENT")
+            .startArray("judgmentRatings").startObject().field("query", "red shoes")
+            .startArray("ratings").startObject().field("docId", docId).field("rating", "0.5")
+            .endObject().endArray().endObject().endArray().endObject()).utf8ToString();
+        RestRequest request = createPutRestRequestWithContent(content, "judgment");
+        when(channel.request()).thenReturn(request);
+        ArgumentCaptor<PutImportJudgmentRequest> captor = ArgumentCaptor.forClass(PutImportJudgmentRequest.class);
+        restPutJudgmentAction.handleRequest(request, channel, client);
+        verify(client).execute(eq(PutJudgmentAction.INSTANCE), captor.capture(), any());
+        List<?> ratings = (List<?>) captor.getValue().getJudgmentRatings().get(0).get("ratings");
+        assertEquals(docId, ((Map<?, ?>) ratings.get(0)).get("docId"));
+    }
+
+    public void testPutImportJudgment_RejectsDocumentIdOverByteLimit() throws Exception {
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        String content = BytesReference.bytes(JsonXContent.contentBuilder().startObject()
+            .field("name", "test_name").field("type", "IMPORT_JUDGMENT")
+            .startArray("judgmentRatings").startObject().field("query", "red shoes")
+            .startArray("ratings").startObject().field("docId", "é".repeat(257)).field("rating", "0.5")
+            .endObject().endArray().endObject().endArray().endObject()).utf8ToString();
+        RestRequest request = createPutRestRequestWithContent(content, "judgment");
+        when(channel.request()).thenReturn(request);
+        restPutJudgmentAction.handleRequest(request, channel, client);
+        ArgumentCaptor<BytesRestResponse> captor = ArgumentCaptor.forClass(BytesRestResponse.class);
+        verify(channel).sendResponse(captor.capture());
+        assertEquals(RestStatus.BAD_REQUEST, captor.getValue().status());
     }
 
     public void testPutImportJudgment_QueryCountLimitExceeded() throws Exception {

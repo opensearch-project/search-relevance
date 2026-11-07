@@ -549,6 +549,19 @@ public class UpdateJudgmentRatingsTransportActionTests extends OpenSearchTestCas
         }
     }
 
+    public void testRequestValidation_DocumentIds() {
+        for (String docId : List.of("sku\"<red>\\part", " ", "é".repeat(256))) {
+            RatingAdjustment adjustment = new RatingAdjustment("query", docId, "0.5");
+            assertFalse(adjustment.isIncomplete());
+            assertNull(new UpdateJudgmentRatingsRequest("id-1", List.of(adjustment)).validate());
+        }
+        for (String docId : List.of("", "é".repeat(257))) {
+            assertNotNull(
+                new UpdateJudgmentRatingsRequest("id-1", List.of(new RatingAdjustment("query", docId, "0.5"))).validate()
+            );
+        }
+    }
+
     public void testRequestValidation_TooManyAdjustments() {
         List<RatingAdjustment> adjustments = new ArrayList<>();
         for (int i = 0; i <= UpdateJudgmentRatingsRequest.MAX_ADJUSTMENTS; i++) {

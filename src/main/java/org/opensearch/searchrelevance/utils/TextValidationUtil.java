@@ -17,9 +17,24 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
+import org.opensearch.action.ActionRequestValidationException;
+import org.opensearch.action.DocWriteRequest;
 import org.opensearch.searchrelevance.model.QueryWithReference;
 
 public class TextValidationUtil {
+    /** Validates an exact OpenSearch document identifier without restricting or rewriting its characters. */
+    public static ValidationResult validateDocumentId(Object docId) {
+        if (!(docId instanceof String)) {
+            return new ValidationResult(false, "must be a string");
+        }
+        String id = (String) docId;
+        if (id.isEmpty()) {
+            return new ValidationResult(false, "must not be null or empty");
+        }
+        ActionRequestValidationException error = DocWriteRequest.validateDocIdLength(id, null);
+        return error == null ? new ValidationResult(true, null) : new ValidationResult(false, error.getMessage());
+    }
+
     private static final int DEFAULT_MAX_TEXT_LENGTH = 2000;
     private static final int MAX_NAME_LENGTH = 50;
     private static final int MAX_DESCRIPTION_LENGTH = 250;

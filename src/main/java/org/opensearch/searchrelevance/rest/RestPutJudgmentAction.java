@@ -313,13 +313,7 @@ public class RestPutJudgmentAction extends BaseRestHandler {
                 Map<?, ?> rating = (Map<?, ?>) rawRating;
 
                 Object docId = rating.get("docId");
-                if (!(docId instanceof String) || ((String) docId).isEmpty()) {
-                    return new BytesRestResponse(
-                        RestStatus.BAD_REQUEST,
-                        "Invalid query " + query + ": each rating must have a non-empty docId"
-                    );
-                }
-                TextValidationUtil.ValidationResult docIdValidation = TextValidationUtil.validateText((String) docId);
+                TextValidationUtil.ValidationResult docIdValidation = TextValidationUtil.validateDocumentId(docId);
                 if (!docIdValidation.isValid()) {
                     return new BytesRestResponse(
                         RestStatus.BAD_REQUEST,
