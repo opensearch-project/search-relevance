@@ -248,13 +248,13 @@ public class ImportJudgmentsProcessorTests extends OpenSearchTestCase {
         assertTrue("Should be SearchRelevanceException", exceptionRef.get() instanceof SearchRelevanceException);
         assertTrue(
             "Exception message should mention invalid rating",
-            exceptionRef.get().getMessage().contains("rating 'not-a-number' for queryText test query must be a valid float")
+            exceptionRef.get().getMessage().contains("rating 'not-a-number' for queryText test query must be a finite number")
         );
     }
 
     public void testGenerateJudgmentRatingWithNonFiniteRating() throws Exception {
         // Float.parseFloat accepts these, but they would fail metric evaluation later; reject at import.
-        for (String rating : List.of("NaN", "Infinity", "-Infinity", "1e308")) {
+        for (String rating : List.of("NaN", "Infinity", "-Infinity")) {
             Map<String, Object> queryJudgment = new HashMap<>();
             queryJudgment.put("query", "test query");
             queryJudgment.put("ratings", List.of(Map.of("docId", "doc1", "rating", rating)));
@@ -278,13 +278,15 @@ public class ImportJudgmentsProcessorTests extends OpenSearchTestCase {
 
             assertTrue(latch.await(5, TimeUnit.SECONDS));
             assertTrue("rating '" + rating + "' must be rejected", exceptionRef.get() instanceof SearchRelevanceException);
-            assertTrue(exceptionRef.get().getMessage().contains("rating '" + rating + "' for queryText test query must be a valid float"));
+            assertTrue(
+                exceptionRef.get().getMessage().contains("rating '" + rating + "' for queryText test query must be a finite number")
+            );
         }
     }
 
     public void testGenerateJudgmentRatingWithOutOfRangeRating() throws Exception {
         // Finite ratings outside [0, 40] would overflow DCG (2^rating - 1) or give negative gain; reject at import.
-        for (String rating : List.of("-0.5", "-1", "40.5", "100", "100.000")) {
+        for (String rating : List.of("-0.5", "-1", "40.5", "100", "100.000", "1e308", "40.000001", "-1e-50")) {
             Exception e = runWithSingleRating(rating).failure;
             assertTrue("rating '" + rating + "' must be rejected", e instanceof SearchRelevanceException);
             assertEquals(RestStatus.BAD_REQUEST, ((SearchRelevanceException) e).status());

@@ -91,6 +91,24 @@ public class PutJudgmentTransportActionTests extends OpenSearchTestCase {
         );
     }
 
+    public void testInvalidImportIsRejectedBeforeWriting() {
+        for (String rating : List.of("100", "-1", "NaN", "Infinity", "40.000001", "-1e-50")) {
+            PutImportJudgmentRequest request = new PutImportJudgmentRequest(
+                JudgmentType.IMPORT_JUDGMENT,
+                "import",
+                "description",
+                List.of(Map.of("query", "test query", "ratings", List.of(Map.of("docId", "doc1", "rating", rating))))
+            );
+            ActionListener<IndexResponse> listener = mock(ActionListener.class);
+            action.execute(null, request, listener);
+            ArgumentCaptor<Exception> error = ArgumentCaptor.forClass(Exception.class);
+            verify(listener).onFailure(error.capture());
+            assertEquals(RestStatus.BAD_REQUEST, org.opensearch.ExceptionsHelper.status(error.getValue()));
+            verify(listener, org.mockito.Mockito.never()).onResponse(any());
+        }
+        org.mockito.Mockito.verifyNoInteractions(judgmentDao, judgmentsProcessorFactory);
+    }
+
     // --- Helpers for the existing-judgment reuse index-consistency validation ---
 
     /** Stub QuerySet existence to pass. */
