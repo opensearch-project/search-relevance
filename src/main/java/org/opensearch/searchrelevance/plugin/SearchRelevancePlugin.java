@@ -11,6 +11,8 @@ import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_I
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_CACHE_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_EXPERIMENT_HISTORY_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_JOBS_INDEX;
+import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_JUDGMENT_IMPORT_MAX_QUERIES;
+import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_JUDGMENT_IMPORT_MAX_RATINGS_PER_QUERY;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_ENABLED;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_MINIMUM_INTERVAL;
@@ -445,7 +447,9 @@ public class SearchRelevancePlugin extends Plugin
             SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT,
             SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_ENABLED,
             SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_TIMEOUT,
-            SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_MINIMUM_INTERVAL
+            SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_MINIMUM_INTERVAL,
+            SEARCH_RELEVANCE_JUDGMENT_IMPORT_MAX_QUERIES,
+            SEARCH_RELEVANCE_JUDGMENT_IMPORT_MAX_RATINGS_PER_QUERY
         );
     }
 

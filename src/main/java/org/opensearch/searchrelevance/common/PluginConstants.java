@@ -111,6 +111,7 @@ public class PluginConstants {
     public static final String CRON_EXPRESSION = "cronExpression";
 
     public static final String JUDGMENT_RATINGS = "judgmentRatings";
+    public static final String RATINGS = "ratings";
     public static final String CONTEXT_FIELDS = "contextFields";
     public static final String IGNORE_FAILURE = "ignoreFailure";
     // Deprecated: the judgment cache was removed. Accepted but ignored for backward compatibility.

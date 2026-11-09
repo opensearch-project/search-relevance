@@ -34,6 +34,7 @@ import org.opensearch.searchrelevance.settings.SearchRelevanceSettingsAccessor;
 import org.opensearch.searchrelevance.transport.judgment.RatingAdjustment;
 import org.opensearch.searchrelevance.transport.judgment.UpdateJudgmentRatingsAction;
 import org.opensearch.searchrelevance.transport.judgment.UpdateJudgmentRatingsRequest;
+import org.opensearch.searchrelevance.utils.TextValidationUtil;
 import org.opensearch.transport.client.node.NodeClient;
 
 import lombok.AllArgsConstructor;
@@ -121,7 +122,14 @@ public class RestUpdateJudgmentRatingsAction extends BaseRestHandler {
                     );
                 }
                 for (Map<String, Object> rating : ratings) {
-                    String docId = rating.get("docId") == null ? null : rating.get("docId").toString();
+                    Object rawDocId = rating.get("docId");
+                    TextValidationUtil.ValidationResult docIdValidation = TextValidationUtil.validateDocumentId(rawDocId);
+                    if (!docIdValidation.isValid()) {
+                        return channel -> channel.sendResponse(
+                            new BytesRestResponse(RestStatus.BAD_REQUEST, "Invalid docId: " + docIdValidation.getErrorMessage())
+                        );
+                    }
+                    String docId = (String) rawDocId;
                     String ratingValue = rating.get("rating") == null ? null : rating.get("rating").toString();
                     adjustments.add(new RatingAdjustment(query, docId, ratingValue));
                 }

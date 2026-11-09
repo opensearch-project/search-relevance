@@ -14,6 +14,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.opensearch.searchrelevance.utils.TextValidationUtil;
+
 /**
  * Handles data transformation for judgment processing
  */
@@ -36,7 +38,10 @@ public class JudgmentDataTransformer {
             ? List.of()
             : docIdToScore.entrySet()
                 .stream()
-                .map(entry -> Map.of("docId", entry.getKey(), "rating", entry.getValue()))
+                .map(entry -> {
+                    validateDocumentId(entry.getKey());
+                    return Map.of("docId", entry.getKey(), "rating", entry.getValue());
+                })
                 .collect(Collectors.toList());
 
         judgmentForQuery.put("ratings", docIdRatings);
@@ -55,11 +60,19 @@ public class JudgmentDataTransformer {
     public static List<Map<String, String>> buildFailedDocs(Set<String> sentDocIds, Set<String> ratedDocIds) {
         List<Map<String, String>> failures = new ArrayList<>();
         for (String docId : sentDocIds) {
+            validateDocumentId(docId);
             if (!ratedDocIds.contains(docId)) {
                 failures.add(Map.of("docId", docId));
             }
         }
         return failures;
+    }
+
+    private static void validateDocumentId(String docId) {
+        TextValidationUtil.ValidationResult result = TextValidationUtil.validateDocumentId(docId);
+        if (!result.isValid()) {
+            throw new IllegalArgumentException("Invalid docId: " + result.getErrorMessage());
+        }
     }
 
     /**

@@ -16,6 +16,7 @@ import org.opensearch.action.ActionRequest;
 import org.opensearch.action.ActionRequestValidationException;
 import org.opensearch.core.common.io.stream.StreamInput;
 import org.opensearch.core.common.io.stream.StreamOutput;
+import org.opensearch.searchrelevance.utils.TextValidationUtil;
 
 /**
  * Transport Request for adjusting one or more ratings on an existing judgment in place.
@@ -108,6 +109,11 @@ public class UpdateJudgmentRatingsRequest extends ActionRequest {
                         "each adjustment must have a non-empty query, docId and rating",
                         validationException
                     );
+                    break;
+                }
+                TextValidationUtil.ValidationResult docIdValidation = TextValidationUtil.validateDocumentId(adjustment.getDocId());
+                if (!docIdValidation.isValid()) {
+                    validationException = addValidationError("Invalid docId: " + docIdValidation.getErrorMessage(), validationException);
                     break;
                 }
                 if (!isValidRating(adjustment.getRating())) {

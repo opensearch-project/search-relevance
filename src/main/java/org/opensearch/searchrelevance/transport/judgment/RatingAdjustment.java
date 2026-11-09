@@ -76,12 +76,12 @@ public class RatingAdjustment implements Writeable {
         return rating;
     }
 
-    /** @return true if any of the three fields is null or blank */
+    /** @return true if query or rating is null or blank, or the exact document ID is null or empty */
     public boolean isIncomplete() {
         return query == null
             || query.trim().isEmpty()
             || docId == null
-            || docId.trim().isEmpty()
+            || docId.isEmpty()
             || rating == null
             || rating.trim().isEmpty();
     }

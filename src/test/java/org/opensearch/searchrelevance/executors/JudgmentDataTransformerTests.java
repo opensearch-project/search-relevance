@@ -54,6 +54,20 @@ public class JudgmentDataTransformerTests extends OpenSearchTestCase {
         assertEquals("0.5", ratingsMap.get("doc3"));
     }
 
+    public void testDocumentIdsPreservedAtByteLimit() {
+        String docId = "\"<>\\" + "é".repeat(254);
+        Map<String, Object> result = transformer.createJudgmentResult("query", Map.of(docId, "0.5"));
+        assertEquals(List.of(Map.of("docId", docId, "rating", "0.5")), result.get("ratings"));
+        assertEquals(List.of(Map.of("docId", docId)), transformer.buildFailedDocs(Set.of(docId), Set.of()));
+    }
+
+    public void testInvalidDocumentIdsRejected() {
+        for (String docId : List.of("", "é".repeat(257))) {
+            expectThrows(IllegalArgumentException.class, () -> transformer.createJudgmentResult("query", Map.of(docId, "0.5")));
+            expectThrows(IllegalArgumentException.class, () -> transformer.buildFailedDocs(Set.of(docId), Set.of()));
+        }
+    }
+
     public void testCreateJudgmentResultWithEmptyRatings() {
         // Arrange
         String queryTextWithCustomInput = "laptop||Professional laptop for business";

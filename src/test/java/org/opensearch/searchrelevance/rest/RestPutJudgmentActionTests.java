@@ -12,11 +12,14 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.Map;
 
 import org.mockito.ArgumentCaptor;
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.common.xcontent.json.JsonXContent;
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.core.common.bytes.BytesReference;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.rest.BytesRestResponse;
 import org.opensearch.rest.RestRequest;
@@ -106,6 +109,8 @@ public class RestPutJudgmentActionTests extends SearchRelevanceRestTestCase {
         // Setup channel mock
         when(channel.newBuilder()).thenReturn(JsonXContent.contentBuilder());
         when(channel.newErrorBuilder()).thenReturn(JsonXContent.contentBuilder());
+        when(settingsAccessor.getMaxJudgmentImportQueriesAllowed()).thenReturn(1000);
+        when(settingsAccessor.getMaxJudgmentImportRatingsPerQueryAllowed()).thenReturn(1000);
     }
 
     public void testPrepareRequest_WorkbenchDisabled() throws Exception {
@@ -196,6 +201,320 @@ public class RestPutJudgmentActionTests extends SearchRelevanceRestTestCase {
         ArgumentCaptor<BytesRestResponse> responseCaptor = ArgumentCaptor.forClass(BytesRestResponse.class);
         verify(channel).sendResponse(responseCaptor.capture());
         assertEquals(RestStatus.OK, responseCaptor.getValue().status());
+    }
+
+    public void testPutImportJudgment_PreservesSpecialCharactersInDocumentId() throws Exception {
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        String docId = "sku\"<red>\\part";
+        String content = BytesReference.bytes(JsonXContent.contentBuilder().startObject()
+            .field("name", "test_name").field("type", "IMPORT_JUDGMENT")
+            .startArray("judgmentRatings").startObject().field("query", "red shoes")
+            .startArray("ratings").startObject().field("docId", docId).field("rating", "0.5")
+            .endObject().endArray().endObject().endArray().endObject()).utf8ToString();
+        RestRequest request = createPutRestRequestWithContent(content, "judgment");
+        when(channel.request()).thenReturn(request);
+        ArgumentCaptor<PutImportJudgmentRequest> captor = ArgumentCaptor.forClass(PutImportJudgmentRequest.class);
+        restPutJudgmentAction.handleRequest(request, channel, client);
+        verify(client).execute(eq(PutJudgmentAction.INSTANCE), captor.capture(), any());
+        List<?> ratings = (List<?>) captor.getValue().getJudgmentRatings().get(0).get("ratings");
+        assertEquals(docId, ((Map<?, ?>) ratings.get(0)).get("docId"));
+    }
+
+    public void testPutImportJudgment_RejectsDocumentIdOverByteLimit() throws Exception {
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        String content = BytesReference.bytes(JsonXContent.contentBuilder().startObject()
+            .field("name", "test_name").field("type", "IMPORT_JUDGMENT")
+            .startArray("judgmentRatings").startObject().field("query", "red shoes")
+            .startArray("ratings").startObject().field("docId", "é".repeat(257)).field("rating", "0.5")
+            .endObject().endArray().endObject().endArray().endObject()).utf8ToString();
+        RestRequest request = createPutRestRequestWithContent(content, "judgment");
+        when(channel.request()).thenReturn(request);
+        restPutJudgmentAction.handleRequest(request, channel, client);
+        ArgumentCaptor<BytesRestResponse> captor = ArgumentCaptor.forClass(BytesRestResponse.class);
+        verify(channel).sendResponse(captor.capture());
+        assertEquals(RestStatus.BAD_REQUEST, captor.getValue().status());
+    }
+
+    public void testPutImportJudgment_QueryCountLimitExceeded() throws Exception {
+        // Setup
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        when(settingsAccessor.getMaxJudgmentImportQueriesAllowed()).thenReturn(1);
+        RestRequest request = createPutRestRequestWithContent(IMPORT_JUDGMENT_CONTENT, "judgment");
+        when(channel.request()).thenReturn(request);
+
+        // Execute
+        restPutJudgmentAction.handleRequest(request, channel, client);
+
+        // Verify
+        ArgumentCaptor<BytesRestResponse> responseCaptor = ArgumentCaptor.forClass(BytesRestResponse.class);
+        verify(channel).sendResponse(responseCaptor.capture());
+        assertEquals(RestStatus.FORBIDDEN, responseCaptor.getValue().status());
+    }
+
+    public void testPutImportJudgment_RatingsPerQueryLimitExceeded() throws Exception {
+        // Setup
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        when(settingsAccessor.getMaxJudgmentImportRatingsPerQueryAllowed()).thenReturn(0);
+        RestRequest request = createPutRestRequestWithContent(IMPORT_JUDGMENT_CONTENT, "judgment");
+        when(channel.request()).thenReturn(request);
+
+        // Execute
+        restPutJudgmentAction.handleRequest(request, channel, client);
+
+        // Verify
+        ArgumentCaptor<BytesRestResponse> responseCaptor = ArgumentCaptor.forClass(BytesRestResponse.class);
+        verify(channel).sendResponse(responseCaptor.capture());
+        assertEquals(RestStatus.FORBIDDEN, responseCaptor.getValue().status());
+    }
+
+    public void testPutImportJudgment_InvalidQueryText() throws Exception {
+        // Setup
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        String content = """
+            {
+              "name": "test_name",
+              "description": "test_description",
+              "type": "IMPORT_JUDGMENT",
+              "judgmentRatings": [
+                {
+                  "query": "",
+                  "ratings": [
+                    {
+                      "docId": "B077ZJXCTS",
+                      "rating": "0.000"
+                    }
+                  ]
+                }
+              ]
+            }""";
+        RestRequest request = createPutRestRequestWithContent(content, "judgment");
+        when(channel.request()).thenReturn(request);
+
+        // Execute
+        restPutJudgmentAction.handleRequest(request, channel, client);
+
+        // Verify
+        ArgumentCaptor<BytesRestResponse> responseCaptor = ArgumentCaptor.forClass(BytesRestResponse.class);
+        verify(channel).sendResponse(responseCaptor.capture());
+        assertEquals(RestStatus.BAD_REQUEST, responseCaptor.getValue().status());
+    }
+
+    public void testPutImportJudgment_MissingJudgmentRatings() throws Exception {
+        // Setup
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        String content = "{"
+            + "\"name\": \"test_name\","
+            + "\"description\": \"test_description\","
+            + "\"type\": \"IMPORT_JUDGMENT\""
+            + "}";
+        RestRequest request = createPutRestRequestWithContent(content, "judgment");
+        when(channel.request()).thenReturn(request);
+
+        // Execute
+        restPutJudgmentAction.handleRequest(request, channel, client);
+
+        // Verify
+        ArgumentCaptor<BytesRestResponse> responseCaptor = ArgumentCaptor.forClass(BytesRestResponse.class);
+        verify(channel).sendResponse(responseCaptor.capture());
+        assertEquals(RestStatus.BAD_REQUEST, responseCaptor.getValue().status());
+    }
+
+    public void testPutImportJudgment_RatingsNotAList() throws Exception {
+        // Setup
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        String content = """
+            {
+              "name": "test_name",
+              "description": "test_description",
+              "type": "IMPORT_JUDGMENT",
+              "judgmentRatings": [
+                {
+                  "query": "red shoes",
+                  "ratings": "not-a-list"
+                }
+              ]
+            }""";
+        RestRequest request = createPutRestRequestWithContent(content, "judgment");
+        when(channel.request()).thenReturn(request);
+
+        // Execute
+        restPutJudgmentAction.handleRequest(request, channel, client);
+
+        // Verify
+        ArgumentCaptor<BytesRestResponse> responseCaptor = ArgumentCaptor.forClass(BytesRestResponse.class);
+        verify(channel).sendResponse(responseCaptor.capture());
+        assertEquals(RestStatus.BAD_REQUEST, responseCaptor.getValue().status());
+    }
+
+    public void testPutImportJudgment_JudgmentRatingsNotAList() throws Exception {
+        // Setup: judgmentRatings itself being a JSON object (not an array) previously crashed with an
+        // uncaught ClassCastException at the unchecked cast in prepareRequest, before validation ran.
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        String content = """
+            {
+              "name": "test_name",
+              "description": "test_description",
+              "type": "IMPORT_JUDGMENT",
+              "judgmentRatings": {"query": "x"}
+            }""";
+        RestRequest request = createPutRestRequestWithContent(content, "judgment");
+        when(channel.request()).thenReturn(request);
+
+        // Execute
+        restPutJudgmentAction.handleRequest(request, channel, client);
+
+        // Verify
+        ArgumentCaptor<BytesRestResponse> responseCaptor = ArgumentCaptor.forClass(BytesRestResponse.class);
+        verify(channel).sendResponse(responseCaptor.capture());
+        assertEquals(RestStatus.BAD_REQUEST, responseCaptor.getValue().status());
+    }
+
+    public void testPutImportJudgment_QueryWithNewlineRejected() throws Exception {
+        // Setup: query validation now uses validateQuerySetValue (same as query sets), which rejects
+        // newlines -- closing off sequences like "foo\n<script>" and keeping import/query-set query
+        // validation identical so imported queries can't silently fail to match query set entries.
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        String content = """
+            {
+              "name": "test_name",
+              "description": "test_description",
+              "type": "IMPORT_JUDGMENT",
+              "judgmentRatings": [
+                {
+                  "query": "red shoes\\nmore",
+                  "ratings": [
+                    {
+                      "docId": "B077ZJXCTS",
+                      "rating": "0.5"
+                    }
+                  ]
+                }
+              ]
+            }""";
+        RestRequest request = createPutRestRequestWithContent(content, "judgment");
+        when(channel.request()).thenReturn(request);
+
+        // Execute
+        restPutJudgmentAction.handleRequest(request, channel, client);
+
+        // Verify
+        ArgumentCaptor<BytesRestResponse> responseCaptor = ArgumentCaptor.forClass(BytesRestResponse.class);
+        verify(channel).sendResponse(responseCaptor.capture());
+        assertEquals(RestStatus.BAD_REQUEST, responseCaptor.getValue().status());
+    }
+
+    public void testPutImportJudgment_NonObjectEntryInJudgmentRatings() throws Exception {
+        // Setup: a bare string instead of a query/ratings object previously caused an uncaught
+        // ClassCastException (surfaced as 500) instead of a clean 400.
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        String content = """
+            {
+              "name": "test_name",
+              "description": "test_description",
+              "type": "IMPORT_JUDGMENT",
+              "judgmentRatings": ["not an object"]
+            }""";
+        RestRequest request = createPutRestRequestWithContent(content, "judgment");
+        when(channel.request()).thenReturn(request);
+
+        // Execute
+        restPutJudgmentAction.handleRequest(request, channel, client);
+
+        // Verify
+        ArgumentCaptor<BytesRestResponse> responseCaptor = ArgumentCaptor.forClass(BytesRestResponse.class);
+        verify(channel).sendResponse(responseCaptor.capture());
+        assertEquals(RestStatus.BAD_REQUEST, responseCaptor.getValue().status());
+    }
+
+    public void testPutImportJudgment_NonObjectRatingItem() throws Exception {
+        // Setup: a bare string inside "ratings" previously caused an uncaught ClassCastException
+        // instead of a clean 400.
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        String content = """
+            {
+              "name": "test_name",
+              "description": "test_description",
+              "type": "IMPORT_JUDGMENT",
+              "judgmentRatings": [
+                {
+                  "query": "red shoes",
+                  "ratings": ["not an object"]
+                }
+              ]
+            }""";
+        RestRequest request = createPutRestRequestWithContent(content, "judgment");
+        when(channel.request()).thenReturn(request);
+
+        // Execute
+        restPutJudgmentAction.handleRequest(request, channel, client);
+
+        // Verify
+        ArgumentCaptor<BytesRestResponse> responseCaptor = ArgumentCaptor.forClass(BytesRestResponse.class);
+        verify(channel).sendResponse(responseCaptor.capture());
+        assertEquals(RestStatus.BAD_REQUEST, responseCaptor.getValue().status());
+    }
+
+    public void testPutImportJudgment_MissingDocId() throws Exception {
+        // Setup
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        String content = """
+            {
+              "name": "test_name",
+              "description": "test_description",
+              "type": "IMPORT_JUDGMENT",
+              "judgmentRatings": [
+                {
+                  "query": "red shoes",
+                  "ratings": [
+                    {
+                      "rating": "0.5"
+                    }
+                  ]
+                }
+              ]
+            }""";
+        RestRequest request = createPutRestRequestWithContent(content, "judgment");
+        when(channel.request()).thenReturn(request);
+
+        // Execute
+        restPutJudgmentAction.handleRequest(request, channel, client);
+
+        // Verify
+        ArgumentCaptor<BytesRestResponse> responseCaptor = ArgumentCaptor.forClass(BytesRestResponse.class);
+        verify(channel).sendResponse(responseCaptor.capture());
+        assertEquals(RestStatus.BAD_REQUEST, responseCaptor.getValue().status());
+    }
+
+    public void testPutImportJudgment_NonFiniteRating() throws Exception {
+        // Setup
+        when(settingsAccessor.isWorkbenchEnabled()).thenReturn(true);
+        String content = """
+            {
+              "name": "test_name",
+              "description": "test_description",
+              "type": "IMPORT_JUDGMENT",
+              "judgmentRatings": [
+                {
+                  "query": "red shoes",
+                  "ratings": [
+                    {
+                      "docId": "B077ZJXCTS",
+                      "rating": "NaN"
+                    }
+                  ]
+                }
+              ]
+            }""";
+        RestRequest request = createPutRestRequestWithContent(content, "judgment");
+        when(channel.request()).thenReturn(request);
+
+        // Execute
+        restPutJudgmentAction.handleRequest(request, channel, client);
+
+        // Verify
+        ArgumentCaptor<BytesRestResponse> responseCaptor = ArgumentCaptor.forClass(BytesRestResponse.class);
+        verify(channel).sendResponse(responseCaptor.capture());
+        assertEquals(RestStatus.BAD_REQUEST, responseCaptor.getValue().status());
     }
 
     public void testPutJudgment_InvalidType() {
