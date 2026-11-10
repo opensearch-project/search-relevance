@@ -1,0 +1,43 @@
+{
+  "**/*.*": [
+    " SPDX-License-Identifier: Apache-2.0",
+    " The OpenSearch Contributors require contributions made to",
+    " this file be licensed under the Apache-2.0 license or a",
+    " compatible open source license."
+  ],
+  "ignore": [
+    ".md",
+    ".json",
+    ".yml",
+    ".yaml",
+    ".txt",
+    ".xml",
+    ".config",
+    ".png",
+    ".jar",
+    ".gz",
+    ".zip",
+    ".ndjson",
+    ".lock",
+    ".toml",
+    ".ini",
+    ".bat",
+    ".properties",
+    ".policy",
+    ".git",
+    ".idea",
+    ".github",
+    ".gitignore",
+    ".whitesource",
+    ".gradle",
+    "gradle/wrapper",
+    "settings.gradle",
+    "**/build/",
+    "licenses/",
+    "src/test/resources/",
+    "**/test/resources/",
+    "LICENSE",
+    "NOTICE",
+    "META-INF/services/"
+  ]
+}

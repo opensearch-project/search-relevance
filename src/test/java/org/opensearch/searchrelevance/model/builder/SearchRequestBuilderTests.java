@@ -423,10 +423,7 @@ public class SearchRequestBuilderTests extends OpenSearchTestCase {
         assertNotNull(sourceBuilder);
         String renderedSource = sourceBuilder.toString();
         assertTrue("Query text should be substituted into the query", renderedSource.contains(TEST_QUERY_TEXT));
-        assertFalse(
-            "Legacy placeholder should not remain unsubstituted",
-            renderedSource.contains(WILDCARD_QUERY_TEXT_DEPRECATED)
-        );
+        assertFalse("Legacy placeholder should not remain unsubstituted", renderedSource.contains(WILDCARD_QUERY_TEXT_DEPRECATED));
         assertWarnings(LEGACY_PLACEHOLDER_DEPRECATION_MESSAGE);
     }
 
@@ -444,10 +441,7 @@ public class SearchRequestBuilderTests extends OpenSearchTestCase {
         assertNotNull(sourceBuilder);
         String renderedSource = sourceBuilder.toString();
         assertTrue("Query text should be substituted into the query", renderedSource.contains(TEST_QUERY_TEXT));
-        assertFalse(
-            "Preferred placeholder should not remain unsubstituted",
-            renderedSource.contains(WILDCARD_QUERY_TEXT)
-        );
+        assertFalse("Preferred placeholder should not remain unsubstituted", renderedSource.contains(WILDCARD_QUERY_TEXT));
     }
 
     /**
@@ -469,10 +463,7 @@ public class SearchRequestBuilderTests extends OpenSearchTestCase {
         assertNotNull(sourceBuilder);
         String renderedSource = sourceBuilder.toString();
         assertFalse("Legacy placeholder should not remain unsubstituted", renderedSource.contains(WILDCARD_QUERY_TEXT_DEPRECATED));
-        assertFalse(
-            "Preferred placeholder should not remain unsubstituted",
-            renderedSource.contains(WILDCARD_QUERY_TEXT)
-        );
+        assertFalse("Preferred placeholder should not remain unsubstituted", renderedSource.contains(WILDCARD_QUERY_TEXT));
         assertWarnings(LEGACY_PLACEHOLDER_DEPRECATION_MESSAGE);
     }
 

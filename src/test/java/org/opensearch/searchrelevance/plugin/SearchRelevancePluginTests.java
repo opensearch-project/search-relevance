@@ -15,6 +15,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENT_INDEX;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENT_CACHE_INDEX;
+import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_EXPERIMENT_HISTORY_INDEX;
+import static org.opensearch.searchrelevance.common.PluginConstants.SCHEDULED_JOBS_INDEX;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_QUERY_SET_MAX_LIMIT;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_ENABLED;
 import static org.opensearch.searchrelevance.settings.SearchRelevanceSettings.SEARCH_RELEVANCE_SCHEDULED_EXPERIMENTS_MINIMUM_INTERVAL;
@@ -116,7 +118,12 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
     private NodeEnvironment nodeEnvironment;
     private SearchRelevancePlugin plugin;
 
-    public static final Set<String> SUPPORTED_SYSTEM_INDEX_PATTERN = Set.of(EXPERIMENT_INDEX, JUDGMENT_CACHE_INDEX);
+    public static final Set<String> SUPPORTED_SYSTEM_INDEX_PATTERN = Set.of(
+        EXPERIMENT_INDEX,
+        JUDGMENT_CACHE_INDEX,
+        SCHEDULED_JOBS_INDEX,
+        SCHEDULED_EXPERIMENT_HISTORY_INDEX
+    );
 
     private final Set<Class> SUPPORTED_COMPONENTS = Set.of(
         SearchRelevanceIndicesManager.class,
@@ -181,6 +188,14 @@ public class SearchRelevancePluginTests extends OpenSearchTestCase {
             registeredSystemIndexPatterns.add(descriptor.getIndexPattern());
         }
         assertEquals(SUPPORTED_SYSTEM_INDEX_PATTERN, registeredSystemIndexPatterns);
+    }
+
+    public void testSystemIndexFlagMatchesDescriptors() {
+        Collection<SystemIndexDescriptor> descriptors = plugin.getSystemIndexDescriptors(Settings.EMPTY);
+        for (SearchRelevanceIndices index : SearchRelevanceIndices.values()) {
+            boolean registered = descriptors.stream().anyMatch(d -> d.matchesIndexPattern(index.getIndexName()));
+            assertEquals(index.getIndexName(), registered, index.isSystemIndex());
+        }
     }
 
     public void testCreateComponents() {
