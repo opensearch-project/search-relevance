@@ -11,6 +11,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -19,6 +20,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.lucene.search.TotalHits;
 import org.junit.Before;
@@ -28,12 +30,15 @@ import org.mockito.MockitoAnnotations;
 import org.opensearch.action.index.IndexResponse;
 import org.opensearch.action.search.SearchResponse;
 import org.opensearch.action.support.ActionFilters;
+import org.opensearch.common.util.concurrent.AbstractRunnable;
 import org.opensearch.core.action.ActionListener;
+import org.opensearch.core.concurrency.OpenSearchRejectedExecutionException;
 import org.opensearch.search.SearchHit;
 import org.opensearch.search.SearchHits;
 import org.opensearch.searchrelevance.dao.JudgmentDao;
 import org.opensearch.searchrelevance.judgments.LlmJudgmentsProcessor;
 import org.opensearch.searchrelevance.model.AsyncStatus;
+import org.opensearch.searchrelevance.model.Judgment;
 import org.opensearch.searchrelevance.model.JudgmentType;
 import org.opensearch.searchrelevance.utils.TimeUtils;
 import org.opensearch.test.OpenSearchTestCase;
@@ -197,6 +202,68 @@ public class RetryFailedJudgmentTransportActionTests extends OpenSearchTestCase 
         assertTrue(exceptionCaptor.getValue().getMessage().contains("concurrent retry is already in progress"));
     }
 
+    public void testRetry_ForksRetryOffStatusWriteListener() {
+        List<Runnable> genericTasks = new ArrayList<>();
+        ExecutorService queuingExecutor = mock(ExecutorService.class);
+        doAnswer(invocation -> {
+            genericTasks.add(invocation.getArgument(0));
+            return null;
+        }).when(queuingExecutor).execute(any(Runnable.class));
+        when(threadPool.executor(ThreadPool.Names.GENERIC)).thenReturn(queuingExecutor);
+        SearchResponse mockResponse = buildMockSearchResponse(buildRetryableJudgmentSource());
+        when(judgmentDao.getJudgmentSync("fork-id")).thenReturn(mockResponse);
+        doAnswer(invocation -> {
+            ActionListener<IndexResponse> l = invocation.getArgument(3);
+            l.onResponse(mock(IndexResponse.class));
+            return null;
+        }).when(judgmentDao).updateJudgment(any(), anyLong(), anyLong(), any());
+
+        ActionListener<IndexResponse> listener = mock(ActionListener.class);
+        action.doExecute(null, new RetryFailedJudgmentRequest("fork-id"), listener);
+        assertEquals(1, genericTasks.size());
+        genericTasks.remove(0).run();
+
+        verify(listener).onResponse(any(IndexResponse.class));
+        verify(llmJudgmentsProcessor, never()).retryFailedDocs(any(), any(), any(), any());
+        assertEquals(1, genericTasks.size());
+
+        genericTasks.remove(0).run();
+        verify(llmJudgmentsProcessor).retryFailedDocs(any(), any(), any(), any());
+    }
+
+    public void testRetry_RetryRejectedByThreadPool_MarksJudgmentError() {
+        AtomicInteger submissions = new AtomicInteger();
+        ExecutorService rejectingExecutor = mock(ExecutorService.class);
+        doAnswer(invocation -> {
+            Runnable task = invocation.getArgument(0);
+            if (submissions.getAndIncrement() == 0) {
+                task.run();
+            } else {
+                ((AbstractRunnable) task).onRejection(new OpenSearchRejectedExecutionException("rejected"));
+            }
+            return null;
+        }).when(rejectingExecutor).execute(any(Runnable.class));
+        when(threadPool.executor(ThreadPool.Names.GENERIC)).thenReturn(rejectingExecutor);
+        SearchResponse mockResponse = buildMockSearchResponse(buildRetryableJudgmentSource());
+        when(judgmentDao.getJudgmentSync("rejected-id")).thenReturn(mockResponse);
+        doAnswer(invocation -> {
+            ActionListener<IndexResponse> l = invocation.getArgument(3);
+            l.onResponse(mock(IndexResponse.class));
+            return null;
+        }).when(judgmentDao).updateJudgment(any(), anyLong(), anyLong(), any());
+
+        ActionListener<IndexResponse> listener = mock(ActionListener.class);
+        action.doExecute(null, new RetryFailedJudgmentRequest("rejected-id"), listener);
+
+        verify(listener).onResponse(any(IndexResponse.class));
+        verify(listener, never()).onFailure(any());
+        verify(llmJudgmentsProcessor, never()).retryFailedDocs(any(), any(), any(), any());
+        ArgumentCaptor<Judgment> written = ArgumentCaptor.forClass(Judgment.class);
+        verify(judgmentDao).updateJudgment(written.capture(), any(ActionListener.class));
+        assertEquals(AsyncStatus.ERROR, written.getValue().getStatus());
+        assertEquals("rejected", written.getValue().getMetadata().get("error"));
+    }
+
     public void testRetry_NoFailures() {
         List<Map<String, Object>> judgmentRatings = new ArrayList<>();
         Map<String, Object> queryEntry = new HashMap<>();
@@ -278,6 +345,16 @@ public class RetryFailedJudgmentTransportActionTests extends OpenSearchTestCase 
         source.put("metadata", metadata);
 
         return source;
+    }
+
+    private Map<String, Object> buildRetryableJudgmentSource() {
+        Map<String, Object> queryEntry = new HashMap<>();
+        queryEntry.put("query", "superhero");
+        queryEntry.put("ratings", new ArrayList<>());
+        queryEntry.put("failures", List.of(Map.of("docId", "5")));
+        List<Map<String, Object>> judgmentRatings = new ArrayList<>();
+        judgmentRatings.add(queryEntry);
+        return buildJudgmentSource(JudgmentType.LLM_JUDGMENT.name(), AsyncStatus.COMPLETED.name(), judgmentRatings);
     }
 
     private SearchResponse buildMockSearchResponse(Map<String, Object> source) {
