@@ -11,6 +11,7 @@ import static org.opensearch.searchrelevance.common.MetricsConstants.METRICS_FIE
 import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_METRIC;
 import static org.opensearch.searchrelevance.common.MetricsConstants.PAIRWISE_FIELD_NAME_VALUE;
 import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.METRICS_DISCOUNTED_CUMULATIVE_GAIN_AT;
+import static org.opensearch.searchrelevance.metrics.calculator.Evaluation.roundToTwoDecimals;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -24,8 +25,6 @@ import java.util.Map;
  * DCG is summed; other metrics are averaged. Values are rounded to two decimals.
  */
 public final class ExperimentLevelMetrics {
-
-    private static final double MAX_ROUNDABLE = Long.MAX_VALUE / 100.0;
 
     private ExperimentLevelMetrics() {}
 
@@ -133,14 +132,5 @@ public final class ExperimentLevelMetrics {
             return false;
         }
         return map.containsKey(PAIRWISE_FIELD_NAME_METRIC) || map.containsKey(PAIRWISE_FIELD_NAME_VALUE);
-    }
-
-    private static double roundToTwoDecimals(double value) {
-        if (!Double.isFinite(value) || Math.abs(value) >= MAX_ROUNDABLE) {
-            throw new IllegalArgumentException(
-                "Metric value [" + value + "] is not a finite number that can be rounded; check per-query metrics"
-            );
-        }
-        return Math.round(value * 100.0) / 100.0;
     }
 }

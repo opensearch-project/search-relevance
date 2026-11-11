@@ -30,7 +30,7 @@ public class Evaluation {
      *
      * @throws IllegalArgumentException if the value is not finite or too large to round
      */
-    static double roundToTwoDecimals(double value) {
+    public static double roundToTwoDecimals(double value) {
         if (!Double.isFinite(value) || Math.abs(value) >= MAX_ROUNDABLE) {
             throw new IllegalArgumentException(
                 "Metric value [" + value + "] is not a finite number that can be rounded; check the judgment ratings"

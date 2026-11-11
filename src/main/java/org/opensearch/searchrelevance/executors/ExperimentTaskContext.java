@@ -215,19 +215,17 @@ public class ExperimentTaskContext {
         return results;
     }
 
-    @SuppressWarnings("unchecked")
     private static void putEvaluationFields(Map<String, Object> result, Object variantValue) {
-        if (variantValue instanceof Map<?, ?> variantResult) {
-            Object evaluationId = variantResult.get(POINTWISE_FIELD_NAME_EVALUATION_ID);
-            if (evaluationId != null) {
-                result.put(POINTWISE_FIELD_NAME_EVALUATION_ID, evaluationId);
-            }
-            Object metrics = variantResult.get(METRICS_FIELD_NAME);
-            if (metrics instanceof List<?>) {
-                result.put(METRICS_FIELD_NAME, metrics);
-            }
-        } else if (variantValue != null) {
-            result.put(POINTWISE_FIELD_NAME_EVALUATION_ID, variantValue);
+        if (!(variantValue instanceof Map<?, ?> variantResult)) {
+            return;
+        }
+        Object evaluationId = variantResult.get(POINTWISE_FIELD_NAME_EVALUATION_ID);
+        if (evaluationId != null) {
+            result.put(POINTWISE_FIELD_NAME_EVALUATION_ID, evaluationId);
+        }
+        Object metrics = variantResult.get(METRICS_FIELD_NAME);
+        if (metrics instanceof List<?>) {
+            result.put(METRICS_FIELD_NAME, metrics);
         }
     }
 }
