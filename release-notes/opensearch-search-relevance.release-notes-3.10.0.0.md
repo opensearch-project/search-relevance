@@ -4,31 +4,29 @@ Compatible with OpenSearch and OpenSearch Dashboards version 3.10.0
 
 ### Features
 
+* Add LLM-as-a-judge demo script with local Ollama and OpenAI connector support ([#322](https://github.com/opensearch-project/search-relevance/pull/322))
 * Persist per-query search latency (`tookMs`) on experiment results for performance visibility ([#593](https://github.com/opensearch-project/search-relevance/pull/593))
 
 ### Enhancements
 
 * Make `%queryText%` the default query placeholder and deprecate `%SearchText%` with backward-compatible fallback ([#613](https://github.com/opensearch-project/search-relevance/pull/613))
+* Validate manual judgment rating edits on the server, rejecting non-finite and out-of-range values, capping requests at 1000 adjustments, and failing metric evaluation loudly on bad stored ratings ([#601](https://github.com/opensearch-project/search-relevance/pull/601))
+* Simplify model-group registration in `demo_hybrid_optimizer.sh` using idempotent register pattern ([#629](https://github.com/opensearch-project/search-relevance/pull/629))
 
 ### Bug Fixes
 
-* Add missing `slf4j-api` runtime dependency so LLM judgment no longer crashes the node with `NoClassDefFoundError` on the first completed remote-model predict call ([#322](https://github.com/opensearch-project/search-relevance/pull/322))
-* Validate manual judgment rating edits on the server, rejecting non-finite and out-of-range values that previously broke metric evaluation ([#601](https://github.com/opensearch-project/search-relevance/pull/601))
-* Force jspecify 1.0.1 to fix dependency version conflict ([#602](https://github.com/opensearch-project/search-relevance/pull/602))
+* Force jspecify 1.0.1 to resolve dependency version conflict ([#602](https://github.com/opensearch-project/search-relevance/pull/602))
+* Fix GitHub Pages build failure caused by unsupported Liquid include tags in design documentation ([#633](https://github.com/opensearch-project/search-relevance/pull/633))
 
 ### Infrastructure
 
-* Simplify model-group registration in `demo_hybrid_optimizer.sh` using idempotent register pattern ([#629](https://github.com/opensearch-project/search-relevance/pull/629))
 * Suppress javadoc missing-comment warnings for internal classes while preserving real error detection ([#628](https://github.com/opensearch-project/search-relevance/pull/628))
-* Update `systemProp.bwc.bundle.version` on minor version bumps ([#598](https://github.com/opensearch-project/search-relevance/pull/598))
 
 ### Documentation
 
-* Add KNOWN_ISSUES.md documenting known issues and workarounds ([#635](https://github.com/opensearch-project/search-relevance/pull/635))
-* Fix broken search relevance documentation link in the README ([#603](https://github.com/opensearch-project/search-relevance/pull/603))
+* Add KNOWN_ISSUES.md file documenting known issues and workarounds ([#635](https://github.com/opensearch-project/search-relevance/pull/635))
+* Fix broken search relevance documentation link in README ([#603](https://github.com/opensearch-project/search-relevance/pull/603))
 * Document repository best practices for contributors and maintainers ([#621](https://github.com/opensearch-project/search-relevance/pull/621))
-* Add `demo_llm_as_judge.sh`, an LLM-as-a-judge demo script with local Ollama and OpenAI connector support ([#322](https://github.com/opensearch-project/search-relevance/pull/322))
-* Fix GitHub Pages build by removing unsupported Liquid include tags and update design doc to reflect shipped implementation ([#633](https://github.com/opensearch-project/search-relevance/pull/633))
 
 ### Maintenance
 
