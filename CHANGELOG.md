@@ -15,6 +15,7 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 - Add SPDX license header checker and missing headers ([#574](https://github.com/opensearch-project/search-relevance/pull/574))
 - Attach a normalization search pipeline to the `hybrid_query_1` search configuration in `demo.sh` so evaluations using it no longer produce NDCG values above 1 from repeated unnormalized hybrid hits ([#639](https://github.com/opensearch-project/search-relevance/pull/639))
 - Rescale the ESCI demo judgments (`esci_us_judgments.json`) from 0/1/10/100 to a graded 0–3 scale so DCG@K no longer overflows and demo experiments evaluate every query ([#640](https://github.com/opensearch-project/search-relevance/pull/640))
+- Remove the stale `error_prone_annotations` version force in `build.gradle`; nothing in the dependency graph conflicts on it anymore ([#660](https://github.com/opensearch-project/search-relevance/pull/660))
 
 ### Documentation
 
