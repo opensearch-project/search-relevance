@@ -10,6 +10,7 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 - Register the scheduled experiment jobs and history indices as system indices. ([#638](https://github.com/opensearch-project/search-relevance/pull/638))
 
 ### Bug Fixes
+- Run the judgment retry on the generic thread pool so it no longer blocks a transport thread ([#656](https://github.com/opensearch-project/search-relevance/pull/656))
 
 ### Infrastructure
 - Add SPDX license header checker and missing headers ([#574](https://github.com/opensearch-project/search-relevance/pull/574))
