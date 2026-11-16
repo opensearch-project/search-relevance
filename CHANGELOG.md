@@ -10,6 +10,9 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 - Register the scheduled experiment jobs and history indices as system indices. ([#638](https://github.com/opensearch-project/search-relevance/pull/638))
 
 ### Bug Fixes
+* Reject imported judgment ratings outside 0–40, which overflow DCG@K or produce negative gain, at the request boundary before creating a judgment, using the same numeric precision as evaluation ([#627](https://github.com/opensearch-project/search-relevance/issues/627))
+* Validate manual judgment rating edits on the server ([#601](https://github.com/opensearch-project/search-relevance/pull/601))
+* Add missing `slf4j-api` runtime dependency so LLM_JUDGMENT no longer crashes the node with `NoClassDefFoundError` on the first completed remote-model predict call ([#322](https://github.com/opensearch-project/search-relevance/pull/322))
 
 ### Infrastructure
 - Add SPDX license header checker and missing headers ([#574](https://github.com/opensearch-project/search-relevance/pull/574))
