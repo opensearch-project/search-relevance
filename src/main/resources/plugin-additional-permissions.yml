@@ -10,9 +10,11 @@
 # against these indices in addition to the per-item action, so it is granted alongside them. Only
 # literal action names and wildcards take effect here; action-group names match no action.
 #
-# The cluster_permissions key must be present even when empty, because the security plugin appends
-# the bulk action to whatever list is parsed here, and an absent key leaves an immutable empty one.
-cluster_permissions: []
+# A delete by query scrolls through the documents it deletes and frees the scroll context when it
+# finishes. The security plugin classifies both actions as cluster permissions.
+cluster_permissions:
+  - "indices:data/read/scroll"
+  - "indices:data/read/scroll/clear"
 
 index_permissions:
   - index_patterns:
@@ -28,4 +30,5 @@ index_permissions:
       - "indices:data/write/index"
       - "indices:data/write/update"
       - "indices:data/write/delete"
+      - "indices:data/write/delete/byquery"
       - "indices:data/write/bulk*"
