@@ -145,7 +145,7 @@ public class DeleteExperimentTransportActionTests extends OpenSearchTestCase {
         verify(experimentDao, never()).deleteExperiment(any(), any(ActionListener.class));
     }
 
-    public void testEvaluationResultDeletionWithBulkFailures() {
+    public void testEvaluationResultBulkFailuresDoNotSendASecondResponse() {
         String experimentId = "test-experiment-id";
         OpenSearchDocRequest request = new OpenSearchDocRequest(experimentId);
 
@@ -167,16 +167,12 @@ public class DeleteExperimentTransportActionTests extends OpenSearchTestCase {
         ActionListener<DeleteResponse> responseListener = mock(ActionListener.class);
         transportAction.doExecute(null, request, responseListener);
 
-        ArgumentCaptor<Exception> exceptionCaptor = ArgumentCaptor.forClass(Exception.class);
-        verify(responseListener).onFailure(exceptionCaptor.capture());
-
-        Exception exception = exceptionCaptor.getValue();
-        assertTrue(exception instanceof SearchRelevanceException);
-        assertTrue(exception.getMessage().contains("Failed to delete the evaluation results"));
-        assertTrue(exception.getMessage().contains("due to failures in deleting evaluation results"));
+        // The experiment delete has answered; a cleanup failure must not send a second response.
+        verify(responseListener).onResponse(mockDeleteResponse);
+        verify(responseListener, never()).onFailure(any());
     }
 
-    public void testEvaluationResultDeletionWithSearchFailures() {
+    public void testEvaluationResultSearchFailuresDoNotSendASecondResponse() {
         String experimentId = "test-experiment-id";
         OpenSearchDocRequest request = new OpenSearchDocRequest(experimentId);
 
@@ -198,16 +194,12 @@ public class DeleteExperimentTransportActionTests extends OpenSearchTestCase {
         ActionListener<DeleteResponse> responseListener = mock(ActionListener.class);
         transportAction.doExecute(null, request, responseListener);
 
-        ArgumentCaptor<Exception> exceptionCaptor = ArgumentCaptor.forClass(Exception.class);
-        verify(responseListener).onFailure(exceptionCaptor.capture());
-
-        Exception exception = exceptionCaptor.getValue();
-        assertTrue(exception instanceof SearchRelevanceException);
-        assertTrue(exception.getMessage().contains("Failed to delete the evaluation results"));
-        assertTrue(exception.getMessage().contains("due to failures in deleting evaluation results"));
+        // The experiment delete has answered; a cleanup failure must not send a second response.
+        verify(responseListener).onResponse(mockDeleteResponse);
+        verify(responseListener, never()).onFailure(any());
     }
 
-    public void testExperimentVariantDeletionWithBulkFailures() {
+    public void testExperimentVariantBulkFailuresDoNotSendASecondResponse() {
         String experimentId = "test-experiment-id";
         OpenSearchDocRequest request = new OpenSearchDocRequest(experimentId);
 
@@ -236,16 +228,12 @@ public class DeleteExperimentTransportActionTests extends OpenSearchTestCase {
         ActionListener<DeleteResponse> responseListener = mock(ActionListener.class);
         transportAction.doExecute(null, request, responseListener);
 
-        ArgumentCaptor<Exception> exceptionCaptor = ArgumentCaptor.forClass(Exception.class);
-        verify(responseListener).onFailure(exceptionCaptor.capture());
-
-        Exception exception = exceptionCaptor.getValue();
-        assertTrue(exception instanceof SearchRelevanceException);
-        assertTrue(exception.getMessage().contains("Failed to delete experiment"));
-        assertTrue(exception.getMessage().contains("due to failures in deleting experiment variants"));
+        // The experiment delete has answered; a cleanup failure must not send a second response.
+        verify(responseListener).onResponse(mockDeleteResponse);
+        verify(responseListener, never()).onFailure(any());
     }
 
-    public void testExperimentVariantDeletionWithSearchFailures() {
+    public void testExperimentVariantSearchFailuresDoNotSendASecondResponse() {
         String experimentId = "test-experiment-id";
         OpenSearchDocRequest request = new OpenSearchDocRequest(experimentId);
 
@@ -274,13 +262,9 @@ public class DeleteExperimentTransportActionTests extends OpenSearchTestCase {
         ActionListener<DeleteResponse> responseListener = mock(ActionListener.class);
         transportAction.doExecute(null, request, responseListener);
 
-        ArgumentCaptor<Exception> exceptionCaptor = ArgumentCaptor.forClass(Exception.class);
-        verify(responseListener).onFailure(exceptionCaptor.capture());
-
-        Exception exception = exceptionCaptor.getValue();
-        assertTrue(exception instanceof SearchRelevanceException);
-        assertTrue(exception.getMessage().contains("Failed to delete experiment"));
-        assertTrue(exception.getMessage().contains("due to failures in deleting experiment variants"));
+        // The experiment delete has answered; a cleanup failure must not send a second response.
+        verify(responseListener).onResponse(mockDeleteResponse);
+        verify(responseListener, never()).onFailure(any());
     }
 
     public void testEvaluationResultDeletionFailureDoesNotStopOtherDeletions() {

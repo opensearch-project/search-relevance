@@ -7,6 +7,7 @@
  */
 package org.opensearch.searchrelevance.security;
 
+import static org.opensearch.searchrelevance.common.PluginConstants.BATCH_SIZE_FOR_DELETE_BY_QUERY;
 import static org.opensearch.searchrelevance.common.PluginConstants.EXPERIMENTS_URI;
 import static org.opensearch.searchrelevance.common.PluginConstants.JUDGMENTS_URL;
 
@@ -24,6 +25,7 @@ import org.apache.hc.client5.http.ssl.NoopHostnameVerifier;
 import org.apache.hc.core5.http.HttpHost;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.ssl.SSLContextBuilder;
+import org.junit.After;
 import org.junit.Before;
 import org.opensearch.client.Request;
 import org.opensearch.client.Response;
@@ -46,6 +48,23 @@ public class PluginOwnedIndexAccessSecurityIT extends BaseSearchRelevanceIT {
     private static final String PASSWORD = "Search-Relevance-Test-7!";
     private static final String EXPERIMENT_ID = "experiment1";
 
+    @After
+    public void deleteUser() throws IOException {
+        if (!isHttps()) {
+            return;
+        }
+        for (String resource : List.of("rolesmapping", "internalusers", "roles")) {
+            Request delete = new Request("DELETE", "/_plugins/_security/api/" + resource + "/" + USER);
+            try {
+                adminClient().performRequest(delete);
+            } catch (ResponseException e) {
+                if (e.getResponse().getStatusLine().getStatusCode() != 404) {
+                    throw e;
+                }
+            }
+        }
+    }
+
     @Before
     public void createUser() throws IOException {
         assumeTrue("Security-enabled test cluster required", isHttps());
@@ -61,18 +80,32 @@ public class PluginOwnedIndexAccessSecurityIT extends BaseSearchRelevanceIT {
     }
 
     public void testDeletingAnExperimentDeletesItsResultsAndVariants() throws Exception {
-        for (SearchRelevanceIndices index : List.of(SearchRelevanceIndices.EVALUATION_RESULT, SearchRelevanceIndices.EXPERIMENT_VARIANT)) {
-            createIndex(index);
-            Request doc = new Request("PUT", "/" + index.getIndexName() + "/_doc/" + index.name().toLowerCase(java.util.Locale.ROOT));
-            doc.addParameter("refresh", "true");
-            doc.setJsonEntity("{\"experimentId\":\"" + EXPERIMENT_ID + "\"}");
-            client().performRequest(doc);
+        // More evaluation results than one delete by query batch, so the delete has to scroll to a second page.
+        Map<SearchRelevanceIndices, Integer> documents = Map.of(
+            SearchRelevanceIndices.EVALUATION_RESULT,
+            BATCH_SIZE_FOR_DELETE_BY_QUERY + 1,
+            SearchRelevanceIndices.EXPERIMENT_VARIANT,
+            1
+        );
+        for (Map.Entry<SearchRelevanceIndices, Integer> entry : documents.entrySet()) {
+            createIndex(entry.getKey());
+            StringBuilder bulk = new StringBuilder();
+            for (int i = 0; i < entry.getValue(); i++) {
+                bulk.append("{\"index\":{}}\n{\"experimentId\":\"").append(EXPERIMENT_ID).append("\"}\n");
+            }
+            Request request = new Request("POST", "/" + entry.getKey().getIndexName() + "/_bulk");
+            request.addParameter("refresh", "true");
+            request.setJsonEntity(bulk.toString());
+            Map<String, Object> response = entityAsMap(client().performRequest(request));
+            assertEquals("bulk errors: " + response, false, response.get("errors"));
+            assertEquals((long) entry.getValue(), count(entry.getKey()));
         }
 
         Response response = asUser("DELETE", EXPERIMENTS_URI + "/" + EXPERIMENT_ID, null);
         assertNotEquals("the user may delete experiments: " + body(response), 403, response.getStatusLine().getStatusCode());
 
-        // The results and variants are deleted after the response, and a failed delete is only logged.
+        // The results and variants are deleted after the response, and a failed delete is only logged. A failed
+        // scroll clear at the end of the delete is only logged too, so this test cannot see it.
         assertBusy(() -> {
             for (SearchRelevanceIndices index : List.of(
                 SearchRelevanceIndices.EVALUATION_RESULT,
