@@ -29,6 +29,10 @@ public class PluginAdditionalPermissionsTests extends OpenSearchTestCase {
         assertTrue("an absent key leaves an immutable list", load().get("cluster_permissions") instanceof List);
     }
 
+    public void testGrantsTheScrollActionsOfADeleteByQuery() throws Exception {
+        assertEquals(List.of("indices:data/read/scroll", "indices:data/read/scroll/clear"), load().get("cluster_permissions"));
+    }
+
     @SuppressWarnings("unchecked")
     public void testGrantsExactlyTheActionsThePluginClientSends() throws Exception {
         // Index, update and delete also run on the shard as indices:data/write/bulk[s].
@@ -39,6 +43,7 @@ public class PluginAdditionalPermissionsTests extends OpenSearchTestCase {
             "indices:data/write/index",
             "indices:data/write/update",
             "indices:data/write/delete",
+            "indices:data/write/delete/byquery",
             "indices:data/write/bulk*"
         );
         for (Map<String, Object> grant : indexPermissions()) {

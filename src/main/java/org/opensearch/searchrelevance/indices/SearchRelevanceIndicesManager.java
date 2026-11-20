@@ -65,19 +65,16 @@ import reactor.util.annotation.NonNull;
 public class SearchRelevanceIndicesManager {
 
     private final ClusterService clusterService;
-    private final Client client;
     private final Client pluginClient;
 
     /**
      * Creates the manager for the search relevance indices.
      *
      * @param clusterService reads index metadata from the cluster state
-     * @param client runs as the caller, so it is evaluated against the caller's own privileges
      * @param pluginClient runs as the plugin subject, which is what grants access to the indices this plugin owns
      */
-    public SearchRelevanceIndicesManager(@NonNull ClusterService clusterService, @NonNull Client client, @NonNull Client pluginClient) {
+    public SearchRelevanceIndicesManager(@NonNull ClusterService clusterService, @NonNull Client pluginClient) {
         this.clusterService = clusterService;
-        this.client = client;
         this.pluginClient = pluginClient;
     }
 
@@ -336,7 +333,7 @@ public class SearchRelevanceIndicesManager {
             .seqNoAndPrimaryTerm(true);
         searchRequest.source(sourceBuilder);
 
-        return client.search(searchRequest).actionGet();
+        return pluginClient.search(searchRequest).actionGet();
     }
 
     /**
@@ -720,8 +717,8 @@ public class SearchRelevanceIndicesManager {
     }
 
     /**
-     * Deletes the documents whose field equals the given value. On a system index the request runs as the
-     * plugin subject, because the caller has no direct write access there; elsewhere it runs as the caller.
+     * Deletes the documents whose field equals the given value, as the plugin subject, like every other
+     * operation on the plugin's own indices.
      * @param fieldId the value the field must equal
      * @param fieldName the field to match
      * @param index the index to delete from
@@ -738,8 +735,7 @@ public class SearchRelevanceIndicesManager {
         deleteByQueryRequest.setBatchSize(BATCH_SIZE_FOR_DELETE_BY_QUERY);
         deleteByQueryRequest.setQuery(QueryBuilders.termQuery(fieldName, fieldId));
 
-        Client deleteClient = index.isSystemIndex() ? pluginClient : client;
-        deleteClient.execute(DeleteByQueryAction.INSTANCE, deleteByQueryRequest, listener);
+        pluginClient.execute(DeleteByQueryAction.INSTANCE, deleteByQueryRequest, listener);
     }
 
     /**
