@@ -15,10 +15,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
-import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.EVALUATION_RESULT;
-import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.EXPERIMENT_VARIANT;
 import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.QUERY_SET;
 import static org.opensearch.searchrelevance.indices.SearchRelevanceIndices.SCHEDULED_EXPERIMENT_HISTORY;
 
@@ -85,8 +82,6 @@ import org.opensearch.transport.client.IndicesAdminClient;
 
 public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
     @Mock
-    private Client client;
-    @Mock
     private Client pluginClient;
     @Mock
     private ClusterService clusterService;
@@ -114,13 +109,11 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         when(pluginClient.admin()).thenReturn(adminClient);
         when(adminClient.indices()).thenReturn(indicesAdminClient);
 
-        indicesManager = new SearchRelevanceIndicesManager(clusterService, client, pluginClient);
+        indicesManager = new SearchRelevanceIndicesManager(clusterService, pluginClient);
     }
 
     @Override
     public void tearDown() throws Exception {
-        // Every operation these tests drive must run as the plugin subject, never on the caller's client.
-        verifyNoInteractions(client);
         super.tearDown();
         openMocks.close();
     }
@@ -998,26 +991,37 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         assertTrue(exceptionCaptor.getValue().getMessage().contains("Index cannot be null"));
     }
 
-    public void testDeleteByQueryRunsAsThePluginSubjectOnlyOnSystemIndices() {
-        assertTrue(SCHEDULED_EXPERIMENT_HISTORY.isSystemIndex());
-        assertFalse(EVALUATION_RESULT.isSystemIndex());
-        assertFalse(EXPERIMENT_VARIANT.isSystemIndex());
+    public void testDeleteByQueryRunsAsThePluginSubjectOnEveryIndex() {
         for (SearchRelevanceIndices index : SearchRelevanceIndices.values()) {
-            Client caller = mock(Client.class);
             Client plugin = mock(Client.class);
-            SearchRelevanceIndicesManager manager = new SearchRelevanceIndicesManager(clusterService, caller, plugin);
+            SearchRelevanceIndicesManager manager = new SearchRelevanceIndicesManager(clusterService, plugin);
             @SuppressWarnings("unchecked")
             ActionListener<BulkByScrollResponse> listener = mock(ActionListener.class);
 
             manager.deleteByQuery("experiment-id", "experimentId", index, listener);
 
-            Client expected = index.isSystemIndex() ? plugin : caller;
             ArgumentCaptor<DeleteByQueryRequest> request = ArgumentCaptor.forClass(DeleteByQueryRequest.class);
-            verify(expected).execute(eq(DeleteByQueryAction.INSTANCE), request.capture(), same(listener));
+            verify(plugin).execute(eq(DeleteByQueryAction.INSTANCE), request.capture(), same(listener));
             assertArrayEquals(index.getIndexName(), new String[] { index.getIndexName() }, request.getValue().indices());
             assertEquals(QueryBuilders.termQuery("experimentId", "experiment-id"), request.getValue().getSearchRequest().source().query());
-            verifyNoInteractions(index.isSystemIndex() ? caller : plugin);
         }
+    }
+
+    public void testGetDocByDocIdSyncSearchesAsThePluginSubject() {
+        Client plugin = mock(Client.class);
+        @SuppressWarnings("unchecked")
+        org.opensearch.common.action.ActionFuture<SearchResponse> future = mock(org.opensearch.common.action.ActionFuture.class);
+        SearchResponse response = mock(SearchResponse.class);
+        when(future.actionGet()).thenReturn(response);
+        when(plugin.search(any(SearchRequest.class))).thenReturn(future);
+        SearchRelevanceIndicesManager manager = new SearchRelevanceIndicesManager(clusterService, plugin);
+
+        assertSame(response, manager.getDocByDocIdSync("doc-id", QUERY_SET));
+
+        ArgumentCaptor<SearchRequest> request = ArgumentCaptor.forClass(SearchRequest.class);
+        verify(plugin).search(request.capture());
+        assertArrayEquals(new String[] { QUERY_SET.getIndexName() }, request.getValue().indices());
+        assertEquals(QueryBuilders.termQuery("_id", "doc-id"), request.getValue().source().query());
     }
 
     public void testDeleteByQueryOnSystemIndexRunsOutsideTheCallerContextAndAnswersInIt() throws Exception {
@@ -1036,7 +1040,7 @@ public class SearchRelevanceIndicesManagerTests extends OpenSearchTestCase {
         }).when(nodeClient).execute(eq(DeleteByQueryAction.INSTANCE), any(DeleteByQueryRequest.class), any());
         PluginClient plugin = new PluginClient(nodeClient);
         plugin.setSubject(new StashingSubject(threadContext));
-        SearchRelevanceIndicesManager manager = new SearchRelevanceIndicesManager(clusterService, client, plugin);
+        SearchRelevanceIndicesManager manager = new SearchRelevanceIndicesManager(clusterService, plugin);
 
         CompletableFuture<String> callerSeenByListener = new CompletableFuture<>();
         ActionListener<BulkByScrollResponse> listener = ActionListener.wrap(

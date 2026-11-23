@@ -72,69 +72,11 @@ public class DeleteExperimentTransportAction extends HandledTransportAction<Open
             // variants etc.
             experimentDao.deleteExperiment(experimentId, listener);
 
-            // 2. Delete evaluation results corresponding to the experiment.
-            evaluationResultDao.deleteEvaluationResultByExperimentId(experimentId, new ActionListener<>() {
-                @Override
-                public void onResponse(BulkByScrollResponse bulkByScrollResponse) {
-                    if (hasBulkFailures(bulkByScrollResponse)) {
-                        listener.onFailure(
-                            new SearchRelevanceException(
-                                "Failed to delete the evaluation results of the experiment, due to failures in deleting evaluation results "
-                                    + bulkByScrollResponse.getBulkFailures(),
-                                RestStatus.INTERNAL_SERVER_ERROR
-                            )
-                        );
-                    }
-
-                    if (hasSearchFailures(bulkByScrollResponse)) {
-                        listener.onFailure(
-                            new SearchRelevanceException(
-                                "Failed to delete the evaluation results of the experiment, due to failures in deleting evaluation results "
-                                    + bulkByScrollResponse.getSearchFailures(),
-                                RestStatus.INTERNAL_SERVER_ERROR
-                            )
-                        );
-                    }
-                }
-
-                // In case of the index does not exist, it results in a failure.
-                @Override
-                public void onFailure(Exception e) {
-                    log.error("Failed to delete evaluation results for experiment [{}]", experimentId, e);
-                }
-            });
-
-            // 3. Delete Experiment Variants corresponding to the experiment.
-            experimentVariantDao.deleteExperimentVariantByExperimentId(experimentId, new ActionListener<>() {
-                @Override
-                public void onResponse(BulkByScrollResponse bulkByScrollResponse) {
-                    if (hasBulkFailures(bulkByScrollResponse)) {
-                        listener.onFailure(
-                            new SearchRelevanceException(
-                                "Failed to delete experiment, due to failures in deleting experiment variants "
-                                    + bulkByScrollResponse.getBulkFailures(),
-                                RestStatus.INTERNAL_SERVER_ERROR
-                            )
-                        );
-                    }
-
-                    if (hasSearchFailures(bulkByScrollResponse)) {
-                        listener.onFailure(
-                            new SearchRelevanceException(
-                                "Failed to delete experiment, due to failures in deleting experiment variants "
-                                    + bulkByScrollResponse.getSearchFailures(),
-                                RestStatus.INTERNAL_SERVER_ERROR
-                            )
-                        );
-                    }
-                }
-
-                // In case of the index does not exist, it results in a failure.
-                @Override
-                public void onFailure(Exception e) {
-                    log.error("Failed to delete experiment variants results for experiment [{}]", experimentId, e);
-                }
-            });
+            // 2 and 3. Delete the evaluation results and experiment variants of the experiment. The response comes from the
+            // experiment delete above, so these only log what they could not delete: answering the listener here as well
+            // would send a second response. A missing index also ends here as a failure.
+            evaluationResultDao.deleteEvaluationResultByExperimentId(experimentId, logFailures("evaluation results", experimentId));
+            experimentVariantDao.deleteExperimentVariantByExperimentId(experimentId, logFailures("experiment variants", experimentId));
 
             // 4. Delete schedule jobs corresponding to the experiment.
             scheduledJobsDao.deleteScheduledJob(experimentId, new ActionListener<>() {
@@ -160,6 +102,17 @@ public class DeleteExperimentTransportAction extends HandledTransportAction<Open
         } catch (Exception e) {
             listener.onFailure(e);
         }
+    }
+
+    private ActionListener<BulkByScrollResponse> logFailures(String what, String experimentId) {
+        return ActionListener.wrap(response -> {
+            if (hasBulkFailures(response)) {
+                log.error("Failed to delete the {} of experiment [{}]: {}", what, experimentId, response.getBulkFailures());
+            }
+            if (hasSearchFailures(response)) {
+                log.error("Failed to delete the {} of experiment [{}]: {}", what, experimentId, response.getSearchFailures());
+            }
+        }, e -> log.error("Failed to delete the {} of experiment [{}]", what, experimentId, e));
     }
 
     private boolean hasBulkFailures(BulkByScrollResponse bulkByScrollResponse) {

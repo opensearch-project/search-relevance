@@ -232,7 +232,7 @@ public class SearchRelevancePlugin extends Plugin
         this.pluginClient = new PluginClient(client);
         this.clusterService = clusterService;
         this.scriptService = scriptService;
-        this.searchRelevanceIndicesManager = new SearchRelevanceIndicesManager(clusterService, client, pluginClient);
+        this.searchRelevanceIndicesManager = new SearchRelevanceIndicesManager(clusterService, pluginClient);
         this.experimentDao = new ExperimentDao(searchRelevanceIndicesManager);
         this.experimentVariantDao = new ExperimentVariantDao(searchRelevanceIndicesManager);
         this.querySetDao = new QuerySetDao(searchRelevanceIndicesManager);
