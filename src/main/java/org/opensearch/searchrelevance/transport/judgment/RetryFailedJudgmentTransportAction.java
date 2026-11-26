@@ -24,6 +24,7 @@ import org.opensearch.action.support.ActionFilters;
 import org.opensearch.action.support.HandledTransportAction;
 import org.opensearch.action.support.PlainActionFuture;
 import org.opensearch.common.inject.Inject;
+import org.opensearch.common.util.concurrent.AbstractRunnable;
 import org.opensearch.core.action.ActionListener;
 import org.opensearch.core.rest.RestStatus;
 import org.opensearch.index.engine.VersionConflictEngineException;
@@ -208,7 +209,17 @@ public class RetryFailedJudgmentTransportAction extends HandledTransportAction<R
             // we surface as 409 so only one retry proceeds. On success, return 200 and start the retry.
             judgmentDao.updateJudgment(retryingJudgment, seqNo, primaryTerm, ActionListener.wrap(updateResponse -> {
                 listener.onResponse((IndexResponse) updateResponse);
-                retryFailedDocsAsync(judgmentId, name, metadata, judgmentRatings, failedQueriesMap);
+                threadPool.executor(ThreadPool.Names.GENERIC).execute(new AbstractRunnable() {
+                    @Override
+                    protected void doRun() {
+                        retryFailedDocsAsync(judgmentId, name, metadata, judgmentRatings, failedQueriesMap);
+                    }
+
+                    @Override
+                    public void onFailure(Exception e) {
+                        markJudgmentAsError(judgmentId, name, metadata, judgmentRatings, e);
+                    }
+                });
             }, error -> {
                 if (error instanceof VersionConflictEngineException) {
                     listener.onFailure(
