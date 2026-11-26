@@ -21,10 +21,12 @@ import org.opensearch.searchrelevance.exception.SearchRelevanceException;
 import org.opensearch.searchrelevance.model.JudgmentType;
 import org.opensearch.searchrelevance.stats.events.EventStatName;
 import org.opensearch.searchrelevance.stats.events.EventStatsManager;
+import org.opensearch.searchrelevance.utils.ImportJudgmentRatingValidator;
 import org.opensearch.transport.client.Client;
 
 public class ImportJudgmentsProcessor implements BaseJudgmentsProcessor {
     private static final Logger LOGGER = LogManager.getLogger(ImportJudgmentsProcessor.class);
+
     private final Client client;
 
     @Inject
@@ -79,26 +81,11 @@ public class ImportJudgmentsProcessor implements BaseJudgmentsProcessor {
                     );
                     return;
                 }
-                if (ratingObj == null) {
-                    listener.onFailure(
-                        new SearchRelevanceException("rating for queryText " + queryText + " must not be null", RestStatus.BAD_REQUEST)
-                    );
-                    return;
-                }
-
                 String rating = String.valueOf(ratingObj);
                 try {
-                    // parseFloat accepts "NaN" and "Infinity"; reject them so they cannot fail evaluation later.
-                    if (!Float.isFinite(Float.parseFloat(rating))) {
-                        throw new NumberFormatException("non-finite rating: " + rating);
-                    }
-                } catch (NumberFormatException e) {
-                    listener.onFailure(
-                        new SearchRelevanceException(
-                            "rating '" + rating + "' for queryText " + queryText + " must be a valid float",
-                            RestStatus.BAD_REQUEST
-                        )
-                    );
+                    ImportJudgmentRatingValidator.validate(ratingObj, queryText);
+                } catch (SearchRelevanceException e) {
+                    listener.onFailure(e);
                     return;
                 }
 

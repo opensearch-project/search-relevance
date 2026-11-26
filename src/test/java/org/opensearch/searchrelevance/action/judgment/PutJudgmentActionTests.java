@@ -65,6 +65,18 @@ public class PutJudgmentActionTests extends OpenSearchTestCase {
         assertNull(request.validate());
     }
 
+    public void testImportValidationAcceptsBoundariesAndNumericRatings() {
+        for (Object rating : List.of("0", "40", "0.5", 0, 40, 0.5)) {
+            PutImportJudgmentRequest request = new PutImportJudgmentRequest(
+                JudgmentType.IMPORT_JUDGMENT,
+                "name",
+                "description",
+                List.of(Map.of("query", "test query", "ratings", List.of(Map.of("docId", "doc1", "rating", rating))))
+            );
+            assertNull("rating '" + rating + "' must be accepted", request.validate());
+        }
+    }
+
     public void testImportJudgementStream() throws IOException {
 
         // Add entries for "red dress" query
