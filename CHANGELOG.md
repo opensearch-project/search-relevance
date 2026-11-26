@@ -17,6 +17,7 @@ Inspired from [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 - Rescale the ESCI demo judgments (`esci_us_judgments.json`) from 0/1/10/100 to a graded 0–3 scale so DCG@K no longer overflows and demo experiments evaluate every query ([#640](https://github.com/opensearch-project/search-relevance/pull/640))
 
 ### Documentation
+- Add LTR model registry design doc ([#582](https://github.com/opensearch-project/search-relevance/pull/582))
 
 ### Maintenance
 
